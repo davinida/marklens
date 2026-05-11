@@ -1,0 +1,151 @@
+# ============================================
+# MarkLens .gitignore
+# ============================================
+
+# ============================================
+# AI Tool Local Files
+# ============================================
+# CLAUDE.md는 로컬 전용 (Claude Code 가이드)
+CLAUDE.md
+
+# ============================================
+# Python
+# ============================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ============================================
+# Node.js / Next.js
+# ============================================
+node_modules/
+.next/
+out/
+build/
+.swc/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Dependency
+package-lock.json.bak
+
+# ============================================
+# ML Data (Large Files, Don't Commit)
+# ============================================
+# 이미지 데이터
+ml/data/images/
+ml/data/raw/
+ml/data/processed/
+
+# FAISS 인덱스 파일
+ml/data/index/
+*.index
+*.faiss
+
+# 모델 가중치
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# 임베딩 캐시
+*.npy
+*.npz
+*.pkl
+
+# ============================================
+# Environment Variables
+# ============================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# API 키
+secrets/
+*.key
+*.pem
+
+# ============================================
+# IDE / Editor
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================
+# OS
+# ============================================
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+
+# ============================================
+# Database
+# ============================================
+*.db
+*.sqlite
+*.sqlite3
+
+# ============================================
+# Temporary Files
+# ============================================
+tmp/
+temp/
+*.tmp
+*.bak
