@@ -3,6 +3,9 @@ CLIP 기반 이미지 임베딩 생성 모듈.
 
 이 모듈은 이미지를 OpenCLIP ViT-B/32 모델에 통과시켜
 512차원 벡터(임베딩)로 변환하는 함수를 제공합니다.
+
+내부적으로 preprocess_image()를 호출하여 EXIF 회전, 알파 채널 처리,
+크기 검증 등 안전한 전처리를 자동으로 수행합니다.
 """
 
 from pathlib import Path
@@ -12,6 +15,8 @@ import numpy as np
 import torch
 import open_clip
 from PIL import Image
+
+from src.preprocess import preprocess_image
 
 
 # 사용할 CLIP 모델 아키텍처
@@ -65,14 +70,18 @@ def _load_model() -> tuple:
     return _model, _preprocess
 
 
-def encode_image(image: Union[str, Path, Image.Image]) -> np.ndarray:
+def encode_image(image: Union[str, Path, bytes, Image.Image]) -> np.ndarray:
     """
     이미지를 CLIP 임베딩 벡터로 변환합니다.
 
+    내부적으로 preprocess_image()를 호출하여 EXIF 회전 보정,
+    알파 채널 처리, 크기 검증을 자동으로 수행합니다.
+
     Args:
-        image: 다음 중 하나
+        image: 다음 중 하나:
             - str: 이미지 파일 경로
             - Path: 이미지 파일 경로 객체
+            - bytes: 이미지 바이트 데이터 (FastAPI 업로드 등)
             - PIL.Image.Image: 이미 열린 PIL 이미지
 
     Returns:
@@ -80,20 +89,15 @@ def encode_image(image: Union[str, Path, Image.Image]) -> np.ndarray:
                     shape == (512,), norm == 1.0
 
     Raises:
-        FileNotFoundError: 파일 경로가 존재하지 않는 경우
-        ValueError: 이미지를 열 수 없는 경우
+        FileNotFoundError: 파일 경로가 존재하지 않는 경우.
+        ValueError: 이미지를 열 수 없거나 크기가 너무 작은 경우.
     """
     model, preprocess = _load_model()
 
-    # 입력 타입에 따라 PIL Image로 통일
-    if isinstance(image, (str, Path)):
-        image = Image.open(image).convert("RGB")
-    elif isinstance(image, Image.Image):
-        image = image.convert("RGB")
-    else:
-        raise ValueError(f"Unsupported image type: {type(image)}")
+    # 다양한 입력을 표준 RGB PIL Image로 통일 (EXIF, 알파, 크기 자동 처리)
+    image = preprocess_image(image)
 
-    # 전처리 + 배치 차원 추가 + 디바이스 이동
+    # CLIP 모델용 전처리 (리사이즈 + 정규화) + 배치 차원 추가 + 디바이스 이동
     image_tensor = preprocess(image).unsqueeze(0).to(DEVICE)
 
     # 추론 (gradient 계산 비활성화)
