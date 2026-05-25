@@ -1,0 +1,16 @@
+# MarkLens backend 추가 패키지
+#
+# 본 백엔드는 ml/venv 를 공유합니다.
+# ML 관련 패키지(torch, faiss-cpu, open_clip_torch, pillow, numpy)는
+# ml/requirements.txt 에서 관리되며 여기에 중복 기재하지 않습니다.
+#
+# 이 파일에는 웹 API 계층에서만 새로 필요한 의존성만 기록합니다.
+
+# 웹 프레임워크 (pydantic 자동 동반)
+fastapi>=0.115.0,<1.0.0
+
+# ASGI 서버 (standard extras: httptools, watchfiles, uvloop, websockets 포함)
+uvicorn[standard]>=0.32.0,<1.0.0
+
+# multipart/form-data 파일 업로드 처리 (FastAPI가 별도로 요구)
+python-multipart>=0.0.20,<1.0.0
