@@ -93,6 +93,12 @@ marklens/
 │   ├── scripts/    # 인덱스 빌드/검색 + KIPRIS 데이터 가공 CLI
 │   └── data/       # 원천 데이터·인덱스·이미지 (.gitignore 제외)
 ├── backend/      # FastAPI 서버
+│   ├── src/
+│   │   ├── main.py     # 앱 진입점 (lifespan startup, CORS, 정적 서빙)
+│   │   ├── api/        # 엔드포인트 (health, search)
+│   │   ├── core/       # 경로/설정/엔진/입력 검증
+│   │   └── schemas/    # Pydantic 응답 모델
+│   └── requirements.txt
 ├── frontend/     # Next.js 웹
 └── shared/       # 공통 타입 정의
 ```
@@ -164,13 +170,26 @@ python scripts/extract_kipris_images.py   # PDF 로고 → data/images/*.png
 
 ### 5. Backend 설정
 
+백엔드는 ML 모듈과 동일한 PyTorch/FAISS 스택을 공유하므로, **별도 venv를 만들지 않고 `ml/venv`를 그대로 사용**합니다. 처음 한 번 백엔드 추가 패키지만 설치하면 됩니다.
+
 ```bash
-cd backend
-python3.11 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn src.main:app --reload
+cd ml && source venv/bin/activate
+pip install -r ../backend/requirements.txt
 ```
+
+서버 실행은 **반드시 프로젝트 루트(`marklens/`)에서** 다음 명령을 사용합니다. backend 폴더 안에서 띄우면 `ml/src` import가 충돌하므로 그렇게 하지 마세요.
+
+```bash
+cd ~/marklens && source ml/venv/bin/activate
+uvicorn backend.src.main:app --reload
+```
+
+- API 문서: <http://127.0.0.1:8000/docs> (Swagger), <http://127.0.0.1:8000/redoc>
+- 헬스체크: `GET http://127.0.0.1:8000/health`
+- 검색: `POST http://127.0.0.1:8000/search` (multipart, `file` 필드에 이미지)
+- 정적 이미지: `GET http://127.0.0.1:8000/images/{출원번호.png}`
+
+서버는 startup 시 CLIP 모델·FAISS 인덱스·KIPRIS 메타데이터를 1회 로딩하여 메모리에 보관합니다.
 
 ### 6. Frontend 설정
 
@@ -190,7 +209,7 @@ npm run dev
 - **Phase 1:** ML 파이프라인 단독 검증 (완료)
 - **Phase 2-A:** 검색 결과 → 4단계 등급 변환 모듈 (완료)
 - **Phase 2-D:** KIPRIS 실데이터 파이프라인 (완료, 100건)
-- **Phase 2-B:** Backend API 구현 (예정)
+- **Phase 2-B:** Backend API 구현 (완료, `/search` `/health`)
 - **Phase 3:** Frontend 최소 기능 구현 (예정)
 - **Phase 4:** 통합 및 데이터 확장 (예정)
 
