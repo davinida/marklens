@@ -19,6 +19,13 @@ import numpy as np
 
 
 # === 등급 판정 경계값 ===
+# 절대 유사도 안전장치: top1이 이 값 이상이면 격차 조건과 무관하게 CAUTION.
+# 배경: 완전 동일 로고(top1=1.0)가 격차 조건(gap_a < GAP_CAUTION)에 걸려
+# REVIEW 이하로 강등되는 등급 역전 실측(2026-07-07, 로드맵 §5).
+# TODO.pdf E의 "단독 임계값 안전장치"를 외관 축에 선행 도입한 것.
+# 임시값 - 정답 데이터 확보 후 F(등급 재보정)에서 축별 수치 재조정 예정
+SIM_IDENTICAL = 0.95
+
 # 임시값 - Phase 1 시연 데이터 9장에서 역산. 데이터 확보 후 튜닝 예정
 SIM_CAUTION = 0.75
 
@@ -142,7 +149,11 @@ def score_results(distances: np.ndarray) -> dict:
     gap_b = top1 - mean_sim
 
     # 5. 4단계 등급 판정 (if-elif 사다리, 위에서부터 검사)
-    if top1 >= SIM_CAUTION and gap_a >= GAP_CAUTION:
+    # 격차(gap) 조건은 절대 유사도가 매우 높은 경우를 강등시킬 수 있으므로,
+    # SIM_IDENTICAL 이상은 격차와 무관하게 최상위 등급을 보장한다.
+    if top1 >= SIM_IDENTICAL:
+        grade = GRADE_CAUTION
+    elif top1 >= SIM_CAUTION and gap_a >= GAP_CAUTION:
         grade = GRADE_CAUTION
     elif top1 >= SIM_REVIEW and gap_a >= GAP_REVIEW:
         grade = GRADE_REVIEW
