@@ -1,0 +1,53 @@
+# MarkLens CI — push/PR 마다 백엔드 + ml 테스트 전체 실행.
+#
+# 핵심 설계:
+# - MARKLENS_FAKE_ML=1: 계약 테스트가 더미 FAISS 인덱스 + 가짜 인코더로 돌므로
+#   CLIP 가중치 다운로드 없이 항상 실행된다 (backend/tests/conftest.py 참조).
+# - torch 는 CPU 휠 인덱스에서 설치 (기본 리눅스 휠은 CUDA 포함이라 ~2GB).
+# - postgres 서비스 컨테이너로 마이그레이션 버전 추적 테스트까지 실행.
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            ml/requirements.txt
+            backend/requirements.txt
+            backend/requirements-dev.txt
+
+      - name: Install torch (CPU wheels)
+        run: pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -r ml/requirements.txt -r backend/requirements.txt -r backend/requirements-dev.txt
+
+      - name: Run tests
+        run: pytest -v
+        env:
+          MARKLENS_FAKE_ML: "1"
+          MARKLENS_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/marklens_test
