@@ -7,8 +7,8 @@ KIPRIS 상표명완전일치 API 를 실시간 호출하되, 동일 질의는 TT
 
 import os
 import threading
-import time
 
+from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException, Query, status
 
 from ..core import kipris_client
@@ -19,24 +19,23 @@ router = APIRouter()
 # 동일 질의 캐시 TTL. 등록상표 목록은 하루 안에 바뀔 일이 거의 없다 → 기본 24h.
 CACHE_TTL_SEC: int = int(os.getenv("KIPRIS_NAME_CACHE_TTL", str(24 * 3600)))
 
-# {정규화된 질의: (저장 시각 monotonic, summary dict)}
-_cache: dict[str, tuple[float, dict]] = {}
+# 캐시 항목 상한. 수제 dict 는 상한이 없어 서로 다른 질의가 쌓이면 무한 성장했다
+# → TTLCache 로 교체 (상한 + TTL + LRU 방출을 라이브러리가 처리).
+CACHE_MAX_ENTRIES: int = int(os.getenv("KIPRIS_NAME_CACHE_MAX", "1024"))
+
+# {정규화된 질의: summary dict}. TTLCache 는 스레드 안전하지 않아 락으로 감싼다.
+_cache: TTLCache = TTLCache(maxsize=CACHE_MAX_ENTRIES, ttl=CACHE_TTL_SEC)
 _cache_lock = threading.Lock()
 
 
 def _cache_get(key: str) -> dict | None:
     with _cache_lock:
-        hit = _cache.get(key)
-        if hit and (time.monotonic() - hit[0]) < CACHE_TTL_SEC:
-            return hit[1]
-        if hit:
-            del _cache[key]
-    return None
+        return _cache.get(key)
 
 
 def _cache_put(key: str, value: dict) -> None:
     with _cache_lock:
-        _cache[key] = (time.monotonic(), value)
+        _cache[key] = value
 
 
 def _to_message(summary: dict) -> str:
