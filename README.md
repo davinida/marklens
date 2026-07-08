@@ -334,7 +334,26 @@ CLIP 모델 로딩(인덱스 빌드·검색·서버 기동)에는 **여유 커�
 | 프론트 `npm run dev`가 `VirtualAlloc failed`로 즉사 | `set NODE_OPTIONS=--max-old-space-size=768` 후 재실행 |
 | 근본 해결 | 페이지파일을 "시스템이 관리"로 변경(제어판 → 고급 시스템 설정 → 성능 → 가상 메모리) 후 재부팅 |
 
-### 6-7. 프론트엔드 실행 (Next.js)
+### 6-7. 한 번에 시작/종료 (dev 통합 스크립트) ⭐ 권장
+
+백엔드(6-6)와 프론트엔드(6-8)를 수동으로 따로 띄우는 대신, 한 명령으로
+같이 시작/종료할 수 있습니다. 시작 스크립트는 포트 선점 검사 → 백엔드 기동
+→ `/health` 준비 대기(CLIP 로딩) → 프론트 기동 순서로 진행하고, 종료
+스크립트는 기록된 PID(+포트 폴백)로 `--reload` 워커까지 트리째 정리합니다.
+
+```powershell
+# Windows (PowerShell)
+.\scripts\dev-start.ps1        # 시작 (-Force: 포트 점유 시 종료 후 진행)
+.\scripts\dev-stop.ps1         # 종료
+```
+
+```bash
+# macOS/Linux
+./scripts/dev-start.sh         # 시작 (--force 지원, 로그: scripts/*.log)
+./scripts/dev-stop.sh          # 종료
+```
+
+### 6-8. 프론트엔드 실행 (Next.js)
 
 `frontend/`에 Next.js 앱이 구현되어 있습니다 (입력 → 검색중 → 결과 3층 → 오류 화면,
 백엔드 `POST /search` 연동).
