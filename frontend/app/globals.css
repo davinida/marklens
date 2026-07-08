@@ -1,0 +1,154 @@
+@import "tailwindcss";
+
+/* ===== MarkLens 디자인 토큰 — E안 '토스 결' =====
+   바탕 회색 위 흰 카드, 잉크/서브/뮤트 3단 텍스트, 파란 단일 액션 컬러.
+   등급(status) 색은 액션 컬러와 분리해 예약: caution/review/safe/low. */
+:root {
+  --bg: #f2f4f6;
+  --card: #ffffff;
+  --ink: #191f28;
+  --sub: #4e5968;
+  --muted: #8b95a1;
+  --faint: #b0b8c1;
+  --line: #eef1f4;
+  --blue: #3182f6;
+  --blue-dark: #1b64da;
+  --blue-bg: #e8f3ff;
+  --caution: #f04452;
+  --caution-deep: #c62f3c;
+  --caution-bg: #fdedee;
+  --review: #ff8a00;
+  --review-deep: #a96000;
+  --review-bg: #fff4e5;
+  --safe: #00a05a;
+  --safe-deep: #007a45;
+  --safe-bg: #e6f6ee;
+  --low: #6b7684;
+  --low-bg: #eef1f4;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-sub: var(--sub);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-line: var(--line);
+  --color-blue: var(--blue);
+  --color-blue-dark: var(--blue-dark);
+  --color-blue-bg: var(--blue-bg);
+  --color-caution: var(--caution);
+  --color-caution-deep: var(--caution-deep);
+  --color-caution-bg: var(--caution-bg);
+  --color-review: var(--review);
+  --color-review-deep: var(--review-deep);
+  --color-review-bg: var(--review-bg);
+  --color-safe: var(--safe);
+  --color-safe-deep: var(--safe-deep);
+  --color-safe-bg: var(--safe-bg);
+  --color-low: var(--low);
+  --color-low-bg: var(--low-bg);
+  --font-sans: var(--font-pretendard), "Pretendard", "Apple SD Gothic Neo",
+    "Segoe UI", "Malgun Gothic", sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 숫자는 항상 고정폭으로 — 유사도·퍼센트 정렬 */
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 토스 결 버튼 프레스 피드백 */
+.press {
+  transition:
+    transform 0.12s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+}
+.press:active:not(:disabled) {
+  transform: scale(0.975);
+}
+
+/* 카드 등장 애니메이션 */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise-in 0.35s ease both;
+}
+.rise-1 {
+  animation-delay: 0.05s;
+}
+.rise-2 {
+  animation-delay: 0.12s;
+}
+.rise-3 {
+  animation-delay: 0.19s;
+}
+
+/* 로딩 점 3개 */
+@keyframes dot-bounce {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  40% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+.loading-dot {
+  animation: dot-bounce 1.15s infinite ease-in-out;
+}
+.loading-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.loading-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* 스캔 링 펄스 */
+@keyframes ring-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(49, 130, 246, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 22px rgba(49, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(49, 130, 246, 0);
+  }
+}
+.scan-pulse {
+  animation: ring-pulse 1.6s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .loading-dot,
+  .scan-pulse {
+    animation: none;
+  }
+  .press,
+  .press:active:not(:disabled) {
+    transition: none;
+    transform: none;
+  }
+}

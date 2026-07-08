@@ -1,0 +1,6 @@
+# 개발/테스트 전용 의존성 (배포 불필요)
+# 설치: ml/venv 에 함께 설치
+#   ml\venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
+
+# 테스트 러너 (backend/tests)
+pytest>=8.0.0,<9.0.0

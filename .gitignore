@@ -152,3 +152,7 @@ temp/
 
 # 데이터 폴더 (저작권 이미지 + 큰 인덱스 파일)
 ml/data/
+
+# dev 통합 스크립트 산출물 (scripts/dev-start·stop)
+scripts/.dev-pids*
+scripts/*.log
