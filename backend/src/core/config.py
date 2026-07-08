@@ -3,7 +3,14 @@
 
 업로드 검증, 검색 파라미터, 정적 파일 마운트 경로 등을 한 곳에서 관리합니다.
 값의 근거는 각 상수 위 주석에 명시합니다.
+비밀값(DB 접속 문자열, KIPRIS 키)은 .env 에서 읽습니다 (paths.py 가 1회 로드).
 """
+
+import os
+
+# paths 가 .env 를 로드한다 — 아래 os.getenv 보다 먼저 import 되어야 함.
+# (from .core import config, paths 처럼 config 가 먼저 로드되는 경로가 실재한다)
+from . import paths  # noqa: F401
 
 # ====================================================================
 # 업로드 검증
@@ -62,3 +69,17 @@ IMAGES_URL_PREFIX: str = "/images"
 # 개발 단계에서는 허용적으로 설정. 배포 시 실제 프론트엔드 origin으로 좁힐 것.
 # Phase 3 Next.js 개발 서버가 보통 http://localhost:3000 에서 뜸.
 CORS_ALLOW_ORIGINS: list[str] = ["*"]
+
+
+# ====================================================================
+# 저장소 모드 (백엔드-1/2/4 — PostgreSQL 전환)
+# ====================================================================
+
+# DATABASE_URL 이 설정되어 있으면 상표 메타를 DB 에서 조회하고(db 모드),
+# 비어 있으면 기존처럼 ml/data/kipris_metadata.json 을 통째로 적재한다(file 모드).
+# 예: postgresql://postgres:password@127.0.0.1:5432/marklens
+# 팀원이 DB 를 아직 안 깔았어도 file 모드로 기존과 동일하게 동작한다.
+DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+# 현재 저장소 모드 문자열. /health 응답과 로그에 노출.
+STORAGE_MODE: str = "db" if DATABASE_URL else "file"

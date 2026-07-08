@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from .api import health, search
+from .api import health, namecheck, search
 from .core import config, engine
 from .core.paths import IMAGES_DIR
 
@@ -33,7 +33,8 @@ async def lifespan(app: FastAPI):
         print(f"[FATAL] startup 리소스 로딩 실패: {e}", file=sys.stderr)
         raise
     yield
-    # shutdown 시 별도 정리 없음 (CLIP 모델/인덱스는 프로세스 종료와 함께 해제)
+    # shutdown: DB 커넥션 풀 정리 (file 모드에서는 no-op)
+    engine.shutdown()
 
 
 app = FastAPI(
@@ -60,9 +61,14 @@ app.add_middleware(
 # === 라우터 등록 ===
 app.include_router(health.router)
 app.include_router(search.router)
+app.include_router(namecheck.router)
 
 # === 정적 파일 서빙 (검색 결과 이미지) ===
 # 설계 결정: 응답에는 이미지 URL만 담고, 실제 이미지는 이 경로로 노출.
+# 주의: StaticFiles 는 기본(check_dir=True)으로 생성 시점에 디렉토리 존재를
+# 요구한다 — 디렉토리가 없으면 lifespan 의 친절한 [FATAL] 안내가 나오기 전에
+# import 단계에서 죽는다 (2026-07-07 검증에서 확인). 먼저 보장해 준다.
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 app.mount(
     config.IMAGES_URL_PREFIX,
     StaticFiles(directory=str(IMAGES_DIR)),

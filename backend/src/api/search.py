@@ -1,6 +1,6 @@
 """POST /search — multipart 이미지 업로드 → top-K 검색 결과 + 등급."""
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 
 from ..core import config, engine, validation
 from ..core.paths import IMAGES_DIR  # noqa: F401  (참조 의도 명시)
@@ -55,6 +55,7 @@ def _to_response(engine_result: dict) -> SearchResponse:
 
 @router.post("/search", response_model=SearchResponse)
 async def search_endpoint(
+    request: Request,
     file: UploadFile = File(..., description="검색할 상표 이미지 (PNG/JPEG/WEBP)"),
     top_k: int = Query(
         default=config.DEFAULT_TOP_K,
@@ -73,6 +74,26 @@ async def search_endpoint(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="엔진이 아직 초기화되지 않았습니다. 잠시 후 다시 시도하세요.",
         )
+    # 빈 인덱스는 클라이언트 잘못이 아니라 서버 데이터 문제 → 503
+    if engine.state.index is None or int(engine.state.index.ntotal) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="검색 인덱스가 비어 있습니다. 데이터 적재 후 다시 시도하세요.",
+        )
+
+    # 0) Content-Length 선검사 — 본문을 메모리에 다 받기 전에 큰 요청을 차단.
+    #    (헤더는 위조 가능하므로 아래 실측 크기 검증도 그대로 유지한다)
+    content_length = request.headers.get("content-length")
+    if content_length and content_length.isdigit():
+        # multipart 오버헤드가 있으므로 파일 상한보다 여유(1 MiB)를 두고 비교.
+        if int(content_length) > config.MAX_UPLOAD_BYTES + 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=(
+                    f"요청 본문이 너무 큽니다 (Content-Length: {content_length} bytes). "
+                    f"파일 상한: {config.MAX_UPLOAD_BYTES} bytes."
+                ),
+            )
 
     # 1) 업로드 검증
     raw = await file.read()
@@ -94,4 +115,12 @@ async def search_endpoint(
             detail=f"검색 처리 중 오류: {e}",
         )
 
-    return _to_response(result)
+    # 3) 응답 조립 — 메타 계약 불일치(예: dataset_info 필드 누락)가 미처리 500 으로
+    #    새지 않도록 감싼다. load_all() 이 기동 시점에 선검증하지만 이중 방어.
+    try:
+        return _to_response(result)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"응답 조립 중 메타데이터 계약 오류: {e}",
+        )

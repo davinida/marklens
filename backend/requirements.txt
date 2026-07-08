@@ -14,3 +14,14 @@ uvicorn[standard]>=0.32.0,<1.0.0
 
 # multipart/form-data 파일 업로드 처리 (FastAPI가 별도로 요구)
 python-multipart>=0.0.20,<1.0.0
+
+# .env 로드 (KIPRIS 키/DATABASE_URL — 키 커밋 금지 정책의 실행 수단)
+python-dotenv>=1.0.0,<2.0.0
+
+# KIPRIS Open API 호출 (백엔드-5 수집 / 백엔드-7 호칭 검색)
+httpx>=0.27.0,<1.0.0
+
+# PostgreSQL 드라이버 + 커넥션 풀 (백엔드-1~4)
+# DATABASE_URL 미설정이면 서버는 기존 file 모드로 동작하므로 DB가 없어도 무방
+psycopg[binary]>=3.1.0,<4.0.0
+psycopg-pool>=3.2.0,<4.0.0

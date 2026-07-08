@@ -15,5 +15,6 @@ def health() -> HealthResponse:
         status="ok" if engine.state.ready else "loading",
         engine_ready=engine.state.ready,
         index_size=int(engine.state.index.ntotal) if engine.state.index else 0,
-        trademark_count=len(engine.state.trademark_lookup),
+        trademark_count=engine.state.trademark_count,
+        storage_mode=engine.state.storage_mode,
     )
