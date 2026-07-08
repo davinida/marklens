@@ -1,5 +1,9 @@
 """POST /search — multipart 이미지 업로드 → top-K 검색 결과 + 등급."""
 
+import functools
+
+import anyio
+import anyio.to_thread
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 
 from ..core import config, engine, validation
@@ -15,6 +19,20 @@ from ..schemas.search import (
 
 
 router = APIRouter()
+
+
+# CPU 바운드 검색의 동시 실행 상한 리미터.
+# 이벤트 루프가 아닌 워커 스레드에서 실행되지만, CLIP 인코딩을 동시에 여러 개
+# 돌리면 CPU 스래싱으로 전부 느려지므로 SEARCH_MAX_CONCURRENCY 로 묶는다.
+# (이벤트 루프가 있어야 생성 가능한 anyio 버전이 있어 지연 생성)
+_search_limiter: anyio.CapacityLimiter | None = None
+
+
+def _get_search_limiter() -> anyio.CapacityLimiter:
+    global _search_limiter
+    if _search_limiter is None:
+        _search_limiter = anyio.CapacityLimiter(config.SEARCH_MAX_CONCURRENCY)
+    return _search_limiter
 
 
 def _to_image_url(filename: str | None) -> str | None:
@@ -100,8 +118,13 @@ async def search_endpoint(
     validation.validate_upload(file, raw)
 
     # 2) 검색 (engine 가 preprocess + encode + search + 결합 + 등급까지 수행)
+    #    CPU 바운드(CLIP+FAISS) + 동기 DB 조회이므로 이벤트 루프를 막지 않도록
+    #    워커 스레드로 오프로드한다. run_search 는 순수 동기 함수라 무수정 위임 가능.
     try:
-        result = engine.run_search(raw, top_k=top_k)
+        result = await anyio.to_thread.run_sync(
+            functools.partial(engine.run_search, raw, top_k=top_k),
+            limiter=_get_search_limiter(),
+        )
     except ValueError as e:
         # preprocess/scoring 내부 검증 실패는 4xx로
         raise HTTPException(

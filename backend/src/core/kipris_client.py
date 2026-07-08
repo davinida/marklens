@@ -225,13 +225,39 @@ def _require_config(url: str, url_env_name: str) -> None:
         )
 
 
+# 모듈 공용 HTTP 클라이언트 — 호출마다 새로 만들면 TCP/TLS 커넥션을 매번
+# 다시 맺는다. 재사용으로 커넥션 풀링 (httpx.Client 는 스레드 안전).
+_http_client: Optional[httpx.Client] = None
+_http_client_lock = threading.Lock()
+
+
+def _get_client() -> httpx.Client:
+    global _http_client
+    with _http_client_lock:
+        if _http_client is None:
+            _http_client = httpx.Client(
+                timeout=15,
+                follow_redirects=True,
+                limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            )
+        return _http_client
+
+
+def close_client() -> None:
+    """공용 HTTP 클라이언트 정리 (main.py lifespan shutdown 이 호출)."""
+    global _http_client
+    with _http_client_lock:
+        if _http_client is not None:
+            _http_client.close()
+            _http_client = None
+
+
 def _get(url: str, params: dict) -> str:
     """리미터를 통과한 뒤 GET. 응답 본문(XML 텍스트) 반환."""
     limiter.acquire()
-    with httpx.Client(timeout=15) as client:
-        resp = client.get(url, params={**params, "accessKey": ACCESS_KEY})
-        resp.raise_for_status()
-        return resp.text
+    resp = _get_client().get(url, params={**params, "accessKey": ACCESS_KEY})
+    resp.raise_for_status()
+    return resp.text
 
 
 def name_match_search(name: str) -> list[dict]:
@@ -255,8 +281,8 @@ def download_file_now(url: str, dest: Path) -> Path:
     주의: 이 링크는 시한부다 — 응답에서 받자마자 호출할 것 (모아뒀다 열면 만료).
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
-    with httpx.Client(timeout=30, follow_redirects=True) as client:
-        resp = client.get(url)
-        resp.raise_for_status()
-        dest.write_bytes(resp.content)
+    # 파일 다운로드는 본문이 커 검색 API 보다 여유 있는 타임아웃을 준다.
+    resp = _get_client().get(url, timeout=30)
+    resp.raise_for_status()
+    dest.write_bytes(resp.content)
     return dest

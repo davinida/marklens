@@ -52,6 +52,11 @@ DEFAULT_TOP_K: int = 5
 MIN_TOP_K: int = 1
 MAX_TOP_K: int = 20
 
+# CPU 바운드 검색(CLIP 인코딩 + FAISS)의 동시 실행 상한.
+# 검색은 워커 스레드로 오프로드되는데(이벤트 루프 차단 방지), CPU 추론을
+# 무제한 동시 실행하면 서로 스래싱해 전부 느려진다 → 2개 초과분은 대기열로.
+SEARCH_MAX_CONCURRENCY: int = int(os.getenv("MARKLENS_SEARCH_CONCURRENCY", "2"))
+
 
 # ====================================================================
 # 이미지 정적 파일 서빙
