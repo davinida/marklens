@@ -233,6 +233,11 @@ pip install -r requirements.txt
 pip install -r ../backend/requirements.txt
 ```
 
+> **환경변수(.env):** KIPRIS 인증키·DB 접속 문자열 등 비밀값은 프로젝트 루트의
+> `.env` 파일로 관리합니다(커밋 금지 — `.gitignore` 처리됨). 루트의
+> `.env.example`을 복사해 `.env`로 저장하고 필요한 값만 채우면 서버가 자동으로
+> 읽습니다. **아무것도 설정하지 않아도 기존과 동일하게 동작합니다.**
+
 > **macOS(Apple Silicon) 참고:** PyTorch와 FAISS가 각각 OpenMP(libomp)를 내장해
 > 충돌이 날 수 있어 `KMP_DUPLICATE_LIB_OK=TRUE` 환경변수가 필요합니다.
 > 이 값은 인덱스 빌드 스크립트와 백엔드 엔진 코드 내부에서 **자동으로 설정**되므로
@@ -292,10 +297,56 @@ uvicorn backend.src.main:app --reload
 > **자주 겪는 오류:** `ModuleNotFoundError: No module named 'src.embedding'`
 > → `backend` 폴더 안에서 서버를 띄운 경우입니다. 루트에서 위 명령으로 다시 실행하세요.
 
-### 6-7. 프론트엔드 (구현 예정)
+> **저장소 모드(선택):** `.env`에 `DATABASE_URL`을 설정하면 상표 메타데이터를
+> PostgreSQL에서 조회합니다(db 모드). 최초 1회
+> `python -m backend.scripts.migrate_json_to_db` 로 JSON 100건을 DB로 옮긴 뒤
+> 서버를 재시작하세요. 설정하지 않으면 기존 JSON 파일 모드로 동작합니다.
+> 상세: `docs/MarkLens_작업가이드_백엔드.md`
 
-아직 구현되지 않았습니다. 향후 `frontend/`에 Next.js 앱이 추가되면 실행 방법을
-이 자리에 안내할 예정입니다.
+#### 서버 중지·포트 정리 (Windows)
+
+터미널에서 직접 띄웠다면 `Ctrl+C`로 중지합니다. 백그라운드로 띄웠거나 터미널을
+잃어버린 경우, **포트로 PID를 찾아 종료**합니다.
+
+```powershell
+# 8000 포트를 점유한 프로세스(PID) 확인
+netstat -ano | findstr :8000
+
+# 해당 PID 종료 (마지막 열의 숫자)
+Stop-Process -Id <PID> -Force     # cmd 라면: taskkill /PID <PID> /F
+```
+
+- `--reload` 옵션으로 띄웠다면 감시 프로세스와 워커, **프로세스가 2개**일 수
+  있습니다. 둘 다 종료해야 포트가 풀립니다.
+- `[Errno 10048] address already in use` → 위 방법으로 기존 프로세스를 정리하거나
+  `--port 8001`처럼 다른 포트로 실행하세요. (프론트도 동일: 3000 점유 시
+  `npm run dev -- -p 3100`)
+
+#### 메모리 부족(오류 1455) 트러블슈팅
+
+CLIP 모델 로딩(인덱스 빌드·검색·서버 기동)에는 **여유 커밋 메모리 약 4.5GB**가
+필요합니다. 부족하면 다음 증상이 나타납니다.
+
+| 증상 | 원인·대응 |
+|------|-----------|
+| `OSError 1455: 페이징 파일이 너무 작습니다` 또는 트레이스백 없이 프로세스 사망 | 커밋 메모리 고갈. 브라우저·IDE·WSL(`wsl --shutdown`) 등을 닫아 여유 확보 후 재시도 |
+| PostgreSQL 접속이 갑자기 끊김 (`server closed the connection unexpectedly`) 후 서비스 중지됨 | DB도 같은 원인(1455)으로 죽을 수 있음. 관리자 권한으로 `net start postgresql-x64-16` 재시작 |
+| 프론트 `npm run dev`가 `VirtualAlloc failed`로 즉사 | `set NODE_OPTIONS=--max-old-space-size=768` 후 재실행 |
+| 근본 해결 | 페이지파일을 "시스템이 관리"로 변경(제어판 → 고급 시스템 설정 → 성능 → 가상 메모리) 후 재부팅 |
+
+### 6-7. 프론트엔드 실행 (Next.js)
+
+`frontend/`에 Next.js 앱이 구현되어 있습니다 (입력 → 검색중 → 결과 3층 → 오류 화면,
+백엔드 `POST /search` 연동).
+
+```bash
+cd frontend
+npm install        # 최초 1회
+npm run dev        # http://localhost:3000 (포트 사용 중이면 npm run dev -- -p 3100)
+```
+
+백엔드 주소가 기본값(127.0.0.1:8000)과 다르면 `NEXT_PUBLIC_API_BASE` 환경변수로
+지정합니다. 백엔드를 먼저 띄운 뒤 접속하세요.
 
 ---
 
@@ -320,7 +371,8 @@ curl http://127.0.0.1:8000/health
   "status": "ok",
   "engine_ready": true,
   "index_size": 100,
-  "trademark_count": 100
+  "trademark_count": 100,
+  "storage_mode": "file"
 }
 ```
 
@@ -330,6 +382,7 @@ curl http://127.0.0.1:8000/health
 | `engine_ready` | 검색 엔진 준비 완료 여부 |
 | `index_size` | 인덱스에 적재된 선행상표 벡터 수 |
 | `trademark_count` | 메타데이터로 연결된 상표 수 |
+| `storage_mode` | 상표 메타 저장소: `"file"`(JSON) / `"db"`(PostgreSQL) |
 
 ### 7-2. `POST /search` — 이미지로 유사 상표 검색
 
@@ -442,6 +495,30 @@ curl -X POST "http://127.0.0.1:8000/search?top_k=5" \
 curl http://127.0.0.1:8000/images/4020210070072.png --output result.png
 ```
 
+### 7-4. `GET /name-check` — 동일 명칭 등록상표 확인 (KIPRIS 실시간)
+
+입력한 상표명을 KIPRIS 상표명완전일치 API로 조회해 **등록 상태인 선행상표
+건수**를 요약합니다. 동일 질의는 24시간 캐시되어 월 호출 한도를 아낍니다.
+
+```bash
+curl "http://127.0.0.1:8000/name-check?name=삼성전자"
+```
+
+```json
+{
+  "query": "삼성전자",
+  "total_found": 59,
+  "registered_count": 31,
+  "exact_registered_count": 4,
+  "cached": false,
+  "message": "동일 명칭의 선행 등록상표 4건이 존재합니다."
+}
+```
+
+> `.env`에 `KIPRIS_ACCESS_KEY`와 `KIPRIS_TM_NAME_SEARCH_URL`(API 통합설명서에서
+> 확인)이 설정되어 있어야 하며, 미설정 시 503과 함께 설정 안내를 반환합니다.
+> 한도 초과 시 429.
+
 ---
 
 ## 8. 개발 단계 (로드맵)
@@ -451,8 +528,8 @@ curl http://127.0.0.1:8000/images/4020210070072.png --output result.png
 | Phase 0 | 개발 환경 · 프로젝트 구조 세팅 | ✅ 완료 |
 | Phase 1 | ML 파이프라인 단독 검증 (CLIP + FAISS) | ✅ 완료 |
 | Phase 2 | KIPRIS 실데이터 100건 파이프라인 + 4단계 등급 모듈 | ✅ 완료 |
-| Phase 3 | FastAPI 백엔드 API (`/search`, `/health`) | ✅ 완료 |
-| Phase 4 | 프론트엔드 (업로드 + 3층 결과 화면) | 🔜 예정 |
+| Phase 3 | FastAPI 백엔드 API (`/search`, `/health`, `/name-check`) | ✅ 완료 |
+| Phase 4 | 프론트엔드 (업로드 + 3층 결과 화면, 백엔드 1차 연동) | ✅ 완료 |
 | Phase 5 | 다축 위험 평가 (호칭·외관·관념·견련성) + 통계적 위험 확률 | 🔜 예정 |
 | Phase 6 | 식별력 없는 상표 필터 · 데이터 확장 | 🔜 예정 |
 
