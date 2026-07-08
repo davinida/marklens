@@ -8,15 +8,25 @@ MarkLens FastAPI 백엔드 진입점.
 Swagger UI: http://127.0.0.1:8000/docs
 """
 
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import health, namecheck, search
-from .core import config, engine
-from .core.paths import IMAGES_DIR
+from .core.logging_conf import setup_logging
+
+# 앱/라우터 import 전에 로깅부터 구성 (import 시점 로그도 같은 포맷으로)
+setup_logging()
+
+from .api import health, namecheck, search  # noqa: E402
+from .core import config, engine, kipris_client  # noqa: E402
+from .core.paths import IMAGES_DIR  # noqa: E402
+from .core.request_id import RequestIdMiddleware  # noqa: E402
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -27,14 +37,14 @@ async def lifespan(app: FastAPI):
     """
     try:
         engine.load_all()
-    except Exception as e:
+    except Exception:
         # uvicorn 로그에 노출. 조용히 넘어가지 않음.
-        import sys
-        print(f"[FATAL] startup 리소스 로딩 실패: {e}", file=sys.stderr)
+        logger.exception("[FATAL] startup 리소스 로딩 실패")
         raise
     yield
-    # shutdown: DB 커넥션 풀 정리 (file 모드에서는 no-op)
+    # shutdown: DB 커넥션 풀 + 외부 API HTTP 클라이언트 정리
     engine.shutdown()
+    kipris_client.close_client()
 
 
 app = FastAPI(
@@ -47,6 +57,22 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+# === 전역 예외 핸들러 ===
+# 엔드포인트별 HTTPException 은 그대로 두고, 어디서도 처리되지 않은 예외만
+# 여기서 받아 (1) 요청 ID와 함께 traceback 로그 (2) 스택 미노출 JSON 500 반환.
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("처리되지 않은 예외: %s %s", request.method, request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "서버 내부 오류가 발생했습니다. 로그의 요청 ID로 문의하세요."},
+    )
+
+
+# === 요청 ID ===
+# 모든 응답에 X-Request-ID 헤더 + 요청 처리 중 로그 라인에 같은 ID 주입.
+app.add_middleware(RequestIdMiddleware)
 
 # === CORS ===
 # 개발용 설정. 배포 시 좁힐 것 (실제 프론트엔드 origin으로 한정).

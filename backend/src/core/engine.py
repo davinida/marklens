@@ -9,12 +9,15 @@ ML 리소스 로딩 및 검색 실행 엔진.
 """
 
 import json
+import logging
 import os
 import sys
 from dataclasses import dataclass, field
 from typing import Optional
 
 from . import config, paths
+
+logger = logging.getLogger(__name__)
 
 
 # === macOS Apple Silicon의 PyTorch + FAISS OpenMP 충돌 방지 ===
@@ -73,6 +76,7 @@ def load_all() -> None:
         )
 
     # ---- FAISS 인덱스 로드 ----
+    logger.info("리소스 로딩 시작 (storage_mode=%s)", config.STORAGE_MODE)
     state.index = load_index(paths.INDEX_PATH)
 
     # ---- 인덱스 메타 로드 (image_paths) ----
@@ -138,6 +142,12 @@ def load_all() -> None:
     encode_image(_dummy)
 
     state.ready = True
+    logger.info(
+        "리소스 로딩 완료: index=%d건, trademark=%d건, mode=%s",
+        state.index.ntotal,
+        state.trademark_count,
+        state.storage_mode,
+    )
 
 
 def shutdown() -> None:
