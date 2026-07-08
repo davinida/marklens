@@ -98,11 +98,42 @@ def ensure_database_exists(database_url: str) -> None:
             raise original
 
 
-def apply_migrations(conn: psycopg.Connection) -> None:
-    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
-        conn.execute(path.read_text(encoding="utf-8"))
-        print(f"[migrate] 적용: {path.name}")
+# 마이그레이션 버전 추적 테이블 — 어떤 *.sql 이 적용됐는지 기록한다.
+# 파일 자체의 멱등성(IF NOT EXISTS)은 관례로 유지하되, 이 테이블 덕분에
+# "매번 전부 재실행"에 의존하지 않는다 (비멱등 마이그레이션도 안전).
+SCHEMA_MIGRATIONS_DDL = """
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version    text PRIMARY KEY,
+    applied_at timestamptz NOT NULL DEFAULT now()
+)
+"""
+
+
+def apply_migrations(conn: psycopg.Connection) -> int:
+    """미적용 마이그레이션만 정렬 순서대로 적용. 적용한 파일 수를 반환.
+
+    파일 하나 = 트랜잭션 하나 (SQL 실행 + 버전 기록을 함께 커밋).
+    """
+    conn.execute(SCHEMA_MIGRATIONS_DDL)
     conn.commit()
+    already = {
+        row[0]
+        for row in conn.execute("SELECT version FROM schema_migrations").fetchall()
+    }
+    applied_count = 0
+    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        if path.name in already:
+            continue
+        conn.execute(path.read_text(encoding="utf-8"))
+        conn.execute(
+            "INSERT INTO schema_migrations (version) VALUES (%s)", (path.name,)
+        )
+        conn.commit()
+        print(f"[migrate] 적용: {path.name}")
+        applied_count += 1
+    if applied_count == 0:
+        print("[migrate] 0 applied — 모든 마이그레이션이 이미 적용되어 있음")
+    return applied_count
 
 
 def main() -> int:
