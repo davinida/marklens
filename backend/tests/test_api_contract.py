@@ -10,6 +10,7 @@ API 계약 회귀 테스트 — 2026-07-07 더미 데이터 검증 매트릭스�
 """
 
 import io
+import json
 
 import pytest
 from PIL import Image, ImageDraw
@@ -57,6 +58,21 @@ def client():
         yield c
 
 
+@pytest.fixture(scope="session")
+def identity_query(fake_ml_mode) -> bytes:
+    """'완전 동일 이미지가 rank1, 유사도 ≈ 1.0'을 두 모드 모두에서 보장하는 쿼리 바이트.
+
+    가짜 모드: 더미 1번(빨간 원)과 픽셀 단위로 동일한 dup_query().
+    실모드: 더미 이미지는 실인덱스에 없으므로 대신 실인덱스 0번 레코드의
+    실제 이미지 파일을 그대로 읽어 자기 자신과 비교 → 완전 일치가 보장된다.
+    """
+    if fake_ml_mode:
+        return dup_query()
+    meta = json.loads(paths.INDEX_META_PATH.read_text(encoding="utf-8"))
+    first_image = paths.IMAGES_DIR / meta["image_paths"][0]
+    return first_image.read_bytes()
+
+
 def post_search(client, content: bytes, mime="image/png", query=""):
     return client.post(
         f"/search{query}", files={"file": ("q.png", content, mime)}
@@ -82,8 +98,8 @@ def test_health_contract(client):
 # POST /search — 정상 경로
 # ---------------------------------------------------------------
 
-def test_search_happy_path(client):
-    r = post_search(client, dup_query(), query="?top_k=5")
+def test_search_happy_path(client, identity_query):
+    r = post_search(client, identity_query, query="?top_k=5")
     assert r.status_code == 200
     body = r.json()
 
@@ -125,7 +141,9 @@ def test_search_top_k_clamped_to_index_size(client):
     assert body["top_k_returned"] == min(20, body["index_size"])
 
 
-def test_search_missing_metadata_yields_null_trademark(client):
+def test_search_missing_metadata_yields_null_trademark(client, fake_ml_mode):
+    if not fake_ml_mode:
+        pytest.skip("더미 픽스처 전용 — 실데이터는 메타 완전")
     # 더미 데이터는 10번 상표를 메타에서 고의 누락 → trademark: null 경로 검증
     r = post_search(client, dup_query(), query="?top_k=20")
     nulls = [m for m in r.json()["matches"] if m["trademark"] is None]

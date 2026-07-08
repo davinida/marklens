@@ -66,7 +66,7 @@ def name_check(
         return NameCheckResponse(**cached, cached=True, message=_to_message(cached))
 
     try:
-        items = kipris_client.name_match_search(key)
+        items, total_found = kipris_client.name_match_search(key)
     except kipris_client.CallBudgetExceeded as e:
         raise HTTPException(status_code=429, detail=str(e))
     except kipris_client.KiprisError as e:
@@ -78,6 +78,7 @@ def name_check(
         )
         raise HTTPException(status_code=code, detail=str(e))
 
-    summary = kipris_client.summarize_name_search(key, items)
+    # total_found 는 TotalSearchCount(전체 건수), registered/exact 는 수집된 items 기준
+    summary = kipris_client.summarize_name_search(key, items, total_found)
     _cache_put(key, summary)
     return NameCheckResponse(**summary, cached=False, message=_to_message(summary))

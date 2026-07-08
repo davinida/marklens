@@ -115,6 +115,16 @@ def pytest_configure(config):
     os.environ["DATABASE_URL"] = ""  # 가짜 모드는 항상 file 모드로
 
 
+@pytest.fixture(scope="session")
+def fake_ml_mode() -> bool:
+    """현재 테스트 실행이 가짜 ML 모드인지 여부.
+
+    실모드/가짜모드에서 서로 다른 단언이 필요한 테스트(예: 완전 동일 이미지
+    쿼리 구성, 더미 전용 메타 누락 케이스)가 분기 조건으로 사용한다.
+    """
+    return FAKE_ML_MODE
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _fake_encode_image():
     """가짜 모드에서 CLIP 인코딩을 결정적 벡터로 대체.

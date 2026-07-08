@@ -10,7 +10,9 @@ KIPRIS Plus Open API 클라이언트 (백엔드-5 수집 / 백엔드-7 호칭 �
 (사이트 상단 링크에서 다운로드. 상표 출원속보: 오퍼레이션 54개):
     KIPRIS_ACCESS_KEY               = 상품 인증키 (마이페이지)
     KIPRIS_TM_NAME_SEARCH_URL       = 상표명완전일치(trademarkNameMatchSearchInfo) 오퍼레이션 URL
-    KIPRIS_TM_NAME_PARAM            = 상표명 파라미터명 (기본 trademarkName)
+    KIPRIS_TM_NAME_PARAM            = 상표명 파라미터명 (기본 trademarkNameMatch)
+                                      실측: trademarkName 을 주면 resultCode 11
+                                      (NO_MANDATORY_REQUEST_PARAMETERS_ERROR)
     KIPRIS_APPLICANT_SEARCH_URL     = 출원인 검색 오퍼레이션 URL (백엔드-5)
     KIPRIS_APPLICANT_PARAM          = 출원인 파라미터명 (기본 applicantName)
 """
@@ -34,7 +36,7 @@ from . import paths
 
 ACCESS_KEY: str = os.getenv("KIPRIS_ACCESS_KEY", "")
 TM_NAME_SEARCH_URL: str = os.getenv("KIPRIS_TM_NAME_SEARCH_URL", "")
-TM_NAME_PARAM: str = os.getenv("KIPRIS_TM_NAME_PARAM", "trademarkName")
+TM_NAME_PARAM: str = os.getenv("KIPRIS_TM_NAME_PARAM", "trademarkNameMatch")
 APPLICANT_SEARCH_URL: str = os.getenv("KIPRIS_APPLICANT_SEARCH_URL", "")
 APPLICANT_PARAM: str = os.getenv("KIPRIS_APPLICANT_PARAM", "applicantName")
 
@@ -164,9 +166,16 @@ def check_result_code(xml_text: str) -> None:
         )
 
 
+# 항목 태그명. 오퍼레이션마다 항목 태그가 다르다 — 출원인 검색 등은 <item>,
+# 상표명완전일치(trademarkNameMatchSearchInfo)는 <TradeMarkInfo> 다.
+# 실측(TODO.pdf): <item> 만 찾던 기존 코드는 상표명완전일치 응답에서
+# resultCode 00·59건이 와도 0건으로 파싱했다(위양성 "안전" 판정 — 실사용 위험).
+ITEM_TAGS = ("item", "TradeMarkInfo")
+
+
 def parse_items(xml_text: str) -> list[dict]:
     """
-    응답의 <item> 목록을 dict 리스트로 변환한다.
+    응답의 항목 목록(<item> 또는 <TradeMarkInfo>)을 dict 리스트로 변환한다.
 
     - 자식 태그명 → 키, 텍스트 → 값
     - MULTI_VALUE_FIELDS 는 '|' 로 분리해 list[str] 로
@@ -174,7 +183,10 @@ def parse_items(xml_text: str) -> list[dict]:
     check_result_code(xml_text)
     root = ET.fromstring(xml_text)
     items = []
-    for item in root.iter("item"):
+    # root.iter() 로 전체를 순회하며 항목 태그만 골라 문서 순서를 유지한다.
+    for item in root.iter():
+        if item.tag not in ITEM_TAGS:
+            continue
         row: dict = {}
         for child in item:
             value = (child.text or "").strip()
@@ -186,23 +198,49 @@ def parse_items(xml_text: str) -> list[dict]:
     return items
 
 
+def parse_total_count(xml_text: str) -> Optional[int]:
+    """
+    응답의 <TotalSearchCount>(전체 검색 건수)를 반환. 없거나 숫자가 아니면 None.
+
+    실측(TODO.pdf): 상표명완전일치 응답은 페이지네이션되며 items 는 한 페이지분
+    (기본 30건)만 온다. 전체 건수는 항상 TotalSearchCount 에 담기므로
+    /name-check 총계(total_found)는 len(items) 가 아니라 이 값을 써야 한다.
+    """
+    root = ET.fromstring(xml_text)
+    node = root.find(".//TotalSearchCount")
+    if node is None or not (node.text or "").strip():
+        return None
+    try:
+        return int(node.text.strip())
+    except ValueError:
+        return None
+
+
 def filter_registered(items: list[dict]) -> list[dict]:
     """ApplicationStatus == '등록' 만 채택 (등록/소멸/거절 중)."""
     return [it for it in items if it.get("ApplicationStatus") == "등록"]
 
 
-def summarize_name_search(query: str, items: list[dict]) -> dict:
+def summarize_name_search(
+    query: str, items: list[dict], total_found: Optional[int] = None
+) -> dict:
     """
     상표명완전일치 결과 요약.
 
     실측 주의: '완전일치'여도 해당 문구를 포함한 상표까지 잡힌다
     ("삼성전자 SAM SUNG ELECTRONICS" 포함) → 정확 일치와 포함을 나눠 센다.
+
+    total_found: 전체 검색 건수(TotalSearchCount). 미지정 시 수집된 items 수로 대체한다.
+      실측(TODO.pdf): 응답은 페이지네이션되고 수집에는 안전 상한(NAME_SEARCH_MAX_ITEMS)이
+      걸려 있어 items 가 전체보다 적을 수 있다. 그래서 total_found 는 항상
+      TotalSearchCount 기준으로 받고, registered/exact 카운트는 실제 수집된 items
+      기준이다(상한에 잘리면 등록/정확일치 건수가 실제보다 적게 집계될 수 있음).
     """
     registered = filter_registered(items)
     exact = [it for it in registered if it.get("Title", "").strip() == query.strip()]
     return {
         "query": query,
-        "total_found": len(items),
+        "total_found": total_found if total_found is not None else len(items),
         "registered_count": len(registered),
         "exact_registered_count": len(exact),
     }
@@ -260,11 +298,53 @@ def _get(url: str, params: dict) -> str:
     return resp.text
 
 
-def name_match_search(name: str) -> list[dict]:
-    """상표명완전일치 검색 (백엔드-7). 반환: item dict 리스트."""
+# 상표명완전일치 페이지네이션 설정 (백엔드-7). 실측(TODO.pdf):
+#  - 기본 30건/페이지 → docsCount 로 한 번에 더 받는다(docsCount=100 이면 59건 전부).
+#  - TotalSearchCount 는 항상 전체 건수, SerialNumber 는 페이지마다 1부터 재시작.
+#  - 다음 페이지는 docsStart(=이미 받은 건수+1)로 이어 받는다.
+# 아래 두 상한은 월 1,000회 예산 보호용 — 초과하면 수집분으로만 진행한다.
+NAME_SEARCH_DOCS_COUNT: int = 500   # 페이지당 요청 건수(docsCount) — 대부분 1회로 끝난다
+NAME_SEARCH_MAX_ITEMS: int = 500    # 수집 상한 (초과분 버림 → summarize 는 total 로 별도 보고)
+NAME_SEARCH_MAX_PAGES: int = 5      # 추가 호출 폭주 방지 상한
+
+
+def name_match_search(name: str) -> tuple[list[dict], int]:
+    """
+    상표명완전일치 검색 (백엔드-7).
+
+    반환: (수집된 item dict 리스트, 전체 검색 건수 total_found).
+      total_found 는 응답의 TotalSearchCount(없으면 수집 건수)로, 안전 상한에 잘려
+      len(items) 가 total_found 보다 작을 수 있다.
+
+    실측(TODO.pdf): 응답이 기본 30건/페이지라 docsCount 로 페이지를 키우고,
+    len(items) < TotalSearchCount 면 docsStart 로 나머지 페이지를 이어 받는다.
+    월 예산 보호를 위해 수집 상한/페이지 상한을 두고 초과 시 수집분으로만 진행한다.
+    """
     _require_config(TM_NAME_SEARCH_URL, "KIPRIS_TM_NAME_SEARCH_URL")
-    xml_text = _get(TM_NAME_SEARCH_URL, {TM_NAME_PARAM: name})
-    return parse_items(xml_text)
+    items: list[dict] = []
+    total: Optional[int] = None
+    start = 1   # docsStart 는 1-기반. 첫 페이지(1)는 파라미터를 생략한다.
+    pages = 0
+    while True:
+        params: dict = {TM_NAME_PARAM: name, "docsCount": NAME_SEARCH_DOCS_COUNT}
+        if start > 1:
+            params["docsStart"] = start
+        # 페이지 호출마다 _get 내장 limiter(예산+딜레이)를 그대로 통과한다.
+        xml_text = _get(TM_NAME_SEARCH_URL, params)
+        page_items = parse_items(xml_text)
+        if total is None:
+            total = parse_total_count(xml_text)
+        items.extend(page_items)
+        pages += 1
+        # --- 종료 조건 ---
+        if not page_items:
+            break  # 빈 페이지 → 더 이상 없음
+        if total is not None and len(items) >= total:
+            break  # 전체 건수 도달
+        if len(items) >= NAME_SEARCH_MAX_ITEMS or pages >= NAME_SEARCH_MAX_PAGES:
+            break  # 월 예산 보호 상한 — 수집분으로만 진행
+        start += len(page_items)  # 다음 페이지 시작 위치
+    return items, (total if total is not None else len(items))
 
 
 def applicant_search(applicant: str) -> list[dict]:

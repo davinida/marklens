@@ -153,6 +153,9 @@ temp/
 # 데이터 폴더 (저작권 이미지 + 큰 인덱스 파일)
 ml/data/
 
+# assets 내 데이터 압축본 (저작권 KIPRIS 데이터 + 구버전 코드 스냅샷 — 커밋 금지)
+assets/marklens(코드+실행가이드)/
+
 # dev 통합 스크립트 산출물 (scripts/dev-start·stop)
 scripts/.dev-pids*
 scripts/*.log
