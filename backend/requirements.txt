@@ -9,6 +9,10 @@
 # 웹 프레임워크 (pydantic 자동 동반)
 fastapi>=0.115.0,<1.0.0
 
+# env 설정 검증 (감사보고서 R5 — 잘못된 env 를 기동 시 필드명 명시로 실패)
+# fastapi 가 이미 pydantic v2 를 동반하므로 pydantic 본체는 별도 기재 안 함.
+pydantic-settings>=2.4.0,<3.0.0
+
 # ASGI 서버 (standard extras: httptools, watchfiles, uvloop, websockets 포함)
 uvicorn[standard]>=0.32.0,<1.0.0
 
