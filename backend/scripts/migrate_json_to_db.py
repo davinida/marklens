@@ -30,7 +30,7 @@ import psycopg  # noqa: E402
 from psycopg import sql  # noqa: E402
 from psycopg.types.json import Jsonb  # noqa: E402
 
-from backend.src.core import config, paths  # noqa: E402
+from backend.src.core import config, paths, storage  # noqa: E402
 from backend.src.core.appno import normalize_application_number  # noqa: E402
 
 MIGRATIONS_DIR = PROJECT_ROOT / "backend" / "migrations"
@@ -164,7 +164,7 @@ def main() -> int:
     for t in trademarks:
         app_no = normalize_application_number(t["출원번호"])
         image_key = t.get("이미지파일") or f"{app_no}.png"
-        if not (paths.IMAGES_DIR / image_key).exists():
+        if not storage.image_exists(image_key):
             skipped_no_image.append(app_no)
             continue
         app_date = parse_date(t.get("출원일자"))

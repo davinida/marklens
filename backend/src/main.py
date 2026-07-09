@@ -23,9 +23,8 @@ from .core.logging_conf import setup_logging
 setup_logging()
 
 from .api import health, namecheck, search  # noqa: E402
-from .core import config, engine, kipris_client  # noqa: E402
+from .core import config, engine, kipris_client, storage  # noqa: E402
 from .core.auth import require_api_key  # noqa: E402
-from .core.paths import IMAGES_DIR  # noqa: E402
 from .core.ratelimit import limiter, rate_limit_exceeded_handler  # noqa: E402
 from .core.request_id import RequestIdMiddleware  # noqa: E402
 
@@ -107,12 +106,15 @@ app.include_router(namecheck.router, dependencies=[Depends(require_api_key)])
 
 # === 정적 파일 서빙 (검색 결과 이미지) ===
 # 설계 결정: 응답에는 이미지 URL만 담고, 실제 이미지는 이 경로로 노출.
+# 서빙 대상 디렉터리는 storage 심이 결정한다 (S3 전환 시 이 마운트를 걷어내고
+# core/storage.py 구현만 교체 — 모듈 docstring 의 전환 계약 참조).
 # 주의: StaticFiles 는 기본(check_dir=True)으로 생성 시점에 디렉토리 존재를
 # 요구한다 — 디렉토리가 없으면 lifespan 의 친절한 [FATAL] 안내가 나오기 전에
 # import 단계에서 죽는다 (2026-07-07 검증에서 확인). 먼저 보장해 준다.
-IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+_images_dir = storage.local_path()
+_images_dir.mkdir(parents=True, exist_ok=True)
 app.mount(
     config.IMAGES_URL_PREFIX,
-    StaticFiles(directory=str(IMAGES_DIR)),
+    StaticFiles(directory=str(_images_dir)),
     name="images",
 )

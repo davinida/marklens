@@ -6,9 +6,7 @@ import anyio
 import anyio.to_thread
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
 
-from ..core import config, engine, validation
-from ..core.paths import IMAGES_DIR  # noqa: F401  (참조 의도 명시)
-from ..core.config import IMAGES_URL_PREFIX
+from ..core import config, engine, storage, validation
 from ..core.ratelimit import limiter
 from ..schemas.search import (
     DatasetInfo,
@@ -36,13 +34,6 @@ def _get_search_limiter() -> anyio.CapacityLimiter:
     return _search_limiter
 
 
-def _to_image_url(filename: str | None) -> str | None:
-    """파일명을 정적 서빙 URL로 변환. 파일명이 없으면 None 반환."""
-    if not filename:
-        return None
-    return f"{IMAGES_URL_PREFIX}/{filename}"
-
-
 def _to_response(engine_result: dict) -> SearchResponse:
     """engine.run_search() 의 dict 결과를 Pydantic 응답 모델로 변환."""
     matches: list[SearchMatch] = []
@@ -54,7 +45,7 @@ def _to_response(engine_result: dict) -> SearchResponse:
                 rank=m["rank"],
                 similarity=m["similarity"],
                 이미지파일=m.get("이미지파일"),
-                이미지URL=_to_image_url(m.get("이미지파일")),
+                이미지URL=storage.public_url(m.get("이미지파일")),
                 trademark=tm_obj,
             )
         )

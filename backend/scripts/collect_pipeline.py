@@ -31,7 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from backend.src.core import config, kipris_client, paths  # noqa: E402
+from backend.src.core import config, kipris_client, paths, storage  # noqa: E402
 from backend.src.core.appno import (  # noqa: E402
     is_trademark_application_number,
     normalize_application_number,
@@ -142,7 +142,7 @@ def main() -> int:
             picked = picked[: args.limit]
         for it in picked:
             app_no = normalize_application_number(it["ApplicationNumber"])
-            dest = paths.IMAGES_DIR / f"{app_no}.png"
+            dest = storage.local_path(f"{app_no}.png")
             if args.dry_run:
                 print(f"[dry-run] 수집 대상: {app_no} {it.get('Title', '')!r}")
             else:
