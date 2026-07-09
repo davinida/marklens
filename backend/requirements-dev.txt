@@ -4,3 +4,8 @@
 
 # 테스트 러너 (backend/tests)
 pytest>=8.0.0,<9.0.0
+
+# 부하 베이스라인 (감사보고서 R13 — backend/tests/perf/locustfile.py)
+# 다축 확장 전 /search·/health 성능 기준점 측정용. 측정 절차·기록 템플릿은
+# docs/MarkLens_부하테스트_베이스라인.md 참조. (설치는 측정할 때만 — 상시 불요)
+locust>=2.30.0,<3.0.0
