@@ -68,6 +68,17 @@ def test_result_code_31_raises_with_hint():
     assert "상품 신청" in str(exc.value)  # 대응 방법 안내 포함
 
 
+def test_result_code_31_actionable_guidance():
+    # 승인 대기(키 발급 직후 미승인) 상황에서 바로 조치할 수 있는 한국어 안내인지 검증.
+    # (사용자 상황: 상품 승인 대기 중 → 이 코드가 실제로 반환될 수 있다)
+    with pytest.raises(KiprisError) as exc:
+        check_result_code(XML_EXPIRED)
+    msg = str(exc.value)
+    assert "승인 대기" in msg          # 만료가 아니라 "승인 대기"일 수 있음을 명시
+    assert "plus.kipris.or.kr" in msg  # 확인할 위치(마이페이지)
+    assert "사용중" in msg             # 확인할 처리상태 값
+
+
 def test_non_xml_raises():
     with pytest.raises(KiprisError):
         check_result_code("<html>not an api response")

@@ -53,9 +53,14 @@ CALL_COUNTER_PATH: Path = Path(
 
 # resultCode 의미 (TODO.pdf 실측)
 RESULT_CODE_OK = "00"
+# 31 은 "상품 미신청 또는 승인 대기" 상태에서 반환된다(실측: TODO.pdf).
+# 키를 막 발급받아 아직 승인(처리상태 '사용중') 전이면 이 코드가 오므로,
+# 사용자가 바로 조치할 수 있게 마이페이지 확인 경로까지 안내한다.
 RESULT_CODE_MESSAGES = {
-    "31": "상품 미신청 또는 사용 기간 만료 (DEADLINE_HAS_EXPIRED_ERROR) — "
-          "KIPRIS Plus 마이페이지에서 상품 신청 상태와 키를 확인하세요.",
+    "31": "상품 미신청 또는 승인 대기 (DEADLINE_HAS_EXPIRED_ERROR) — "
+          "plus.kipris.or.kr 마이페이지 > 오픈API 신청현황에서 처리상태가 '사용중'인지 "
+          "확인하세요. '승인대기/신청'이면 승인 후 다시 시도하고, '사용중'인데도 이 오류가 "
+          "나면 상품 신청 상태와 .env 의 KIPRIS_ACCESS_KEY 를 재확인하세요.",
 }
 
 
