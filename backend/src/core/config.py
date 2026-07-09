@@ -68,12 +68,42 @@ IMAGES_URL_PREFIX: str = "/images"
 
 
 # ====================================================================
-# CORS (개발용)
+# CORS
 # ====================================================================
 
-# 개발 단계에서는 허용적으로 설정. 배포 시 실제 프론트엔드 origin으로 좁힐 것.
-# Phase 3 Next.js 개발 서버가 보통 http://localhost:3000 에서 뜸.
-CORS_ALLOW_ORIGINS: list[str] = ["*"]
+# 허용 오리진 목록. MARKLENS_CORS_ORIGINS(콤마 구분)로 지정하고, 미설정 시
+# 로컬 프론트 개발 서버(Next.js localhost:3000)만 허용한다.
+# 근거(감사보고서 작업3 1-2, R12): allow_origins=["*"] 하드코딩 제거 — 시연 URL
+#   노출 시 임의 오리진의 자격증명 없는 요청이라도 브라우저 정책상 넓게 열지 않는다.
+_CORS_ORIGINS_RAW: str = os.getenv(
+    "MARKLENS_CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+)
+CORS_ALLOW_ORIGINS: list[str] = [
+    origin.strip() for origin in _CORS_ORIGINS_RAW.split(",") if origin.strip()
+]
+
+
+# ====================================================================
+# 인바운드 레이트리밋 (R12 시연 하드닝)
+# ====================================================================
+
+# IP 기준 요청 한도. slowapi 포맷("<횟수>/<주기>", 예: "10/minute").
+# env 로 오버라이드 가능 — 시연 중 한도 조정을 재배포 없이 처리.
+# 근거(감사보고서 작업3 6-3): /search 는 CPU 바운드(CLIP+FAISS) 보호,
+#   /name-check 는 KIPRIS 월 쿼터(1,000회) 보호가 목적이라 서로 다른 기본값.
+SEARCH_RATE_LIMIT: str = os.getenv("MARKLENS_SEARCH_RATELIMIT", "10/minute")
+NAMECHECK_RATE_LIMIT: str = os.getenv("MARKLENS_NAMECHECK_RATELIMIT", "30/minute")
+
+
+# ====================================================================
+# 정적 X-API-Key 인증 (R12 시연 하드닝)
+# ====================================================================
+
+# 설정 시에만 /search·/name-check 요청에서 X-API-Key 헤더 일치를 검증(불일치 401).
+# 미설정("")이면 완전 비활성 — 로컬 개발은 기존처럼 무인증 개방.
+# 근거(감사보고서 작업3 1-1): 유저가 없으므로 JWT/OAuth 대신 정적 키 1개.
+# 실제 검증 로직·제외 대상(/health·/docs·/images)은 core/auth.py 참조.
+API_KEY: str = os.getenv("MARKLENS_API_KEY", "")
 
 
 # ====================================================================

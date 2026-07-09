@@ -11,10 +11,11 @@ Swagger UI: http://127.0.0.1:8000/docs
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
 
 from .core.logging_conf import setup_logging
 
@@ -23,7 +24,9 @@ setup_logging()
 
 from .api import health, namecheck, search  # noqa: E402
 from .core import config, engine, kipris_client  # noqa: E402
+from .core.auth import require_api_key  # noqa: E402
 from .core.paths import IMAGES_DIR  # noqa: E402
+from .core.ratelimit import limiter, rate_limit_exceeded_handler  # noqa: E402
 from .core.request_id import RequestIdMiddleware  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -58,6 +61,15 @@ app = FastAPI(
 )
 
 
+# === 레이트리밋 (slowapi) ===
+# limiter 를 app.state 에 두고(slowapi 데코레이터가 요청 시 참조), 한도 초과
+# 예외(RateLimitExceeded)를 한국어 429 핸들러에 연결한다. 실제 한도 데코레이터는
+# search/namecheck 라우터에 붙어 있다. RateLimitExceeded 는 HTTPException 하위라
+# 아래 전역 Exception 핸들러보다 먼저(더 구체적인 타입으로) 디스패치된다.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+
+
 # === 전역 예외 핸들러 ===
 # 엔드포인트별 HTTPException 은 그대로 두고, 어디서도 처리되지 않은 예외만
 # 여기서 받아 (1) 요청 ID와 함께 traceback 로그 (2) 스택 미노출 JSON 500 반환.
@@ -75,7 +87,8 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 app.add_middleware(RequestIdMiddleware)
 
 # === CORS ===
-# 개발용 설정. 배포 시 좁힐 것 (실제 프론트엔드 origin으로 한정).
+# 허용 오리진은 config.CORS_ALLOW_ORIGINS (env MARKLENS_CORS_ORIGINS, 기본 localhost:3000).
+# 과거 하드코딩 "*" 제거 (감사보고서 작업3 1-2, R12).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=config.CORS_ALLOW_ORIGINS,
@@ -85,9 +98,12 @@ app.add_middleware(
 )
 
 # === 라우터 등록 ===
+# X-API-Key 인증(require_api_key)은 MARKLENS_API_KEY 설정 시에만 활성(미설정이면 무인증).
+# /health 는 무인증 유지 — 로드밸런서·부하테스트가 키 없이 상태를 폴링해야 함.
+# 실제 처리 비용/외부 쿼터를 쓰는 /search·/name-check 에만 의존성을 주입한다.
 app.include_router(health.router)
-app.include_router(search.router)
-app.include_router(namecheck.router)
+app.include_router(search.router, dependencies=[Depends(require_api_key)])
+app.include_router(namecheck.router, dependencies=[Depends(require_api_key)])
 
 # === 정적 파일 서빙 (검색 결과 이미지) ===
 # 설계 결정: 응답에는 이미지 URL만 담고, 실제 이미지는 이 경로로 노출.

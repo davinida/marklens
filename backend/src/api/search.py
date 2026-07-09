@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, 
 from ..core import config, engine, validation
 from ..core.paths import IMAGES_DIR  # noqa: F401  (참조 의도 명시)
 from ..core.config import IMAGES_URL_PREFIX
+from ..core.ratelimit import limiter
 from ..schemas.search import (
     DatasetInfo,
     GradeInfo,
@@ -72,6 +73,7 @@ def _to_response(engine_result: dict) -> SearchResponse:
 
 
 @router.post("/search", response_model=SearchResponse)
+@limiter.limit(config.SEARCH_RATE_LIMIT)  # IP 기준 한도(기본 10/min) — CPU 바운드 보호
 async def search_endpoint(
     request: Request,
     file: UploadFile = File(..., description="검색할 상표 이미지 (PNG/JPEG/WEBP)"),

@@ -9,9 +9,10 @@ import os
 import threading
 
 from cachetools import TTLCache
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, HTTPException, Query, Request, status
 
-from ..core import kipris_client
+from ..core import config, kipris_client
+from ..core.ratelimit import limiter
 from ..schemas.namecheck import NameCheckResponse
 
 router = APIRouter()
@@ -51,7 +52,9 @@ def _to_message(summary: dict) -> str:
 
 
 @router.get("/name-check", response_model=NameCheckResponse)
+@limiter.limit(config.NAMECHECK_RATE_LIMIT)  # IP 기준 한도(기본 30/min) — KIPRIS 쿼터 보호
 def name_check(
+    request: Request,  # slowapi 데코레이터가 IP 추출에 사용 (OpenAPI 파라미터로는 노출 안 됨)
     name: str = Query(..., min_length=1, max_length=100, description="확인할 상표명"),
 ) -> NameCheckResponse:
     """상표명완전일치 검색 → 등록 상태만 집계해 요약을 반환합니다."""
