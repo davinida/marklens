@@ -278,10 +278,10 @@ def test_main_dry_run_mock_xml(tmp_path, monkeypatch, capsys):
 
 
 def test_main_dry_run_applicant_batch(tmp_path, monkeypatch, capsys):
-    # --applicant 배치 경로: applicant_search_raw 를 monkeypatch 해 네트워크 없이 흐름 검증
+    # --applicant 배치 경로: advanced_search_raw 를 monkeypatch 해 네트워크 없이 흐름 검증
     _no_db(monkeypatch)
     _isolate_data(tmp_path, monkeypatch)
-    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_APPLICANT)
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_APPLICANT)
     monkeypatch.setattr(cp.sys, "argv",
                         ["collect_pipeline", "--applicant", "삼성전자", "--dry-run"])
     rc = cp.main()
@@ -311,7 +311,7 @@ def test_main_limit_caps_per_applicant(tmp_path, monkeypatch, capsys):
     # --limit 은 출원인당 수집 상한 (호출 예산 관리)
     _no_db(monkeypatch)
     _isolate_data(tmp_path, monkeypatch)
-    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_APPLICANT)
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_APPLICANT)
     monkeypatch.setattr(cp.sys, "argv",
                         ["collect_pipeline", "--applicant", "삼성전자",
                          "--limit", "1", "--dry-run"])
@@ -324,7 +324,7 @@ def test_main_limit_caps_per_applicant(tmp_path, monkeypatch, capsys):
 # ====================================================================
 # 백엔드-6 감사보고서 DoD — 원본 선저장 / 기수집 skip / 레코드별 체크포인트
 #
-# 전부 오프라인. KIPRIS 실호출 0회(applicant_search_raw/download_file_now 를
+# 전부 오프라인. KIPRIS 실호출 0회(advanced_search_raw/download_file_now 를
 # 전부 mock), 실 DB 쓰기 0회(upsert_rows·load_db_app_numbers 를 mock + 경로를
 # tmp 로 격리)를 코드로 강제한다. 실 ml/data/images(100장)·실 체크포인트에 손대지 않는다.
 # ====================================================================
@@ -395,8 +395,8 @@ def _counting_download(calls, *, raise_on=None):
 def test_rerun_skips_collected_zero_download_calls(sandbox, monkeypatch, capsys):
     # ② 재실행 시 기수집 출원번호를 건너뛰고 재다운로드 HTTP 호출이 0 인지.
     search_calls, dl_calls = [], []
-    monkeypatch.setattr(kc, "applicant_search_raw",
-                        lambda name: (search_calls.append(name), XML_THREE)[1])
+    monkeypatch.setattr(kc, "advanced_search_raw",
+                        lambda name, **_: (search_calls.append(name), XML_THREE)[1])
     monkeypatch.setattr(kc, "download_file_now", _counting_download(dl_calls))
     monkeypatch.setattr(cp.sys, "argv",
                         ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
@@ -425,7 +425,7 @@ def test_rerun_skips_collected_zero_download_calls(sandbox, monkeypatch, capsys)
 
 def test_checkpoint_resume_after_interrupt(sandbox, monkeypatch, capsys):
     # ① 중단→재개: 3건 중 2건 처리 후 중단(KeyboardInterrupt), 재실행 시 3번째만 처리.
-    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_THREE)
     monkeypatch.setattr(cp.sys, "argv",
                         ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
 
@@ -453,7 +453,7 @@ def test_checkpoint_resume_after_interrupt(sandbox, monkeypatch, capsys):
 
 def test_raw_xml_saved_before_parse_survives_parse_error(sandbox, monkeypatch):
     # Ⓐ 원본 선저장: 파싱이 터져도 응답 XML 원본은 디스크에 남아야 한다(파싱 전 저장).
-    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_THREE)
 
     def boom_parse(xml_text):
         raise ValueError("parse boom")
@@ -470,7 +470,7 @@ def test_raw_xml_saved_before_parse_survives_parse_error(sandbox, monkeypatch):
 
 def test_image_saved_before_rowparse_survives_error(sandbox, monkeypatch, capsys):
     # ③ 원본 선저장(이미지): 행 변환(파싱)이 터져도 다운로드된 원본 이미지는 보존된다.
-    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_THREE)
     monkeypatch.setattr(kc, "download_file_now", _counting_download([]))
 
     def boom_row(item):
@@ -494,7 +494,7 @@ def test_image_saved_before_rowparse_survives_error(sandbox, monkeypatch, capsys
 
 def test_force_reprocesses_already_collected(sandbox, monkeypatch):
     # --force: 기수집 skip 을 무시하고 재수집(재보정·재수집 시나리오).
-    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_THREE)
     dl = []
     monkeypatch.setattr(kc, "download_file_now", _counting_download(dl))
 

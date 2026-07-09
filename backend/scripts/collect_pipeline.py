@@ -90,16 +90,35 @@ def save_raw_xml(source: str, xml_text: str) -> Path:
 
 
 def search_batch(source: str) -> list[dict]:
-    """출원인 검색 → item 리스트. 원본 XML 을 파싱 전에 반드시 선저장한다.
+    """출원인 검색(getAdvancedSearch) → 정규화된 item 리스트. 원본 XML 을 파싱 전에 선저장한다.
+
+    본 수집 소스는 항목별검색(advanced_search)이다 — 인증 ServiceKey + 불리언 플래그
+    30개(등록만·도형/도형복합만·표장유형 전부)를 실어 보내고, camelCase 응답을
+    normalize_advanced_item 으로 파이프라인 정규 키로 바꾼다.
 
     **dry-run 도 예외가 아니다.** dry-run 은 다운로드·DB 를 건너뛸 뿐 검색 API 는
     실제로 호출해 월 쿼터를 태운다. 그 응답을 버리면 본 수집 때 같은 검색을 다시
     호출하게 되는데, 이는 원본 선저장(DoD Ⓐ)이 막으려는 바로 그 낭비다.
     저장된 원본은 --mock-xml 로 재파싱·검증에 그대로 재사용할 수 있다.
     """
-    xml_text = kipris_client.applicant_search_raw(source)  # 원본 확보
-    save_raw_xml(source, xml_text)                         # Ⓐ 파싱 전 선저장
-    return kipris_client.parse_items(xml_text)             # 그 다음 파싱
+    rows = kipris_client.ADVANCED_DEFAULT_ROWS  # 500(상한) — 같은 건수를 적은 호출로
+    collected: list[dict] = []
+    total: int | None = None
+    for page in range(1, kipris_client.ADVANCED_MAX_PAGES + 1):
+        xml_text = kipris_client.advanced_search_raw(source, page_no=page, num_of_rows=rows)
+        save_raw_xml(f"{source}_p{page}", xml_text)        # Ⓐ 페이지마다 파싱 전 선저장
+        page_items = kipris_client.parse_items(xml_text)   # camelCase 원 항목
+        collected.extend(kipris_client.normalize_advanced_item(it) for it in page_items)
+        if total is None:
+            total = kipris_client.parse_advanced_total_count(xml_text)
+        # 마지막 페이지 판정: 빈 페이지이거나, 전체 건수를 다 받았거나, 한 페이지가 덜 찼다.
+        if not page_items or len(page_items) < rows or (total is not None and len(collected) >= total):
+            break
+    else:
+        print(f"[경고] {source}: 페이지 상한({kipris_client.ADVANCED_MAX_PAGES})에 걸려 "
+              f"{len(collected)}건에서 멈춤 (전체 {total}건) — 남은 건수는 다음 실행에서 이어받는다",
+              file=sys.stderr)
+    return collected
 
 
 # --------------------------------------------------------------------
@@ -275,7 +294,10 @@ def main() -> int:
     #    mock-xml 은 원본 파일 자체가 이미 디스크에 있어 요건을 자연히 만족한다.
     if args.mock_xml:
         xml_text = Path(args.mock_xml).read_text(encoding="utf-8")
-        batches = [("(mock)", kipris_client.parse_items(xml_text))]
+        # 저장된 원본은 항목별검색(camelCase)일 수 있으므로 search_batch 와 같은
+        # 정규화를 거친다. 이미 정규 키(PascalCase)면 normalize 가 그대로 통과시킨다.
+        items = kipris_client.parse_items(xml_text)
+        batches = [("(mock)", [kipris_client.normalize_advanced_item(it) for it in items])]
     else:
         applicants = args.applicant or [
             line.strip()

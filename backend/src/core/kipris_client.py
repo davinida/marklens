@@ -6,14 +6,24 @@ KIPRIS Plus Open API 클라이언트 (백엔드-5 수집 / 백엔드-7 호칭 �
 - 인증키는 .env 로만 주입 (커밋 금지 — 키 공유는 약관 위반, 각자 발급)
 - fileToss.jsp 형태의 파일 링크는 일회성/시한부 → 응답 수신 즉시 다운로드
 
+두 개의 서로 다른 KIPRIS API 계열이 공존한다(실측 확정):
+  - 상표명완전일치(trademarkNameMatchSearchInfo, /name-check 백엔드-7):
+    openapi/rest 계열, 인증 파라미터 **accessKey**, 응답 PascalCase.
+  - 항목별검색(getAdvancedSearch, 본 수집 백엔드-6):
+    kipo-api/kipi 계열, 인증 파라미터 **ServiceKey**, 응답 camelCase.
+호스트(KIPRIS_BASE_URL)만 같고 경로·인증 파라미터·응답 표기가 다르다.
+
 오퍼레이션 URL/파라미터명은 KIPRIS "API 통합설명서"에서 확인해 .env 에 넣는다
 (사이트 상단 링크에서 다운로드. 상표 출원속보: 오퍼레이션 54개):
-    KIPRIS_ACCESS_KEY               = 상품 인증키 (마이페이지)
-    KIPRIS_TM_NAME_SEARCH_URL       = 상표명완전일치(trademarkNameMatchSearchInfo) 오퍼레이션 URL
+    KIPRIS_ACCESS_KEY               = 상품 인증키 (마이페이지). 두 계열 공용 —
+                                      계열에 따라 accessKey/ServiceKey 로 이름만 바꿔 싣는다.
+    KIPRIS_BASE_URL                 = 공통 호스트 (기본 http://plus.kipris.or.kr/)
+    KIPRIS_TM_NAME_SEARCH_URL       = 상표명완전일치 오퍼레이션 URL 오버라이드(선택,
+                                      미설정 시 BASE_URL + 경로 상수로 자동 조합)
     KIPRIS_TM_NAME_PARAM            = 상표명 파라미터명 (기본 trademarkNameMatch)
                                       실측: trademarkName 을 주면 resultCode 11
                                       (NO_MANDATORY_REQUEST_PARAMETERS_ERROR)
-    KIPRIS_APPLICANT_SEARCH_URL     = 출원인 검색 오퍼레이션 URL (백엔드-5)
+    KIPRIS_APPLICANT_SEARCH_URL     = 항목별검색(getAdvancedSearch) URL 오버라이드(선택)
     KIPRIS_APPLICANT_PARAM          = 출원인 파라미터명 (기본 applicantName)
 """
 
@@ -35,9 +45,35 @@ from . import paths
 # ====================================================================
 
 ACCESS_KEY: str = os.getenv("KIPRIS_ACCESS_KEY", "")
-TM_NAME_SEARCH_URL: str = os.getenv("KIPRIS_TM_NAME_SEARCH_URL", "")
+
+# 공통 호스트. 오퍼레이션 경로 상수와 조합해 전체 URL 을 만든다. 두 API 계열
+# (openapi/rest 상표명완전일치 · kipo-api/kipi getAdvancedSearch)이 이 호스트를 공유한다.
+KIPRIS_BASE_URL: str = os.getenv("KIPRIS_BASE_URL", "http://plus.kipris.or.kr/")
+
+# 오퍼레이션 경로(호스트 제외) — 실측으로 확정한 검증값.
+TM_NAME_SEARCH_PATH: str = (
+    "openapi/rest/trademarkInfoSearchService/trademarkNameMatchSearchInfo"
+)
+ADVANCED_SEARCH_PATH: str = "kipo-api/kipi/trademarkInfoSearchService/getAdvancedSearch"
+
+
+def _compose_url(base: str, path: str) -> str:
+    """KIPRIS_BASE_URL 과 오퍼레이션 경로를 슬래시 중복 없이 합친다."""
+    return base.rstrip("/") + "/" + path.lstrip("/")
+
+
+# 상표명완전일치(백엔드-7). env 오버라이드가 있으면 우선, 없으면 검증된 기본값으로 조합한다.
+# (과거엔 기본값이 "" 라 .env 없이는 동작하지 않았다 — 표의 검증값으로 채운다.)
+TM_NAME_SEARCH_URL: str = os.getenv("KIPRIS_TM_NAME_SEARCH_URL", "") or _compose_url(
+    KIPRIS_BASE_URL, TM_NAME_SEARCH_PATH
+)
 TM_NAME_PARAM: str = os.getenv("KIPRIS_TM_NAME_PARAM", "trademarkNameMatch")
-APPLICANT_SEARCH_URL: str = os.getenv("KIPRIS_APPLICANT_SEARCH_URL", "")
+
+# 항목별검색 getAdvancedSearch(백엔드-6 본 수집). 인증 파라미터는 ServiceKey.
+# env 오버라이드명은 기존 KIPRIS_APPLICANT_SEARCH_URL 을 계속 지원한다(설정 시 우선).
+ADVANCED_SEARCH_URL: str = os.getenv("KIPRIS_APPLICANT_SEARCH_URL", "") or _compose_url(
+    KIPRIS_BASE_URL, ADVANCED_SEARCH_PATH
+)
 APPLICANT_PARAM: str = os.getenv("KIPRIS_APPLICANT_PARAM", "applicantName")
 
 # 월 호출 예산. 공식 한도는 1,000회지만 수동 실험/재시도 여유로 50회를 남긴다.
@@ -295,10 +331,16 @@ def close_client() -> None:
             _http_client = None
 
 
-def _get(url: str, params: dict) -> str:
-    """리미터를 통과한 뒤 GET. 응답 본문(XML 텍스트) 반환."""
+def _get(url: str, params: dict, auth_param: str = "accessKey") -> str:
+    """리미터를 통과한 뒤 GET. 응답 본문(XML 텍스트) 반환.
+
+    auth_param: 인증키를 실을 파라미터 이름. 상표명완전일치/openapi-rest 계열은
+      accessKey(기본), getAdvancedSearch/kipo-api 계열은 ServiceKey 다(실측).
+      값은 두 계열 모두 같은 KIPRIS_ACCESS_KEY 를 쓰고 파라미터 이름만 다르다 —
+      잘못 붙이면 resultCode=10 (INVALID_REQUEST_PARAMETER_ERROR).
+    """
     limiter.acquire()
-    resp = _get_client().get(url, params={**params, "accessKey": ACCESS_KEY})
+    resp = _get_client().get(url, params={**params, auth_param: ACCESS_KEY})
     resp.raise_for_status()
     return resp.text
 
@@ -352,21 +394,160 @@ def name_match_search(name: str) -> tuple[list[dict], int]:
     return items, (total if total is not None else len(items))
 
 
-def applicant_search_raw(applicant: str) -> str:
+# ====================================================================
+# 항목별검색 getAdvancedSearch (백엔드-6 본 수집)
+#
+# 실측 확정(호출 소진분 재분석):
+#  - 상표명완전일치와 다른 API 계열(kipo-api/kipi). 인증 파라미터는 ServiceKey.
+#  - 30개 불리언 플래그(행정상태 8 + 표장유형 9 + 표장구성 13)를 "전부" 실어야 한다.
+#    일부만 넘기면 resultCode=10(INVALID_REQUEST_PARAMETER_ERROR). 값은 "true"/"false".
+#  - 응답은 camelCase 필드, 항목 태그는 <item>, 전체 건수는 <totalCount>.
+#    페이징 요청 파라미터명은 미확인 → 보내지 않고 서버 기본값(numOfRows=20)에 맡긴다.
+#  - 유사군(similarityCode) 필드가 없다 → normalize 에서 빈 배열(후속 보강 TODO).
+# ====================================================================
+
+# 행정상태 8
+ADVANCED_ADMIN_STATUS_FLAGS: tuple[str, ...] = (
+    "application", "registration", "refused", "expiration",
+    "withdrawal", "publication", "cancel", "abandonment",
+)
+# 표장유형 9
+ADVANCED_MARK_TYPE_FLAGS: tuple[str, ...] = (
+    "trademark", "serviceMark", "businessEmblem", "collectiveMark",
+    "geoOrgMark", "trademarkServiceMark", "certMark", "geoCertMark",
+    "internationalMark",
+)
+# 표장구성 13
+ADVANCED_COMPOSITION_FLAGS: tuple[str, ...] = (
+    "character", "figure", "compositionCharacter", "figureComposition",
+    "fragrance", "sound", "color", "colorMixed", "dimension",
+    "hologram", "invisible", "motion", "visual",
+)
+# 전체 30개 — 요청에 반드시 전부 실어야 한다(일부만 넘기면 resultCode=10).
+ADVANCED_ALL_FLAGS: tuple[str, ...] = (
+    ADVANCED_ADMIN_STATUS_FLAGS + ADVANCED_MARK_TYPE_FLAGS + ADVANCED_COMPOSITION_FLAGS
+)
+
+# 본 수집 기본 필터(실측 성공 조합):
+#  - 행정상태: 등록만(registration)         ← 서버측에서 미등록을 걸러준다
+#  - 표장구성: 도형 + 도형복합(figure, figureComposition)만
+#  - 표장유형: 전부 허용(9종 모두 true)
+# 호출자가 정책을 바꾸려면 advanced_search 에 다른 true_flags 를 넘긴다.
+DEFAULT_ADVANCED_TRUE_FLAGS: frozenset[str] = frozenset(
+    {"registration", "figure", "figureComposition", *ADVANCED_MARK_TYPE_FLAGS}
+)
+
+
+def build_advanced_flags(
+    true_flags: "frozenset[str] | set[str]" = DEFAULT_ADVANCED_TRUE_FLAGS,
+) -> dict[str, str]:
+    """30개 불리언 플래그를 전부 담은 요청 dict 를 만든다.
+
+    true_flags 에 든 플래그만 "true", 나머지는 "false"(문자열). 일부만 넘기면
+    resultCode=10 이 오므로 항상 30개를 다 싣는다.
     """
-    출원인(회사명) 검색 — 응답 원본 XML 텍스트를 그대로 반환한다 (백엔드-5).
+    return {f: ("true" if f in true_flags else "false") for f in ADVANCED_ALL_FLAGS}
 
-    백엔드-6 원본 선저장용: 파싱(parse_items) 전에 이 원본을 디스크에 남겨두면,
-    파싱 버그로 재실행해도 검색 호출(월 쿼터)을 다시 태우지 않고 로컬 원본에서
-    다시 파싱할 수 있다. applicant_search 는 이 함수의 결과를 파싱할 뿐이다.
+
+# 항목별검색 페이징(공식 문서 실측): pageNo(페이지 번호), numOfRows(페이지당 건수,
+# 기본 30 · 최대 500). 상표명완전일치 계열의 docsStart/docsCount 와 이름이 다르다.
+# 한 페이지를 크게 받을수록 같은 건수를 적은 호출로 수집한다 — 월 1,000회 예산의 핵심.
+ADVANCED_MAX_ROWS: int = 500      # 공식 상한
+ADVANCED_DEFAULT_ROWS: int = 500  # 예산 절약을 위해 항상 상한으로 받는다
+ADVANCED_MAX_PAGES: int = 10      # 호출 폭주 방지 상한(출원인당 최대 5,000건)
+
+
+def advanced_search_raw(
+    applicant: str,
+    true_flags: "frozenset[str] | set[str]" = DEFAULT_ADVANCED_TRUE_FLAGS,
+    page_no: int = 1,
+    num_of_rows: int = ADVANCED_DEFAULT_ROWS,
+) -> str:
+    """항목별검색(getAdvancedSearch) — 응답 원본 XML 텍스트를 그대로 반환한다(백엔드-6).
+
+    상표명완전일치와 달리 인증 파라미터가 ServiceKey 이고, 30개 불리언 플래그를 전부
+    실어 보낸다. 원본 선저장(DoD Ⓐ)을 위해 raw 를 분리해 둔다 — advanced_search 는
+    이 원본을 파싱·정규화할 뿐이다. 파싱 버그로 재실행해도 이 원본에서 다시 파싱할 수 있다.
     """
-    _require_config(APPLICANT_SEARCH_URL, "KIPRIS_APPLICANT_SEARCH_URL")
-    return _get(APPLICANT_SEARCH_URL, {APPLICANT_PARAM: applicant})
+    _require_config(ADVANCED_SEARCH_URL, "KIPRIS_APPLICANT_SEARCH_URL")
+    rows = max(1, min(num_of_rows, ADVANCED_MAX_ROWS))
+    params = {
+        APPLICANT_PARAM: applicant,
+        **build_advanced_flags(true_flags),
+        "pageNo": str(max(1, page_no)),
+        "numOfRows": str(rows),
+    }
+    return _get(ADVANCED_SEARCH_URL, params, auth_param="ServiceKey")
 
 
-def applicant_search(applicant: str) -> list[dict]:
-    """출원인(회사명) 검색 (백엔드-5). 반환: item dict 리스트."""
-    return parse_items(applicant_search_raw(applicant))
+def parse_advanced_total_count(xml_text: str) -> Optional[int]:
+    """항목별검색 응답의 <totalCount>(전체 건수)를 반환. 없거나 숫자가 아니면 None.
+
+    상표명완전일치의 <TotalSearchCount> 와 태그명이 다르다(실측: camelCase totalCount).
+    """
+    root = ET.fromstring(xml_text)
+    node = root.find(".//totalCount")
+    if node is None or not (node.text or "").strip():
+        return None
+    try:
+        return int(node.text.strip())
+    except ValueError:
+        return None
+
+
+def normalize_advanced_item(item: dict) -> dict:
+    """항목별검색(camelCase) 항목을 파이프라인 정규 키(기존 PascalCase 계약)로 변환한다.
+
+    - viennaCode/classificationCode 는 '|' 다중값 → 리스트로 분해
+    - 이미지 URL 은 bigDrawing(큰 이미지) 우선, 없으면 drawing → ImagePath
+    - title 은 빈 문자열도 그대로 둔다(item_to_row 가 빈 값을 None 으로 처리)
+    - SimilarCode(유사군)는 빈 배열
+      TODO(백엔드-6): getAdvancedSearch 응답엔 유사군(similarityCode)이 없다.
+      서지정보 오퍼레이션으로 후속 보강한다.
+
+    이미 정규 키(PascalCase)로 들어온 항목(레거시 name-match 원본·mock 재파싱)은 그대로
+    통과시킨다 — 정규화는 camelCase 원 응답에만 적용해, 두 입력 형식을 한 파이프라인이 쓴다.
+    """
+    if "ApplicationNumber" in item and "applicationNumber" not in item:
+        return item  # 이미 정규 키 → 그대로
+
+    def _multi(value: str) -> list[str]:
+        return [v.strip() for v in (value or "").split("|") if v.strip()]
+
+    return {
+        "ApplicationNumber": item.get("applicationNumber", ""),
+        "ApplicationStatus": item.get("applicationStatus", ""),
+        "Title": item.get("title", ""),
+        "RegistrationNumber": item.get("registrationNumber", ""),
+        "ApplicationDate": item.get("applicationDate", ""),
+        "RegistrationDate": item.get("registrationDate", ""),
+        "ApplicantName": item.get("applicantName", ""),
+        # 등록권리자명 슬롯 — getAdvancedSearch 는 regPrivilegeName 로 온다(실측 item 필드).
+        "RegistrationRightholderName": item.get("regPrivilegeName", ""),
+        "ViennaCode": _multi(item.get("viennaCode", "")),
+        "GoodClassificationCode": _multi(item.get("classificationCode", "")),
+        "SimilarCode": [],  # TODO(백엔드-6): 유사군 부재 → 서지정보 오퍼레이션으로 후속 보강
+        "ImagePath": item.get("bigDrawing") or item.get("drawing") or "",
+    }
+
+
+def advanced_search(
+    applicant: str,
+    true_flags: "frozenset[str] | set[str]" = DEFAULT_ADVANCED_TRUE_FLAGS,
+    page_no: int = 1,
+    num_of_rows: int = ADVANCED_DEFAULT_ROWS,
+) -> tuple[list[dict], int]:
+    """항목별검색(getAdvancedSearch) — (정규화된 item 리스트, 전체 건수)를 반환한다(백엔드-6).
+
+    한 페이지(numOfRows, 기본이자 상한 500)를 받고 전체 건수(totalCount)를 함께 준다.
+    총 건수가 한 페이지를 넘으면 호출자가 page_no 를 올려 이어 받는다 — 수집
+    파이프라인은 원본 선저장(DoD Ⓐ) 때문에 페이지마다 raw 를 따로 저장해야 하므로
+    여기서 페이지를 합치지 않는다(collect_pipeline.search_batch 참조).
+    """
+    xml_text = advanced_search_raw(applicant, true_flags, page_no, num_of_rows)
+    items = [normalize_advanced_item(it) for it in parse_items(xml_text)]
+    total = parse_advanced_total_count(xml_text)
+    return items, (total if total is not None else len(items))
 
 
 def download_file_now(url: str, dest: Path) -> Path:
