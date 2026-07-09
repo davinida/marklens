@@ -11,7 +11,9 @@
     3) trademarks[] 를 정규화(출원번호) 후 UPSERT
        - 이미지 실물이 없는 레코드는 제외 (reconcile — "DB에 있으면 이미지도 있다" 불변식)
     4) dataset_info 를 meta 테이블에 저장
-    5) 무결성 검증 리포트 출력 (건수/필드 누락/배열 표본/DB 대조)
+    5) 잔존 행 검사 — JSON에 없는 DB 행(이전 시드·삭제된 상표)은 이미지 실물이 없어
+       reconcile 불변식을 깨뜨릴 수 있으므로 반드시 리포트. --prune 이면 삭제까지 수행
+    6) 무결성 검증 리포트 출력 (건수/필드 누락/배열 표본/DB 대조)
 """
 
 import argparse
@@ -139,6 +141,11 @@ def apply_migrations(conn: psycopg.Connection) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--dry-run", action="store_true", help="DB에 쓰지 않고 리포트만")
+    ap.add_argument(
+        "--prune",
+        action="store_true",
+        help="JSON에 없는 DB 잔존 행 삭제 (이전 시드·삭제된 상표 정리)",
+    )
     args = ap.parse_args()
 
     if not config.DATABASE_URL:
@@ -206,6 +213,29 @@ def main() -> int:
             )
         conn.commit()
 
+        # ---- 잔존 행 검사 (JSON에 없는 DB 행 = 이전 시드·삭제된 상표) ----
+        # 이런 행은 images/ 에 실물이 없을 수 있어 "DB에 있으면 이미지도 있다"
+        # 불변식을 깨뜨린다 (실측: 2026-07-09 더미 시드 9건이 검증을 통과했었음).
+        loaded_nos = [r[0] for r in rows]
+        stale = []
+        if loaded_nos:
+            stale = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT application_no FROM trademark "
+                    "WHERE NOT (application_no = ANY(%s)) ORDER BY application_no",
+                    (loaded_nos,),
+                ).fetchall()
+            ]
+        if stale and args.prune:
+            conn.execute(
+                "DELETE FROM trademark WHERE NOT (application_no = ANY(%s))",
+                (loaded_nos,),
+            )
+            conn.commit()
+            print(f"[prune] 잔존 행 {len(stale)}건 삭제: {stale[:5]}{' ...' if len(stale) > 5 else ''}")
+            stale = []
+
         # ---- 적재 후 검증 ----
         db_count = conn.execute("SELECT count(*) FROM trademark").fetchone()[0]
         null_name = conn.execute(
@@ -218,6 +248,13 @@ def main() -> int:
 
     ok = db_count >= len(rows)
     print(f"[검증] DB 건수 {db_count} (적재 대상 {len(rows)}) → {'OK' if ok else '불일치!'}")
+    if stale:
+        print(
+            f"[경고] JSON에 없는 DB 잔존 행 {len(stale)}건: "
+            f"{stale[:5]}{' ...' if len(stale) > 5 else ''}\n"
+            f"       이미지 실물이 없어 검색 결과와 어긋날 수 있습니다. "
+            f"--prune 으로 정리할 수 있습니다."
+        )
     print(f"[검증] 이름(한/영) 모두 NULL: {null_name}건")
     for s in sample:
         print(f"[표본] {s}")
