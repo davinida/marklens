@@ -1,4 +1,4 @@
-"""
+﻿"""
 백엔드-5 수집 파이프라인(collect_pipeline) 파싱/필터 단위 테스트.
 
 전부 네트워크 없이 동작한다 — KIPRIS 실호출은 monkeypatch/픽스처로 대체하고,
@@ -14,6 +14,8 @@ main() 은 항상 --dry-run + config.DATABASE_URL="" 로 이중 차단한다(실
 실행 (project root 기준):
     ml\\venv\\Scripts\\python.exe -m pytest backend/tests/test_collect_pipeline.py -q
 """
+
+import json
 
 import pytest
 
@@ -245,6 +247,21 @@ def _no_db(monkeypatch):
     monkeypatch.setattr(cp.config, "DATABASE_URL", "")
 
 
+def _isolate_data(tmp_path, monkeypatch):
+    """원본 선저장·이미지 경로를 tmp 로 돌린다 — 실 ml/data 오염 및 의존 방지.
+
+    - 원본 XML: dry-run 도 검색 응답 원본을 저장하므로(쿼터를 태우는 호출이라)
+      배치 경로를 타는 테스트에는 반드시 이 격리가 필요하다.
+    - 이미지 디렉터리: 기수집 skip 판정이 storage.image_exists 를 보므로, 실
+      ml/data/images 에 같은 출원번호 PNG 가 있으면 결과가 달라진다(과거 더미
+      데이터가 실제로 그랬다). 판정을 로컬 데이터와 무관하게 고정한다.
+    """
+    monkeypatch.setattr(cp, "COLLECT_RAW_XML_DIR", tmp_path / "raw" / "xml")
+    images = tmp_path / "images"
+    images.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(cp.paths, "IMAGES_DIR", images)  # storage 심이 같은 모듈 참조
+
+
 def test_main_dry_run_mock_xml(tmp_path, monkeypatch, capsys):
     _no_db(monkeypatch)
     xml_file = tmp_path / "mock.xml"
@@ -260,17 +277,19 @@ def test_main_dry_run_mock_xml(tmp_path, monkeypatch, capsys):
     assert "[dry-run] 수집 대상: 4020210000001" in out  # 하이픈 번호 정규화 확인
 
 
-def test_main_dry_run_applicant_batch(monkeypatch, capsys):
-    # --applicant 배치 경로: applicant_search 를 monkeypatch 해 네트워크 없이 흐름 검증
+def test_main_dry_run_applicant_batch(tmp_path, monkeypatch, capsys):
+    # --applicant 배치 경로: applicant_search_raw 를 monkeypatch 해 네트워크 없이 흐름 검증
     _no_db(monkeypatch)
-    monkeypatch.setattr(kc, "applicant_search",
-                        lambda name: kc.parse_items(XML_APPLICANT))
+    _isolate_data(tmp_path, monkeypatch)
+    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_APPLICANT)
     monkeypatch.setattr(cp.sys, "argv",
                         ["collect_pipeline", "--applicant", "삼성전자", "--dry-run"])
     rc = cp.main()
     out = capsys.readouterr().out
     assert rc == 0
     assert "'수집': 2" in out
+    # dry-run 도 쿼터를 태우는 호출이므로 응답 원본이 남아야 한다 (DoD Ⓐ)
+    assert len(list(cp.COLLECT_RAW_XML_DIR.glob("*.xml"))) == 1
 
 
 def test_main_all_filtered_returns_2(tmp_path, monkeypatch):
@@ -288,11 +307,11 @@ def test_main_all_filtered_returns_2(tmp_path, monkeypatch):
     assert cp.main() == 2
 
 
-def test_main_limit_caps_per_applicant(monkeypatch, capsys):
+def test_main_limit_caps_per_applicant(tmp_path, monkeypatch, capsys):
     # --limit 은 출원인당 수집 상한 (호출 예산 관리)
     _no_db(monkeypatch)
-    monkeypatch.setattr(kc, "applicant_search",
-                        lambda name: kc.parse_items(XML_APPLICANT))
+    _isolate_data(tmp_path, monkeypatch)
+    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_APPLICANT)
     monkeypatch.setattr(cp.sys, "argv",
                         ["collect_pipeline", "--applicant", "삼성전자",
                          "--limit", "1", "--dry-run"])
@@ -300,3 +319,192 @@ def test_main_limit_caps_per_applicant(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert rc == 0
     assert "'수집': 1" in out  # 2건 대상이지만 limit=1 로 1건만
+
+
+# ====================================================================
+# 백엔드-6 감사보고서 DoD — 원본 선저장 / 기수집 skip / 레코드별 체크포인트
+#
+# 전부 오프라인. KIPRIS 실호출 0회(applicant_search_raw/download_file_now 를
+# 전부 mock), 실 DB 쓰기 0회(upsert_rows·load_db_app_numbers 를 mock + 경로를
+# tmp 로 격리)를 코드로 강제한다. 실 ml/data/images(100장)·실 체크포인트에 손대지 않는다.
+# ====================================================================
+
+# 수집 대상 3건 (등록 + ViennaCode + 40.. 상표번호 + ImagePath) — skip/체크포인트용.
+XML_THREE = """<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <header><resultCode>00</resultCode></header>
+  <body><items>
+    <item><Title>로고1</Title><ApplicationStatus>등록</ApplicationStatus>
+      <ApplicationNumber>40-2021-0000001</ApplicationNumber>
+      <ViennaCode>260101</ViennaCode><GoodClassificationCode>09</GoodClassificationCode>
+      <ImagePath>http://plus.kipris.or.kr/fileToss.jsp?a=1</ImagePath></item>
+    <item><Title>로고2</Title><ApplicationStatus>등록</ApplicationStatus>
+      <ApplicationNumber>40-2021-0000002</ApplicationNumber>
+      <ViennaCode>270501</ViennaCode><GoodClassificationCode>09</GoodClassificationCode>
+      <ImagePath>http://plus.kipris.or.kr/fileToss.jsp?a=2</ImagePath></item>
+    <item><Title>로고3</Title><ApplicationStatus>등록</ApplicationStatus>
+      <ApplicationNumber>40-2021-0000003</ApplicationNumber>
+      <ViennaCode>260101</ViennaCode><GoodClassificationCode>09</GoodClassificationCode>
+      <ImagePath>http://plus.kipris.or.kr/fileToss.jsp?a=3</ImagePath></item>
+  </items></body>
+</response>
+"""
+
+
+@pytest.fixture
+def sandbox(tmp_path, monkeypatch):
+    """실 DB/이미지/네트워크/체크포인트를 원천 차단하는 격리 샌드박스.
+
+    - 체크포인트·원본 XML·이미지 경로를 tmp 로 리디렉트(실 ml/data 미오염)
+    - upsert_rows / load_db_app_numbers 를 mock → 실 DB 접촉 0
+    - rebuild_index no-op → 무거운 subprocess 미기동
+    - config.DATABASE_URL 은 가짜(비어있지 않아야 실 수집 경로 진입) — 단, 실 접속 없음
+    """
+    images = tmp_path / "images"
+    images.mkdir()
+    monkeypatch.setattr(cp, "CHECKPOINT_PATH", tmp_path / "collect_checkpoint.json")
+    monkeypatch.setattr(cp, "COLLECT_RAW_XML_DIR", tmp_path / "raw" / "xml")
+    monkeypatch.setattr(cp.paths, "IMAGES_DIR", images)  # storage 심이 같은 paths 모듈 참조
+    monkeypatch.setattr(cp, "load_db_app_numbers", lambda url: set())
+    monkeypatch.setattr(cp, "rebuild_index", lambda: None)
+
+    captured = {"rows": []}
+
+    def fake_upsert(rows, database_url):
+        assert "fake" in database_url  # 실 DATABASE_URL 이 새어들지 않았는지 방어
+        captured["rows"].extend(rows)
+
+    monkeypatch.setattr(cp, "upsert_rows", fake_upsert)
+    monkeypatch.setattr(cp.config, "DATABASE_URL", "postgresql://fake/marklens")
+    return {"images": images, "captured": captured}
+
+
+def _counting_download(calls, *, raise_on=None):
+    """실 다운로드 대체 mock — 호출을 세고 tmp 에 더미 PNG 를 쓴다.
+    raise_on(1-기반)번째 호출에서 KeyboardInterrupt 를 던져 사용자 중단을 시뮬레이션."""
+    def _dl(url, dest):
+        calls.append(url)
+        if raise_on is not None and len(calls) == raise_on:
+            raise KeyboardInterrupt("사용자 중단 시뮬레이션")
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"\x89PNG\r\n\x1a\n(fake)")
+        return dest
+    return _dl
+
+
+def test_rerun_skips_collected_zero_download_calls(sandbox, monkeypatch, capsys):
+    # ② 재실행 시 기수집 출원번호를 건너뛰고 재다운로드 HTTP 호출이 0 인지.
+    search_calls, dl_calls = [], []
+    monkeypatch.setattr(kc, "applicant_search_raw",
+                        lambda name: (search_calls.append(name), XML_THREE)[1])
+    monkeypatch.setattr(kc, "download_file_now", _counting_download(dl_calls))
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
+
+    # 1차: 3건 다운로드·적재
+    assert cp.main() == 0
+    assert len(dl_calls) == 3
+    assert len(sandbox["captured"]["rows"]) == 3
+    # 체크포인트 파일에 3건 영속 기록 (레코드별 체크포인트)
+    ckpt = json.loads(cp.CHECKPOINT_PATH.read_text(encoding="utf-8"))
+    assert ckpt["collected"] == ["4020210000001", "4020210000002", "4020210000003"]
+
+    # 2차: 전부 기수집 → 다운로드 HTTP 0회
+    dl_calls.clear()
+    sandbox["captured"]["rows"].clear()
+    n_search_before = len(search_calls)
+    assert cp.main() == 0
+    out = capsys.readouterr().out
+    assert len(dl_calls) == 0                       # ← 핵심: 재다운로드 0
+    assert sandbox["captured"]["rows"] == []        # DB UPSERT 도 0건
+    assert "'건너뜀_기수집': 3" in out
+    assert "'수집': 0" in out
+    # 검색은 출원인당 1회 상각 호출(신규 등록 발견용)이라 재실행에도 정상 수행
+    assert len(search_calls) == n_search_before + 1
+
+
+def test_checkpoint_resume_after_interrupt(sandbox, monkeypatch, capsys):
+    # ① 중단→재개: 3건 중 2건 처리 후 중단(KeyboardInterrupt), 재실행 시 3번째만 처리.
+    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
+
+    # 1차: 3번째 다운로드에서 중단 → 예외 전파(이어받기용 체크포인트만 남는다)
+    run1 = []
+    monkeypatch.setattr(kc, "download_file_now", _counting_download(run1, raise_on=3))
+    with pytest.raises(KeyboardInterrupt):
+        cp.main()
+    ckpt = json.loads(cp.CHECKPOINT_PATH.read_text(encoding="utf-8"))
+    assert ckpt["collected"] == ["4020210000001", "4020210000002"]  # 2건만 체크포인트
+    assert sorted(p.name for p in sandbox["images"].glob("*.png")) == [
+        "4020210000001.png", "4020210000002.png"]                    # 3번째 이미지 없음
+
+    # 2차: 앞 2건은 skip, 3번째만 다운로드
+    run2 = []
+    monkeypatch.setattr(kc, "download_file_now", _counting_download(run2))
+    assert cp.main() == 0
+    out = capsys.readouterr().out
+    assert run2 == ["http://plus.kipris.or.kr/fileToss.jsp?a=3"]     # 3번째만 호출
+    assert "'수집': 1" in out
+    assert "'건너뜀_기수집': 2" in out
+    ckpt = json.loads(cp.CHECKPOINT_PATH.read_text(encoding="utf-8"))
+    assert ckpt["collected"] == ["4020210000001", "4020210000002", "4020210000003"]
+
+
+def test_raw_xml_saved_before_parse_survives_parse_error(sandbox, monkeypatch):
+    # Ⓐ 원본 선저장: 파싱이 터져도 응답 XML 원본은 디스크에 남아야 한다(파싱 전 저장).
+    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+
+    def boom_parse(xml_text):
+        raise ValueError("parse boom")
+
+    monkeypatch.setattr(kc, "parse_items", boom_parse)
+
+    with pytest.raises(ValueError):
+        cp.search_batch("삼성전자")
+
+    saved = list(cp.COLLECT_RAW_XML_DIR.glob("*.xml"))
+    assert len(saved) == 1                                  # 파싱 전에 이미 저장됨
+    assert saved[0].read_text(encoding="utf-8") == XML_THREE
+
+
+def test_image_saved_before_rowparse_survives_error(sandbox, monkeypatch, capsys):
+    # ③ 원본 선저장(이미지): 행 변환(파싱)이 터져도 다운로드된 원본 이미지는 보존된다.
+    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+    monkeypatch.setattr(kc, "download_file_now", _counting_download([]))
+
+    def boom_row(item):
+        raise ValueError("row boom")
+
+    monkeypatch.setattr(cp, "item_to_row", boom_row)
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
+
+    rc = cp.main()
+    # 3건 모두 이미지 원본은 디스크에 남았지만(선저장), 행 변환 실패로 수집 0
+    assert sorted(p.name for p in sandbox["images"].glob("*.png")) == [
+        "4020210000001.png", "4020210000002.png", "4020210000003.png"]
+    assert sandbox["captured"]["rows"] == []                 # DB 적재 0
+    assert rc == 2                                           # 수집 0 → 필터/포맷 실패 신호
+    err = capsys.readouterr().err
+    assert "레코드 변환 실패" in err
+    # 실패해도 체크포인트에는 기록하지 않는다(수정 후 --force 재처리 여지)
+    assert not cp.CHECKPOINT_PATH.exists()
+
+
+def test_force_reprocesses_already_collected(sandbox, monkeypatch):
+    # --force: 기수집 skip 을 무시하고 재수집(재보정·재수집 시나리오).
+    monkeypatch.setattr(kc, "applicant_search_raw", lambda name: XML_THREE)
+    dl = []
+    monkeypatch.setattr(kc, "download_file_now", _counting_download(dl))
+
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
+    assert cp.main() == 0
+    assert len(dl) == 3
+
+    dl.clear()
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index", "--force"])
+    assert cp.main() == 0
+    assert len(dl) == 3          # --force 로 기수집분도 다시 다운로드

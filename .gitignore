@@ -153,6 +153,12 @@ temp/
 # 데이터 폴더 (저작권 이미지 + 큰 인덱스 파일)
 ml/data/
 
+# 백엔드-6 수집기 산출물 (위 ml/data/ 로 이미 커버되나 명시):
+#   - 레코드별 체크포인트(재실행 이어받기)
+#   - 파싱 전 KIPRIS 응답 원본 XML 선저장(일회성 링크 보호, 저작권 원본)
+ml/data/collect_checkpoint.json
+ml/data/raw_kipris/collect/
+
 # assets 내 데이터 압축본 (저작권 KIPRIS 데이터 + 구버전 코드 스냅샷 — 커밋 금지)
 assets/marklens(코드+실행가이드)/
 assets/*.zip

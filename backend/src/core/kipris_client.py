@@ -352,11 +352,21 @@ def name_match_search(name: str) -> tuple[list[dict], int]:
     return items, (total if total is not None else len(items))
 
 
+def applicant_search_raw(applicant: str) -> str:
+    """
+    출원인(회사명) 검색 — 응답 원본 XML 텍스트를 그대로 반환한다 (백엔드-5).
+
+    백엔드-6 원본 선저장용: 파싱(parse_items) 전에 이 원본을 디스크에 남겨두면,
+    파싱 버그로 재실행해도 검색 호출(월 쿼터)을 다시 태우지 않고 로컬 원본에서
+    다시 파싱할 수 있다. applicant_search 는 이 함수의 결과를 파싱할 뿐이다.
+    """
+    _require_config(APPLICANT_SEARCH_URL, "KIPRIS_APPLICANT_SEARCH_URL")
+    return _get(APPLICANT_SEARCH_URL, {APPLICANT_PARAM: applicant})
+
+
 def applicant_search(applicant: str) -> list[dict]:
     """출원인(회사명) 검색 (백엔드-5). 반환: item dict 리스트."""
-    _require_config(APPLICANT_SEARCH_URL, "KIPRIS_APPLICANT_SEARCH_URL")
-    xml_text = _get(APPLICANT_SEARCH_URL, {APPLICANT_PARAM: applicant})
-    return parse_items(xml_text)
+    return parse_items(applicant_search_raw(applicant))
 
 
 def download_file_now(url: str, dest: Path) -> Path:
