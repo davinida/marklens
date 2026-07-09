@@ -60,6 +60,7 @@ MarkLens는 이 문제를 두 단계로 접근합니다.
 | FastAPI 백엔드 | `POST /search`(이미지 업로드 → 유사 상표 + 위험도 반환), `GET /health`(서버·엔진 상태), 결과 이미지 `/images` 정적 서빙. CLIP·인덱스를 서버 시작 시 1회 로딩 | `backend/` |
 | 입력 이미지 검증 | 업로드 파일의 형식·크기·치수를 실제 디코딩으로 검증 | `backend/src/core/validation.py` |
 | 초기 위험도 등급 | CLIP 시각 유사도 **단일 축**으로 4단계 등급 산출 (주의 필요 / 검토 권장 / 특정 위협 없음 / 비교적 안전) | `ml/src/scoring.py` |
+| 프론트엔드 | 이미지 업로드 화면 + **3층 구조 결과 화면**(① 등급·권장 행동 → ② 유사 상표 비교 → ③ 상세 정보). 입력 → 검색중 → 결과 → 오류 4상태, 백엔드 `POST /search` 1차 연동 | `frontend/` |
 
 ### 🔜 구현 예정 (아직 없음)
 
@@ -72,7 +73,6 @@ MarkLens는 이 문제를 두 단계로 접근합니다.
 | ┗ X4 상품 견련성 | 유사군 코드 집합 간 **자카드(Jaccard) 계수**로 상품 분야 겹침을 연속 수치화 |
 | **통계적 위험 확률** | 4개 축 점수를 **로지스틱 회귀**로 결합하고, **특허법원 심결 데이터**로 가중치를 최적화하여 **0~100% 출처 혼동 위험 확률**을 산출 |
 | **식별력 없는 상표 필터** | 보통명칭·기술적표장 등 애초에 등록받을 수 없는 표장을 유사 판단 전에 걸러내는 기능 |
-| **프론트엔드** | 이미지 업로드 화면 + **3층 구조 결과 화면**(① 등급·권장 행동 → ② 유사 상표 비교 → ③ 상세 정보). 현재 **디자인 시안만 완성**, 코드 미구현 |
 
 ### 🔄 초기 계획에서 변경된 점 (방향 전환)
 
@@ -96,6 +96,7 @@ MarkLens는 이 문제를 두 단계로 접근합니다.
 |------|------|
 | 언어 / 런타임 | Python 3.11 |
 | 백엔드 | FastAPI, uvicorn, Pydantic v2 |
+| 프론트엔드 | Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS |
 | ML / AI | OpenCLIP (ViT-B/32, `laion2b_s34b_b79k`), PyTorch, FAISS (`faiss-cpu`) |
 | 이미지 처리 | Pillow (PIL) |
 | 데이터 | KIPRIS 등록상표 공보 (검증 데이터 100건), FAISS 인덱스 파일 + JSON 메타데이터 |
@@ -105,12 +106,12 @@ MarkLens는 이 문제를 두 단계로 접근합니다.
 
 | 분류 | 기술 | 용도 |
 |------|------|------|
-| 프론트엔드 | Next.js 14 (App Router), TypeScript | 업로드 UI + 3층 결과 화면 |
 | 통계 모델 | 로지스틱 회귀 (예: scikit-learn 계열) | 4개 축 점수 결합 및 가중치 최적화 |
 | 언어 모델 | 사전학습 한국어 임베딩 모델 | X3 관념 유사도 계산 |
 
-> 데이터 저장은 1학기 MVP 기준으로 **파일 기반(FAISS 인덱스 + JSON)** 입니다.
-> PostgreSQL 등 DBMS 도입은 데이터 규모가 커질 경우에 한해 추후 검토합니다.
+> 데이터 저장은 **파일/DB 이중 모드**입니다. 기본은 파일 기반(FAISS 인덱스 + JSON)이며,
+> `.env`에 `DATABASE_URL`을 설정하면 상표 메타데이터를 PostgreSQL에서 조회합니다(db 모드).
+> FAISS 벡터 인덱스는 두 모드 공통으로 파일에 둡니다. (설정·마이그레이션은 §6-6 참조)
 
 ---
 
@@ -180,7 +181,7 @@ marklens/
 │   │   ├── core/       # 경로·설정·엔진·입력 검증
 │   │   └── schemas/    # Pydantic 응답 모델
 │   └── requirements.txt
-├── frontend/     # Next.js 웹 (★구현 예정 — 현재 비어 있음)
+├── frontend/     # Next.js 16 웹 (구현 완료 — 업로드 + 3층 결과 화면, /search 연동)
 └── shared/       # 공통 타입 정의 (예정)
 ```
 
@@ -189,7 +190,7 @@ marklens/
 ## 6. 설치 및 실행
 
 > 아래 명령은 모두 **실제로 동작이 확인된** 절차입니다.
-> 프론트엔드는 아직 구현되지 않아 실행 방법이 없습니다.
+> 프론트엔드 실행 방법은 **§6-8**을 참고하세요.
 
 ### 6-1. 사전 요구사항
 
@@ -300,8 +301,15 @@ uvicorn backend.src.main:app --reload
 > **저장소 모드(선택):** `.env`에 `DATABASE_URL`을 설정하면 상표 메타데이터를
 > PostgreSQL에서 조회합니다(db 모드). 최초 1회
 > `python -m backend.scripts.migrate_json_to_db` 로 JSON 100건을 DB로 옮긴 뒤
-> 서버를 재시작하세요. 설정하지 않으면 기존 JSON 파일 모드로 동작합니다.
+> 서버를 재시작하세요. (JSON에 없는 DB 잔존 행까지 정리하려면 `--prune` 옵션을 붙입니다.)
+> 설정하지 않으면 기존 JSON 파일 모드로 동작합니다.
 > 상세: `docs/MarkLens_작업가이드_백엔드.md`
+
+> **시연·배포 하드닝(선택, 미설정 시 로컬 개발 기본):** `.env`로 다음을 조절할 수 있습니다.
+> `MARKLENS_API_KEY`(설정 시 `/search`·`/name-check`에 `X-API-Key` 헤더 일치를 요구, 미설정 시 무인증),
+> `MARKLENS_CORS_ORIGINS`(허용 오리진 콤마 목록, 기본 `http://localhost:3000,http://127.0.0.1:3000`),
+> `MARKLENS_SEARCH_RATELIMIT`(기본 `10/minute`)·`MARKLENS_NAMECHECK_RATELIMIT`(기본 `30/minute`) 인바운드 레이트리밋.
+> `/health`·`/docs`·`/images`는 항상 인증에서 제외됩니다.
 
 #### 서버 중지·포트 정리 (Windows)
 
