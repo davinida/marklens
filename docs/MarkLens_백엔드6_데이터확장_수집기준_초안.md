@@ -2,7 +2,7 @@
 
 > **상태: 초안 — 단톡 합의 전.** 아래 수치·기준은 제안값이며, [잠정] 표기 항목은 팀 논의로 확정한다.
 > 기준 문서: `assets/TODO.pdf`(백엔드-5·6), `docs/MarkLens_기술감사보고서_2026-07.md`(§5·6·횡단리스크), `docs/MarkLens_로드맵_마일스톤.md`(M3).
-> 작성일: 2026-07-09 · 상태: **KIPRIS Plus 상품 승인 완료**(2026-07-09) · 본 수집 오퍼레이션 `getAdvancedSearch` 확보·구현 완료 · 실측 호출 누적 **5/950회**.
+> 작성일: 2026-07-09 · 상태: **KIPRIS Plus 상품 승인 완료**(2026-07-09) · 본 수집 오퍼레이션 `getAdvancedSearch` 확보·구현 완료 · **서지상세 `getBibliographyDetailInfoSearch` 확보(유사군 보강 경로 해소, 2026-07-10)** · 실측 호출 누적 **8/950회**.
 
 읽는 법(설계결정기록과 동일): **[확정]** 합의 완료 / **[잠정]** 방향 합의·수치 미정 / **[미정]** 미결정.
 
@@ -18,8 +18,9 @@
 
 감사보고서(§횡단리스크·6-2)가 백엔드-5 DoD로 못박았던 세 가지. **`collect_pipeline.py`에 구현 완료**되어 본 수집의 코드 측 선결 조건은 해소되었다(오프라인 테스트 5건으로 검증, KIPRIS 실호출 0회).
 
-1. **레코드별 체크포인트** — 수집 완료 출원번호를 `ml/data/collect_checkpoint.json`에 원자적으로 기록. 중단(Ctrl-C·예외·쿼터 소진) 후 재실행 시 이어받는다.
-2. **기수집 출원번호 skip** — 체크포인트 ∪ DB ∪ 이미지 실물 중 하나라도 있으면 검색 결과에서 건너뛴다(리포트에 `건너뜀_기수집` 집계). 재수집이 필요하면 `--force`.
+1. **레코드별 체크포인트** — **DB UPSERT 성공 후에만** 출원번호를 `ml/data/collect_checkpoint.json`에 원자적으로 기록한다. 중단(Ctrl-C·쿼터 소진) 시에도 그때까지 확보한 행을 먼저 적재하고 종료 코드 3으로 끝내므로, 재실행이 이어받을 때 체크포인트와 DB가 어긋나지 않는다.
+   - *(2026-07-10 수정)* 처음엔 레코드마다 체크포인트를 먼저 쓰고 적재는 루프 끝에 한 번 했다. 그러면 예산 소진으로 중단될 때 체크포인트·이미지는 남고 DB 적재만 빠져서, **재실행이 그 레코드들을 skip 해 영원히 적재되지 않았다.** 500건 보강이 바로 그 시나리오였다.
+2. **기수집 출원번호 skip** — **DB ∪ 체크포인트**(=적재 완료)에 있으면 건너뛴다(리포트에 `건너뜀_기수집`). **이미지 실물 존재는 skip 근거가 아니다** — 이미지는 적재보다 먼저 저장되므로 "이미지 있음 ≠ 적재됨"이다. 이미지가 이미 있으면 **다운로드만 건너뛰고 적재는 진행**한다(`이미지_재사용` 집계, 만료된 일회성 링크 재호출 방지). 재수집이 필요하면 `--force`.
 3. **파싱 전 원본(XML·이미지) 디스크 선저장** — 검색 응답 XML을 파싱 이전에 `ml/data/raw_kipris/collect/xml/`에 저장하고, 이미지는 행 변환 이전에 저장한다. `ImagePath`는 일회성 링크라 파싱 버그로 재수집하면 링크가 만료돼 호출을 또 태우기 때문. 저장된 원본은 `--mock-xml`로 재파싱할 수 있다.
    - **`--dry-run`도 검색 API를 호출해 쿼터를 태우므로 원본을 저장한다.** dry-run을 "공짜 미리보기"로 오해하지 말 것.
 
@@ -121,7 +122,7 @@
 - **출원인 검색 1회 → 최대 500건 반환**(검색 호출은 페이지당 1회, 레코드당 아님)이라 검색 호출은 크게 상각된다. 실측: 500건 수신 중 **443건(89%)이 적재 대상** ⇒ **적재당 검색 호출 ≈ 0.002회**. 검색은 더 이상 예산의 병목이 아니다.
 - **페이징 확정**(`pageNo`/`numOfRows`, 최대 500). 코드는 `totalCount` 를 다 받을 때까지 페이지를 이어받고, 페이지마다 원본 XML을 따로 선저장한다(DoD Ⓐ). 출원인당 페이지 상한 10(=5,000건)을 두어 폭주를 막는다.
 - 이미지 다운로드(`download_file_now`)는 `fileToss.jsp` 파일 링크로, **현재 코드상 월 카운터에 잡히지 않는다**(검색 `_get`만 리미터 통과). 다만 KIPRIS가 다운로드도 쿼터에 산입하는지는 **파일럿에서 실측 필요**.
-- 영문명·상세 서지·**유사군(similarityCode)** 등 보강 필드가 필요하면 **레코드별 상세/서지 조회 1회**가 추가될 수 있다(현재 미구현 — getAdvancedSearch 응답엔 유사군이 없어 `similarity_codes`는 빈 배열로 적재).
+- **유사군(similarityCode) 보강 경로 확보·구현 [해소 — 2026-07-10]**: 서지상세 `getBibliographyDetailInfoSearch`(출원번호 1개 → 유사군·지정상품·비엔나·서지요약)를 클라이언트에 구현하고(`kipris_client.bibliography_detail`), 수집 파이프라인에 **옵트인 플래그 `--enrich-biblio`** 로 붙였다. **레코드당 +1회 호출**이라 500건 보강 = **+500회(월 예산 950의 절반)** — 기본은 꺼짐. 실제 증가분은 파일럿에서 실측한다. 영문명·상세 서지는 여전히 미구현(후속).
 
 > **결론: "건당 2~4회"는 상한 가정으로 두고, 5건 파일럿에서 카운터 증가분(`kipris_call_count.json`)을 실측해 확정한다. 수율 80%·검색 상각(적재당 ≈0.06회)을 감안하면 500~1,000건 목표는 예산 950회 안에서 여유롭게 도달 가능하다(단, 페이징 확장·이미지 쿼터 산입 여부가 변수).**
 
@@ -164,7 +165,7 @@
 - [x] 체크포인트 / 기수집 skip / 원본 선저장 3종 구현·테스트. *(2026-07-09 완료)*
 - [ ] 수집 리포트에 **류 분포** 추가.
 - [ ] **`45/50/51/56/70` 출원번호 정책 결정**(§ⓑ 수율 실측 1번) — 등록 도형상표 500건 표본의 **11.4%(57건)** 를 버린다. 이 접두들은 **등록번호가 40/41/45 인 정식 상표**임이 실측으로 확인됐다(특허 아님). 화이트리스트 → 블랙리스트(`appno.NON_TRADEMARK_PREFIXES`) 전환 제안. 확정 전까지 코드는 40/41만 통과(현행 유지).
-- [ ] **유사군 보강 경로 확정** — `getAdvancedSearch` 응답에 유사군이 없다. 서지정보 계열 오퍼레이션으로 출원번호 → 유사군·지정상품을 가져오는 절차가 필요하다(X4 축·다빈-1 라벨표 학습의 선결 조건).
+- [x] **유사군 보강 경로 확정** *(2026-07-10 해소)* — 서지상세 `getBibliographyDetailInfoSearch`(kipo-api/ServiceKey, 파라미터 `applicationNumber` 1개)로 출원번호 → 유사군·지정상품을 가져온다. `collect_pipeline --enrich-biblio`(옵트인)로 붙였다. **⚠ 레코드당 +1회 호출 = 500건 보강 시 +500회(예산 950의 절반)** — 파일럿에서 카운터 증가분 실측. **[미정]** 본 수집에 포함할지 vs 나중에 배치로 따로 돌릴지(부록 B).
 
 **3단계 — 소규모 5건 파일럿**
 - [ ] 오프라인 예행: `--mock-xml` 로 파싱·필터 확인(네트워크 0).
@@ -197,15 +198,16 @@
 
 두 계열이 공존한다. **인증 파라미터·응답 표기·페이징 파라미터가 전부 다르다** — 섞으면 `resultCode=10`.
 
-| | 상표명완전일치 (`/name-check`) | **항목별검색 (본 수집)** | 도형코드 검색 (미사용) |
-|---|---|---|---|
-| 오퍼레이션 | `trademarkNameMatchSearchInfo` | **`getAdvancedSearch`** | `viennaCodesearchInfo` |
-| 경로 | `openapi/rest/trademarkInfoSearchService/…` | **`kipo-api/kipi/trademarkInfoSearchService/…`** | `openapi/rest/trademarkInfoSearchService/…` |
-| 인증 | `accessKey` | **`ServiceKey`** | `accessKey` |
-| 응답 표기 | PascalCase (`ApplicationStatus`, `ImagePath`) | **camelCase** (`applicationStatus`, `bigDrawing`) | PascalCase |
-| 페이징 | `docsStart`/`docsCount` | **`pageNo`/`numOfRows`** (기본 30, 최대 500) | `docsStart`/`docsCount` |
-| 전체 건수 | `TotalSearchCount` | `totalCount` | `TotalSearchCount` |
-| 유사군 | 응답 `SimilarCode` **있음** | 응답 **없음**(요청 `similarityCode`로 검색만 가능) | 응답 없음 |
+| | 상표명완전일치 (`/name-check`) | **항목별검색 (본 수집)** | **서지상세 (유사군 보강)** | 도형코드 검색 (미사용) |
+|---|---|---|---|---|
+| 오퍼레이션 | `trademarkNameMatchSearchInfo` | **`getAdvancedSearch`** | **`getBibliographyDetailInfoSearch`** | `viennaCodesearchInfo` |
+| 경로 | `openapi/rest/trademarkInfoSearchService/…` | **`kipo-api/kipi/trademarkInfoSearchService/…`** | **`kipo-api/kipi/trademarkInfoSearchService/…`** | `openapi/rest/trademarkInfoSearchService/…` |
+| 인증 | `accessKey` | **`ServiceKey`** | **`ServiceKey`** | `accessKey` |
+| 응답 표기 | PascalCase (`ApplicationStatus`, `ImagePath`) | **camelCase** (`applicationStatus`, `bigDrawing`) | camelCase **중첩 Array** (`similarityCodeInfoArray`, `asignProductArray`) | PascalCase |
+| 요청 파라미터 | `trademarkNameMatch` | 출원인 + 불리언 플래그 30개 | **`applicationNumber` 1개** (레코드당 1회 = 쿼터 1) | 비엔나코드 |
+| 페이징 | `docsStart`/`docsCount` | **`pageNo`/`numOfRows`** (기본 30, 최대 500) | 없음(출원번호 단건 조회) | `docsStart`/`docsCount` |
+| 전체 건수 | `TotalSearchCount` | `totalCount` | 해당 없음 | `TotalSearchCount` |
+| 유사군 | 응답 `SimilarCode` **있음** | 응답 **없음**(요청 `similarityCode`로 검색만 가능) | 응답 **있음**(`similarCode`·`asignProduct.subCode`) | 응답 없음 |
 
 **getAdvancedSearch 불리언 플래그 30개는 전부 실어야 한다**(일부만 넘기면 `resultCode=10`). 값은 `"true"`/`"false"`.
 - 행정상태 8: `application` `registration` `refused` `expiration` `withdrawal` `publication` `cancel` `abandonment`
@@ -214,12 +216,22 @@
 
 > 괄호 안 숫자는 **표장유형 코드**다. 출원번호 접두와 1:1로 대응하지 않는다 — 실측상 `50/51/56/70` 출원번호도 등록번호는 40/41이다(§ⓑ 결정 1).
 
+**서지상세 `getBibliographyDetailInfoSearch` 응답 경로**(실측, 중첩 구조라 평면 `parse_items` 로는 못 읽어 전용 파서 `parse_bibliography_detail` 를 둔다):
+- 유사군: `body/item/similarityCodeInfoArray/similarityCodeInfo/similarCode`(반복) — 정렬·중복 제거. 비면 `asignProductArray/asignProduct/subCode` 로 폴백(실측상 동일 집합).
+- 지정상품: `asignProduct/{mainCode(류), subCode(유사군), productName(상품명)}` — `mainCode` 를 int 로 모아 류(`nice_classes`) 보강.
+- 비엔나: `viennaCodeInfoArray/viennaCodeInfo/{viennaCode, viennaCodeDescription}`(코드+한글 설명).
+- 서지요약: `biblioSummaryInfoArray/biblioSummaryInfo/{registerStatus, trademarkDivisionCode(연속 공백 정규화 필요), registrationNumber, imageFlag, …}`.
+- 이미지: `sampleImageInfoArray/sampleImageInfo/{path(큰이미지), smallPath}` — 둘 다 `fileToss` 일회성 링크.
+
+> **예산**: 레코드당 1회 호출이라 500건 보강 = **500회(예산 950의 절반)**. `collect_pipeline --enrich-biblio`(옵트인, 기본 꺼짐)로만 태운다. 파일럿에서 카운터 증가분 실측.
+
 ---
 
 ## 부록 B — 합의 필요 항목 요약 (단톡용)
 
 - **[미정·시급] `45/50/51/56/70` 접두 출원번호를 수집할 것인가** — 등록 도형상표 500건 표본의 11.4%(57건). **등록번호가 40/41/45 인 정식 상표**임이 실측 확인됨. 지금은 전량 폐기 중(§ⓑ 결정 1)
-- **[미정·차단] 유사군 보강 경로** — 본 수집 응답에 유사군이 없다. X4 축·통합모델 학습이 이것에 걸려 있다
+- **[해소] 유사군 보강 경로** — 서지상세 `getBibliographyDetailInfoSearch`(ServiceKey·`applicationNumber` 1개)로 출원번호 → 유사군·지정상품을 얻는다. `kipris_client.bibliography_detail` + `collect_pipeline --enrich-biblio`(옵트인) 구현·오프라인 검증 완료. *(2026-07-10)*
+- **[미정·차단] 유사군 보강을 언제 태울 것인가** — 레코드당 +1회라 500건 보강 = **예산 950의 절반**. ① 본 수집에 `--enrich-biblio` 로 **동시 태우기**(적재+유사군 한 번에, 단 예산 절반 소모) vs ② 본 수집은 유사군 없이 먼저 채우고 **나중에 배치로 따로 보강**(예산이 회복된 달에). X4 축·다빈-1 라벨표 학습이 여기 걸려 있다 — 파일럿 실측 후 결정
 - **[해소] 출원인 검색 오퍼레이션 확보** — `getAdvancedSearch`(ServiceKey·플래그 30개·`pageNo`/`numOfRows` 최대 500)로 확정, 코드가 URL 자동 조합. *(2026-07-09)*
 - [잠정] 수집 기간 N=10년 vs 전체 등록분
 - [잠정] 목표 건수 500 vs 1,000 (1차 500 → 재보정 후 확장?)

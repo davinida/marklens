@@ -15,6 +15,10 @@
     --force       기수집 skip 을 무시하고 재수집 (일회성 링크 재호출 주의 — 예산 소모)
     --mock-xml F  API 대신 저장된 XML 파일로 전체 흐름 테스트 (키 없이 개발용.
                   이미지 다운로드 대신 플레이스홀더 PNG 생성)
+    --enrich-biblio  서지상세(getBibliographyDetailInfoSearch)로 유사군을 보강.
+                  ⚠ 레코드당 +1회 호출 — 500건 보강 = +500회(월 예산 950의 절반).
+                  getAdvancedSearch 응답엔 유사군이 없어 이 옵션 없이는 similarity_codes
+                  가 빈 배열로 적재된다. 기본 꺼짐(옵트인).
 
 TODO.pdf 필수 반영 사항이 코드에 강제되어 있다:
     ① 호출 카운터+초당 딜레이 (kipris_client.limiter)
@@ -27,10 +31,11 @@ TODO.pdf 필수 반영 사항이 코드에 강제되어 있다:
     Ⓐ 파싱 전 원본 선저장 — 검색 응답 XML 원본을 파싱 이전에 COLLECT_RAW_XML_DIR 에
        저장하고, 이미지 원본은 storage.local_path 경유로 즉시 저장한다. 파싱 버그로
        재실행해도 일회성 링크(월 쿼터)를 다시 태우지 않는다.
-    Ⓑ 기수집 출원번호 skip — DB/이미지 실물/체크포인트 중 하나라도 있으면 검색 결과에서
-       건너뛴다(중복 다운로드 = 예산 낭비). 건너뛴 건수를 리포트에 집계. --force 로 무시.
-    Ⓒ 레코드별 체크포인트 — 수집 완료한 출원번호를 CHECKPOINT_PATH 에 영속 기록.
-       중단(Ctrl-C·예외·쿼터 소진) 후 재실행 시 이어받는다.
+    Ⓑ 기수집 출원번호 skip — DB 또는 체크포인트에 있으면(=적재 완료) 건너뛴다. 이미지가
+       이미 있으면 다운로드만 건너뛰고 적재는 진행한다(만료 링크 재호출 방지). --force 로 무시.
+    Ⓒ 레코드별 체크포인트 — **DB UPSERT 성공 후에만** 출원번호를 CHECKPOINT_PATH 에 기록한다.
+       중단(Ctrl-C·쿼터 소진) 시에도 그때까지의 행을 먼저 적재하고 끝내므로, 재실행이
+       이어받을 때 체크포인트와 DB가 어긋나지 않는다(실측 결함 수정, 2026-07-10).
 """
 
 import argparse
@@ -174,19 +179,18 @@ def load_db_app_numbers(database_url: str) -> set[str]:
             return {row[0] for row in cur.fetchall()}
 
 
-def already_collected(app_no: str, image_key: str,
-                      checkpoint: set[str], db_existing: set[str]) -> bool:
-    """기수집 판정 — 셋 중 하나라도 참이면 검색·다운로드를 건너뛴다(초안 §0.2).
+def already_collected(app_no: str, checkpoint: set[str], db_existing: set[str]) -> bool:
+    """**적재 완료** 판정 — 참이면 이 레코드를 통째로 건너뛴다(초안 §0.2).
 
-    - 체크포인트에 있음: 이번/이전 실행에서 이미 수집함
     - DB 에 있음: 이미 적재된 권리
-    - 이미지 실물 존재(storage.image_exists): 파일시스템 truth (심 경유)
+    - 체크포인트에 있음: 이전 실행에서 적재까지 끝난 권리(체크포인트는 UPSERT 성공 후에만 쓴다)
+
+    ⚠ **이미지 실물 존재는 여기에 넣지 않는다.** 이미지는 DB 적재보다 먼저 저장되므로
+    "이미지 있음"이 "적재됨"을 뜻하지 않는다. 이미지만 있고 DB에 없는 레코드를 skip 하면
+    그 레코드는 영원히 적재되지 않는다(실측 결함, 2026-07-10). 이미지 재사용 판정은
+    `storage.image_exists` 로 다운로드 직전에 따로 한다 — 일회성 링크를 아끼는 용도.
     """
-    return (
-        app_no in checkpoint
-        or app_no in db_existing
-        or storage.image_exists(image_key)
-    )
+    return app_no in checkpoint or app_no in db_existing
 
 
 # --------------------------------------------------------------------
@@ -230,6 +234,30 @@ def item_to_row(item: dict) -> tuple:
         [int(c) for c in item.get("GoodClassificationCode", []) if str(c).isdigit()],
         [str(s) for s in item.get("SimilarCode", [])],
     )
+
+
+def enrich_item(item: dict) -> None:
+    """서지상세(getBibliographyDetailInfoSearch)로 유사군을 보강한다 — 레코드당 +1회 호출.
+
+    getAdvancedSearch 응답엔 유사군이 없어, 이 오퍼레이션만 출원번호로 유사군·지정상품을
+    준다(X4 상품 견련성 축·다빈-1 라벨표 학습의 경로). item 을 제자리에서 갱신한다:
+      - SimilarCode 를 서지상세의 유사군으로 덮어쓴다(빈 배열이었음).
+      - GoodClassificationCode(류)가 비어 있으면 서지상세 mainCode 로 채운다.
+      - DrawingKindName(표장구분)이 비어 있으면 서지상세 trademarkDivisionCode 로 채운다.
+
+    원본 XML 은 파싱 전에 선저장한다(DoD Ⓐ) — 라벨에 출원번호를 넣어 어느 레코드 것인지
+    남긴다. 예산 소진(CallBudgetExceeded)이나 파싱 오류는 호출자로 전파한다 —
+    호출자(main)가 CallBudgetExceeded 는 이어받기용으로 전파, 그 외 실패는 '보강실패'로 집계.
+    """
+    app_no = normalize_application_number(item["ApplicationNumber"])
+    raw = kipris_client.bibliography_detail_raw(app_no)
+    save_raw_xml(f"biblio_{app_no}", raw)          # Ⓐ 파싱 전 원본 선저장
+    detail = kipris_client.parse_bibliography_detail(raw)
+    item["SimilarCode"] = detail["similarity_codes"]
+    if not item.get("GoodClassificationCode") and detail["nice_classes"]:
+        item["GoodClassificationCode"] = [str(c) for c in detail["nice_classes"]]
+    if not item.get("DrawingKindName") and detail.get("mark_type"):
+        item["DrawingKindName"] = detail["mark_type"]
 
 
 def should_collect(item: dict, report: dict) -> bool:
@@ -282,7 +310,15 @@ def main() -> int:
     ap.add_argument("--skip-index", action="store_true")
     ap.add_argument("--force", action="store_true",
                     help="기수집 skip 을 무시하고 재수집(만료된 링크 재호출 주의 — 예산 소모)")
+    ap.add_argument("--enrich-biblio", action="store_true",
+                    help="서지상세로 유사군 보강. ⚠ 레코드당 +1회 호출 "
+                         "(500건=+500회, 월 예산 950의 절반). 기본 꺼짐(옵트인)")
     args = ap.parse_args()
+
+    # --mock-xml 은 "키 없이 오프라인 개발"용인데 --enrich-biblio 는 실 API 를 부른다.
+    # 조합을 허용하면 오프라인인 줄 알고 돌리다 예산을 태운다(실측 지적, 2026-07-10).
+    if args.mock_xml and args.enrich_biblio:
+        ap.error("--mock-xml 은 오프라인 개발용이라 --enrich-biblio(실 API 호출)와 함께 쓸 수 없습니다.")
 
     if not args.dry_run and not config.DATABASE_URL:
         print("[오류] DATABASE_URL 미설정 — 수집 결과를 적재할 DB가 필요합니다.", file=sys.stderr)
@@ -311,7 +347,8 @@ def main() -> int:
 
     # ---- 수집 ----
     report = {
-        "검색결과": 0, "수집": 0, "건너뜀_기수집": 0, "이미지실패": 0, "레코드실패": 0,
+        "검색결과": 0, "수집": 0, "건너뜀_기수집": 0, "이미지_재사용": 0,
+        "이미지실패": 0, "레코드실패": 0, "보강": 0, "보강실패": 0,
         "제외_미등록": 0, "제외_비엔나없음(문자상표)": 0, "제외_상표번호아님": 0,
     }
     # ① 체크포인트 이어받기 + ② 기수집 skip 재료. checkpoint 는 이번 실행에서
@@ -319,69 +356,99 @@ def main() -> int:
     checkpoint = load_checkpoint()
     db_existing = load_db_app_numbers(config.DATABASE_URL) if not args.dry_run else set()
     rows = []
-    for source, items in batches:
-        report["검색결과"] += len(items)
-        picked = [it for it in items if should_collect(it, report)]
-        if args.limit:
-            picked = picked[: args.limit]
-        for it in picked:
-            app_no = normalize_application_number(it["ApplicationNumber"])
-            image_key = f"{app_no}.png"
+    # 이번 실행에서 행 변환까지 끝난 출원번호. **UPSERT 성공 후에만** 체크포인트에 쓴다 —
+    # 먼저 쓰면 적재 전에 죽었을 때 재실행이 이 레코드를 skip 해 영원히 DB에 안 들어간다.
+    pending: list[str] = []
+    aborted: BaseException | None = None
+    try:
+        for source, items in batches:
+            report["검색결과"] += len(items)
+            picked = [it for it in items if should_collect(it, report)]
+            if args.limit:
+                picked = picked[: args.limit]
+            for it in picked:
+                app_no = normalize_application_number(it["ApplicationNumber"])
+                image_key = f"{app_no}.png"
 
-            # ② 기수집 skip — DB/이미지 실물/체크포인트 중 하나라도 있으면 건너뛴다
-            if not args.force and already_collected(app_no, image_key, checkpoint, db_existing):
-                report["건너뜀_기수집"] += 1
-                continue
+                # ② 기수집 skip — DB 또는 체크포인트에 있으면(=적재 완료) 건너뛴다
+                if not args.force and already_collected(app_no, checkpoint, db_existing):
+                    report["건너뜀_기수집"] += 1
+                    continue
 
-            if args.dry_run:
-                print(f"[dry-run] 수집 대상: {app_no} {it.get('Title', '')!r}")
-                checkpoint.add(app_no)  # 미리보기 내 중복 표시용 (파일에는 안 씀)
+                if args.dry_run:
+                    print(f"[dry-run] 수집 대상: {app_no} {it.get('Title', '')!r}")
+                    checkpoint.add(app_no)  # 미리보기 내 중복 표시용 (파일에는 안 씀)
+                    report["수집"] += 1
+                    continue
+
+                # ③ 원본(이미지 바이트) 즉시 저장 — 일회성 링크 보호. 파싱/DB 보다 먼저.
+                #    이미 받아 둔 이미지가 있으면 재다운로드하지 않는다(만료된 링크 재호출 방지).
+                dest = storage.local_path(image_key)
+                try:
+                    if storage.image_exists(image_key) and not args.force:
+                        report["이미지_재사용"] += 1
+                    elif args.mock_xml:
+                        make_placeholder_png(dest, it.get("Title", app_no))
+                    else:
+                        image_url = it.get("ImagePath") or it.get("ThumbnailPath", "")
+                        if not image_url:
+                            raise kipris_client.KiprisError("ImagePath 없음")
+                        kipris_client.download_file_now(image_url, dest)
+                except Exception as e:
+                    # 개별 이미지 실패는 배치를 죽이지 않는다. KeyboardInterrupt·쿼터 초과
+                    # 등은 여기서 잡히지 않고 바깥 try 로 전파 → 지금까지의 행을 적재하고 종료.
+                    report["이미지실패"] += 1
+                    print(f"[경고] 이미지 확보 실패({app_no}): {e}", file=sys.stderr)
+                    continue
+
+                # 이 지점부터 이미지 원본은 디스크에 안전히 존재한다.
+                # (옵트인) 서지상세 보강 — 이미지 저장 후, 행 변환 전. 레코드당 +1회 호출.
+                #   실패해도 레코드를 죽이지 않는다: 경고 + '보강실패' 집계 후 유사군 빈 배열로 진행.
+                #   예산 소진(CallBudgetExceeded)만은 전파해 지금까지의 행을 적재하고 끝낸다.
+                if args.enrich_biblio:
+                    try:
+                        enrich_item(it)
+                        report["보강"] += 1
+                    except kipris_client.CallBudgetExceeded:
+                        raise
+                    except Exception as e:
+                        report["보강실패"] += 1
+                        print(f"[경고] 유사군 보강 실패({app_no}) — 유사군 빈 배열로 진행: {e}",
+                              file=sys.stderr)
+
+                # 이후 파싱(행 변환).
+                try:
+                    rows.append(item_to_row(it))
+                except Exception as e:
+                    # 파싱(행 변환) 실패해도 원본 이미지는 남는다 → 버그 수정 후 --force 재처리.
+                    report["레코드실패"] += 1
+                    print(f"[경고] 레코드 변환 실패({app_no}) — 원본 이미지는 보존됨: {e}",
+                          file=sys.stderr)
+                    continue
+
+                pending.append(app_no)
                 report["수집"] += 1
-                continue
-
-            # ③ 원본(이미지 바이트) 즉시 저장 — 일회성 링크 보호. 파싱/DB 보다 먼저.
-            dest = storage.local_path(image_key)
-            try:
-                if args.mock_xml:
-                    make_placeholder_png(dest, it.get("Title", app_no))
-                else:
-                    image_url = it.get("ImagePath") or it.get("ThumbnailPath", "")
-                    if not image_url:
-                        raise kipris_client.KiprisError("ImagePath 없음")
-                    kipris_client.download_file_now(image_url, dest)
-            except Exception as e:
-                # 개별 이미지 실패는 배치를 죽이지 않는다. KeyboardInterrupt·쿼터 초과
-                # 등 BaseException 은 여기서 잡히지 않고 전파 → 체크포인트로 이어받기.
-                report["이미지실패"] += 1
-                print(f"[경고] 이미지 확보 실패({app_no}): {e}", file=sys.stderr)
-                continue
-
-            # 이 지점부터 이미지 원본은 디스크에 안전히 존재한다. 이후 파싱(행 변환).
-            try:
-                rows.append(item_to_row(it))
-            except Exception as e:
-                # 파싱(행 변환) 실패해도 원본 이미지는 남는다 → 버그 수정 후 --force 재처리.
-                report["레코드실패"] += 1
-                print(f"[경고] 레코드 변환 실패({app_no}) — 원본 이미지는 보존됨: {e}",
-                      file=sys.stderr)
-                continue
-
-            # ① 원본 저장 + 행 변환 성공 → 출원번호를 체크포인트에 영속 기록
-            checkpoint.add(app_no)
-            append_checkpoint(app_no)
-            report["수집"] += 1
+    except (kipris_client.CallBudgetExceeded, KeyboardInterrupt) as e:
+        # 중단되어도 여기까지 모은 행은 아래에서 적재한다. 그래야 체크포인트와 DB가 어긋나지 않는다.
+        aborted = e
+        print(f"\n[중단] {type(e).__name__}: {e}\n"
+              f"       지금까지 확보한 {len(rows)}건을 적재하고 종료합니다 — 재실행하면 이어받습니다.",
+              file=sys.stderr)
 
     # ⑤ 검색 결과는 있는데 수집도 skip 도 0이면 필터/포맷 문제 — 조용히 끝내지 않는다.
     #    (기수집 skip 으로 0건이면 정상 — 재실행/증분 수집에서 흔함)
-    if report["검색결과"] > 0 and report["수집"] == 0 and report["건너뜀_기수집"] == 0:
+    if aborted is None and report["검색결과"] > 0 and report["수집"] == 0 and report["건너뜀_기수집"] == 0:
         print(f"[오류] 검색 {report['검색결과']}건 중 수집 0건 — 필터/포맷 확인 필요: {report}",
               file=sys.stderr)
         return 2
 
-    # ---- DB 적재 ----
+    # ---- DB 적재 → 성공한 뒤에야 체크포인트 기록 ----
     if rows and not args.dry_run:
         upsert_rows(rows, config.DATABASE_URL)
         print(f"[DB] UPSERT {len(rows)}건 완료")
+        for app_no in pending:
+            checkpoint.add(app_no)
+            append_checkpoint(app_no)
 
     # ---- 인덱스 재빌드 ----
     if rows and not args.dry_run and not args.skip_index:
@@ -391,6 +458,8 @@ def main() -> int:
     if not args.dry_run and rows:
         print("[참고] dataset_info(데이터 범위 안내 문구)는 백엔드-6 기준 확정 후 "
               "meta 테이블에서 갱신하세요.")
+    if aborted is not None:
+        return 3  # 정상 종료가 아님을 호출자(배치 스크립트)가 알 수 있게
     return 0
 
 

@@ -55,6 +55,12 @@ TM_NAME_SEARCH_PATH: str = (
     "openapi/rest/trademarkInfoSearchService/trademarkNameMatchSearchInfo"
 )
 ADVANCED_SEARCH_PATH: str = "kipo-api/kipi/trademarkInfoSearchService/getAdvancedSearch"
+# 서지상세정보 getBibliographyDetailInfoSearch(백엔드-6 유사군 보강). getAdvancedSearch
+# 와 같은 kipo-api/kipi 계열(인증 ServiceKey). 출원번호 1개로 유사군·지정상품·비엔나·
+# 서지요약을 준다 — getAdvancedSearch 응답에 없는 유사군을 얻는 유일한 경로다.
+BIBLIO_DETAIL_PATH: str = (
+    "kipo-api/kipi/trademarkInfoSearchService/getBibliographyDetailInfoSearch"
+)
 
 
 def _compose_url(base: str, path: str) -> str:
@@ -75,6 +81,11 @@ ADVANCED_SEARCH_URL: str = os.getenv("KIPRIS_APPLICANT_SEARCH_URL", "") or _comp
     KIPRIS_BASE_URL, ADVANCED_SEARCH_PATH
 )
 APPLICANT_PARAM: str = os.getenv("KIPRIS_APPLICANT_PARAM", "applicantName")
+
+# 서지상세정보(백엔드-6 유사군 보강). env 오버라이드가 있으면 우선, 없으면 검증 경로로 조합.
+BIBLIO_DETAIL_URL: str = os.getenv("KIPRIS_BIBLIO_DETAIL_URL", "") or _compose_url(
+    KIPRIS_BASE_URL, BIBLIO_DETAIL_PATH
+)
 
 # 월 호출 예산. 공식 한도는 1,000회지만 수동 실험/재시도 여유로 50회를 남긴다.
 MONTHLY_CALL_BUDGET: int = int(os.getenv("KIPRIS_MONTHLY_BUDGET", "950"))
@@ -548,6 +559,133 @@ def advanced_search(
     items = [normalize_advanced_item(it) for it in parse_items(xml_text)]
     total = parse_advanced_total_count(xml_text)
     return items, (total if total is not None else len(items))
+
+
+# ====================================================================
+# 서지상세정보 getBibliographyDetailInfoSearch (백엔드-6 유사군 보강)
+#
+# 실측 확정(2026-07-10):
+#  - getAdvancedSearch 와 같은 kipo-api/kipi 계열, 인증 파라미터 ServiceKey.
+#  - 요청 파라미터는 applicationNumber 하나뿐 → 레코드당 1회 호출(쿼터 1 소모).
+#  - 본 수집 소스(getAdvancedSearch)에는 유사군이 없다. 이 오퍼레이션이 유일하게
+#    출원번호로 유사군·지정상품을 준다(X4 상품 견련성 축·다빈-1 라벨표 학습의 경로).
+#  - 응답은 평면 <item> 이 아니라 중첩 구조라 parse_items 로는 못 읽는다 → 전용 파서.
+#
+# 예산 주의: 레코드당 1회다. 500건 보강 = 500회(월 예산 950의 절반). 기본 동작이
+#           아니라 옵트인이어야 한다(collect_pipeline --enrich-biblio).
+# ====================================================================
+
+def _child_text(parent: ET.Element, tag: str) -> str:
+    """직계 자식 태그의 텍스트를 공백 정리해 반환한다(없으면 빈 문자열)."""
+    node = parent.find(tag)
+    return (node.text or "").strip() if node is not None else ""
+
+
+def bibliography_detail_raw(application_number: str) -> str:
+    """서지상세(getBibliographyDetailInfoSearch) — 응답 원본 XML 텍스트를 그대로 반환한다.
+
+    인증 파라미터는 ServiceKey(getAdvancedSearch 와 같은 계열), 요청 파라미터는
+    applicationNumber 하나뿐이다. 원본 선저장(DoD Ⓐ)을 위해 raw 를 분리해 둔다 —
+    bibliography_detail 은 이 원본을 파싱할 뿐이다.
+    """
+    _require_config(BIBLIO_DETAIL_URL, "KIPRIS_BIBLIO_DETAIL_URL")
+    return _get(
+        BIBLIO_DETAIL_URL,
+        {"applicationNumber": application_number},
+        auth_param="ServiceKey",
+    )
+
+
+def parse_bibliography_detail(xml_text: str) -> dict:
+    """서지상세 응답을 파싱한다(백엔드-6 유사군 보강).
+
+    응답은 중첩 구조라 parse_items(평면 item)로는 못 읽어 전용 파서를 둔다.
+    반환 dict(파이프라인이 쓰기 쉬운 정규 키):
+      - similarity_codes: list[str]  유사군코드(similarCode, 정렬·중복 제거).
+        비어 있으면 지정상품 subCode 로 폴백(실측상 동일 집합).
+      - nice_classes:     list[int]  지정상품 mainCode(류)를 int 로(정렬·중복 제거, 비숫자 버림).
+      - vienna_codes:     list[str]  비엔나 코드(문서 순서, 빈 값 제외).
+      - goods:            list[dict] 지정상품 {mainCode(류), subCode(유사군), productName(상품명)}.
+      - mark_type:        str|None   trademarkDivisionCode(연속 공백을 한 칸으로 정규화). 없으면 None.
+      - register_status:  str|None   registerStatus.
+      - registration_number: str|None
+      - image_url:        str|None   sampleImageInfo/path(큰 이미지) 우선, 없으면 smallPath.
+      - application_number: str|None  biblioSummaryInfo/applicationNumber.
+
+    resultCode != 00 이면 KiprisError(check_result_code 를 먼저 통과시킨다).
+    """
+    check_result_code(xml_text)
+    root = ET.fromstring(xml_text)
+
+    # 유사군: similarityCodeInfo/similarCode (정렬·중복 제거)
+    similarity = sorted({
+        (el.text or "").strip()
+        for el in root.findall(".//similarityCodeInfo/similarCode")
+        if (el.text or "").strip()
+    })
+
+    # 지정상품(asignProduct) — 류(mainCode)·유사군 폴백(subCode)·상품명 재료
+    goods: list[dict] = []
+    nice: set[int] = set()
+    sub_codes: set[str] = set()
+    for ap in root.findall(".//asignProduct"):
+        main = _child_text(ap, "mainCode")
+        sub = _child_text(ap, "subCode")
+        goods.append({
+            "mainCode": main,
+            "subCode": sub,
+            "productName": _child_text(ap, "productName"),
+        })
+        if main.isdigit():
+            nice.add(int(main))
+        if sub:
+            sub_codes.add(sub)
+    if not similarity:
+        similarity = sorted(sub_codes)  # 폴백: 실측상 유사군 집합과 동일
+
+    # 비엔나 코드 (문서 순서 유지, 빈 값 제외)
+    vienna = [
+        (el.text or "").strip()
+        for el in root.findall(".//viennaCodeInfo/viennaCode")
+        if (el.text or "").strip()
+    ]
+
+    # 서지요약 — 표장구분/등록상태/등록번호/출원번호
+    biblio = root.find(".//biblioSummaryInfo")
+    mark_type = register_status = registration_number = application_number = None
+    if biblio is not None:
+        # trademarkDivisionCode 는 공백이 여러 칸 섞여 온다 → 연속 공백을 한 칸으로.
+        mark_type = " ".join(_child_text(biblio, "trademarkDivisionCode").split()) or None
+        register_status = _child_text(biblio, "registerStatus") or None
+        registration_number = _child_text(biblio, "registrationNumber") or None
+        application_number = _child_text(biblio, "applicationNumber") or None
+
+    # 이미지 URL — path(큰 이미지) 우선, 없으면 smallPath (둘 다 fileToss 일회성 링크)
+    image_url = None
+    sample = root.find(".//sampleImageInfo")
+    if sample is not None:
+        image_url = _child_text(sample, "path") or _child_text(sample, "smallPath") or None
+
+    return {
+        "similarity_codes": similarity,
+        "nice_classes": sorted(nice),
+        "vienna_codes": vienna,
+        "goods": goods,
+        "mark_type": mark_type,
+        "register_status": register_status,
+        "registration_number": registration_number,
+        "image_url": image_url,
+        "application_number": application_number,
+    }
+
+
+def bibliography_detail(application_number: str) -> dict:
+    """서지상세 — 원본 XML 을 받아 parse_bibliography_detail 로 파싱해 돌려준다.
+
+    원본 선저장이 필요한 파이프라인은 bibliography_detail_raw → save → parse 를
+    직접 조합한다(collect_pipeline.enrich_item). 이 함수는 raw 저장이 필요 없는 호출용.
+    """
+    return parse_bibliography_detail(bibliography_detail_raw(application_number))
 
 
 def download_file_now(url: str, dest: Path) -> Path:

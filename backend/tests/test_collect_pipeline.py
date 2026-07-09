@@ -425,19 +425,20 @@ def test_rerun_skips_collected_zero_download_calls(sandbox, monkeypatch, capsys)
 
 def test_checkpoint_resume_after_interrupt(sandbox, monkeypatch, capsys):
     # ① 중단→재개: 3건 중 2건 처리 후 중단(KeyboardInterrupt), 재실행 시 3번째만 처리.
+    #    중단되어도 죽지 않고 그때까지의 행을 적재한 뒤 rc=3 으로 끝낸다(체크포인트=적재분).
     monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_THREE)
     monkeypatch.setattr(cp.sys, "argv",
                         ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
 
-    # 1차: 3번째 다운로드에서 중단 → 예외 전파(이어받기용 체크포인트만 남는다)
+    # 1차: 3번째 다운로드에서 중단
     run1 = []
     monkeypatch.setattr(kc, "download_file_now", _counting_download(run1, raise_on=3))
-    with pytest.raises(KeyboardInterrupt):
-        cp.main()
+    assert cp.main() == 3  # 중단 종료 코드 — 조용히 성공하지 않는다
     ckpt = json.loads(cp.CHECKPOINT_PATH.read_text(encoding="utf-8"))
-    assert ckpt["collected"] == ["4020210000001", "4020210000002"]  # 2건만 체크포인트
+    assert ckpt["collected"] == ["4020210000001", "4020210000002"]  # 적재된 2건만 체크포인트
     assert sorted(p.name for p in sandbox["images"].glob("*.png")) == [
         "4020210000001.png", "4020210000002.png"]                    # 3번째 이미지 없음
+    assert len(sandbox["captured"]["rows"]) == 2, "중단 전 확보한 행은 반드시 적재돼야 한다"
 
     # 2차: 앞 2건은 skip, 3번째만 다운로드
     run2 = []
@@ -449,6 +450,63 @@ def test_checkpoint_resume_after_interrupt(sandbox, monkeypatch, capsys):
     assert "'건너뜀_기수집': 2" in out
     ckpt = json.loads(cp.CHECKPOINT_PATH.read_text(encoding="utf-8"))
     assert ckpt["collected"] == ["4020210000001", "4020210000002", "4020210000003"]
+
+
+def test_checkpoint_never_written_when_upsert_fails(sandbox, monkeypatch):
+    """체크포인트는 **UPSERT 성공 후에만** 쓴다.
+
+    회귀 방지(2026-07-10 실측 결함): 적재 전에 체크포인트를 쓰면, 적재가 실패한 레코드를
+    재실행이 '이미 수집됨'으로 skip 해 **영원히 DB에 들어가지 않는다.**
+    """
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_THREE)
+    monkeypatch.setattr(kc, "download_file_now", _counting_download([]))
+
+    def boom_upsert(rows, database_url):
+        raise RuntimeError("DB 다운")
+
+    monkeypatch.setattr(cp, "upsert_rows", boom_upsert)
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
+
+    with pytest.raises(RuntimeError):
+        cp.main()
+    assert not cp.CHECKPOINT_PATH.exists(), "적재 실패 시 체크포인트를 남기면 안 된다"
+
+
+def test_existing_image_is_reused_not_skipped(sandbox, monkeypatch, capsys):
+    """이미지만 있고 DB/체크포인트에 없는 레코드는 **skip 하지 않고 적재**한다.
+
+    이미지는 적재보다 먼저 저장되므로 '이미지 있음'이 '적재됨'을 뜻하지 않는다.
+    다만 만료된 일회성 링크를 다시 부르지 않도록 다운로드는 건너뛴다.
+    """
+    (sandbox["images"] / "4020210000001.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    monkeypatch.setattr(kc, "advanced_search_raw", lambda name, **_: XML_THREE)
+    dl = []
+    monkeypatch.setattr(kc, "download_file_now", _counting_download(dl))
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"])
+
+    assert cp.main() == 0
+    out = capsys.readouterr().out
+    assert "'수집': 3" in out                      # 3건 모두 적재 (skip 아님)
+    assert "'이미지_재사용': 1" in out
+    assert len(dl) == 2, "이미 있는 이미지는 다시 받지 않는다"
+    rows = sandbox["captured"]["rows"]
+    assert sorted(r[0] for r in rows) == [
+        "4020210000001", "4020210000002", "4020210000003"]
+
+
+def test_mock_xml_rejects_enrich_biblio(tmp_path, monkeypatch):
+    """--mock-xml(오프라인 개발)과 --enrich-biblio(실 API)를 함께 쓰면 즉시 거부한다.
+
+    허용하면 오프라인인 줄 알고 돌리다 월 예산을 태운다.
+    """
+    xml_file = tmp_path / "m.xml"
+    xml_file.write_text(XML_THREE, encoding="utf-8")
+    monkeypatch.setattr(cp.sys, "argv",
+                        ["collect_pipeline", "--mock-xml", str(xml_file), "--enrich-biblio"])
+    with pytest.raises(SystemExit):
+        cp.main()
 
 
 def test_raw_xml_saved_before_parse_survives_parse_error(sandbox, monkeypatch):
