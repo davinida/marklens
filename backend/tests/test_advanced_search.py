@@ -273,13 +273,22 @@ def test_normalize_then_should_collect_then_item_to_row():
 
 
 def test_chain_rejects_non_trademark_and_empty_vienna():
-    # 50.. 접두(미결 정책) → 40/41 아님으로 제외 유지(정책 변경 없음).
+    # 50.. 접두 → 채택 (2026-07-10 정책 적용: 등록번호 40/41 인 정식 상표로 실측 확인,
+    # 특허 10/실용신안 20/디자인권 30 만 블랙리스트로 제외).
     n_50 = kc.normalize_advanced_item({
         "applicationNumber": "5020210000001", "applicationStatus": "등록",
         "viennaCode": "260101", "title": "도형50"})
     r1 = _fresh_report()
-    assert cp.should_collect(n_50, r1) is False
-    assert r1["제외_상표번호아님"] == 1
+    assert cp.should_collect(n_50, r1) is True
+    assert r1["제외_상표번호아님"] == 0
+
+    # 특허(10..)는 상표가 아닌 별개 권리 → 제외 유지(블랙리스트의 존재 이유).
+    n_patent = kc.normalize_advanced_item({
+        "applicationNumber": "1020210000001", "applicationStatus": "등록",
+        "viennaCode": "260101", "title": "특허혼입"})
+    r_p = _fresh_report()
+    assert cp.should_collect(n_patent, r_p) is False
+    assert r_p["제외_상표번호아님"] == 1
 
     # 비엔나 빈 값(순수 문자상표 가능성) → 제외 유지.
     n_empty = kc.normalize_advanced_item({
