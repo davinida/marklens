@@ -58,6 +58,16 @@ def client():
         yield c
 
 
+@pytest.fixture(scope="function", autouse=True)
+def reset_rate_limiter():
+    """Keep the production rate limit while isolating each contract test."""
+    from backend.src.core.ratelimit import limiter
+
+    limiter.reset()
+    yield
+    limiter.reset()
+
+
 @pytest.fixture(scope="session")
 def identity_query(fake_ml_mode) -> bytes:
     """'완전 동일 이미지가 rank1, 유사도 ≈ 1.0'을 두 모드 모두에서 보장하는 쿼리 바이트.
@@ -197,6 +207,7 @@ def test_search_too_small_400(client):
 
 def test_images_static_serving(client):
     r = post_search(client, dup_query())
+    assert r.status_code == 200
     filename = r.json()["matches"][0]["이미지파일"]
     img = client.get(f"/images/{filename}")
     assert img.status_code == 200
