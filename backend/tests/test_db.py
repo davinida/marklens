@@ -26,7 +26,6 @@ import pytest
 
 from backend.src.core import config, db
 
-
 # --------------------------------------------------------------------
 # psycopg 대역 (실 커넥션 없이 계약만 흉내낸다)
 # --------------------------------------------------------------------
@@ -308,6 +307,25 @@ def test_fetch_by_image_keys_missing_key_absent_from_result(monkeypatch):
     assert set(result.keys()) == {present}
 
 
+def test_fetch_by_application_numbers_uses_parameterized_query(monkeypatch):
+    numbers = ["4020210000001", "4020210000002"]
+    pool = _FakePool()
+    pool.conn.rows = [_make_row(f"{number}.png") for number in numbers]
+    monkeypatch.setattr(db, "_pool", pool)
+
+    result = db.fetch_trademarks_by_application_numbers(numbers)
+
+    sql, params = pool.conn.executed[0]
+    assert "application_no = ANY(%s)" in sql
+    assert params == (numbers,)
+    assert set(result) == set(numbers)
+
+
+def test_fetch_by_application_numbers_empty_returns_empty(monkeypatch):
+    monkeypatch.setattr(db, "_pool", None)
+    assert db.fetch_trademarks_by_application_numbers([]) == {}
+
+
 # --------------------------------------------------------------------
 # fetch_dataset_info — meta 테이블 JSONB
 # --------------------------------------------------------------------
@@ -348,3 +366,12 @@ def test_count_trademarks_returns_int(monkeypatch):
     n = db.count_trademarks()
     assert n == 42
     assert type(n) is int  # noqa: E721 — Decimal 이 그대로 새어 나오면 실패해야 한다
+
+
+def test_fetch_all_image_keys_returns_authoritative_set(monkeypatch):
+    pool = _FakePool()
+    pool.conn.rows = [("a.png",), ("b.jpg",), ("a.png",)]
+    monkeypatch.setattr(db, "_pool", pool)
+
+    assert db.fetch_all_image_keys() == {"a.png", "b.jpg"}
+    assert "WHERE image_key IS NOT NULL" in pool.conn.executed[0][0]

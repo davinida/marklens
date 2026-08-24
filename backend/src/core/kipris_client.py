@@ -17,7 +17,7 @@ KIPRIS Plus Open API 클라이언트 (백엔드-5 수집 / 백엔드-7 호칭 �
 (사이트 상단 링크에서 다운로드. 상표 출원속보: 오퍼레이션 54개):
     KIPRIS_ACCESS_KEY               = 상품 인증키 (마이페이지). 두 계열 공용 —
                                       계열에 따라 accessKey/ServiceKey 로 이름만 바꿔 싣는다.
-    KIPRIS_BASE_URL                 = 공통 호스트 (기본 http://plus.kipris.or.kr/)
+    KIPRIS_BASE_URL                 = 공통 호스트 (기본 https://plus.kipris.or.kr/)
     KIPRIS_TM_NAME_SEARCH_URL       = 상표명완전일치 오퍼레이션 URL 오버라이드(선택,
                                       미설정 시 BASE_URL + 경로 상수로 자동 조합)
     KIPRIS_TM_NAME_PARAM            = 상표명 파라미터명 (기본 trademarkNameMatch)
@@ -28,17 +28,27 @@ KIPRIS Plus Open API 클라이언트 (백엔드-5 수집 / 백엔드-7 호칭 �
 """
 
 import json
+import logging
 import os
+import re
 import threading
 import time
+import unicodedata
 import xml.etree.ElementTree as ET
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
 from . import paths
+
+# httpx 는 INFO 에서 query string 전체를 기록한다. KIPRIS 인증키와 사용자 질의가
+# query parameter 로 전달되므로 애플리케이션의 root INFO 로거로 전파되지 않게 한다.
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 # ====================================================================
 # 설정 (.env)
@@ -48,7 +58,11 @@ ACCESS_KEY: str = os.getenv("KIPRIS_ACCESS_KEY", "")
 
 # 공통 호스트. 오퍼레이션 경로 상수와 조합해 전체 URL 을 만든다. 두 API 계열
 # (openapi/rest 상표명완전일치 · kipo-api/kipi getAdvancedSearch)이 이 호스트를 공유한다.
-KIPRIS_BASE_URL: str = os.getenv("KIPRIS_BASE_URL", "http://plus.kipris.or.kr/")
+KIPRIS_BASE_URL: str = os.getenv("KIPRIS_BASE_URL", "https://plus.kipris.or.kr/")
+
+# 인증키가 query string 에 실리므로 HTTPS + 공식 호스트만 허용한다. 환경변수 오타나
+# 악성 리다이렉트로 키가 제3자 호스트에 전달되는 것을 막는 자격증명 경계다.
+ALLOWED_KIPRIS_HOSTS: frozenset[str] = frozenset({"plus.kipris.or.kr"})
 
 # 오퍼레이션 경로(호스트 제외) — 실측으로 확정한 검증값.
 TM_NAME_SEARCH_PATH: str = (
@@ -119,6 +133,18 @@ class KiprisError(RuntimeError):
         self.result_code = result_code
 
 
+class KiprisConfigError(KiprisError):
+    """KIPRIS 키/URL 설정이 없거나 안전 정책을 위반함."""
+
+
+class KiprisNetworkError(KiprisError):
+    """KIPRIS 네트워크/HTTP 오류. 메시지에 요청 URL을 포함하지 않는다."""
+
+
+class KiprisProtocolError(KiprisError):
+    """KIPRIS 응답 envelope/XML 계약 위반."""
+
+
 class CallBudgetExceeded(KiprisError):
     """월 호출 예산 초과 — 다음 달 1일 초기화까지 호출 금지."""
 
@@ -152,12 +178,17 @@ class RateLimiter:
         return datetime.now(timezone.utc).strftime("%Y-%m")
 
     def _load(self) -> dict:
-        if self.counter_path.exists():
-            try:
-                return json.loads(self.counter_path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                return {}
-        return {}
+        if not self.counter_path.exists():
+            return {}
+        try:
+            payload = json.loads(self.counter_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as exc:
+            raise KiprisConfigError(
+                "KIPRIS 호출 카운터를 안전하게 읽을 수 없습니다."
+            ) from exc
+        if not isinstance(payload, dict):
+            raise KiprisConfigError("KIPRIS 호출 카운터 형식이 올바르지 않습니다.")
+        return payload
 
     def used_this_month(self) -> int:
         return int(self._load().get(self._month_key(), 0))
@@ -174,10 +205,20 @@ class RateLimiter:
                     f"(사용: {used}). 매월 1일 초기화."
                 )
             counts[key] = used + 1
-            self.counter_path.parent.mkdir(parents=True, exist_ok=True)
-            self.counter_path.write_text(
-                json.dumps(counts, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
+            try:
+                self.counter_path.parent.mkdir(parents=True, exist_ok=True)
+                temporary = self.counter_path.with_suffix(
+                    self.counter_path.suffix + ".tmp"
+                )
+                temporary.write_text(
+                    json.dumps(counts, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                os.replace(temporary, self.counter_path)
+            except OSError as exc:
+                raise KiprisConfigError(
+                    "KIPRIS 호출 카운터를 안전하게 저장할 수 없습니다."
+                ) from exc
             # 초당 제한 — 마지막 호출로부터 최소 간격 보장
             elapsed = time.monotonic() - self._last_call
             if elapsed < self.min_interval:
@@ -198,22 +239,45 @@ MULTI_VALUE_FIELDS = {"GoodClassificationCode", "ViennaCode", "AsignProductMainC
                       "AsignProductSubCode", "SimilarCode"}
 
 
-def check_result_code(xml_text: str) -> None:
-    """resultCode != 00 이면 KiprisError. 헤더가 없으면 통과(오퍼레이션별 편차 방어)."""
+def _local_name(tag: str) -> str:
+    """XML namespace 가 있어도 로컬 태그명만 반환한다."""
+    return tag.rsplit("}", 1)[-1]
+
+
+def _find_first(root: ET.Element, tag_name: str) -> ET.Element | None:
+    return next((node for node in root.iter() if _local_name(node.tag) == tag_name), None)
+
+
+def _parse_response_root(xml_text: str) -> ET.Element:
+    """KIPRIS 공통 `<response>` envelope 를 엄격히 검증해 반환한다."""
     try:
         root = ET.fromstring(xml_text)
-    except ET.ParseError as e:
-        raise KiprisError(f"KIPRIS 응답이 XML이 아닙니다: {e}")
-    node = root.find(".//resultCode")
-    if node is None or node.text is None:
-        return
+    except ET.ParseError:
+        raise KiprisProtocolError("KIPRIS 응답을 XML로 해석할 수 없습니다.") from None
+    if _local_name(root.tag) != "response":
+        raise KiprisProtocolError("KIPRIS 응답 envelope가 올바르지 않습니다.")
+    if not any(_local_name(child.tag) == "body" for child in root):
+        raise KiprisProtocolError("KIPRIS 응답에 body가 없습니다.")
+    return root
+
+
+def check_result_code(xml_text: str) -> None:
+    """정상 envelope와 필수 resultCode=00을 검증한다."""
+    root = _parse_response_root(xml_text)
+    header = next(
+        (child for child in root if _local_name(child.tag) == "header"),
+        None,
+    )
+    if header is None:
+        raise KiprisProtocolError("KIPRIS 응답에 header가 없습니다.")
+    node = _find_first(header, "resultCode")
+    if node is None or not (node.text or "").strip():
+        raise KiprisProtocolError("KIPRIS 응답에 resultCode가 없습니다.")
     code = node.text.strip()
     if code != RESULT_CODE_OK:
-        msg_node = root.find(".//resultMsg")
-        detail = (msg_node.text or "").strip() if msg_node is not None else ""
         hint = RESULT_CODE_MESSAGES.get(code, "")
         raise KiprisError(
-            f"KIPRIS 오류 resultCode={code} {detail} {hint}".strip(),
+            f"KIPRIS 오류 resultCode={code} {hint}".strip(),
             result_code=code,
         )
 
@@ -233,19 +297,20 @@ def parse_items(xml_text: str) -> list[dict]:
     - MULTI_VALUE_FIELDS 는 '|' 로 분리해 list[str] 로
     """
     check_result_code(xml_text)
-    root = ET.fromstring(xml_text)
+    root = _parse_response_root(xml_text)
     items = []
     # root.iter() 로 전체를 순회하며 항목 태그만 골라 문서 순서를 유지한다.
     for item in root.iter():
-        if item.tag not in ITEM_TAGS:
+        if _local_name(item.tag) not in ITEM_TAGS:
             continue
         row: dict = {}
         for child in item:
+            child_tag = _local_name(child.tag)
             value = (child.text or "").strip()
-            if child.tag in MULTI_VALUE_FIELDS:
-                row[child.tag] = [v.strip() for v in value.split("|") if v.strip()]
+            if child_tag in MULTI_VALUE_FIELDS:
+                row[child_tag] = [v.strip() for v in value.split("|") if v.strip()]
             else:
-                row[child.tag] = value
+                row[child_tag] = value
         items.append(row)
     return items
 
@@ -258,14 +323,18 @@ def parse_total_count(xml_text: str) -> Optional[int]:
     (기본 30건)만 온다. 전체 건수는 항상 TotalSearchCount 에 담기므로
     /name-check 총계(total_found)는 len(items) 가 아니라 이 값을 써야 한다.
     """
-    root = ET.fromstring(xml_text)
-    node = root.find(".//TotalSearchCount")
+    check_result_code(xml_text)
+    root = _parse_response_root(xml_text)
+    node = _find_first(root, "TotalSearchCount")
     if node is None or not (node.text or "").strip():
         return None
     try:
-        return int(node.text.strip())
+        total = int(node.text.strip())
     except ValueError:
-        return None
+        raise KiprisProtocolError("KIPRIS TotalSearchCount가 올바른 정수가 아닙니다.") from None
+    if total < 0:
+        raise KiprisProtocolError("KIPRIS TotalSearchCount가 음수입니다.")
+    return total
 
 
 def filter_registered(items: list[dict]) -> list[dict]:
@@ -273,8 +342,23 @@ def filter_registered(items: list[dict]) -> list[dict]:
     return [it for it in items if it.get("ApplicationStatus") == "등록"]
 
 
+def normalize_mark_title(value: object) -> str:
+    """표시 문자열을 훼손하지 않으면서 명칭 동일성 비교용 표현을 만든다.
+
+    KIPRIS 원문은 ASCII 대소문자, 전각 문자, 연속 공백이 섞일 수 있다. 이 차이만
+    때문에 ``BBQ``와 ``bbq``를 다른 명칭으로 집계하지 않도록 NFKC/casefold와
+    공백 정규화만 적용한다. 구두점이나 단어 사이 공백은 제거하지 않는다.
+    """
+    text = unicodedata.normalize("NFKC", str(value or "")).casefold().strip()
+    return re.sub(r"\s+", " ", text)
+
+
 def summarize_name_search(
-    query: str, items: list[dict], total_found: Optional[int] = None
+    query: str,
+    items: list[dict],
+    total_found: Optional[int] = None,
+    *,
+    complete: Optional[bool] = None,
 ) -> dict:
     """
     상표명완전일치 결과 요약.
@@ -289,12 +373,29 @@ def summarize_name_search(
       기준이다(상한에 잘리면 등록/정확일치 건수가 실제보다 적게 집계될 수 있음).
     """
     registered = filter_registered(items)
-    exact = [it for it in registered if it.get("Title", "").strip() == query.strip()]
+    normalized_query = normalize_mark_title(query)
+    exact_all = [
+        it
+        for it in items
+        if normalized_query and normalize_mark_title(it.get("Title")) == normalized_query
+    ]
+    exact_registered = [it for it in exact_all if it.get("ApplicationStatus") == "등록"]
+    status_counts: dict[str, int] = {}
+    for item in items:
+        status_name = str(item.get("ApplicationStatus") or "").strip() or "미상"
+        status_counts[status_name] = status_counts.get(status_name, 0) + 1
+    resolved_total = total_found if total_found is not None else len(items)
+    if complete is None:
+        complete = total_found is None or len(items) >= resolved_total
     return {
         "query": query,
-        "total_found": total_found if total_found is not None else len(items),
+        "total_found": resolved_total,
+        "scanned_count": len(items),
         "registered_count": len(registered),
-        "exact_registered_count": len(exact),
+        "exact_registered_count": len(exact_registered),
+        "exact_title_count": len(exact_all),
+        "status_counts": status_counts,
+        "complete": complete,
     }
 
 
@@ -302,17 +403,53 @@ def summarize_name_search(
 # HTTP 호출
 # ====================================================================
 
+def _validate_kipris_url(url: str, url_env_name: str) -> None:
+    """인증정보를 전송해도 되는 HTTPS KIPRIS 공식 URL인지 검증한다."""
+    try:
+        parsed = urlsplit(url)
+        port = parsed.port
+    except ValueError:
+        raise KiprisConfigError(f"{url_env_name} 형식이 올바르지 않습니다.") from None
+    if parsed.scheme.lower() != "https":
+        raise KiprisConfigError(f"{url_env_name} 는 HTTPS URL이어야 합니다.")
+    if (parsed.hostname or "").lower() not in ALLOWED_KIPRIS_HOSTS:
+        raise KiprisConfigError(f"{url_env_name} 의 호스트가 KIPRIS 공식 호스트가 아닙니다.")
+    if parsed.username or parsed.password or port not in (None, 443):
+        raise KiprisConfigError(f"{url_env_name} 에 사용자정보나 비표준 포트를 넣을 수 없습니다.")
+
+
+def _secure_kipris_download_url(url: str) -> str:
+    """공식 호스트가 반환한 legacy HTTP 파일 링크를 HTTPS로만 승격한다."""
+    try:
+        parsed = urlsplit(url)
+        port = parsed.port
+    except ValueError:
+        raise KiprisConfigError("KIPRIS 이미지 URL 형식이 올바르지 않습니다.") from None
+    host = (parsed.hostname or "").lower()
+    if (
+        parsed.scheme.lower() == "http"
+        and host in ALLOWED_KIPRIS_HOSTS
+        and not parsed.username
+        and not parsed.password
+        and port in (None, 80)
+    ):
+        url = urlunsplit(("https", host, parsed.path, parsed.query, ""))
+    _validate_kipris_url(url, "KIPRIS 이미지 URL")
+    return url
+
+
 def _require_config(url: str, url_env_name: str) -> None:
     if not ACCESS_KEY:
-        raise KiprisError(
+        raise KiprisConfigError(
             "KIPRIS_ACCESS_KEY 가 설정되지 않았습니다. "
             "KIPRIS Plus 에서 상품 신청 후 .env 에 키를 넣으세요 (커밋 금지)."
         )
     if not url:
-        raise KiprisError(
+        raise KiprisConfigError(
             f"{url_env_name} 가 설정되지 않았습니다. "
             f"API 통합설명서에서 오퍼레이션 URL 을 확인해 .env 에 넣으세요."
         )
+    _validate_kipris_url(url, url_env_name)
 
 
 # 모듈 공용 HTTP 클라이언트 — 호출마다 새로 만들면 TCP/TLS 커넥션을 매번
@@ -327,7 +464,7 @@ def _get_client() -> httpx.Client:
         if _http_client is None:
             _http_client = httpx.Client(
                 timeout=15,
-                follow_redirects=True,
+                follow_redirects=False,
                 limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
             )
         return _http_client
@@ -342,7 +479,13 @@ def close_client() -> None:
             _http_client = None
 
 
-def _get(url: str, params: dict, auth_param: str = "accessKey") -> str:
+def _get(
+    url: str,
+    params: dict,
+    auth_param: str = "accessKey",
+    *,
+    timeout: float | None = None,
+) -> str:
     """리미터를 통과한 뒤 GET. 응답 본문(XML 텍스트) 반환.
 
     auth_param: 인증키를 실을 파라미터 이름. 상표명완전일치/openapi-rest 계열은
@@ -350,9 +493,20 @@ def _get(url: str, params: dict, auth_param: str = "accessKey") -> str:
       값은 두 계열 모두 같은 KIPRIS_ACCESS_KEY 를 쓰고 파라미터 이름만 다르다 —
       잘못 붙이면 resultCode=10 (INVALID_REQUEST_PARAMETER_ERROR).
     """
+    _validate_kipris_url(url, "KIPRIS API URL")
     limiter.acquire()
-    resp = _get_client().get(url, params={**params, auth_param: ACCESS_KEY})
-    resp.raise_for_status()
+    try:
+        request_kwargs: dict = {"params": {**params, auth_param: ACCESS_KEY}}
+        if timeout is not None:
+            request_kwargs["timeout"] = timeout
+        resp = _get_client().get(url, **request_kwargs)
+        resp.raise_for_status()
+    except httpx.TimeoutException:
+        raise KiprisNetworkError("KIPRIS 서비스 응답 시간이 초과되었습니다.") from None
+    except httpx.HTTPStatusError:
+        raise KiprisNetworkError("KIPRIS 서비스가 HTTP 오류를 반환했습니다.") from None
+    except httpx.RequestError:
+        raise KiprisNetworkError("KIPRIS 서비스와 통신하지 못했습니다.") from None
     return resp.text
 
 
@@ -366,7 +520,36 @@ NAME_SEARCH_MAX_ITEMS: int = 500    # 수집 상한 (초과분 버림 → summar
 NAME_SEARCH_MAX_PAGES: int = 5      # 추가 호출 폭주 방지 상한
 
 
-def name_match_search(name: str) -> tuple[list[dict], int]:
+@dataclass(frozen=True)
+class NameSearchResult:
+    """호칭 검색 결과와 전체 스캔 완전성.
+
+    기존 `items, total = name_match_search(...)` 호출은 `__iter__` 로 한 릴리스
+    호환한다. 신규 호출자는 complete/scanned_count 를 직접 사용한다.
+    """
+
+    items: list[dict]
+    total_found: int
+    complete: bool
+
+    @property
+    def scanned_count(self) -> int:
+        return len(self.items)
+
+    def __iter__(self) -> Iterator[object]:
+        yield self.items
+        yield self.total_found
+
+
+def _name_item_key(item: dict) -> str:
+    """페이지 반복 판정에 사용할 안정적인 항목 표현."""
+    application_no = str(item.get("ApplicationNumber") or "").strip()
+    if application_no:
+        return f"application:{application_no}"
+    return json.dumps(item, ensure_ascii=False, sort_keys=True, default=str)
+
+
+def name_match_search(name: str) -> NameSearchResult:
     """
     상표명완전일치 검색 (백엔드-7).
 
@@ -380,7 +563,10 @@ def name_match_search(name: str) -> tuple[list[dict], int]:
     """
     _require_config(TM_NAME_SEARCH_URL, "KIPRIS_TM_NAME_SEARCH_URL")
     items: list[dict] = []
+    seen_item_keys: set[str] = set()
+    seen_page_signatures: set[tuple[str, ...]] = set()
     total: Optional[int] = None
+    total_consistent = True
     start = 1   # docsStart 는 1-기반. 첫 페이지(1)는 파라미터를 생략한다.
     pages = 0
     while True:
@@ -390,9 +576,34 @@ def name_match_search(name: str) -> tuple[list[dict], int]:
         # 페이지 호출마다 _get 내장 limiter(예산+딜레이)를 그대로 통과한다.
         xml_text = _get(TM_NAME_SEARCH_URL, params)
         page_items = parse_items(xml_text)
+        page_total = parse_total_count(xml_text)
         if total is None:
-            total = parse_total_count(xml_text)
-        items.extend(page_items)
+            total = page_total
+        elif page_total is not None and page_total != total:
+            total = max(total, page_total)
+            total_consistent = False
+
+        page_keys = tuple(_name_item_key(item) for item in page_items)
+        if page_keys and page_keys in seen_page_signatures:
+            break
+        seen_page_signatures.add(page_keys)
+
+        added = 0
+        for item, item_key in zip(page_items, page_keys):
+            # 실 응답에는 출원번호가 있으므로 중복 제거가 가능하다. 축약 테스트/비정상
+            # 응답처럼 번호가 없다면 페이지별 SerialNumber 재시작을 중복으로 오판하지 않는다.
+            has_application_no = bool(str(item.get("ApplicationNumber") or "").strip())
+            if has_application_no and item_key in seen_item_keys:
+                continue
+            if has_application_no:
+                seen_item_keys.add(item_key)
+            if len(items) >= NAME_SEARCH_MAX_ITEMS:
+                break
+            items.append(item)
+            added += 1
+        if total is not None and len(items) > total:
+            total = len(items)
+            total_consistent = False
         pages += 1
         # --- 종료 조건 ---
         if not page_items:
@@ -401,8 +612,12 @@ def name_match_search(name: str) -> tuple[list[dict], int]:
             break  # 전체 건수 도달
         if len(items) >= NAME_SEARCH_MAX_ITEMS or pages >= NAME_SEARCH_MAX_PAGES:
             break  # 월 예산 보호 상한 — 수집분으로만 진행
+        if added == 0:
+            break  # 서버가 같은/중복 페이지만 반복하면 추가 호출하지 않는다
         start += len(page_items)  # 다음 페이지 시작 위치
-    return items, (total if total is not None else len(items))
+    resolved_total = total if total is not None else len(items)
+    complete = total is not None and len(items) >= resolved_total and total_consistent
+    return NameSearchResult(items=items, total_found=resolved_total, complete=complete)
 
 
 # ====================================================================
@@ -473,6 +688,7 @@ def advanced_search_raw(
     true_flags: "frozenset[str] | set[str]" = DEFAULT_ADVANCED_TRUE_FLAGS,
     page_no: int = 1,
     num_of_rows: int = ADVANCED_DEFAULT_ROWS,
+    request_timeout: float | None = None,
 ) -> str:
     """항목별검색(getAdvancedSearch) — 응답 원본 XML 텍스트를 그대로 반환한다(백엔드-6).
 
@@ -488,7 +704,12 @@ def advanced_search_raw(
         "pageNo": str(max(1, page_no)),
         "numOfRows": str(rows),
     }
-    return _get(ADVANCED_SEARCH_URL, params, auth_param="ServiceKey")
+    return _get(
+        ADVANCED_SEARCH_URL,
+        params,
+        auth_param="ServiceKey",
+        timeout=request_timeout,
+    )
 
 
 def parse_advanced_total_count(xml_text: str) -> Optional[int]:
@@ -496,14 +717,18 @@ def parse_advanced_total_count(xml_text: str) -> Optional[int]:
 
     상표명완전일치의 <TotalSearchCount> 와 태그명이 다르다(실측: camelCase totalCount).
     """
-    root = ET.fromstring(xml_text)
-    node = root.find(".//totalCount")
+    check_result_code(xml_text)
+    root = _parse_response_root(xml_text)
+    node = _find_first(root, "totalCount")
     if node is None or not (node.text or "").strip():
         return None
     try:
-        return int(node.text.strip())
+        total = int(node.text.strip())
     except ValueError:
-        return None
+        raise KiprisProtocolError("KIPRIS totalCount가 올바른 정수가 아닙니다.") from None
+    if total < 0:
+        raise KiprisProtocolError("KIPRIS totalCount가 음수입니다.")
+    return total
 
 
 def normalize_advanced_item(item: dict) -> dict:
@@ -606,7 +831,8 @@ def parse_bibliography_detail(xml_text: str) -> dict:
       - nice_classes:     list[int]  지정상품 mainCode(류)를 int 로(정렬·중복 제거, 비숫자 버림).
       - vienna_codes:     list[str]  비엔나 코드(문서 순서, 빈 값 제외).
       - goods:            list[dict] 지정상품 {mainCode(류), subCode(유사군), productName(상품명)}.
-      - mark_type:        str|None   trademarkDivisionCode(연속 공백을 한 칸으로 정규화). 없으면 None.
+      - mark_type:        str|None   trademarkDivisionCode를 공백 정규화한 값.
+                                      값이 없으면 None.
       - register_status:  str|None   registerStatus.
       - registration_number: str|None
       - image_url:        str|None   sampleImageInfo/path(큰 이미지) 우선, 없으면 smallPath.
@@ -694,9 +920,19 @@ def download_file_now(url: str, dest: Path) -> Path:
 
     주의: 이 링크는 시한부다 — 응답에서 받자마자 호출할 것 (모아뒀다 열면 만료).
     """
+    url = _secure_kipris_download_url(url)
     dest.parent.mkdir(parents=True, exist_ok=True)
     # 파일 다운로드는 본문이 커 검색 API 보다 여유 있는 타임아웃을 준다.
-    resp = _get_client().get(url, timeout=30)
-    resp.raise_for_status()
-    dest.write_bytes(resp.content)
+    try:
+        resp = _get_client().get(url, timeout=30)
+        resp.raise_for_status()
+    except httpx.TimeoutException:
+        raise KiprisNetworkError("KIPRIS 이미지 다운로드 시간이 초과되었습니다.") from None
+    except httpx.HTTPStatusError:
+        raise KiprisNetworkError("KIPRIS 이미지 서버가 HTTP 오류를 반환했습니다.") from None
+    except httpx.RequestError:
+        raise KiprisNetworkError("KIPRIS 이미지를 다운로드하지 못했습니다.") from None
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    tmp.write_bytes(resp.content)
+    os.replace(tmp, dest)
     return dest

@@ -5,7 +5,8 @@
 서비스 컨테이너로 항상 실행).
 
 로컬 실행 예:
-    MARKLENS_TEST_DATABASE_URL=postgresql://postgres:암호@127.0.0.1:5432/marklens_test pytest backend/tests/test_migrations.py
+    MARKLENS_TEST_DATABASE_URL=postgresql://postgres:암호@127.0.0.1:5432/marklens_test `
+        pytest backend/tests/test_migrations.py
 """
 
 import os

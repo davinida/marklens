@@ -1,6 +1,6 @@
 """POST /search — multipart 이미지 업로드 → top-K 검색 결과 + 등급."""
 
-import functools
+import logging
 
 import anyio
 import anyio.to_thread
@@ -16,8 +16,8 @@ from ..schemas.search import (
     TrademarkInfo,
 )
 
-
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # CPU 바운드 검색의 동시 실행 상한 리미터.
@@ -60,6 +60,7 @@ def _to_response(engine_result: dict) -> SearchResponse:
         index_size=engine_result["index_size"],
         top_k_requested=engine_result["top_k_requested"],
         top_k_returned=engine_result["top_k_returned"],
+        scoring_k=engine_result["scoring_k"],
     )
 
 
@@ -99,44 +100,51 @@ async def search_endpoint(
         # multipart 오버헤드가 있으므로 파일 상한보다 여유(1 MiB)를 두고 비교.
         if int(content_length) > config.MAX_UPLOAD_BYTES + 1024 * 1024:
             raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status_code=413,
                 detail=(
                     f"요청 본문이 너무 큽니다 (Content-Length: {content_length} bytes). "
                     f"파일 상한: {config.MAX_UPLOAD_BYTES} bytes."
                 ),
             )
 
-    # 1) 업로드 검증
-    raw = await file.read()
-    validation.validate_upload(file, raw)
+    # 1) 업로드 헤더와 실측 크기 검증. UploadFile 전체를 한 번에 읽지 않고
+    #    상한+1 바이트까지만 읽어 메모리 사용량을 제한한다.
+    validation.validate_content_type(file)
 
-    # 2) 검색 (engine 가 preprocess + encode + search + 결합 + 등급까지 수행)
-    #    CPU 바운드(CLIP+FAISS) + 동기 DB 조회이므로 이벤트 루프를 막지 않도록
-    #    워커 스레드로 오프로드한다. run_search 는 순수 동기 함수라 무수정 위임 가능.
+    # 2) 디코딩과 검색을 같은 동시성 슬롯 안에서 수행한다. 검증된 PIL 객체를
+    #    엔진에 넘기므로 정상 입력을 두 번 디코딩하지 않는다.
     try:
-        result = await anyio.to_thread.run_sync(
-            functools.partial(engine.run_search, raw, top_k=top_k),
-            limiter=_get_search_limiter(),
-        )
+        async with _get_search_limiter():
+            raw = await file.read(config.MAX_UPLOAD_BYTES + 1)
+            validation.validate_upload_size(raw)
+
+            def decode_and_search() -> dict:
+                image = validation.validate_and_decode(raw)
+                return engine.run_search(image, top_k=top_k)
+
+            result = await anyio.to_thread.run_sync(decode_and_search)
+    except HTTPException:
+        raise
     except ValueError as e:
         # preprocess/scoring 내부 검증 실패는 4xx로
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
-    except Exception as e:
-        # 그 외 예외는 서버 측 문제
+    except Exception:
+        logger.exception("검색 처리 중 서버 오류")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"검색 처리 중 오류: {e}",
-        )
+            detail="검색 처리 중 서버 오류가 발생했습니다.",
+        ) from None
 
     # 3) 응답 조립 — 메타 계약 불일치(예: dataset_info 필드 누락)가 미처리 500 으로
     #    새지 않도록 감싼다. load_all() 이 기동 시점에 선검증하지만 이중 방어.
     try:
         return _to_response(result)
-    except Exception as e:
+    except Exception:
+        logger.exception("검색 응답 조립 중 계약 오류")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"응답 조립 중 메타데이터 계약 오류: {e}",
-        )
+            detail="검색 응답을 만들 수 없습니다.",
+        ) from None

@@ -15,8 +15,6 @@
     ml\\venv\\Scripts\\python.exe -m pytest backend/tests/test_advanced_search.py -q
 """
 
-import pytest
-
 from backend.scripts import collect_pipeline as cp
 from backend.src.core import kipris_client as kc
 
@@ -160,7 +158,11 @@ def test_advanced_search_flags_are_overridable(monkeypatch):
 def test_name_match_search_uses_accesskey_not_servicekey(monkeypatch):
     # 인증 파라미터 분기의 반대편: name-match 는 여전히 accessKey.
     client = _install_client(monkeypatch, NAME_XML)
-    monkeypatch.setattr(kc, "TM_NAME_SEARCH_URL", "http://test/name-match")
+    monkeypatch.setattr(
+        kc,
+        "TM_NAME_SEARCH_URL",
+        "https://plus.kipris.or.kr/test/name-match",
+    )
 
     items, total = kc.name_match_search("삼성전자")
     params = client.calls[0]["params"]
@@ -363,7 +365,13 @@ def test_search_batch_follows_pages_until_total(monkeypatch, tmp_path):
     }
     seen: list[int] = []
 
-    def fake_raw(applicant, true_flags=None, page_no=1, num_of_rows=2):
+    def fake_raw(
+        applicant,
+        true_flags=None,
+        page_no=1,
+        num_of_rows=2,
+        request_timeout=None,
+    ):
         seen.append(page_no)
         return pages[page_no]
 
@@ -383,7 +391,13 @@ def test_search_batch_stops_on_short_page(monkeypatch, tmp_path):
     monkeypatch.setattr(kc, "ADVANCED_DEFAULT_ROWS", 500)
     calls: list[int] = []
 
-    def fake_raw(applicant, true_flags=None, page_no=1, num_of_rows=500):
+    def fake_raw(
+        applicant,
+        true_flags=None,
+        page_no=1,
+        num_of_rows=500,
+        request_timeout=None,
+    ):
         calls.append(page_no)
         # totalCount 가 999 라고 우겨도, 페이지가 덜 찼으면 마지막이다.
         return _paged_xml(999, ["4020210000001"])

@@ -14,8 +14,9 @@ env(.env) 에서 오는 값은 pydantic-settings 의 `Settings` 클래스로 모
 """
 
 import re
+from typing import Literal
 
-from pydantic import Field, ValidationError, field_validator
+from pydantic import Field, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # paths 가 .env 를 load_dotenv 로 os.environ 에 1회 적재한다 — Settings() 가
@@ -50,18 +51,26 @@ MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
 MIN_IMAGE_DIM: int = 32
 MAX_IMAGE_DIM: int = 4096
 
+# 디코딩 후 허용하는 총 픽셀 수. 한쪽 변만 짧은 압축 이미지를 포함해
+# 메모리 사용량을 치수 검사 단계에서 일정하게 제한한다.
+MAX_IMAGE_PIXELS: int = MAX_IMAGE_DIM * MAX_IMAGE_DIM
+
 
 # ====================================================================
 # 검색 파라미터  (env 무관 순수 상수 — 현행 유지)
 # ====================================================================
 
-# 기본 top-k 값. 5장 정도면 사용자가 한눈에 보기 적당하고, scoring의
-# 격차 계산(top1 vs top2, top1 vs mean)에도 충분한 표본.
+# 화면에 표시할 기본 top-k 값. 5장 정도면 사용자가 한눈에 보기 적당하다.
+# 판정과 불확실성 계산은 아래 SCORING_TOP_K 후보를 별도로 사용한다.
 DEFAULT_TOP_K: int = 5
 
 # top-k 허용 범위. 너무 크면 응답 크기 증폭.
 MIN_TOP_K: int = 1
 MAX_TOP_K: int = 20
+
+# 화면에 반환하는 top_k와 판정에 쓰는 후보 수를 분리한다. 사용자가 top_k=1을
+# 선택해도 같은 이미지의 시각 판정이 달라지지 않아야 한다.
+SCORING_TOP_K: int = 20
 
 
 # ====================================================================
@@ -112,6 +121,8 @@ _FIELD_TO_ENV: dict[str, str] = {
     "namecheck_rate_limit": "MARKLENS_NAMECHECK_RATELIMIT",
     "api_key": "MARKLENS_API_KEY",
     "database_url": "DATABASE_URL",
+    "environment": "MARKLENS_ENVIRONMENT",
+    "public_result_images": "MARKLENS_PUBLIC_RESULT_IMAGES",
 }
 
 
@@ -163,6 +174,14 @@ class Settings(BaseSettings):
     # 예: postgresql://postgres:password@127.0.0.1:5432/marklens
     database_url: str = Field(default="", validation_alias="DATABASE_URL")
 
+    # production은 Next BFF 뒤에서만 접근하는 비공개 서비스 계약이다.
+    environment: Literal["development", "test", "production"] = Field(
+        default="development", validation_alias="MARKLENS_ENVIRONMENT"
+    )
+    public_result_images: bool = Field(
+        default=True, validation_alias="MARKLENS_PUBLIC_RESULT_IMAGES"
+    )
+
     # ---- 검증 규칙 (사람이 실제로 틀리는 것만) --------------------------------
 
     @field_validator("search_max_concurrency", mode="before")
@@ -205,6 +224,20 @@ class Settings(BaseSettings):
                 "(예: postgresql://user:password@127.0.0.1:5432/marklens)."
             )
         return v
+
+    @model_validator(mode="after")
+    def _check_production_boundary(self) -> "Settings":
+        if self.environment != "production":
+            return self
+        if len(self.api_key) < 32:
+            raise ValueError(
+                "production에서는 32자 이상의 MARKLENS_API_KEY가 필요합니다."
+            )
+        if not self.database_url:
+            raise ValueError(
+                "production에서는 공유 상태와 메타데이터를 위한 DATABASE_URL이 필요합니다."
+            )
+        return self
 
     @property
     def cors_allow_origins(self) -> list[str]:
@@ -261,3 +294,7 @@ API_KEY: str = settings.api_key
 # DB 접속 문자열 및 저장소 모드 (env: DATABASE_URL)
 DATABASE_URL: str = settings.database_url
 STORAGE_MODE: str = settings.storage_mode
+
+# 실행 경계 및 결과 이미지 공개 여부.
+ENVIRONMENT: str = settings.environment
+PUBLIC_RESULT_IMAGES: bool = settings.public_result_images

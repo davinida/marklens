@@ -53,6 +53,6 @@ def public_url(image_key: str | None) -> str | None:
     형식: "<IMAGES_URL_PREFIX>/<image_key>" (예: "/images/40202100000101.png").
     이 형식은 외부 계약이다 — S3 전환 시에도 이 함수만 바꿔 형식을 보존한다.
     """
-    if not image_key:
+    if not image_key or not config.PUBLIC_RESULT_IMAGES:
         return None
     return f"{config.IMAGES_URL_PREFIX}/{image_key}"

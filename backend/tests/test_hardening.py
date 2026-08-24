@@ -10,6 +10,7 @@
 
 import importlib
 
+import pytest
 from fastapi import Depends, FastAPI, Request
 from fastapi.testclient import TestClient
 from slowapi import Limiter
@@ -19,7 +20,6 @@ from slowapi.util import get_remote_address
 from backend.src.core import config
 from backend.src.core.auth import require_api_key
 from backend.src.core.ratelimit import rate_limit_exceeded_handler
-
 
 # ====================================================================
 # X-API-Key 인증 의존성
@@ -152,3 +152,24 @@ def test_cors_env_override_parsing(monkeypatch):
         # 다른 테스트에 영향 주지 않도록 env 제거 후 모듈 원상 복구.
         monkeypatch.delenv("MARKLENS_CORS_ORIGINS", raising=False)
         importlib.reload(config)
+
+
+def test_production_requires_private_backend_credentials():
+    with pytest.raises(ValueError, match="MARKLENS_API_KEY"):
+        config.Settings(
+            MARKLENS_ENVIRONMENT="production",
+            MARKLENS_API_KEY="",
+            DATABASE_URL="",
+        )
+
+
+def test_production_settings_accept_explicit_private_boundary():
+    settings = config.Settings(
+        MARKLENS_ENVIRONMENT="production",
+        MARKLENS_API_KEY="x" * 32,
+        DATABASE_URL="postgresql://marklens:test@db:5432/marklens",
+        MARKLENS_PUBLIC_RESULT_IMAGES=False,
+    )
+    assert settings.environment == "production"
+    assert settings.storage_mode == "db"
+    assert settings.public_result_images is False

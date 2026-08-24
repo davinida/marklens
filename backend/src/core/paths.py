@@ -19,7 +19,6 @@ backend/src/core/paths.py 의 위치를 기준으로 프로젝트 루트를 동�
 import os
 from pathlib import Path
 
-
 # backend/src/core/paths.py  →  backend/src/core  →  backend/src  →  backend  →  <project root>
 PROJECT_ROOT: Path = Path(__file__).resolve().parents[3]
 
@@ -47,6 +46,8 @@ IMAGES_DIR: Path = Path(os.getenv("MARKLENS_IMAGES_DIR", str(ML_DATA_DIR / "imag
 # 인덱스 산출물 (build_index.py)
 INDEX_PATH: Path = ML_DATA_DIR / "index" / "kipris.faiss"
 INDEX_META_PATH: Path = ML_DATA_DIR / "index" / "kipris_metadata.json"
+INDEX_MANIFEST_PATH: Path = ML_DATA_DIR / "index" / "kipris_manifest.json"
+INDEX_DIRTY_PATH: Path = ML_DATA_DIR / "index" / ".kipris-index-dirty"
 
 # 상표 상세 정보 (Phase 2-D 산출물)
 TRADEMARK_META_PATH: Path = ML_DATA_DIR / "kipris_metadata.json"

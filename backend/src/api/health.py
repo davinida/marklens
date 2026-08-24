@@ -17,4 +17,5 @@ def health() -> HealthResponse:
         index_size=int(engine.state.index.ntotal) if engine.state.index else 0,
         trademark_count=engine.state.trademark_count,
         storage_mode=engine.state.storage_mode,
+        artifact_generation_id=engine.state.artifact_generation_id,
     )

@@ -11,10 +11,9 @@ Swagger UI: http://127.0.0.1:8000/docs
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from slowapi.errors import RateLimitExceeded
 
 from .core.logging_conf import setup_logging
@@ -38,15 +37,16 @@ async def lifespan(app: FastAPI):
     실패 시 명확한 메시지와 함께 서버 기동을 중단합니다.
     """
     try:
-        engine.load_all()
-    except Exception:
-        # uvicorn 로그에 노출. 조용히 넘어가지 않음.
-        logger.exception("[FATAL] startup 리소스 로딩 실패")
-        raise
-    yield
-    # shutdown: DB 커넥션 풀 + 외부 API HTTP 클라이언트 정리
-    engine.shutdown()
-    kipris_client.close_client()
+        try:
+            engine.load_all()
+        except Exception:
+            logger.exception("[FATAL] startup 리소스 로딩 실패")
+            raise
+        yield
+    finally:
+        # startup 중간 실패에도 이미 열린 DB/HTTP 자원을 정리한다.
+        engine.shutdown()
+        kipris_client.close_client()
 
 
 app = FastAPI(
@@ -104,17 +104,28 @@ app.include_router(health.router)
 app.include_router(search.router, dependencies=[Depends(require_api_key)])
 app.include_router(namecheck.router, dependencies=[Depends(require_api_key)])
 
-# === 정적 파일 서빙 (검색 결과 이미지) ===
-# 설계 결정: 응답에는 이미지 URL만 담고, 실제 이미지는 이 경로로 노출.
-# 서빙 대상 디렉터리는 storage 심이 결정한다 (S3 전환 시 이 마운트를 걷어내고
-# core/storage.py 구현만 교체 — 모듈 docstring 의 전환 계약 참조).
-# 주의: StaticFiles 는 기본(check_dir=True)으로 생성 시점에 디렉토리 존재를
-# 요구한다 — 디렉토리가 없으면 lifespan 의 친절한 [FATAL] 안내가 나오기 전에
-# import 단계에서 죽는다 (2026-07-07 검증에서 확인). 먼저 보장해 준다.
-_images_dir = storage.local_path()
-_images_dir.mkdir(parents=True, exist_ok=True)
-app.mount(
-    config.IMAGES_URL_PREFIX,
-    StaticFiles(directory=str(_images_dir)),
-    name="images",
-)
+# === 검색 결과 이미지 ===
+# 디렉터리 전체를 정적 마운트하지 않고 현재 인덱스에 포함된 키만 제공한다.
+# production 템플릿은 재배포 권리 확인 전까지 이 라우트를 비활성화한다.
+if config.PUBLIC_RESULT_IMAGES:
+    _images_dir = storage.local_path().resolve()
+    _images_dir.mkdir(parents=True, exist_ok=True)
+
+    @app.get(
+        f"{config.IMAGES_URL_PREFIX}/{{image_key:path}}",
+        include_in_schema=False,
+        dependencies=[Depends(require_api_key)],
+    )
+    def indexed_image(image_key: str) -> FileResponse:
+        if image_key not in engine.state.image_path_set:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        candidate = storage.local_path(image_key).resolve()
+        if not candidate.is_relative_to(_images_dir) or not candidate.is_file():
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+        return FileResponse(
+            candidate,
+            headers={
+                "Cache-Control": "private, max-age=300",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )

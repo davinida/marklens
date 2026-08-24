@@ -9,3 +9,4 @@ class HealthResponse(BaseModel):
     index_size: int
     trademark_count: int
     storage_mode: str = "file"  # "file" | "db" (백엔드-4 전환 상태 노출)
+    artifact_generation_id: str | None = None

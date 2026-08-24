@@ -25,7 +25,6 @@ import pytest
 from backend.scripts import collect_pipeline as cp
 from backend.src.core import kipris_client as kc
 
-
 # --------------------------------------------------------------------
 # 합성 서지상세 XML — 실측 경로 구조(중첩 Array)를 본뜬 임의 값.
 #   유사군 similarCode 중복(G3404) + 정렬 안 됨 / mainCode 에 비숫자(A1) 혼입 /
@@ -261,6 +260,12 @@ def sandbox(tmp_path, monkeypatch):
     images.mkdir()
     monkeypatch.setattr(cp, "CHECKPOINT_PATH", tmp_path / "collect_checkpoint.json")
     monkeypatch.setattr(cp, "COLLECT_RAW_XML_DIR", tmp_path / "raw" / "xml")
+    monkeypatch.setattr(cp, "INDEX_DIRTY_PATH", tmp_path / "index" / ".dirty")
+    monkeypatch.setattr(
+        cp,
+        "AUTHORITATIVE_KEYS_PATH",
+        tmp_path / "index" / "authoritative_keys.json",
+    )
     monkeypatch.setattr(cp.paths, "IMAGES_DIR", images)
     monkeypatch.setattr(cp, "load_db_app_numbers", lambda url: set())
     monkeypatch.setattr(cp, "rebuild_index", lambda: None)

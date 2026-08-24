@@ -16,12 +16,13 @@ main() 은 항상 --dry-run + config.DATABASE_URL="" 로 이중 차단한다(실
 """
 
 import json
+import os
+import subprocess
 
 import pytest
 
 from backend.scripts import collect_pipeline as cp
 from backend.src.core import kipris_client as kc
-
 
 # --------------------------------------------------------------------
 # 출원인 검색 응답 픽스처 (실제 KIPRIS 응답 형태)
@@ -90,6 +91,23 @@ def _fresh_report() -> dict:
         "검색결과": 0, "수집": 0, "이미지실패": 0,
         "제외_미등록": 0, "제외_비엔나없음(문자상표)": 0, "제외_상표번호아님": 0,
     }
+
+
+def _advanced_page(total: int, app_numbers: list[str]) -> str:
+    rows = "".join(
+        f"<item><applicationNumber>{app_no}</applicationNumber>"
+        "<applicationStatus>등록</applicationStatus>"
+        "<viennaCode>260101</viennaCode><classificationCode>09</classificationCode>"
+        f"<title>logo-{app_no}</title>"
+        f"<bigDrawing>https://plus.kipris.or.kr/image/{app_no}.png</bigDrawing>"
+        "</item>"
+        for app_no in app_numbers
+    )
+    return (
+        "<response><header><resultCode>00</resultCode></header>"
+        f"<count><totalCount>{total}</totalCount></count>"
+        f"<body><items>{rows}</items></body></response>"
+    )
 
 
 # ====================================================================
@@ -321,6 +339,262 @@ def test_main_limit_caps_per_applicant(tmp_path, monkeypatch, capsys):
     assert "'수집': 1" in out  # 2건 대상이지만 limit=1 로 1건만
 
 
+def test_main_limit_stops_before_fetching_next_page(tmp_path, monkeypatch):
+    _no_db(monkeypatch)
+    _isolate_data(tmp_path, monkeypatch)
+    monkeypatch.setattr(kc, "ADVANCED_DEFAULT_ROWS", 2)
+    calls = []
+    pages = {
+        1: _advanced_page(4, ["4020210000001", "4020210000002"]),
+        2: _advanced_page(4, ["4020210000003", "4020210000004"]),
+    }
+
+    def fake_raw(_name, *, page_no=1, **_kwargs):
+        calls.append(page_no)
+        return pages[page_no]
+
+    monkeypatch.setattr(kc, "advanced_search_raw", fake_raw)
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        ["collect_pipeline", "--applicant", "삼성전자", "--limit", "1", "--dry-run"],
+    )
+
+    assert cp.main() == 0
+    assert calls == [1]
+
+
+def test_plan_is_offline_and_reports_budget(tmp_path, monkeypatch, capsys):
+    data_dir = tmp_path / "data"
+    stage = data_dir / "staging" / "bbq_29_43.json"
+    monkeypatch.setattr(cp.paths, "ML_DATA_DIR", data_dir)
+    monkeypatch.setattr(cp.config, "DATABASE_URL", "")
+    monkeypatch.setattr(kc, "ACCESS_KEY", "configured-secret")
+    monkeypatch.setattr(kc.limiter, "used_this_month", lambda: 4)
+    monkeypatch.setattr(
+        kc,
+        "advanced_search_raw",
+        lambda *_args, **_kwargs: pytest.fail("--plan must not call KIPRIS"),
+    )
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--applicant",
+            "주식회사 제너시스비비큐",
+            "--plan",
+            "--limit",
+            "50",
+            "--max-pages-per-source",
+            "1",
+            "--nice-class",
+            "29",
+            "--nice-class",
+            "43",
+            "--file-staging",
+            str(stage),
+        ],
+    )
+
+    assert cp.main() == 0
+    output = capsys.readouterr().out
+    plan = json.loads(output.removeprefix("[계획] "))
+    assert plan["network_calls_executed"] == 0
+    assert plan["target_nice_classes"] == [29, 43]
+    assert plan["nice_filter_scope"] == "client-side-after-search"
+    assert plan["estimated_calls"]["search_min"] == 1
+    assert plan["estimated_calls"]["search_hard_max"] == 2
+    assert plan["max_pages_per_source"] == 1
+    assert plan["rows_per_page"] == 100
+    assert plan["search_retries_per_page"] == 1
+    assert plan["search_attempts_per_page_hard_max"] == 2
+    assert plan["search_timeout_seconds"] == 30.0
+    assert plan["quota"]["used"] == 4
+    assert plan["quota"]["remaining"] == 946
+    assert plan["environment"]["storage_target"] == "file-staging"
+    assert plan["ready_for_collection"] is True
+    assert not stage.exists()
+
+
+def test_nice_class_filter_and_distribution_are_reported(
+    tmp_path, monkeypatch, capsys
+):
+    _no_db(monkeypatch)
+    xml_file = tmp_path / "mock.xml"
+    xml_file.write_text(XML_APPLICANT, encoding="utf-8")
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--mock-xml",
+            str(xml_file),
+            "--dry-run",
+            "--nice-class",
+            "35",
+        ],
+    )
+
+    assert cp.main() == 0
+    output = capsys.readouterr().out
+    assert "'수집': 1" in output
+    assert "'제외_대상류아님': 1" in output
+    assert "'류별_수집': {'9': 1, '35': 1}" in output
+
+
+def test_max_pages_per_source_is_a_hard_call_cap(tmp_path, monkeypatch):
+    _no_db(monkeypatch)
+    _isolate_data(tmp_path, monkeypatch)
+    monkeypatch.setattr(kc, "ADVANCED_DEFAULT_ROWS", 2)
+    calls = []
+
+    def fake_raw(_name, *, page_no=1, **_kwargs):
+        calls.append(page_no)
+        return _advanced_page(50, ["4020210000001", "4020210000002"])
+
+    monkeypatch.setattr(kc, "advanced_search_raw", fake_raw)
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--applicant",
+            "주식회사 제너시스비비큐",
+            "--dry-run",
+            "--max-pages-per-source",
+            "1",
+        ],
+    )
+
+    assert cp.main() == 0
+    assert calls == [1]
+
+
+def test_search_page_retries_once_then_succeeds(tmp_path, monkeypatch, capsys):
+    _isolate_data(tmp_path, monkeypatch)
+    calls = []
+    sleeps = []
+
+    def flaky_raw(_name, **kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise kc.KiprisNetworkError("timeout")
+        return _advanced_page(1, ["4020210000001"])
+
+    monkeypatch.setattr(kc, "advanced_search_raw", flaky_raw)
+    monkeypatch.setattr(cp.time, "sleep", sleeps.append)
+
+    results = list(
+        cp.iter_search_pages(
+            "삼성전자",
+            max_pages=1,
+            rows_per_page=100,
+            max_retries=1,
+            retry_backoff_seconds=2,
+            request_timeout_seconds=30,
+        )
+    )
+
+    assert len(results) == 1
+    assert isinstance(results[0], cp.SearchPage)
+    assert [call["num_of_rows"] for call in calls] == [100, 100]
+    assert [call["request_timeout"] for call in calls] == [30, 30]
+    assert sleeps == [2]
+    assert "재시도 1/1" in capsys.readouterr().err
+
+
+def test_search_failure_skips_only_source_and_preserves_cursor(
+    sandbox, monkeypatch, capsys
+):
+    cp.update_checkpoint(
+        [],
+        source="실패 출원인",
+        cursor=(2, 7),
+        rows_per_page=100,
+        path=cp.CHECKPOINT_PATH,
+    )
+    calls = []
+
+    def source_raw(source, **_kwargs):
+        calls.append(source)
+        if source == "실패 출원인":
+            raise kc.KiprisNetworkError("timeout")
+        return _advanced_page(1, ["4020210000001"])
+
+    monkeypatch.setattr(kc, "advanced_search_raw", source_raw)
+    monkeypatch.setattr(kc, "download_file_now", _counting_download([]))
+    monkeypatch.setattr(cp.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--applicant",
+            "실패 출원인",
+            "--applicant",
+            "성공 출원인",
+            "--rows-per-page",
+            "100",
+            "--search-retries",
+            "1",
+            "--retry-backoff-seconds",
+            "0",
+            "--skip-index",
+        ],
+    )
+
+    assert cp.main() == 4
+    assert calls == ["실패 출원인", "실패 출원인", "성공 출원인"]
+    assert [row[0] for row in sandbox["captured"]["rows"]] == ["4020210000001"]
+    assert cp.load_cursor(
+        "실패 출원인",
+        cp.CHECKPOINT_PATH,
+        rows_per_page=100,
+    ) == (2, 7)
+    captured = capsys.readouterr()
+    assert "이 출원인만 건너뜁니다" in captured.err
+    assert "'검색실패_출원인': 1" in captured.out
+
+
+def test_checkpoint_page_size_change_restarts_source_without_mutating_file(
+    tmp_path, capsys
+):
+    checkpoint = tmp_path / "checkpoint.json"
+    cp.update_checkpoint(
+        ["4020210000001"],
+        source="삼성전자",
+        cursor=(3, 17),
+        rows_per_page=500,
+        path=checkpoint,
+    )
+    before = checkpoint.read_bytes()
+
+    assert cp.load_cursor("삼성전자", checkpoint, rows_per_page=500) == (3, 17)
+    assert cp.load_cursor("삼성전자", checkpoint, rows_per_page=100) == (1, 0)
+    assert checkpoint.read_bytes() == before
+    assert "1페이지부터 다시 확인" in capsys.readouterr().err
+
+
+def test_help_is_encodable_on_windows_cp949():
+    env = {**os.environ, "PYTHONIOENCODING": "cp949"}
+    result = subprocess.run(
+        [
+            cp.sys.executable,
+            "-m",
+            "backend.scripts.collect_pipeline",
+            "--help",
+        ],
+        cwd=cp.PROJECT_ROOT,
+        env=env,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr.decode("cp949", errors="replace")
+    assert "--file-staging" in result.stdout.decode("cp949")
+    assert "--target-total" in result.stdout.decode("cp949")
+
+
 # ====================================================================
 # 백엔드-6 감사보고서 DoD — 원본 선저장 / 기수집 skip / 레코드별 체크포인트
 #
@@ -364,6 +638,12 @@ def sandbox(tmp_path, monkeypatch):
     images.mkdir()
     monkeypatch.setattr(cp, "CHECKPOINT_PATH", tmp_path / "collect_checkpoint.json")
     monkeypatch.setattr(cp, "COLLECT_RAW_XML_DIR", tmp_path / "raw" / "xml")
+    monkeypatch.setattr(cp, "INDEX_DIRTY_PATH", tmp_path / "index" / ".dirty")
+    monkeypatch.setattr(
+        cp,
+        "AUTHORITATIVE_KEYS_PATH",
+        tmp_path / "index" / "authoritative_keys.json",
+    )
     monkeypatch.setattr(cp.paths, "IMAGES_DIR", images)  # storage 심이 같은 paths 모듈 참조
     monkeypatch.setattr(cp, "load_db_app_numbers", lambda url: set())
     monkeypatch.setattr(cp, "rebuild_index", lambda: None)
@@ -390,6 +670,94 @@ def _counting_download(calls, *, raise_on=None):
         dest.write_bytes(b"\x89PNG\r\n\x1a\n(fake)")
         return dest
     return _dl
+
+
+def test_target_total_db_caps_distinct_new_records_before_next_source(
+    sandbox, monkeypatch, capsys
+):
+    """DB 기존 건수와 신규 출원번호 합계가 목표를 넘지 않아야 한다."""
+    existing = {
+        "4020190000001",
+        "4020190000002",
+        "4020190000003",
+    }
+    calls = []
+    page_with_duplicate = _advanced_page(
+        3,
+        ["4020210000001", "4020210000001", "4020210000002"],
+    )
+
+    monkeypatch.setattr(cp, "load_db_app_numbers", lambda _url: existing)
+    monkeypatch.setattr(kc.limiter, "used_this_month", lambda: 0)
+    monkeypatch.setattr(
+        kc,
+        "advanced_search_raw",
+        lambda source, **_kwargs: (calls.append(source), page_with_duplicate)[1],
+    )
+    monkeypatch.setattr(kc, "download_file_now", _counting_download([]))
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--applicant",
+            "첫번째",
+            "--applicant",
+            "두번째",
+            "--target-total",
+            "5",
+            "--skip-index",
+        ],
+    )
+
+    assert cp.main() == 0
+    output = capsys.readouterr().out
+    assert calls == ["첫번째"], "목표 도달 뒤 다음 출원인 검색을 호출하면 안 된다"
+    assert [row[0] for row in sandbox["captured"]["rows"]] == [
+        "4020210000001",
+        "4020210000002",
+    ]
+    assert "'기존총계': 3" in output
+    assert "'최종총계': 5" in output
+    assert "'목표도달': True" in output
+
+
+def test_target_total_db_already_met_skips_all_kipris_calls(
+    sandbox, monkeypatch, capsys
+):
+    monkeypatch.setattr(
+        cp,
+        "load_db_app_numbers",
+        lambda _url: {f"402019{index:07d}" for index in range(5)},
+    )
+    monkeypatch.setattr(
+        kc.limiter,
+        "used_this_month",
+        lambda: pytest.fail("목표 달성 시 쿼터 조회도 필요하지 않다"),
+    )
+    monkeypatch.setattr(
+        kc,
+        "advanced_search_raw",
+        lambda *_args, **_kwargs: pytest.fail("목표 달성 시 KIPRIS 호출 금지"),
+    )
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--applicant",
+            "호출금지",
+            "--target-total",
+            "5",
+            "--skip-index",
+        ],
+    )
+
+    assert cp.main() == 0
+    output = capsys.readouterr().out
+    assert "검색 호출을 생략합니다" in output
+    assert sandbox["captured"]["rows"] == []
+    assert "'최종총계': 5" in output
 
 
 def test_rerun_skips_collected_zero_download_calls(sandbox, monkeypatch, capsys):
@@ -436,20 +804,26 @@ def test_checkpoint_resume_after_interrupt(sandbox, monkeypatch, capsys):
     assert cp.main() == 3  # 중단 종료 코드 — 조용히 성공하지 않는다
     ckpt = json.loads(cp.CHECKPOINT_PATH.read_text(encoding="utf-8"))
     assert ckpt["collected"] == ["4020210000001", "4020210000002"]  # 적재된 2건만 체크포인트
+    assert ckpt["cursors"]["삼성전자"] == {
+        "page": 1,
+        "offset": 2,
+        "rows_per_page": 100,
+    }
     assert sorted(p.name for p in sandbox["images"].glob("*.png")) == [
         "4020210000001.png", "4020210000002.png"]                    # 3번째 이미지 없음
     assert len(sandbox["captured"]["rows"]) == 2, "중단 전 확보한 행은 반드시 적재돼야 한다"
 
-    # 2차: 앞 2건은 skip, 3번째만 다운로드
+    # 2차: 영속 offset 커서가 앞 2건을 다시 처리하지 않고 3번째에서 재개
     run2 = []
     monkeypatch.setattr(kc, "download_file_now", _counting_download(run2))
     assert cp.main() == 0
     out = capsys.readouterr().out
     assert run2 == ["http://plus.kipris.or.kr/fileToss.jsp?a=3"]     # 3번째만 호출
     assert "'수집': 1" in out
-    assert "'건너뜀_기수집': 2" in out
+    assert "'건너뜀_기수집': 0" in out
     ckpt = json.loads(cp.CHECKPOINT_PATH.read_text(encoding="utf-8"))
     assert ckpt["collected"] == ["4020210000001", "4020210000002", "4020210000003"]
+    assert "삼성전자" not in ckpt["cursors"]
 
 
 def test_checkpoint_never_written_when_upsert_fails(sandbox, monkeypatch):
@@ -566,3 +940,307 @@ def test_force_reprocesses_already_collected(sandbox, monkeypatch):
                         ["collect_pipeline", "--applicant", "삼성전자", "--skip-index", "--force"])
     assert cp.main() == 0
     assert len(dl) == 3          # --force 로 기수집분도 다시 다운로드
+
+
+def test_two_search_pages_are_upserted_page_by_page(sandbox, monkeypatch):
+    monkeypatch.setattr(kc, "ADVANCED_DEFAULT_ROWS", 2)
+    pages = {
+        1: _advanced_page(3, ["4020210000001", "4020210000002"]),
+        2: _advanced_page(3, ["4020210000003"]),
+    }
+    calls = []
+
+    def fake_raw(_name, *, page_no=1, **_kwargs):
+        return pages[page_no]
+
+    def fake_upsert(rows, _database_url):
+        calls.append([row[0] for row in rows])
+
+    monkeypatch.setattr(kc, "advanced_search_raw", fake_raw)
+    monkeypatch.setattr(kc, "download_file_now", _counting_download([]))
+    monkeypatch.setattr(cp, "upsert_rows", fake_upsert)
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        ["collect_pipeline", "--applicant", "삼성전자", "--skip-index"],
+    )
+
+    assert cp.main() == 0
+    assert calls == [
+        ["4020210000001", "4020210000002"],
+        ["4020210000003"],
+    ]
+    assert len(list(cp.COLLECT_RAW_XML_DIR.glob("*.xml"))) == 2
+
+
+def test_iter_search_pages_stops_on_repeated_page(tmp_path, monkeypatch):
+    monkeypatch.setattr(cp, "COLLECT_RAW_XML_DIR", tmp_path / "raw")
+    monkeypatch.setattr(kc, "ADVANCED_DEFAULT_ROWS", 2)
+    repeated = _advanced_page(99, ["4020210000001", "4020210000002"])
+    calls = []
+
+    def fake_raw(_name, *, page_no=1, **_kwargs):
+        calls.append(page_no)
+        return repeated
+
+    monkeypatch.setattr(kc, "advanced_search_raw", fake_raw)
+
+    pages = list(cp.iter_search_pages("삼성전자"))
+    assert [page.page_no for page in pages] == [1]
+    assert calls == [1, 2]
+
+
+def test_dirty_index_recovery_exports_db_keys_and_clears_marker(
+    sandbox, monkeypatch, tmp_path
+):
+    xml_file = tmp_path / "all_rejected.xml"
+    xml_file.write_text(
+        "<response><header><resultCode>00</resultCode></header><body><items>"
+        "<item><ApplicationStatus>거절</ApplicationStatus>"
+        "<ApplicationNumber>4020210000009</ApplicationNumber>"
+        "<ViennaCode>260101</ViennaCode></item>"
+        "</items></body></response>",
+        encoding="utf-8",
+    )
+    cp.mark_index_dirty()
+    rebuilt = []
+    monkeypatch.setattr(cp, "load_db_image_keys", lambda _url: {"a/one.png"})
+    monkeypatch.setattr(cp, "rebuild_index", lambda: rebuilt.append(True))
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        ["collect_pipeline", "--mock-xml", str(xml_file)],
+    )
+
+    assert cp.main() == 2
+    assert rebuilt == [True]
+    assert not cp.INDEX_DIRTY_PATH.exists()
+    manifest = json.loads(cp.AUTHORITATIVE_KEYS_PATH.read_text(encoding="utf-8"))
+    assert manifest == {
+        "schema_version": 1,
+        "source": "database.image_key",
+        "image_keys": ["a/one.png"],
+    }
+
+
+def test_rebuild_index_passes_authoritative_key_manifest(tmp_path, monkeypatch):
+    manifest = tmp_path / "authoritative_keys.json"
+    manifest.write_text('{"image_keys":["one.png"]}', encoding="utf-8")
+    monkeypatch.setattr(cp, "AUTHORITATIVE_KEYS_PATH", manifest)
+    calls = []
+    monkeypatch.setattr(
+        cp.subprocess,
+        "run",
+        lambda command, **kwargs: calls.append((command, kwargs)),
+    )
+
+    cp.rebuild_index()
+
+    command, kwargs = calls[0]
+    flag_index = command.index("--authoritative-keys")
+    assert command[flag_index + 1] == str(manifest)
+    assert kwargs["check"] is True
+
+
+@pytest.mark.parametrize("bad_key", ["../x.png", "/abs/x.png", "x.txt"])
+def test_authoritative_manifest_rejects_unsafe_image_keys(
+    tmp_path, monkeypatch, bad_key
+):
+    monkeypatch.setattr(cp, "load_db_image_keys", lambda _url: {bad_key})
+    with pytest.raises(ValueError):
+        cp.export_authoritative_keys("postgresql://fake/db", tmp_path / "keys.json")
+
+
+def _empty_file_staging(tmp_path, monkeypatch):
+    data_dir = tmp_path / "data"
+    images = data_dir / "images"
+    images.mkdir(parents=True)
+    source = data_dir / "kipris_metadata.json"
+    source.write_text(
+        json.dumps({"dataset_info": {"총_상표수": 0}, "trademarks": []}),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cp.paths, "ML_DATA_DIR", data_dir)
+    monkeypatch.setattr(cp.paths, "IMAGES_DIR", images)
+    monkeypatch.setattr(cp.paths, "TRADEMARK_META_PATH", source)
+    stage = data_dir / "staging" / "research.json"
+    stage_images = cp.staging_image_dir(stage)
+    stage_images.mkdir(parents=True)
+    return stage, stage_images, images
+
+
+def test_file_staging_atomic_merge_and_conflict_no_overwrite(tmp_path, monkeypatch):
+    stage, stage_images, _runtime_images = _empty_file_staging(tmp_path, monkeypatch)
+    row = (
+        "4020260000001",
+        "4020260000001",
+        "2026-01-01",
+        "2026-02-01",
+        "BBQ",
+        None,
+        "도형복합",
+        "주식회사 제너시스비비큐",
+        "주식회사 제너시스비비큐",
+        "4020260000001.png",
+        ["270501"],
+        [29, 43],
+        [],
+    )
+    (stage_images / row[9]).write_bytes(b"png")
+
+    assert cp.merge_file_staging_rows([row], stage) == (1, 0)
+    assert cp.merge_file_staging_rows([row], stage) == (0, 1)
+    before = stage.read_bytes()
+    conflicting = (*row[:4], "DIFFERENT", *row[5:])
+
+    with pytest.raises(ValueError, match="자동 덮어쓰지 않았습니다"):
+        cp.merge_file_staging_rows([conflicting], stage)
+
+    assert stage.read_bytes() == before
+    assert not cp.staging_dirty_path(stage).exists()
+    payload = json.loads(stage.read_text(encoding="utf-8"))
+    manifest = json.loads(
+        cp.staging_authoritative_path(stage).read_text(encoding="utf-8")
+    )
+    assert payload["dataset_info"]["총_상표수"] == 1
+    assert manifest["image_keys"] == ["4020260000001.png"]
+
+
+def test_file_staging_mock_flow_without_database(tmp_path, monkeypatch, capsys):
+    stage, stage_images, runtime_images = _empty_file_staging(tmp_path, monkeypatch)
+    xml_file = tmp_path / "three.xml"
+    xml_file.write_text(XML_THREE, encoding="utf-8")
+    monkeypatch.setattr(cp.config, "DATABASE_URL", "")
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--mock-xml",
+            str(xml_file),
+            "--file-staging",
+            str(stage),
+            "--nice-class",
+            "9",
+        ],
+    )
+
+    assert cp.main() == 0
+    output = capsys.readouterr().out
+    payload = json.loads(stage.read_text(encoding="utf-8"))
+    assert len(payload["trademarks"]) == 3
+    assert len(list(stage_images.glob("*.png"))) == 3
+    assert list(runtime_images.glob("*.png")) == []
+    assert "[파일 스테이징] page 1 신규 3건" in output
+    assert "운영 메타와 운영 인덱스는 변경하지 않았습니다" in output
+    assert cp.inspect_file_staging(stage) == (True, None)
+
+
+def test_file_staging_dirty_marker_blocks_before_network(tmp_path, monkeypatch):
+    stage, _stage_images, _runtime_images = _empty_file_staging(tmp_path, monkeypatch)
+    cp.staging_dirty_path(stage).parent.mkdir(parents=True, exist_ok=True)
+    cp.staging_dirty_path(stage).write_text("incomplete", encoding="utf-8")
+    monkeypatch.setattr(cp.config, "DATABASE_URL", "")
+    monkeypatch.setattr(
+        kc,
+        "advanced_search_raw",
+        lambda *_args, **_kwargs: pytest.fail("dirty staging must block KIPRIS"),
+    )
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--applicant",
+            "주식회사 제너시스비비큐",
+            "--file-staging",
+            str(stage),
+        ],
+    )
+
+    assert cp.main() == 1
+
+
+def test_target_total_file_staging_counts_runtime_and_stage_union(
+    tmp_path, monkeypatch, capsys
+):
+    """승격 뒤 재사용한 stage는 운영 메타와 겹쳐도 한 번만 세고 커서를 보존한다."""
+    stage, stage_images, _runtime_images = _empty_file_staging(tmp_path, monkeypatch)
+    cp.paths.TRADEMARK_META_PATH.write_text(
+        json.dumps(
+            {
+                "dataset_info": {"총_상표수": 2},
+                "trademarks": [
+                    {"출원번호": "4020190000001"},
+                    # 이미 운영으로 승격됐지만 같은 stage에도 남아 있는 레코드.
+                    {"출원번호": "4020200000001"},
+                ],
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    staged_row = (
+        "4020200000001",
+        None,
+        "2020-01-01",
+        None,
+        "기존 스테이징",
+        None,
+        "도형",
+        "기존 출원인",
+        None,
+        "4020200000001.png",
+        ["260101"],
+        [9],
+        [],
+    )
+    (stage_images / staged_row[9]).write_bytes(b"png")
+    assert cp.merge_file_staging_rows([staged_row], stage) == (1, 0)
+
+    calls = []
+    response = _advanced_page(
+        3,
+        ["4020210000001", "4020210000002", "4020210000003"],
+    )
+    monkeypatch.setattr(cp.config, "DATABASE_URL", "")
+    monkeypatch.setattr(kc.limiter, "used_this_month", lambda: 0)
+    monkeypatch.setattr(
+        kc,
+        "advanced_search_raw",
+        lambda source, **_kwargs: (calls.append(source), response)[1],
+    )
+    monkeypatch.setattr(kc, "download_file_now", _counting_download([]))
+    monkeypatch.setattr(
+        cp.sys,
+        "argv",
+        [
+            "collect_pipeline",
+            "--applicant",
+            "첫번째",
+            "--applicant",
+            "두번째",
+            "--file-staging",
+            str(stage),
+            "--target-total",
+            "4",
+        ],
+    )
+
+    assert cp.main() == 0
+    output = capsys.readouterr().out
+    assert calls == ["첫번째"]
+    assert len(cp.load_file_staging_app_numbers(stage)) == 4
+    stage_payload = json.loads(stage.read_text(encoding="utf-8"))
+    assert len(stage_payload["trademarks"]) == 3
+    assert "'기존총계': 2" in output
+    assert "'최종총계': 4" in output
+    checkpoint = json.loads(
+        cp.staging_checkpoint_path(stage).read_text(encoding="utf-8")
+    )
+    assert checkpoint["cursors"]["첫번째"] == {
+        "page": 1,
+        "offset": 2,
+        "rows_per_page": 100,
+    }
+    assert cp.inspect_file_staging(stage) == (True, None)

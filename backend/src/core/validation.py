@@ -7,6 +7,7 @@
 """
 
 import io
+import warnings
 
 from fastapi import HTTPException, UploadFile, status
 from PIL import Image, UnidentifiedImageError
@@ -23,7 +24,7 @@ def validate_upload_size(raw_bytes: bytes) -> None:
         )
     if len(raw_bytes) > config.MAX_UPLOAD_BYTES:
         raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status_code=413,
             detail=(
                 f"파일 크기 상한({config.MAX_UPLOAD_BYTES} bytes)을 초과했습니다. "
                 f"받은 크기: {len(raw_bytes)} bytes."
@@ -53,21 +54,21 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
     성공 시 RGB가 아니어도 그대로 PIL.Image 반환 (preprocess가 추후 RGB로 변환).
     """
     try:
-        img = Image.open(io.BytesIO(raw_bytes))
-        img.load()  # 지연 로딩 강제 실행 — 손상된 이미지면 여기서 예외
+        source = Image.open(io.BytesIO(raw_bytes))
     except UnidentifiedImageError:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="이미지로 디코딩할 수 없는 파일입니다.",
-        )
-    except Exception as e:
+        ) from None
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"이미지 디코딩 실패: {e}",
-        )
+            detail="이미지 헤더를 읽을 수 없습니다.",
+        ) from None
 
-    fmt = (img.format or "").upper()
+    fmt = (source.format or "").upper()
     if fmt not in config.ALLOWED_PIL_FORMATS:
+        source.close()
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail=(
@@ -76,8 +77,9 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
             ),
         )
 
-    w, h = img.size
+    w, h = source.size
     if w < config.MIN_IMAGE_DIM or h < config.MIN_IMAGE_DIM:
+        source.close()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
@@ -86,12 +88,45 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
             ),
         )
     if w > config.MAX_IMAGE_DIM or h > config.MAX_IMAGE_DIM:
-        # 초과는 preprocess_image 가 자동 축소하지만, 너무 큰 입력은 사전 차단.
-        # MAX_IMAGE_DIM(=preprocess의 MAX_SIZE)을 넘으면 어차피 축소되므로,
-        # 여기서는 통과시키고 preprocess에 맡긴다.
-        pass
+        source.close()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"이미지 치수 상한을 초과했습니다: {w}x{h} "
+                f"(최대 {config.MAX_IMAGE_DIM}x{config.MAX_IMAGE_DIM})"
+            ),
+        )
+    if w * h > config.MAX_IMAGE_PIXELS:
+        source.close()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f"이미지 픽셀 수 상한을 초과했습니다: {w * h} "
+                f"(최대 {config.MAX_IMAGE_PIXELS})"
+            ),
+        )
 
-    return img
+    try:
+        # Pillow 자체 decompression-bomb 경고도 오류로 승격한다. 치수 검사를
+        # 먼저 했으므로 허용 범위 이미지만 실제 픽셀 버퍼를 할당한다.
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            source.load()
+        decoded = source.copy()
+        decoded.info = dict(source.info)
+        return decoded
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="안전하게 처리할 수 없는 이미지 크기입니다.",
+        ) from None
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="손상되었거나 완전히 디코딩할 수 없는 이미지입니다.",
+        ) from None
+    finally:
+        source.close()
 
 
 def validate_upload(upload: UploadFile, raw_bytes: bytes) -> Image.Image:

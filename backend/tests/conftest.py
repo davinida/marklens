@@ -106,6 +106,11 @@ def _build_fake_ml_env(base: Path) -> None:
 def pytest_configure(config):
     """테스트 모듈들이 backend.src.core.{paths,config} 를 import 하기 전에
     가짜 ML 환경 변수를 심는다 (paths/config 는 import 시점에 env 를 읽는다)."""
+    # 계약 테스트 전체가 한 IP(TestClient)로 실행되므로 운영용 10/minute 제한이
+    # 테스트 순서에 따라 누적되지 않도록 충분히 높은 테스트 전용 한도를 사용한다.
+    os.environ["MARKLENS_SEARCH_RATELIMIT"] = "10000/minute"
+    os.environ["MARKLENS_NAMECHECK_RATELIMIT"] = "10000/minute"
+
     if not FAKE_ML_MODE:
         return
     base = Path(tempfile.mkdtemp(prefix="marklens_fake_ml_"))

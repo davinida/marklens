@@ -48,10 +48,26 @@ class SearchMatch(BaseModel):
 
 
 class GradeInfo(BaseModel):
-    """scoring.score_results 결과를 그대로 옮긴 등급 정보."""
+    """교정 전 시각 유사도 판정과 한 릴리스용 레거시 등급 필드."""
 
-    grade_code: str
-    grade_name: str
+    status_code: str = Field(..., description="정식 시각 유사도 상태 코드")
+    status_name: str
+    uncertain: bool
+    uncertainty_reasons: list[str] = Field(default_factory=list)
+    scored_candidate_count: int
+    threshold_version: str
+    scope: str = "visual_similarity_only"
+    calibrated: bool = False
+    legal_conclusion: bool = False
+
+    grade_code: str = Field(
+        ...,
+        deprecated="status_code를 사용하세요. 다음 계약 버전에서 제거됩니다.",
+    )
+    grade_name: str = Field(
+        ...,
+        deprecated="status_name을 사용하세요. 다음 계약 버전에서 제거됩니다.",
+    )
     message: str
     top1_similarity: float
     separability_a: float = Field(..., description="top1 - top2 격차")
@@ -77,3 +93,9 @@ class SearchResponse(BaseModel):
     index_size: int = Field(..., description="인덱스에 들어있는 총 벡터 수")
     top_k_requested: int
     top_k_returned: int
+    scoring_k: int = Field(
+        ...,
+        description="판정에 사용한 내부 후보 수. 표시 top_k와 독립적입니다.",
+    )
+    api_version: str = "2026-08-14"
+    research_beta: bool = True

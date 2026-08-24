@@ -125,10 +125,19 @@ def test_search_happy_path(client, identity_query):
 
     # 등급 블록
     grade = body["grade"]
-    for key in ("grade_code", "grade_name", "message",
-                "top1_similarity", "separability_a", "separability_b", "warnings"):
+    for key in (
+        "status_code", "status_name", "uncertain", "uncertainty_reasons",
+        "scored_candidate_count", "threshold_version", "grade_code", "grade_name",
+        "message", "top1_similarity", "separability_a", "separability_b", "warnings",
+    ):
         assert key in grade
-    assert grade["grade_code"] in ("CAUTION", "REVIEW", "LOW", "SAFE")
+    assert grade["status_code"] in (
+        "STRONG_MATCH", "POSSIBLE_MATCH", "WEAK_MATCH", "NO_CLOSE_MATCH"
+    )
+    assert grade["grade_code"] in ("CAUTION", "REVIEW", "LOW")
+    assert grade["calibrated"] is False
+    assert grade["legal_conclusion"] is False
+    assert body["research_beta"] is True
 
     # 데이터셋 안내 4필드
     for key in ("총_상표수", "출원일자_범위", "데이터_기준", "생성일자"):
@@ -142,6 +151,21 @@ def test_search_default_top_k(client):
     r = post_search(client, dup_query())
     assert r.status_code == 200
     assert r.json()["top_k_requested"] == config.DEFAULT_TOP_K
+
+
+def test_search_assessment_is_independent_from_display_top_k(client):
+    one = post_search(client, dup_query(), query="?top_k=1")
+    five = post_search(client, dup_query(), query="?top_k=5")
+    assert one.status_code == five.status_code == 200
+    one_body = one.json()
+    five_body = five.json()
+    assert one_body["grade"] == five_body["grade"]
+    assert one_body["scoring_k"] == five_body["scoring_k"]
+    assert one_body["scoring_k"] == min(
+        config.SCORING_TOP_K, one_body["index_size"]
+    )
+    assert one_body["top_k_returned"] == 1
+    assert five_body["top_k_returned"] == 5
 
 
 def test_search_top_k_clamped_to_index_size(client):
@@ -201,6 +225,12 @@ def test_search_too_small_400(client):
     assert r.status_code == 400
 
 
+def test_search_oversized_dimensions_rejected_before_decode(client):
+    r = post_search(client, png_bytes(size=(config.MAX_IMAGE_DIM + 1, 32)))
+    assert r.status_code == 400
+    assert "치수 상한" in r.json()["detail"]
+
+
 # ---------------------------------------------------------------
 # /images 정적 서빙
 # ---------------------------------------------------------------
@@ -212,6 +242,27 @@ def test_images_static_serving(client):
     img = client.get(f"/images/{filename}")
     assert img.status_code == 200
     assert img.headers["content-type"] == "image/png"
+
+
+def test_images_nested_index_key_serving(client, fake_ml_mode):
+    if not fake_ml_mode:
+        pytest.skip("중첩 키 계약 테스트는 임시 fake image root에서만 실행")
+
+    from backend.src.core import engine
+
+    image_key = "nested/contract.png"
+    image_path = paths.IMAGES_DIR / image_key
+    image_path.parent.mkdir(parents=True, exist_ok=True)
+    image_path.write_bytes(png_bytes(size=(64, 64)))
+    engine.state.image_path_set.add(image_key)
+    try:
+        response = client.get("/images/nested/contract.png")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+    finally:
+        engine.state.image_path_set.discard(image_key)
+        image_path.unlink(missing_ok=True)
+        image_path.parent.rmdir()
 
 
 def test_images_missing_404(client):

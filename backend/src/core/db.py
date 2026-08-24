@@ -15,7 +15,6 @@ from psycopg_pool import ConnectionPool
 
 from . import config
 
-
 # 모듈 전역 풀. engine.load_all() 이 init_pool() 로 채운다.
 _pool: Optional[ConnectionPool] = None
 
@@ -33,7 +32,7 @@ def init_pool() -> None:
     if _pool is not None:
         return
     # min_size=1: 개발 장비 부담 최소화. 검색은 요청당 쿼리 1개라 소규모면 충분.
-    _pool = ConnectionPool(
+    pool = ConnectionPool(
         conninfo=config.DATABASE_URL,
         min_size=1,
         max_size=4,
@@ -41,8 +40,13 @@ def init_pool() -> None:
         timeout=10,
     )
     # 기동 시점에 연결 가능 여부를 확정한다 (첫 요청에서 터지지 않게).
-    with _pool.connection() as conn:
-        conn.execute("SELECT 1")
+    try:
+        with pool.connection() as conn:
+            conn.execute("SELECT 1")
+    except Exception:
+        pool.close()
+        raise
+    _pool = pool
 
 
 def close_pool() -> None:
@@ -111,6 +115,25 @@ def fetch_trademarks_by_image_keys(image_keys: list[str]) -> dict[str, dict]:
     return result
 
 
+def fetch_trademarks_by_application_numbers(
+    application_numbers: list[str],
+) -> dict[str, dict]:
+    """출원번호 목록에 해당하는 로컬 메타를 한 번의 파라미터 쿼리로 조회한다."""
+    if not application_numbers:
+        return {}
+    pool = _require_pool()
+    with pool.connection() as conn:
+        rows = conn.execute(
+            f"SELECT {_SELECT_COLUMNS} FROM trademark WHERE application_no = ANY(%s)",
+            (application_numbers,),
+        ).fetchall()
+    result = {}
+    for row in rows:
+        trademark = row_to_trademark(row)
+        result[trademark["출원번호"]] = trademark
+    return result
+
+
 def fetch_dataset_info() -> dict:
     """meta 테이블에서 dataset_info(JSONB)를 읽는다. 없으면 빈 dict."""
     pool = _require_pool()
@@ -127,3 +150,13 @@ def count_trademarks() -> int:
     with pool.connection() as conn:
         row = conn.execute("SELECT count(*) FROM trademark").fetchone()
     return int(row[0])
+
+
+def fetch_all_image_keys() -> set[str]:
+    """Return the authoritative DB image-key set for index reconciliation."""
+    pool = _require_pool()
+    with pool.connection() as conn:
+        rows = conn.execute(
+            "SELECT image_key FROM trademark WHERE image_key IS NOT NULL"
+        ).fetchall()
+    return {str(row[0]) for row in rows}

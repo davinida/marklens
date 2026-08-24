@@ -233,7 +233,8 @@ def main() -> int:
                 (loaded_nos,),
             )
             conn.commit()
-            print(f"[prune] 잔존 행 {len(stale)}건 삭제: {stale[:5]}{' ...' if len(stale) > 5 else ''}")
+            suffix = " ..." if len(stale) > 5 else ""
+            print(f"[prune] 잔존 행 {len(stale)}건 삭제: {stale[:5]}{suffix}")
             stale = []
 
         # ---- 적재 후 검증 ----
