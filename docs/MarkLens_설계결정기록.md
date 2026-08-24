@@ -24,6 +24,18 @@
 
 정본 결정을 사후에 뒤집은 변경만 기록한다. 원문은 삭제하지 않고 [폐기] 표시 후 아래에서 대체 결정을 밝힌다.
 
+### 2026-08-14 · 연구 베타 경계와 시각 상태 계약
+
+- 현재 제품은 X2 시각 검색만 제공하며 법적 위험도·등록 가능성·안전 판정을 하지 않는다.
+- `SAFE` 상태를 폐기하고 `STRONG_MATCH`, `POSSIBLE_MATCH`, `WEAK_MATCH`,
+  `NO_CLOSE_MATCH`를 정식 계약으로 사용한다. 기존 `grade_*`는 한 릴리스 호환 필드다.
+- 상태는 top-1 유사도에 대해 단조적이어야 한다. 후보 gap은 하향 조건이 아니라
+  불확실성 메타데이터이며, 판정용 `scoring_k=20`은 표시 `top_k`와 분리한다.
+- 임계값은 200쌍 사람 검수와 frozen holdout 전까지 `uncalibrated`로 표시한다.
+- 공개 경계는 Next BFF + private FastAPI이며 브라우저에 서버 키를 제공하지 않는다.
+- KIPRIS 이미지 공개는 재배포 권리를 서면 확인할 때까지 비활성화한다.
+- production index는 authoritative source와 SHA-256을 기록한 manifest가 필수다.
+
 ### 2026-07 · OCR(EasyOCR) 폐기 — 상표명 사용자 직접 입력으로 전환
 
 - **폐기 사유:** 결합상표의 문자를 이미지에서 자동 인식(OCR)하는 방식은 변형 글꼴·한글 인식 정확도와 파이프라인 복잡도 문제로 폐기하고, **사용자가 상표명을 직접 입력**받는 방식으로 전환했다. (README §2 "초기 계획에서 변경된 점" 참조)
@@ -260,7 +272,8 @@ Phase 2-A 구현 시에는 임시 경계값을 두고, 데이터가 충분히 �
 아니라, 전체를 다시 빌드). 이름을 고정하면 인덱스를 사용하는 상위 코드
 (FastAPI 백엔드 등)가 데이터 갱신 시마다 인덱스 이름을 수정할 필요가 없다.
 인덱스의 생성 시점·이미지 수 등 버전 정보는 파일명이 아니라
-`kipris_metadata.json` 내부(`total_images` 등)에 기록한다.
+`kipris_metadata.json`과 generation commit marker인 `kipris_manifest.json`에 기록한다.
+production은 manifest의 모델·전처리·metric·artifact hash가 맞지 않으면 기동하지 않는다.
 
 **주의 — 동일 파일명 구분**: `kipris_metadata.json`이라는 이름의 파일이
 두 곳에 존재한다. 혼동하지 않도록 한다.
