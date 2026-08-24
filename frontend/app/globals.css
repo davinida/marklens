@@ -8,9 +8,12 @@
   --card: #ffffff;
   --ink: #191f28;
   --sub: #4e5968;
-  --muted: #8b95a1;
-  --faint: #b0b8c1;
-  --line: #eef1f4;
+  --muted: #59636f;
+  --faint: #6b7684;
+  --line: #dfe3e8;
+  --placeholder: #6b7684;
+  --disabled: #d8dde3;
+  --disabled-text: #4e5968;
   --blue: #3182f6;
   --blue-dark: #1b64da;
   --blue-bg: #e8f3ff;
@@ -35,6 +38,9 @@
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-line: var(--line);
+  --color-placeholder: var(--placeholder);
+  --color-disabled: var(--disabled);
+  --color-disabled-text: var(--disabled-text);
   --color-blue: var(--blue);
   --color-blue-dark: var(--blue-dark);
   --color-blue-bg: var(--blue-bg);
@@ -57,8 +63,30 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+summary {
+  letter-spacing: 0;
+}
+
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible,
+dialog:focus-visible {
+  outline: 2px solid var(--blue-dark);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+dialog::backdrop {
+  background: rgba(25, 31, 40, 0.72);
 }
 
 /* 숫자는 항상 고정폭으로 — 유사도·퍼센트 정렬 */

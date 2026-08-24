@@ -10,9 +10,9 @@ const pretendard = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "MarkLens — 상표 유사도 진단",
+  title: "MarkLens — 상표 시각 유사도 비교",
   description:
-    "로고 이미지를 올리면 등록상표와의 시각적 유사도를 진단해 드려요. 법적 판단이 아닌 참고 정보입니다.",
+    "로고 이미지를 올리면 등록상표와의 시각적 유사도를 비교해 드려요. 법적 판단이 아닌 참고 정보입니다.",
 };
 
 export default function RootLayout({
