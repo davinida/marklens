@@ -1,0 +1,88 @@
+name: marklens
+
+services:
+  gateway:
+    image: nginx:1.29-alpine
+    restart: unless-stopped
+    ports:
+      - "${MARKLENS_BIND_ADDRESS:-127.0.0.1}:${MARKLENS_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks: [edge]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+      args:
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?set NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MARKLENS_BACKEND_URL: http://backend:8000
+      MARKLENS_BACKEND_API_KEY: ${MARKLENS_API_KEY:?set MARKLENS_API_KEY}
+      MARKLENS_TURNSTILE_SECRET_KEY: ${MARKLENS_TURNSTILE_SECRET_KEY:?set MARKLENS_TURNSTILE_SECRET_KEY}
+      MARKLENS_TURNSTILE_EXPECTED_HOSTNAMES: ${MARKLENS_TURNSTILE_EXPECTED_HOSTNAMES:?set MARKLENS_TURNSTILE_EXPECTED_HOSTNAMES}
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [edge, internal]
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    environment:
+      MARKLENS_ENVIRONMENT: production
+      MARKLENS_API_KEY: ${MARKLENS_API_KEY:?set MARKLENS_API_KEY}
+      DATABASE_URL: postgresql://marklens:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/marklens
+      MARKLENS_DATA_DIR: /data
+      MARKLENS_IMAGES_DIR: /data/images
+      MARKLENS_PUBLIC_RESULT_IMAGES: ${MARKLENS_PUBLIC_RESULT_IMAGES:-false}
+      MARKLENS_CORS_ORIGINS: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN}
+      MARKLENS_SEARCH_CONCURRENCY: "2"
+      MARKLENS_SEARCH_RATELIMIT: 120/minute
+      MARKLENS_NAMECHECK_RATELIMIT: 60/minute
+      KIPRIS_ACCESS_KEY: ${KIPRIS_ACCESS_KEY:?set rotated KIPRIS_ACCESS_KEY}
+      KIPRIS_BASE_URL: https://plus.kipris.or.kr/
+      KIPRIS_COUNTER_PATH: /state/kipris_call_count.json
+      HF_HOME: /models/huggingface
+    volumes:
+      - ./ml/data:/data:ro
+      - marklens-state:/state
+      - marklens-model-cache:/models/huggingface
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [internal, backend-egress]
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: marklens
+      POSTGRES_USER: marklens
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - marklens-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marklens -d marklens"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [internal]
+
+networks:
+  edge:
+  internal:
+    internal: true
+  backend-egress:
+
+volumes:
+  marklens-postgres:
+  marklens-state:
+  marklens-model-cache:

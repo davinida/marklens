@@ -97,6 +97,9 @@ ml/data/index/
 # Environment Variables
 # ============================================
 .env
+.env.*
+!.env.example
+!.env.production.example
 .env.local
 .env.development.local
 .env.test.local
@@ -113,6 +116,7 @@ secrets/
 # ============================================
 .vscode/
 .idea/
+*.code-workspace
 *.swp
 *.swo
 *~
@@ -166,3 +170,10 @@ assets/*.zip
 # dev 통합 스크립트 산출물 (scripts/dev-start·stop)
 scripts/.dev-pids*
 scripts/*.log
+
+# 로컬 배포 데이터/모델 캐시
+deploy/data/
+deploy/models/
+
+# 코드 그래프 분석 도구 산출물/캐시 (로컬 전용 — 커밋 금지)
+graphify-out/
