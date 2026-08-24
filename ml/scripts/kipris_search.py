@@ -24,6 +24,7 @@ Phase 2-B FastAPI 백엔드가 동일한 결합 로직을 그대로 참고합니
 """
 
 import os
+
 # macOS Apple Silicon의 PyTorch + FAISS OpenMP 라이브러리 충돌 방지
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -38,9 +39,8 @@ ML_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ML_ROOT))
 
 from src.embedding import encode_image
-from src.search import load_index, search
 from src.scoring import score_results
-
+from src.search import load_index, search
 
 # === 고정 경로 ===
 # Phase 2-D 산출물: 상표한글명/비엔나코드 등 풍부한 정보가 든 메타데이터

@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light">
+    <meta name="marklens-csrf" content="__MARKLENS_CSRF_TOKEN__">
+    <title>MarkLens 로컬 시각 검수</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="header-inner">
+        <div>
+          <p class="product-name">MarkLens</p>
+          <h1>시각 유사도 사람 검수</h1>
+        </div>
+        <div class="header-badges" aria-label="검수 환경">
+          <span class="badge badge-local">로컬 전용</span>
+          <span class="badge" id="modeBadge">불러오는 중</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="notice-band" aria-labelledby="noticeTitle">
+        <div>
+          <h2 id="noticeTitle">사람의 시각 판단만 기록합니다</h2>
+          <p>
+            이 결과는 AI 자동 라벨이나 골드 정답이 아니며, 상표 등록 가능성이나
+            법적 판단을 뜻하지 않습니다.
+          </p>
+        </div>
+        <p class="annotator" id="annotatorText">검수자 확인 중</p>
+      </section>
+
+      <section class="progress-band" aria-labelledby="progressHeading">
+        <div class="progress-summary">
+          <div>
+            <p class="section-label" id="progressHeading">진행률</p>
+            <p class="progress-count" id="progressText">0 / 0</p>
+          </div>
+          <p class="remaining-count" id="remainingText">남은 쌍 0</p>
+        </div>
+        <progress
+          class="progress-track"
+          id="progressTrack"
+          aria-label="라벨링 진행률"
+          max="1"
+          value="0"
+        >0%</progress>
+        <div class="filter-row" aria-label="검수 쌍 필터">
+          <button class="filter-button" type="button" data-filter="remaining">
+            미완료
+          </button>
+          <button class="filter-button" type="button" data-filter="all">
+            전체
+          </button>
+          <button class="filter-button" type="button" data-filter="labeled">
+            완료
+          </button>
+          <button class="filter-button" type="button" data-filter="cannot_assess">
+            판정 불가
+          </button>
+          <button class="filter-button" type="button" data-filter="low">
+            낮은 확신도
+          </button>
+        </div>
+      </section>
+
+      <section class="workspace" id="workspace" aria-busy="true">
+        <div class="comparison-column">
+          <div class="pair-toolbar">
+            <button
+              id="previousButton"
+              class="secondary-button"
+              type="button"
+              aria-keyshortcuts="ArrowLeft"
+              title="이전 검수 쌍"
+            >
+              이전
+            </button>
+            <div class="pair-position">
+              <p id="pairPosition">쌍 0 / 0</p>
+              <p class="pair-id" id="pairId">-</p>
+            </div>
+            <button
+              id="nextButton"
+              class="secondary-button"
+              type="button"
+              aria-keyshortcuts="ArrowRight"
+              title="다음 검수 쌍"
+            >
+              다음
+            </button>
+          </div>
+
+          <div class="empty-state" id="emptyState" hidden>
+            <h2>조건에 맞는 쌍이 없습니다</h2>
+            <p>다른 필터를 선택해 검수를 계속하세요.</p>
+          </div>
+
+          <div class="image-grid" id="imageGrid">
+            <figure class="image-pane">
+              <figcaption>이미지 A</figcaption>
+              <button
+                class="image-button"
+                id="leftImageButton"
+                type="button"
+                aria-label="이미지 A 크게 보기"
+              >
+                <img id="leftImage" alt="비교할 이미지 A">
+                <span class="image-fallback" id="leftFallback" hidden>
+                  이미지를 불러올 수 없습니다
+                </span>
+              </button>
+            </figure>
+            <figure class="image-pane">
+              <figcaption>이미지 B</figcaption>
+              <button
+                class="image-button"
+                id="rightImageButton"
+                type="button"
+                aria-label="이미지 B 크게 보기"
+              >
+                <img id="rightImage" alt="비교할 이미지 B">
+                <span class="image-fallback" id="rightFallback" hidden>
+                  이미지를 불러올 수 없습니다
+                </span>
+              </button>
+            </figure>
+          </div>
+        </div>
+
+        <form class="annotation-column" id="annotationForm">
+          <div class="form-heading">
+            <div>
+              <p class="section-label">현재 판단</p>
+              <h2>시각적 관계</h2>
+            </div>
+            <span class="save-state" id="saveState">저장되지 않음</span>
+          </div>
+
+          <p class="ownership-notice" id="ownershipNotice" hidden>
+            다른 검수자가 저장한 항목이라 읽기 전용입니다.
+          </p>
+
+          <fieldset id="labelFieldset">
+            <legend>가장 가까운 판단 하나를 선택하세요</legend>
+            <label class="choice-row">
+              <input
+                type="radio"
+                name="visualSimilarity"
+                value="same_or_near_duplicate"
+                aria-keyshortcuts="1"
+              >
+              <span>
+                <strong>동일 또는 거의 동일</strong>
+                <small>사실상 같은 가시적 디자인</small>
+              </span>
+            </label>
+            <label class="choice-row">
+              <input
+                type="radio"
+                name="visualSimilarity"
+                value="visually_similar"
+                aria-keyshortcuts="2"
+              >
+              <span>
+                <strong>시각적으로 유사</strong>
+                <small>형태나 구도에 의미 있는 닮음이 있음</small>
+              </span>
+            </label>
+            <label class="choice-row">
+              <input
+                type="radio"
+                name="visualSimilarity"
+                value="visually_distinct"
+                aria-keyshortcuts="3"
+              >
+              <span>
+                <strong>시각적으로 구별됨</strong>
+                <small>의미 있는 시각적 닮음이 없음</small>
+              </span>
+            </label>
+            <label class="choice-row">
+              <input
+                type="radio"
+                name="visualSimilarity"
+                value="cannot_assess"
+                aria-keyshortcuts="4"
+              >
+              <span>
+                <strong>판정 불가</strong>
+                <small>누락, 손상, 식별 불가 등으로 비교하기 어려움</small>
+              </span>
+            </label>
+          </fieldset>
+
+          <fieldset id="confidenceFieldset">
+            <legend>판단 확신도</legend>
+            <div class="confidence-options">
+              <label>
+                <input
+                  type="radio"
+                  name="confidence"
+                  value="high"
+                  aria-keyshortcuts="H"
+                >
+                <span>높음</span>
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="confidence"
+                  value="medium"
+                  aria-keyshortcuts="M"
+                >
+                <span>보통</span>
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="confidence"
+                  value="low"
+                  aria-keyshortcuts="L"
+                >
+                <span>낮음</span>
+              </label>
+            </div>
+          </fieldset>
+
+          <label class="notes-label" for="notesInput">
+            메모 <span>선택 사항</span>
+          </label>
+          <textarea
+            id="notesInput"
+            maxlength="2000"
+            rows="4"
+            placeholder="판단이 어려웠던 시각적 이유를 기록하세요"
+          ></textarea>
+          <p class="character-count" id="characterCount">0 / 2000</p>
+
+          <div class="action-row">
+            <button
+              class="primary-button"
+              id="saveButton"
+              type="submit"
+              aria-keyshortcuts="Control+Enter Meta+Enter"
+            >
+              판단 저장
+            </button>
+            <button class="danger-button" id="clearButton" type="button">
+              저장값 지우기
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <p class="app-status" id="appStatus" role="status" aria-live="polite"></p>
+    </main>
+
+    <dialog id="imageDialog" aria-labelledby="dialogTitle">
+      <div class="dialog-header">
+        <h2 id="dialogTitle">이미지 크게 보기</h2>
+        <button id="closeDialogButton" class="secondary-button" type="button">
+          닫기
+        </button>
+      </div>
+      <img id="dialogImage" alt="확대한 검수 이미지">
+    </dialog>
+  </body>
+</html>

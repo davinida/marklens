@@ -3,7 +3,8 @@
 KIPRIS 원시 txt 6개를 출원번호 기준으로 통합하여 메타데이터 JSON을 생성합니다.
 
 사용법:
-    python scripts/build_kipris_metadata.py [--raw-dir data/raw_kipris] [--output data/kipris_metadata.json]
+    python scripts/build_kipris_metadata.py \
+        [--raw-dir data/raw_kipris] [--output data/kipris_metadata.json]
 
 이 단계에서는 "이미지파일" 칼럼에 "{출원번호}.png"를 적어둘 뿐 실제 추출은 하지 않습니다.
 실제 추출은 extract_kipris_images.py가 수행하며, 이미지 부재 항목은
@@ -21,7 +22,6 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 from typing import Optional
-
 
 # === 구분자 ===
 SEP_GONGBO = "^B"      # gongbo/ 4개 파일 (literal "^"+"B" 두 글자)
@@ -279,7 +279,7 @@ def main():
     print("=" * 60)
     print(f"  도형 필터 통과: {len(trademarks)} / {len(main_table)}")
     print(f"  도형 외 제외 건수: {excluded_non_dohyeong}")
-    print(f"  상표구분 분포 (통과분):")
+    print("  상표구분 분포 (통과분):")
     final_gubun = defaultdict(int)
     for t in trademarks:
         final_gubun[t["상표구분"]] += 1

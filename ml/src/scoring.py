@@ -1,180 +1,160 @@
+"""Convert visual-search similarities into a monotonic assessment.
+
+The assessment status depends only on the strongest similarity. Candidate
+separation is reported as uncertainty metadata; it never lowers the status.
+This keeps the result stable when callers request a different display ``top_k``.
 """
-검색 결과 유사도 배열을 사용자용 4단계 등급으로 변환하는 모듈.
 
-이 모듈은 비즈니스 로직 계층(Layer 2)에 속하며, FastAPI 등 상위 계층과
-독립적으로 import/테스트할 수 있도록 순수 계산만 수행합니다.
-torch/faiss에 의존하지 않으며, numpy + 표준 라이브러리만 사용합니다.
+from __future__ import annotations
 
-입력:
-    search.search() 결과의 distances (np.ndarray, shape (k,), float32).
-    값이 클수록 유사 (IP 기반). 일반적으로 내림차순 정렬되어 있음.
-
-출력:
-    등급 코드/이름/사용자 메시지 + 격차 2종 + 경고 목록을 담은 dict.
-
-자세한 인터페이스는 score_results() docstring 참조.
-"""
+from typing import Final
 
 import numpy as np
 
+# Temporary thresholds. They must be recalibrated on a versioned, labelled set.
+SIM_CAUTION: Final = 0.75
+SIM_REVIEW: Final = 0.55
+SIM_LOW: Final = 0.45
 
-# === 등급 판정 경계값 ===
-# 절대 유사도 안전장치: top1이 이 값 이상이면 격차 조건과 무관하게 CAUTION.
-# 배경: 완전 동일 로고(top1=1.0)가 격차 조건(gap_a < GAP_CAUTION)에 걸려
-# REVIEW 이하로 강등되는 등급 역전 실측(2026-07-07, 로드맵 §5).
-# TODO.pdf E의 "단독 임계값 안전장치"를 외관 축에 선행 도입한 것.
-# 임시값 - 정답 데이터 확보 후 F(등급 재보정)에서 축별 수치 재조정 예정
-SIM_IDENTICAL = 0.95
+# Separation thresholds describe ambiguity, not legal or visual risk.
+GAP_REVIEW: Final = 0.04
 
-# 임시값 - Phase 1 시연 데이터 9장에서 역산. 데이터 확보 후 튜닝 예정
-SIM_CAUTION = 0.75
-
-# 임시값 - Phase 1 시연 데이터 9장에서 역산. 데이터 확보 후 튜닝 예정
-SIM_REVIEW = 0.55
-
-# 임시값 - Phase 1 시연 데이터 9장에서 역산. 데이터 확보 후 튜닝 예정
-SIM_LOW = 0.45
-
-# 임시값 - Phase 1 시연 데이터 9장에서 역산. 데이터 확보 후 튜닝 예정
-GAP_CAUTION = 0.15
-
-# 임시값 - Phase 1 시연 데이터 9장에서 역산. 데이터 확보 후 튜닝 예정
-GAP_REVIEW = 0.04
+SIM_MAX_VALID: Final = 1.01
+SIM_MIN_VALID: Final = -1.01
 
 
-# === 비정상 입력 감지용 범위 ===
-# IP 기반 코사인 유사도는 이론상 [-1, 1]. 약간의 float 오차 허용.
-SIM_MAX_VALID = 1.01
-SIM_MIN_VALID = -1.01
-
-
-# === 등급 정의 (이름, 코드, 메시지를 한 곳에 묶음) ===
-GRADE_CAUTION = {
-    "grade_name": "주의 필요",
+STATUS_STRONG_MATCH: Final = {
+    "status_code": "STRONG_MATCH",
+    "status_name": "매우 가까운 시각 후보",
     "grade_code": "CAUTION",
+    "grade_name": "주의 필요",
     "message": (
-        "명확히 닮은 선행상표가 있습니다. "
-        "출원 전 전문가 상담을 강력히 권장합니다."
+        "매우 가까운 시각 후보가 있습니다. 이 결과만으로 등록 가능 여부를 "
+        "판단할 수 없으므로 선행상표와 지정상품을 함께 검토하세요."
     ),
 }
 
-GRADE_REVIEW = {
-    "grade_name": "검토 권장",
+STATUS_POSSIBLE_MATCH: Final = {
+    "status_code": "POSSIBLE_MATCH",
+    "status_name": "가까울 수 있는 시각 후보",
     "grade_code": "REVIEW",
+    "grade_name": "검토 권장",
     "message": (
-        "닮았을 수 있는 선행상표가 있습니다. "
-        "출원 전 확인을 권장합니다."
+        "가까울 수 있는 시각 후보가 있습니다. 상표명과 지정상품을 포함한 추가 검토가 필요합니다."
     ),
 }
 
-GRADE_LOW = {
-    "grade_name": "특정 위협 없음",
+STATUS_WEAK_MATCH: Final = {
+    "status_code": "WEAK_MATCH",
+    "status_name": "약한 시각 후보",
     "grade_code": "LOW",
+    "grade_name": "가까운 후보 미확인",
     "message": (
-        "특별히 가까운 선행상표가 발견되지 않았습니다. "
-        "본 결과는 참고용임을 유의하세요."
+        "현재 비교 데이터에서는 강한 시각 후보를 확인하지 못했습니다. "
+        "이는 등록 가능 여부나 권리 충돌 여부에 대한 결론이 아닙니다."
     ),
 }
 
-GRADE_SAFE = {
-    "grade_name": "비교적 안전",
-    "grade_code": "SAFE",
+STATUS_NO_CLOSE_MATCH: Final = {
+    "status_code": "NO_CLOSE_MATCH",
+    "status_name": "가까운 시각 후보 미확인",
+    # Legacy API compatibility: deliberately do not emit the old SAFE code.
+    "grade_code": "LOW",
+    "grade_name": "가까운 후보 미확인",
     "message": (
-        "시각적으로 충돌하는 선행상표가 보이지 않습니다. "
-        "본 결과는 참고용임을 유의하세요."
+        "현재 비교 데이터에서는 가까운 시각 후보를 확인하지 못했습니다. "
+        "데이터 범위 밖의 권리가 없다는 뜻은 아닙니다."
     ),
 }
+
+
+def _validated_distances(distances: np.ndarray) -> tuple[np.ndarray, list[str]]:
+    """Return a finite descending float64 copy and any normalization warnings."""
+    values = np.asarray(distances, dtype=np.float64)
+    if values.ndim != 1:
+        raise ValueError(f"distances must be a 1-D array, got shape {values.shape}")
+    if values.size == 0:
+        raise ValueError("distances is empty; cannot score")
+    if not np.all(np.isfinite(values)):
+        raise ValueError("distances contains NaN or infinite values; refusing to score")
+
+    sim_min = float(values.min())
+    sim_max = float(values.max())
+    if sim_min < SIM_MIN_VALID or sim_max > SIM_MAX_VALID:
+        raise ValueError(
+            "similarity is outside the normalized cosine range: "
+            f"min={sim_min:.6f}, max={sim_max:.6f}"
+        )
+
+    warnings: list[str] = []
+    if values.size >= 2 and np.any(np.diff(values) > 0):
+        warnings.append(
+            "입력이 내림차순 정렬되어 있지 않아 내부적으로 정렬했습니다."
+        )
+        values = np.sort(values)[::-1]
+    else:
+        values = values.copy()
+    return values, warnings
+
+
+def _status_for_similarity(top1: float) -> dict:
+    """Map similarity to a status monotonically; higher never becomes weaker."""
+    if top1 >= SIM_CAUTION:
+        return STATUS_STRONG_MATCH
+    if top1 >= SIM_REVIEW:
+        return STATUS_POSSIBLE_MATCH
+    if top1 >= SIM_LOW:
+        return STATUS_WEAK_MATCH
+    return STATUS_NO_CLOSE_MATCH
 
 
 def score_results(distances: np.ndarray) -> dict:
+    """Assess a descending vector of cosine similarities.
+
+    ``status_code`` is the canonical contract. Legacy ``grade_*`` fields remain
+    during migration, but ``SAFE`` is never emitted. Status is based only on the
+    strongest result, making it independent of the caller's display ``top_k``.
+
+    A small top-1/top-2 gap means multiple candidates are similarly plausible.
+    It is exposed through ``uncertain`` and ``uncertainty_reasons`` instead of
+    being used as a downgrade condition.
     """
-    검색 결과의 유사도 배열을 받아 등급과 격차 정보를 산출한다.
+    values, warnings = _validated_distances(distances)
+    top1 = float(values[0])
 
-    반환 dict 구조:
-    {
-        "grade_name": str,        # "주의 필요" 등
-        "grade_code": str,        # "CAUTION" 등
-        "message": str,           # 사용자용 메시지 한 줄
-        "top1_similarity": float, # top-1 유사도
-        "separability_a": float,  # 격차 A (top1 - top2)
-        "separability_b": float,  # 격차 B (top1 - mean)
-        "warnings": list[str],    # 모호 케이스/비정상 입력 등 경고 목록
-    }
-
-    Args:
-        distances: 1차원 numpy 배열. 값이 클수록 유사.
-                   일반적으로 내림차순으로 정렬되어 있음.
-
-    Raises:
-        ValueError: distances가 비어 있는 경우.
-    """
-    warnings: list[str] = []
-
-    # 1. 빈 입력 차단
-    if distances.size == 0:
-        raise ValueError("distances is empty; cannot score")
-
-    # 2. 비정상 값 범위 검증 (이후 계산은 그대로 진행)
-    sim_min = float(np.min(distances))
-    sim_max = float(np.max(distances))
-    if sim_min < SIM_MIN_VALID or sim_max > SIM_MAX_VALID:
-        warnings.append(
-            f"비정상 유사도 값 감지: min={sim_min:.4f}, max={sim_max:.4f}. "
-            f"이론상 [-1, 1] 범위를 벗어남."
-        )
-
-    # 3. 정렬 상태 검증 (내림차순이 아니면 경고 + 내부 정렬)
-    # np.diff > 0인 위치가 하나라도 있으면 내림차순 깨진 것
-    if distances.size >= 2 and np.any(np.diff(distances) > 0):
-        warnings.append(
-            "입력이 내림차순 정렬되어 있지 않음. 내부적으로 정렬 후 처리함."
-        )
-        distances = np.sort(distances)[::-1]
-
-    # 4. 핵심 통계량
-    top1 = float(distances[0])
-
-    if distances.size >= 2:
-        top2 = float(distances[1])
+    uncertainty_reasons: list[str] = []
+    if values.size >= 2:
+        top2 = float(values[1])
         gap_a = top1 - top2
     else:
-        # 결과가 1개뿐: 격차 계산 불가 → 0.0으로 채우고 경고
         gap_a = 0.0
+        uncertainty_reasons.append("INSUFFICIENT_CANDIDATES")
         warnings.append(
-            "결과가 1개뿐이라 격차를 계산할 수 없음. "
-            "격차 A/B를 0.0으로 처리함."
+            "후보가 1개뿐이라 후보 간 격차를 계산할 수 없습니다."
         )
 
-    mean_sim = float(np.mean(distances))
+    mean_sim = float(values.mean())
     gap_b = top1 - mean_sim
 
-    # 5. 4단계 등급 판정 (if-elif 사다리, 위에서부터 검사)
-    # 격차(gap) 조건은 절대 유사도가 매우 높은 경우를 강등시킬 수 있으므로,
-    # SIM_IDENTICAL 이상은 격차와 무관하게 최상위 등급을 보장한다.
-    if top1 >= SIM_IDENTICAL:
-        grade = GRADE_CAUTION
-    elif top1 >= SIM_CAUTION and gap_a >= GAP_CAUTION:
-        grade = GRADE_CAUTION
-    elif top1 >= SIM_REVIEW and gap_a >= GAP_REVIEW:
-        grade = GRADE_REVIEW
-    elif top1 >= SIM_LOW:
-        grade = GRADE_LOW
-    else:
-        grade = GRADE_SAFE
-
-    # 6. 모호 케이스 경고: 유사도는 높은데 격차가 작아 판정이 흔들리는 상황
-    if top1 >= SIM_REVIEW and gap_a < GAP_REVIEW:
+    if values.size >= 2 and top1 >= SIM_REVIEW and gap_a < GAP_REVIEW:
+        uncertainty_reasons.append("MULTIPLE_CLOSE_CANDIDATES")
         warnings.append(
-            "유사도는 높으나 경쟁 후보가 많아 판정이 모호함. "
-            "전문가 확인 권장."
+            "비슷한 점수의 후보가 여러 개 있어 대표 후보 순위가 불확실합니다."
         )
 
+    status = _status_for_similarity(top1)
     return {
-        "grade_name": grade["grade_name"],
-        "grade_code": grade["grade_code"],
-        "message": grade["message"],
+        "status_code": status["status_code"],
+        "status_name": status["status_name"],
+        "grade_code": status["grade_code"],
+        "grade_name": status["grade_name"],
+        "message": status["message"],
         "top1_similarity": top1,
         "separability_a": gap_a,
         "separability_b": gap_b,
+        "uncertain": bool(uncertainty_reasons),
+        "uncertainty_reasons": uncertainty_reasons,
         "warnings": warnings,
+        "scored_candidate_count": int(values.size),
+        "threshold_version": "visual-v2-uncalibrated",
     }

@@ -1,89 +1,229 @@
-"""
-이미지 전처리 모듈.
+"""Image validation and deterministic model-view preparation."""
 
-다양한 형식의 이미지 입력(파일 경로, bytes, PIL Image)을 받아
-EXIF 회전 보정, 알파 채널 처리, 크기 검증을 거친
-표준화된 RGB PIL 이미지로 변환합니다.
-
-이 모듈은 encode_image() 내부에서 자동 호출됩니다.
-"""
+from __future__ import annotations
 
 import io
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Union
+from typing import Iterable, Union
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageStat
 
+ImageInput = Union[str, Path, bytes, Image.Image]
 
-# 허용되는 최소 너비/높이 (픽셀)
 MIN_SIZE = 32
-
-# 허용되는 최대 너비/높이 (픽셀). 초과 시 비율 유지하며 자동 축소
 MAX_SIZE = 4096
+MAX_DECODE_PIXELS = 64_000_000
+
+LEGACY_PREPROCESS_VERSION = "clip-center-crop-v1"
+GLOBAL_PREPROCESS_VERSION = "global-letterbox-dual-bg-v1"
+DEFAULT_PREPROCESS_VERSION = LEGACY_PREPROCESS_VERSION
+
+LETTERBOX_SIZE = 224
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+
+# Conservative rejection thresholds: near-uniform uploads are not meaningful
+# marks, while the lowest-contrast real artifact in the current set remains far
+# above these values.
+MIN_CHANNEL_RANGE = 4.0
+MIN_CHANNEL_STDDEV = 1.0
 
 
-def preprocess_image(image: Union[str, Path, bytes, Image.Image]) -> Image.Image:
-    """
-    다양한 형식의 이미지 입력을 깨끗한 RGB PIL Image로 변환합니다.
+@dataclass(frozen=True)
+class ContentMetrics:
+    width: int
+    height: int
+    has_alpha: bool
+    alpha_min: int
+    alpha_max: int
+    max_channel_range: float
+    max_channel_stddev: float
 
-    처리 단계:
-    1. 입력 타입에 따라 PIL Image로 통일
-    2. EXIF 회전 메타데이터 적용 (휴대폰 사진 자동 회전)
-    3. 알파 채널 있으면 흰색 배경에 합성
-    4. RGB 모드로 변환
-    5. 크기 검증 (너무 작으면 ValueError, 너무 크면 비율 유지하며 축소)
+    def to_dict(self) -> dict:
+        return asdict(self)
 
-    Args:
-        image: 다음 중 하나:
-            - str: 이미지 파일 경로
-            - Path: 이미지 파일 경로 객체
-            - bytes: 이미지 바이트 데이터 (FastAPI 업로드 등)
-            - PIL.Image.Image: 이미 열린 PIL 이미지
 
-    Returns:
-        Image.Image: 전처리된 RGB PIL 이미지.
-
-    Raises:
-        FileNotFoundError: 파일 경로가 존재하지 않는 경우.
-        ValueError: 이미지를 열 수 없거나 크기가 MIN_SIZE 미만인 경우.
-    """
-    # 1. 입력 타입을 PIL Image로 통일
+def _open_image(image: ImageInput) -> Image.Image:
     if isinstance(image, bytes):
-        image = Image.open(io.BytesIO(image))
+        source = Image.open(io.BytesIO(image))
     elif isinstance(image, (str, Path)):
-        image = Image.open(image)
+        source = Image.open(image)
     elif isinstance(image, Image.Image):
-        pass  # already PIL
+        source = image
     else:
         raise ValueError(f"Unsupported image type: {type(image)}")
 
-    # 2. EXIF 회전 보정 (휴대폰 사진은 회전 정보가 메타데이터에 있어,
-    #    안 보정하면 옆으로 누워서 인식됨)
-    image = ImageOps.exif_transpose(image)
-
-    # 3. 알파 채널 처리 (RGBA, LA, P 모드는 투명도가 있을 수 있음)
-    if image.mode in ("RGBA", "LA", "P"):
-        # P(팔레트)와 LA(흑백+알파)는 일단 RGBA로 통일
-        if image.mode != "RGBA":
-            image = image.convert("RGBA")
-        # 흰 배경 위에 알파 채널을 마스크로 합성
-        background = Image.new("RGB", image.size, (255, 255, 255))
-        background.paste(image, mask=image.split()[-1])
-        image = background
-    else:
-        # 4. RGB 모드로 변환 (이미 RGB여도 안전)
-        image = image.convert("RGB")
-
-    # 5. 크기 검증
-    w, h = image.size
-    if w < MIN_SIZE or h < MIN_SIZE:
+    width, height = source.size
+    if width <= 0 or height <= 0:
+        if not isinstance(image, Image.Image):
+            source.close()
+        raise ValueError(f"Image has invalid dimensions: {width}x{height}")
+    if width * height > MAX_DECODE_PIXELS:
+        if not isinstance(image, Image.Image):
+            source.close()
         raise ValueError(
-            f"Image too small: {w}x{h} (minimum {MIN_SIZE}x{MIN_SIZE})"
+            f"Image has too many pixels: {width}x{height} "
+            f"(maximum {MAX_DECODE_PIXELS:,})"
+        )
+    try:
+        transposed = ImageOps.exif_transpose(source)
+        transposed.load()
+        result = transposed.copy()
+        if transposed is not source:
+            transposed.close()
+        return result
+    finally:
+        if not isinstance(image, Image.Image):
+            source.close()
+
+
+def _rgba_has_alpha(image: Image.Image) -> bool:
+    return image.mode in ("RGBA", "LA") or (
+        image.mode == "P" and "transparency" in image.info
+    )
+
+
+def _composite(image: Image.Image, background: tuple[int, int, int]) -> Image.Image:
+    rgba = image.convert("RGBA")
+    canvas = Image.new("RGBA", rgba.size, (*background, 255))
+    return Image.alpha_composite(canvas, rgba).convert("RGB")
+
+
+def inspect_image_content(image: Image.Image) -> ContentMetrics:
+    """Measure visible color/alpha variation on a bounded probe image."""
+    probe = image.copy()
+    probe.thumbnail((256, 256), Image.Resampling.LANCZOS)
+    has_alpha = _rgba_has_alpha(probe)
+
+    if has_alpha:
+        alpha = probe.convert("RGBA").getchannel("A")
+        alpha_min, alpha_max = alpha.getextrema()
+        composites = (_composite(probe, WHITE), _composite(probe, BLACK))
+    else:
+        alpha_min = alpha_max = 255
+        composites = (probe.convert("RGB"),)
+
+    channel_ranges: list[float] = []
+    channel_stddevs: list[float] = []
+    for composite in composites:
+        stat = ImageStat.Stat(composite)
+        channel_stddevs.extend(float(value) for value in stat.stddev)
+        channel_ranges.extend(
+            float(high - low) for low, high in composite.getextrema()
         )
 
-    # 6. 너무 크면 자동 축소 (메모리 보호 + CLIP은 어차피 224x224로
-    #    리사이즈하므로 손실 없음)
-    if w > MAX_SIZE or h > MAX_SIZE:
-        image.thumbnail((MAX_SIZE, MAX_SIZE), Image.LANCZOS)
+    return ContentMetrics(
+        width=image.width,
+        height=image.height,
+        has_alpha=has_alpha,
+        alpha_min=int(alpha_min),
+        alpha_max=int(alpha_max),
+        max_channel_range=max(channel_ranges, default=0.0),
+        max_channel_stddev=max(channel_stddevs, default=0.0),
+    )
 
-    return image
+
+def validate_visual_content(image: Image.Image) -> ContentMetrics:
+    """Reject empty-alpha, blank, and effectively uniform inputs."""
+    metrics = inspect_image_content(image)
+    if metrics.has_alpha and metrics.alpha_max == 0:
+        raise ValueError("Image alpha channel is fully transparent")
+    if (
+        metrics.max_channel_range < MIN_CHANNEL_RANGE
+        or metrics.max_channel_stddev < MIN_CHANNEL_STDDEV
+    ):
+        raise ValueError(
+            "Image has insufficient visual contrast; upload a non-blank mark "
+            f"(range={metrics.max_channel_range:.2f}, "
+            f"stddev={metrics.max_channel_stddev:.2f})"
+        )
+    return metrics
+
+
+def preprocess_image(
+    image: ImageInput,
+    *,
+    background: tuple[int, int, int] = WHITE,
+    validate_content: bool = True,
+) -> Image.Image:
+    """Return an EXIF-corrected RGB image while preserving legacy geometry."""
+    opened = _open_image(image)
+    width, height = opened.size
+    if width < MIN_SIZE or height < MIN_SIZE:
+        raise ValueError(
+            f"Image too small: {width}x{height} (minimum {MIN_SIZE}x{MIN_SIZE})"
+        )
+    if validate_content:
+        validate_visual_content(opened)
+
+    if _rgba_has_alpha(opened):
+        result = _composite(opened, background)
+    else:
+        result = opened.convert("RGB")
+
+    if result.width > MAX_SIZE or result.height > MAX_SIZE:
+        result.thumbnail((MAX_SIZE, MAX_SIZE), Image.Resampling.LANCZOS)
+    return result
+
+
+def letterbox_image(
+    image: Image.Image,
+    *,
+    size: int = LETTERBOX_SIZE,
+    background: tuple[int, int, int] = WHITE,
+) -> Image.Image:
+    """Fit the complete image into a square canvas without center cropping."""
+    if size < 1:
+        raise ValueError(f"letterbox size must be positive, got {size}")
+    source = image.convert("RGB").copy()
+    source.thumbnail((size, size), Image.Resampling.LANCZOS)
+    canvas = Image.new("RGB", (size, size), background)
+    offset = ((size - source.width) // 2, (size - source.height) // 2)
+    canvas.paste(source, offset)
+    return canvas
+
+
+def prepare_model_views(
+    image: ImageInput,
+    *,
+    preprocess_version: str = DEFAULT_PREPROCESS_VERSION,
+    backgrounds: Iterable[tuple[int, int, int]] = (WHITE, BLACK),
+) -> tuple[Image.Image, ...]:
+    """Prepare deterministic views for the selected embedding contract.
+
+    The legacy version returns one geometry-preserving RGB image; OpenCLIP then
+    applies its historical resize/center-crop transform. The global version
+    composites alpha onto each requested background and letterboxes every view
+    to 224x224, so the downstream OpenCLIP transform cannot crop the mark.
+    """
+    opened = _open_image(image)
+    width, height = opened.size
+    if width < MIN_SIZE or height < MIN_SIZE:
+        raise ValueError(
+            f"Image too small: {width}x{height} (minimum {MIN_SIZE}x{MIN_SIZE})"
+        )
+    validate_visual_content(opened)
+
+    if preprocess_version == LEGACY_PREPROCESS_VERSION:
+        return (preprocess_image(opened, validate_content=False),)
+    if preprocess_version != GLOBAL_PREPROCESS_VERSION:
+        raise ValueError(f"Unsupported preprocess version: {preprocess_version}")
+
+    requested = tuple(backgrounds) if _rgba_has_alpha(opened) else (WHITE,)
+    if not requested:
+        raise ValueError("At least one model-view background is required")
+
+    views: list[Image.Image] = []
+    for background in requested:
+        if len(background) != 3 or any(not 0 <= value <= 255 for value in background):
+            raise ValueError(f"Invalid RGB background: {background}")
+        composited = (
+            _composite(opened, background)
+            if _rgba_has_alpha(opened)
+            else opened.convert("RGB")
+        )
+        views.append(
+            letterbox_image(composited, size=LETTERBOX_SIZE, background=background)
+        )
+    return tuple(views)

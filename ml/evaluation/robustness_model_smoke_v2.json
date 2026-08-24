@@ -1,0 +1,273 @@
+{
+  "benchmark_version": "visual-robustness-v2",
+  "changed_transform_count": 8,
+  "decode_failure_count": 0,
+  "decoded_image_count": 2,
+  "failures": [],
+  "image_dir": "ml/data/images",
+  "items": [
+    {
+      "image_key": "4020240059822.png",
+      "original_pixel_sha256": "a7c3f2162d00db09f10858c3faaa20a220b2db5f001f19a39fc2be127fc7ba87",
+      "transforms": {
+        "center_crop_90pct": {
+          "changed": true,
+          "height": 400,
+          "pixel_sha256": "d700a6ca97eafca3931409eb3fd3f8d4ff3edf84065dd5a5e5931d251a49cdc6",
+          "width": 400
+        },
+        "gray_margin_20pct": {
+          "changed": true,
+          "height": 400,
+          "pixel_sha256": "668d7df67d84c55a24e2817ed725abdcb6472d89201e69c9362bf570ec70ff15",
+          "width": 400
+        },
+        "jpeg_q60": {
+          "changed": true,
+          "height": 400,
+          "pixel_sha256": "ebc77ef23faf1d9b4df7b0122aaee56017789f003fbdccf124383c223efb136b",
+          "width": 400
+        },
+        "rotate_8deg": {
+          "changed": true,
+          "height": 400,
+          "pixel_sha256": "5e0ddff80fbd7276c635a894f5535ee8440e20a71df857193260979fb1358f38",
+          "width": 400
+        }
+      }
+    },
+    {
+      "image_key": "4020250210469.png",
+      "original_pixel_sha256": "6eed4d5d04e6d71832e8122df0494f0747d105f9e0d18c5113200358159a147c",
+      "transforms": {
+        "center_crop_90pct": {
+          "changed": true,
+          "height": 338,
+          "pixel_sha256": "c7c8297bb83f83bcf8624d57e7ba2a7f0e847c5dbf10a98679952c9b4a5b20e7",
+          "width": 1077
+        },
+        "gray_margin_20pct": {
+          "changed": true,
+          "height": 338,
+          "pixel_sha256": "012782c9f1ec424ce5eabc73b83ba111795a2faa4f6647ea99ff600766dc6c14",
+          "width": 1077
+        },
+        "jpeg_q60": {
+          "changed": true,
+          "height": 338,
+          "pixel_sha256": "0f9deaf72201e1cd8cab74957e00aa5300261523b8be7a092c2ac25ab4c5f3db",
+          "width": 1077
+        },
+        "rotate_8deg": {
+          "changed": true,
+          "height": 338,
+          "pixel_sha256": "cdff53bce40eca760980b685bac78d21cd1aceb6d58991f74977d05d3a7b8cb8",
+          "width": 1077
+        }
+      }
+    }
+  ],
+  "mode": "with_model",
+  "model": {
+    "embedding_contract": "openclip-image-v2",
+    "embedding_dim": 512,
+    "name": "ViT-B-32",
+    "pretrained": "laion2b_s34b_b79k"
+  },
+  "model_metrics": {
+    "center_crop_90pct": {
+      "count": 2,
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "status_stability": 1,
+      "target_similarity_mean": 0.9561722278594971,
+      "target_similarity_median": 0.9561722278594971,
+      "target_similarity_min": 0.9512919187545776
+    },
+    "gray_margin_20pct": {
+      "count": 2,
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "status_stability": 1,
+      "target_similarity_mean": 0.8978441059589386,
+      "target_similarity_median": 0.8978441059589386,
+      "target_similarity_min": 0.880315363407135
+    },
+    "jpeg_q60": {
+      "count": 2,
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "status_stability": 1,
+      "target_similarity_mean": 0.9799085855484009,
+      "target_similarity_median": 0.9799085855484009,
+      "target_similarity_min": 0.9790225625038147
+    },
+    "original": {
+      "count": 2,
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "status_stability": 1,
+      "target_similarity_mean": 1.0000000596046448,
+      "target_similarity_median": 1.0000000596046448,
+      "target_similarity_min": 1.0
+    },
+    "rotate_8deg": {
+      "count": 2,
+      "recall_at_1": 1,
+      "recall_at_5": 1,
+      "status_stability": 1,
+      "target_similarity_mean": 0.9271189570426941,
+      "target_similarity_median": 0.9271189570426941,
+      "target_similarity_min": 0.8994601964950562
+    }
+  },
+  "model_records": [
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020240059822.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 1.0,
+      "transform": "original"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020240059822.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.954777717590332,
+      "transform": "rotate_8deg"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020240059822.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.9610525369644165,
+      "transform": "center_crop_90pct"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020240059822.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.9153728485107422,
+      "transform": "gray_margin_20pct"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020240059822.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.9790225625038147,
+      "transform": "jpeg_q60"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020250210469.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 1.0000001192092896,
+      "transform": "original"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020250210469.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.8994601964950562,
+      "transform": "rotate_8deg"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020250210469.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.9512919187545776,
+      "transform": "center_crop_90pct"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020250210469.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.880315363407135,
+      "transform": "gray_margin_20pct"
+    },
+    {
+      "expected_rank_within_5": 1,
+      "image_key": "4020250210469.png",
+      "recall_at_1": true,
+      "recall_at_5": true,
+      "status_code": "STRONG_MATCH",
+      "target_similarity": 0.9807946085929871,
+      "transform": "jpeg_q60"
+    }
+  ],
+  "preprocess_version": "clip-center-crop-v1",
+  "requested_sample_size": 2,
+  "runtime": {
+    "numpy": "1.26.4",
+    "pillow": "12.3.0",
+    "python": "3.11.9"
+  },
+  "seed": 20260814,
+  "selected_image_keys": [
+    "4020240059822.png",
+    "4020250210469.png"
+  ],
+  "source": {
+    "authoritative_source_sha256": "bb3edc7a993b8f39fb72b8cb076c37de4133e8a419af1b205b58afab100257aa",
+    "generation_id": "20260814T091220Z-aee6b7b9cfed",
+    "git": {
+      "commit": "f95aaa178539c4eeba3b9ab06003ad8ef0f33e21",
+      "dirty": true
+    },
+    "image_set_sha256": "177a67d056f3a794598c7b85d5360950c7eea85e655977ecf5424aaea4cb7357",
+    "index_filename": "kipris.faiss",
+    "index_sha256": "ed3a2760ad162f016ae03def7a2b6008db7711d77d897f87db316eb68aa9ae3b",
+    "manifest_filename": "kipris_manifest.json",
+    "manifest_sha256": "44cfeb47871cc63304569b29061eae91679f9048a382dab27439274a88c66fd3",
+    "metadata_filename": "kipris_metadata.json",
+    "metadata_sha256": "8ea39cfed2bfb07c0095ea46d13209272ba81bb1368b5adf369d5f926c167e1e",
+    "model": {
+      "embedding_contract": "openclip-image-v2",
+      "embedding_dim": 512,
+      "name": "ViT-B-32",
+      "pretrained": "laion2b_s34b_b79k"
+    },
+    "preprocess_version": "clip-center-crop-v1"
+  },
+  "transform_attempt_count": 8,
+  "transform_config": {
+    "center_crop_90pct": {
+      "retained_fraction": 0.9
+    },
+    "gray_margin_20pct": {
+      "background": [
+        224,
+        224,
+        224
+      ],
+      "content_fraction": 0.8
+    },
+    "jpeg_q60": {
+      "quality": 60
+    },
+    "rotate_8deg": {
+      "degrees": 8.0,
+      "expand": false
+    }
+  },
+  "transform_success_count": 8,
+  "transform_version": "bounded-perturbations-v1"
+}

@@ -16,6 +16,7 @@
 """
 
 import os
+
 # macOS Apple Silicon의 PyTorch + FAISS OpenMP 라이브러리 충돌 방지
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -31,7 +32,7 @@ import numpy as np
 ML_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ML_ROOT))
 
-from src.embedding import encode_image, EMBEDDING_DIM, MODEL_NAME, PRETRAINED
+from src.embedding import EMBEDDING_DIM, MODEL_NAME, PRETRAINED, encode_image
 from src.search import load_index, search
 
 

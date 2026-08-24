@@ -15,9 +15,68 @@ from typing import Tuple, Union
 import faiss
 import numpy as np
 
+from src.contracts import EMBEDDING_DIM
 
 # 임베딩 차원 (CLIP ViT-B/32 기준, embedding.py와 동일)
-EMBEDDING_DIM = 512
+NORM_ATOL = 1e-3
+
+
+def _validated_vectors(
+    vectors: np.ndarray,
+    *,
+    name: str,
+    allow_single_vector: bool,
+) -> np.ndarray:
+    """Return a finite, normalized, C-contiguous float32 vector matrix."""
+    try:
+        values = np.asarray(vectors, dtype=np.float32)
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise ValueError(f"{name} must contain numeric values") from exc
+
+    if allow_single_vector and values.ndim == 1:
+        values = values.reshape(1, -1)
+    if values.ndim != 2 or values.shape[1] != EMBEDDING_DIM:
+        expected = (
+            f"({EMBEDDING_DIM},) or (1, {EMBEDDING_DIM})"
+            if allow_single_vector
+            else f"(N, {EMBEDDING_DIM})"
+        )
+        raise ValueError(f"{name} must have shape {expected}, got {values.shape}")
+    if values.shape[0] == 0:
+        raise ValueError(f"{name} must contain at least one vector")
+    if allow_single_vector and values.shape[0] != 1:
+        raise ValueError(f"{name} must contain exactly one vector, got {values.shape[0]}")
+    if not np.all(np.isfinite(values)):
+        raise ValueError(f"{name} contains NaN or infinite values")
+
+    norms = np.linalg.norm(values, axis=1)
+    if not np.all(np.isfinite(norms)) or not np.allclose(
+        norms,
+        1.0,
+        rtol=0.0,
+        atol=NORM_ATOL,
+    ):
+        raise ValueError(
+            f"{name} must be L2-normalized within {NORM_ATOL}; "
+            f"observed norm range {float(norms.min()):.6f}..{float(norms.max()):.6f}"
+        )
+    return np.ascontiguousarray(values, dtype=np.float32)
+
+
+def validate_index(index: faiss.Index, *, require_vectors: bool = True) -> None:
+    """Validate the FAISS contract used by MarkLens cosine search."""
+    if not isinstance(index, faiss.Index):
+        raise ValueError(f"Expected a FAISS index, got {type(index).__name__}")
+    if index.d != EMBEDDING_DIM:
+        raise ValueError(f"Index dimension must be {EMBEDDING_DIM}, got {index.d}")
+    metric = getattr(index, "metric_type", None)
+    if metric != faiss.METRIC_INNER_PRODUCT:
+        raise ValueError(
+            "Index metric must be inner product for normalized cosine search, "
+            f"got {metric}"
+        )
+    if require_vectors and index.ntotal <= 0:
+        raise ValueError("Index must contain at least one vector")
 
 
 def build_index(embeddings: np.ndarray) -> faiss.Index:
@@ -36,26 +95,17 @@ def build_index(embeddings: np.ndarray) -> faiss.Index:
     Raises:
         ValueError: 입력 shape이 (N, 512)가 아닌 경우.
     """
-    # dtype 정규화: FAISS는 float32만 받음
-    if embeddings.dtype != np.float32:
-        embeddings = embeddings.astype(np.float32)
-
-    # shape 검증
-    if embeddings.ndim != 2 or embeddings.shape[1] != EMBEDDING_DIM:
-        raise ValueError(
-            f"Expected shape (N, {EMBEDDING_DIM}), got {embeddings.shape}"
-        )
+    embeddings = _validated_vectors(
+        embeddings,
+        name="embeddings",
+        allow_single_vector=False,
+    )
 
     # 인덱스 생성 (Inner Product 기반)
     index = faiss.IndexFlatIP(EMBEDDING_DIM)
 
-    # FAISS는 내부적으로 C 라이브러리이기 때문에,
-    # 파이썬에서 슬라이싱이나 transpose로 만들어진 비연속 메모리는
-    # 받아들이지 못합니다. ascontiguousarray로 복사본을 만들어 안전하게 처리.
-    if not embeddings.flags['C_CONTIGUOUS']:
-        embeddings = np.ascontiguousarray(embeddings)
-
     index.add(embeddings)
+    validate_index(index)
     return index
 
 
@@ -68,6 +118,7 @@ def save_index(index: faiss.Index, path: Union[str, Path]) -> None:
         path: 저장할 파일 경로. 확장자는 .faiss 또는 .index 권장.
               상위 디렉토리가 없으면 자동 생성됩니다.
     """
+    validate_index(index)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     faiss.write_index(index, str(path))
@@ -89,7 +140,9 @@ def load_index(path: Union[str, Path]) -> faiss.Index:
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(f"Index file not found: {path}")
-    return faiss.read_index(str(path))
+    index = faiss.read_index(str(path))
+    validate_index(index)
+    return index
 
 
 def search(
@@ -113,22 +166,19 @@ def search(
                         퍼센트 변환은 상위 계층에서 수행합니다.
             - indices: shape (k,) int64. 인덱스 내 벡터 순번.
     """
-    # dtype 정규화
-    if query.dtype != np.float32:
-        query = query.astype(np.float32)
-
-    # 차원 정규화: 1차원이면 (1, 512) 2차원으로 변환
-    if query.ndim == 1:
-        query = query.reshape(1, -1)
-
-    # FAISS는 C-연속 메모리만 받음 (build_index와 동일 패턴)
-    if not query.flags['C_CONTIGUOUS']:
-        query = np.ascontiguousarray(query)
+    validate_index(index)
+    if isinstance(k, bool) or not isinstance(k, (int, np.integer)) or k <= 0:
+        raise ValueError(f"k must be a positive integer, got {k!r}")
+    query = _validated_vectors(query, name="query", allow_single_vector=True)
 
     # k가 인덱스 크기보다 크면 자동 조정
     actual_k = min(k, index.ntotal)
 
     distances, indices = index.search(query, actual_k)
+    if not np.all(np.isfinite(distances)):
+        raise RuntimeError("FAISS returned non-finite distances")
+    if np.any(indices < 0) or np.any(indices >= index.ntotal):
+        raise RuntimeError("FAISS returned an out-of-range result index")
 
     # 단일 쿼리이므로 (1, k) → (k,)로 1차원 변환
     return distances[0], indices[0]

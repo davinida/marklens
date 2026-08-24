@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marklens.local/schemas/visual-labeling-pack-v2.json",
+  "title": "MarkLens Visual Similarity Labeling Pack v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol",
+    "pack_id",
+    "selection_method",
+    "pair_count",
+    "split_counts",
+    "similarity_strata",
+    "split_policy",
+    "label_scope",
+    "source",
+    "families",
+    "pairs"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "protocol": { "const": "visual-similarity-labeling-v2" },
+    "pack_id": { "type": "string", "pattern": "^vlp2_[0-9a-f]{20}$" },
+    "selection_method": {
+      "const": "stratified_similarity_family_disjoint"
+    },
+    "pair_count": { "const": 200 },
+    "split_counts": { "$ref": "#/$defs/splitPairCounts" },
+    "similarity_strata": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "$ref": "#/$defs/similarityStratum" }
+    },
+    "split_policy": { "$ref": "#/$defs/splitPolicy" },
+    "label_scope": { "const": "visual_similarity_only" },
+    "source": { "type": "object" },
+    "families": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/family" }
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 200,
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/pair" }
+    }
+  },
+  "$defs": {
+    "splitPairCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev", "frozen_holdout"],
+      "properties": {
+        "dev": { "const": 160 },
+        "frozen_holdout": { "const": 40 }
+      }
+    },
+    "stratumPairCounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev", "frozen_holdout"],
+      "properties": {
+        "dev": { "const": 40 },
+        "frozen_holdout": { "const": 10 }
+      }
+    },
+    "similarityStratum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "lower_inclusive",
+        "upper_exclusive",
+        "pair_counts"
+      ],
+      "properties": {
+        "name": {
+          "enum": ["below_weak", "weak_band", "possible_band", "strong_band"]
+        },
+        "lower_inclusive": { "type": "number" },
+        "upper_exclusive": { "type": "number" },
+        "pair_counts": { "$ref": "#/$defs/stratumPairCounts" }
+      }
+    },
+    "splitCountMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev", "frozen_holdout"],
+      "properties": {
+        "dev": { "type": "integer", "minimum": 1 },
+        "frozen_holdout": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "capacityMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["below_weak", "weak_band", "possible_band", "strong_band"],
+      "properties": {
+        "below_weak": { "type": "integer", "minimum": 0 },
+        "weak_band": { "type": "integer", "minimum": 0 },
+        "possible_band": { "type": "integer", "minimum": 0 },
+        "strong_band": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "splitPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "seed",
+        "holdout_image_fraction_target",
+        "family_similarity_threshold",
+        "assignment_trial",
+        "image_counts",
+        "family_counts",
+        "candidate_capacities"
+      ],
+      "properties": {
+        "type": { "const": "image_and_family_disjoint" },
+        "seed": { "type": "integer" },
+        "holdout_image_fraction_target": { "const": 0.25 },
+        "family_similarity_threshold": { "const": 0.995 },
+        "assignment_trial": { "type": "integer", "minimum": 0 },
+        "image_counts": { "$ref": "#/$defs/splitCountMap" },
+        "family_counts": { "$ref": "#/$defs/splitCountMap" },
+        "candidate_capacities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["dev", "frozen_holdout"],
+          "properties": {
+            "dev": { "$ref": "#/$defs/capacityMap" },
+            "frozen_holdout": { "$ref": "#/$defs/capacityMap" }
+          }
+        }
+      }
+    },
+    "family": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family_id", "image_keys", "split"],
+      "properties": {
+        "family_id": { "type": "string", "pattern": "^vf2_[0-9a-f]{16}$" },
+        "image_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "split": { "enum": ["dev", "frozen_holdout"] }
+      }
+    },
+    "imageRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image_key", "family_id"],
+      "properties": {
+        "image_key": { "type": "string", "minLength": 1 },
+        "family_id": { "type": "string", "pattern": "^vf2_[0-9a-f]{16}$" }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visual_similarity", "confidence", "annotator_id", "notes"],
+      "properties": {
+        "visual_similarity": {
+          "type": ["string", "null"],
+          "enum": [
+            "same_or_near_duplicate",
+            "visually_similar",
+            "visually_distinct",
+            "cannot_assess",
+            null
+          ]
+        },
+        "confidence": {
+          "type": ["string", "null"],
+          "enum": ["high", "medium", "low", null]
+        },
+        "annotator_id": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pair_id",
+        "split",
+        "frozen",
+        "similarity_stratum",
+        "left",
+        "right",
+        "annotation"
+      ],
+      "properties": {
+        "pair_id": { "type": "string", "pattern": "^vp2_[0-9a-f]{20}$" },
+        "split": { "enum": ["dev", "frozen_holdout"] },
+        "frozen": { "type": "boolean" },
+        "similarity_stratum": {
+          "enum": ["below_weak", "weak_band", "possible_band", "strong_band"]
+        },
+        "left": { "$ref": "#/$defs/imageRef" },
+        "right": { "$ref": "#/$defs/imageRef" },
+        "annotation": { "$ref": "#/$defs/annotation" }
+      }
+    }
+  }
+}

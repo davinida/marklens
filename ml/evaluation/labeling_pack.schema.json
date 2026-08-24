@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://marklens.local/schemas/visual-labeling-pack-v1.json",
+  "title": "MarkLens Visual Similarity Labeling Pack",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol",
+    "pack_id",
+    "selection_method",
+    "pair_count",
+    "split_counts",
+    "label_scope",
+    "source",
+    "pairs"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "protocol": { "const": "visual-similarity-labeling-v1" },
+    "pack_id": { "type": "string", "pattern": "^vlp_[0-9a-f]{20}$" },
+    "selection_method": {
+      "enum": ["nearest_index_embeddings", "stable_hash_sample"]
+    },
+    "pair_count": { "const": 200 },
+    "split_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dev", "frozen_holdout"],
+      "properties": {
+        "dev": { "const": 160 },
+        "frozen_holdout": { "const": 40 }
+      }
+    },
+    "label_scope": { "const": "visual_similarity_only" },
+    "source": { "type": "object" },
+    "pairs": {
+      "type": "array",
+      "minItems": 200,
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/pair" }
+    }
+  },
+  "$defs": {
+    "imageRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image_key"],
+      "properties": {
+        "image_key": { "type": "string", "minLength": 1 }
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["visual_similarity", "confidence", "annotator_id", "notes"],
+      "properties": {
+        "visual_similarity": {
+          "type": ["string", "null"],
+          "enum": [
+            "same_or_near_duplicate",
+            "visually_similar",
+            "visually_distinct",
+            "cannot_assess",
+            null
+          ]
+        },
+        "confidence": {
+          "type": ["string", "null"],
+          "enum": ["high", "medium", "low", null]
+        },
+        "annotator_id": { "type": ["string", "null"] },
+        "notes": { "type": ["string", "null"] }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pair_id", "split", "frozen", "left", "right", "annotation"],
+      "properties": {
+        "pair_id": { "type": "string", "pattern": "^vp_[0-9a-f]{20}$" },
+        "split": { "enum": ["dev", "frozen_holdout"] },
+        "frozen": { "type": "boolean" },
+        "left": { "$ref": "#/$defs/imageRef" },
+        "right": { "$ref": "#/$defs/imageRef" },
+        "annotation": { "$ref": "#/$defs/annotation" }
+      }
+    }
+  }
+}
+

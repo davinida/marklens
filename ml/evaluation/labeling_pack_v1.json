@@ -1,0 +1,3421 @@
+{
+  "label_scope": "visual_similarity_only",
+  "pack_id": "vlp_1fde2adcdc33638351bb",
+  "pair_count": 200,
+  "pairs": [
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_00ebbab65608ee1a220a",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_01bf33256660f16e997d",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_02c0a98e208a6031152a",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_02e9a3ba6f915e2a23e8",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_037f0a0c6611d242a393",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_05094a7066eea945f192",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_05a9589778b8b3eddfb9",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_06e53a0d7c5ab837809e",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_07440d724aedaae82a6f",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_07a3a529d7e1eb370f48",
+      "right": {
+        "image_key": "4020250229515.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_07a4424d9240fa45a258",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230088952.png"
+      },
+      "pair_id": "vp_07ec16b2b6cca34aac95",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_09f7fa0c371ca73653fe",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_0a92301c79f825dcec1c",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_0b25102ac569ccf0e060",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_0c1cc00fe73f955eaa6d",
+      "right": {
+        "image_key": "4020230104392.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_0ca60c1cf7a08b40e4f1",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_0d35c55ebe1e0d93198d",
+      "right": {
+        "image_key": "4020220167439.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020250020562.png"
+      },
+      "pair_id": "vp_0e5e23f7d9ec4b050893",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_100dd11289b22e1180d9",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250133645.png"
+      },
+      "pair_id": "vp_10b462fb405085f9f186",
+      "right": {
+        "image_key": "4020250229515.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_13354d70cbba04d5ea02",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_14424f052000c1f293a2",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230088952.png"
+      },
+      "pair_id": "vp_151d8d579eb7dc51bb4a",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_15bbbd6c9b578ec390fe",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_16b0430905d15bd3a0d2",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_175e8fae86a3add79b82",
+      "right": {
+        "image_key": "4020230104392.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_17887879c06c86145c7c",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_1ac7509199c677604a4a",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_1b294550f71fa0e651c4",
+      "right": {
+        "image_key": "4020250229252.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_1ce60f6d4b21ea30404b",
+      "right": {
+        "image_key": "4020230073832.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_1da8c15e53ca6d7bc4d2",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250027521.png"
+      },
+      "pair_id": "vp_1ed5171b98f0d9cda572",
+      "right": {
+        "image_key": "4020250229252.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250070435.png"
+      },
+      "pair_id": "vp_21acdf8c0e545160eceb",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250229252.png"
+      },
+      "pair_id": "vp_226d629d3340094e69a5",
+      "right": {
+        "image_key": "4020250229515.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250020562.png"
+      },
+      "pair_id": "vp_24d8b99da7145f123d72",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250133645.png"
+      },
+      "pair_id": "vp_250b5da223d4275d7bdb",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_25861fa644531e4fb766",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_27f2e2bf8650b07141ee",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_2a4b0e859e98a792022c",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_2b23a8bac70c22854233",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_2ba9dd09ca615182eac4",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230120862.png"
+      },
+      "pair_id": "vp_2e89ae0167bf5844bbc6",
+      "right": {
+        "image_key": "4020230120869.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_2e8e831ba069e3f6efe5",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_31963fae543cebf95c24",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_32cff17a04a6b6ea75f1",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_34d2cb0f214bc21fcf87",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_35040c50cf76b7139f57",
+      "right": {
+        "image_key": "4020230104392.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_366d94b0dd6f1564d4a3",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_3723f8df5b9e2d9f290f",
+      "right": {
+        "image_key": "4020230104392.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_377725ff409d303cc746",
+      "right": {
+        "image_key": "4020230073832.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_38c5f7f5fb7537456fd9",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240224799.png"
+      },
+      "pair_id": "vp_39b73ce08ae9671877be",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_39dc9138b341bb5db36e",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230113172.png"
+      },
+      "pair_id": "vp_3a3951951a10725e33e1",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_3b14906546e7608a05f4",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_3b18e398b15e5c5cb45c",
+      "right": {
+        "image_key": "4020230104392.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230088952.png"
+      },
+      "pair_id": "vp_3d998efcdb0c7a3d3d42",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250034709.png"
+      },
+      "pair_id": "vp_3e010b05464f98a326cb",
+      "right": {
+        "image_key": "4020250229252.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_3f10bedc526102287171",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250027521.png"
+      },
+      "pair_id": "vp_3fc9f7dbe2374552b5a1",
+      "right": {
+        "image_key": "4020250229515.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250027521.png"
+      },
+      "pair_id": "vp_41d0c3e07924817edbb8",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_4258771dbcd61c439863",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_42fa5d68096baedab273",
+      "right": {
+        "image_key": "4020230050697.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_4384a97e2bd08b287b5d",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_44fa5e8963e127c98e5d",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_458d972dd812c957b9f7",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_473d7b8b168f7f5c8b74",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250020562.png"
+      },
+      "pair_id": "vp_48313f3918eab4995ae3",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240224799.png"
+      },
+      "pair_id": "vp_4930e79ba8b2aa6e7ea3",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_4ab8bdc1f4acd87b838c",
+      "right": {
+        "image_key": "4020220173357.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250034709.png"
+      },
+      "pair_id": "vp_4c6f6488bd30fd17f8fe",
+      "right": {
+        "image_key": "4020250229515.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_4d7ec214a7a34b8c207b",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_4e80879eec1fca4b1edf",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_4f164a9700d0624e20ff",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220048807.png"
+      },
+      "pair_id": "vp_4f86998f16a57a9d36be",
+      "right": {
+        "image_key": "4020230150431.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_511e30889d15764344e7",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_5120a6fd374bd22f120d",
+      "right": {
+        "image_key": "4020230088952.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_5a0b48a71699688d60f2",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_5d931d2954ccf63f6c6b",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220048807.png"
+      },
+      "pair_id": "vp_61024ac5f81209549673",
+      "right": {
+        "image_key": "4020230080765.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_6192078f9b211eba9578",
+      "right": {
+        "image_key": "4020250229252.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_62e42be09cfdd97f19d7",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_652c327405eaca2e1ead",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_66dc8c10498e83eb969e",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_66dfb0b5cd9c24aa5d64",
+      "right": {
+        "image_key": "4020230073832.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230088952.png"
+      },
+      "pair_id": "vp_6744dd795a04f932a8c2",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_6aa4a1a527096970bf65",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_6c2dc7c32e4668fad0f6",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_6c5f5f81a8a78c0d80a4",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_6d8bfbd9ce6158bc6e22",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_6fe1ecc69a41623d152a",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230115217.png"
+      },
+      "pair_id": "vp_7292fe68892fcccd825d",
+      "right": {
+        "image_key": "4020230115219.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_73a1af0d20ac15e2184c",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_74617ad7b33893dc5a02",
+      "right": {
+        "image_key": "4020220164027.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240226967.png"
+      },
+      "pair_id": "vp_74ec0c65a1014fa0e63a",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_77e8505cb8deff58671e",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240224799.png"
+      },
+      "pair_id": "vp_78032df6cf8bab0c4645",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_7b095180d8b578641311",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_7e19ef855fe15ae20a84",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230088952.png"
+      },
+      "pair_id": "vp_7e78c031585388a0f4fe",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_83452807a024f2d89f9b",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_839b55a390bc5ceda38f",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_84cca897863d63f4c07d",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_84d312d92f404d64ea07",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_8894c5bc4b1e45d824e9",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_89d6034d7ef30bdf470c",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250020562.png"
+      },
+      "pair_id": "vp_8a2e5666e3cfcd67ee8b",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230080765.png"
+      },
+      "pair_id": "vp_8b1a65220c880599baa8",
+      "right": {
+        "image_key": "4020230150431.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_8c172f282551520045f0",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_8d2dfe9efa640d70a221",
+      "right": {
+        "image_key": "4020220167439.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_8d6f057ee5a8878a320c",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250034709.png"
+      },
+      "pair_id": "vp_8dbab8f90ce7ab2960d6",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250133645.png"
+      },
+      "pair_id": "vp_8df75af69badf34d53aa",
+      "right": {
+        "image_key": "4020250229252.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_8e1f3174b395c20be22b",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_8f18883ffb2b7e7c61bd",
+      "right": {
+        "image_key": "4020230088952.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_8f62b76d05b004e07866",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_8f86f939be4143f042d9",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020250070435.png"
+      },
+      "pair_id": "vp_90e3fec05c051887de92",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_91e57d1222f32eb2cdfa",
+      "right": {
+        "image_key": "4020230050697.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_924810bba769933d0427",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_92f0fd7c6af7204eaba9",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240226967.png"
+      },
+      "pair_id": "vp_941aab488c78e7b08d50",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250027521.png"
+      },
+      "pair_id": "vp_9616f1190ceeedba124a",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230120869.png"
+      },
+      "pair_id": "vp_965bdacbe16bedecfe91",
+      "right": {
+        "image_key": "4020230120872.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_96b5117cabe7238a5ce3",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_99203c4fb4410879df6a",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_9bf2425570b9630a9a24",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_9ced45ddf401a0d97e7b",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_9dd387df1c898ba395d6",
+      "right": {
+        "image_key": "4020250229252.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_9fcc6a8499f1ee211a34",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_a193d46fc74dae08aa89",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_a235969cb768542d4ec8",
+      "right": {
+        "image_key": "4020230073832.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_a258910aba05de8e6b47",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_a2e0cc2f7fa309cbd406",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_a4322911bd8e02a8e26a",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240133425.png"
+      },
+      "pair_id": "vp_a452f19a130109962c2d",
+      "right": {
+        "image_key": "4020240207292.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240224799.png"
+      },
+      "pair_id": "vp_a519824969629ac0d7de",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_a522a0a92a9944a7bed0",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_a87908406bd0cea87a1a",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240239622.png"
+      },
+      "pair_id": "vp_aa566cbf05411d6be719",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_ab750fd910b229b7a18c",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_ad1e49f4be6973fd6355",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_af2be0a7084d6b4275e3",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_af93e981393c5839e793",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_afa030ca0f3368022597",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250027521.png"
+      },
+      "pair_id": "vp_b0ad066682c03a133a4a",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_b28775e3fc8585f1a991",
+      "right": {
+        "image_key": "4020230088952.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240239622.png"
+      },
+      "pair_id": "vp_b2a1d23447d24f424dd3",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_b5afc34e6c095ae92def",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240226967.png"
+      },
+      "pair_id": "vp_b718be36fac9c1bf096d",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_b7b6289651d966c29d71",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_b8f85244d2256da47bec",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_b966864b4e5134e9e459",
+      "right": {
+        "image_key": "4020220173357.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_bac1e1451c3be40a2a6b",
+      "right": {
+        "image_key": "4020240224799.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240239622.png"
+      },
+      "pair_id": "vp_bb4fbd5f88f00d1daa45",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240226967.png"
+      },
+      "pair_id": "vp_bf81bf923adea4a0fe3b",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_bf857d8b034013753f49",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_c029a5eb3934279c121a",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_c0d434d0da05a2e12892",
+      "right": {
+        "image_key": "4020250229515.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_c2c4c8afa441bd713cfb",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_c458619b910dd47eb9f1",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_c571bd16b21182720ee0",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_c7ad393f06cabbe014c6",
+      "right": {
+        "image_key": "4020220173357.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_c80666c39f6353be7c74",
+      "right": {
+        "image_key": "4020230050697.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_c81d4b92a003f03c281a",
+      "right": {
+        "image_key": "4020250229515.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230120862.png"
+      },
+      "pair_id": "vp_c901885cdeb723a3dd0b",
+      "right": {
+        "image_key": "4020230120872.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230104392.png"
+      },
+      "pair_id": "vp_d1528d1d289f4cfe0f54",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250027521.png"
+      },
+      "pair_id": "vp_d2297bc61a1bea5e92b2",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240217657.png"
+      },
+      "pair_id": "vp_d2387927193d51fa0f43",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_d51bdb218fda18e596fa",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_d7787dbae83d3ef3b046",
+      "right": {
+        "image_key": "4020240217822.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230073832.png"
+      },
+      "pair_id": "vp_d7dcc5efbf840f77ffda",
+      "right": {
+        "image_key": "4020230104392.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_d86a1dfbc8b970273ca1",
+      "right": {
+        "image_key": "4020260026077.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220173357.png"
+      },
+      "pair_id": "vp_daacb062a539c1a84f9b",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_dc3d325dffa147bc23ef",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_dd0c7caf2e6177e4dc60",
+      "right": {
+        "image_key": "4020240047157.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_dd5de3282acc43e63c44",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240224799.png"
+      },
+      "pair_id": "vp_dfd4e0c23769a40aeaec",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_e2651c0086f59738ec67",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020230088952.png"
+      },
+      "pair_id": "vp_e399155dd47a88fb68be",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240227309.png"
+      },
+      "pair_id": "vp_e442816804dab2efd7fa",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020240147524.png"
+      },
+      "pair_id": "vp_e463f3fe1a0c1f2f00bc",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_e5f0895b34f6394035f2",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_e68484508b394f3bb2e3",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240217822.png"
+      },
+      "pair_id": "vp_e8153d8e8d0ff7e4ad70",
+      "right": {
+        "image_key": "4020240227309.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_e83222398a0dcaa68e73",
+      "right": {
+        "image_key": "4020250034709.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_e8fbbcfb958484644309",
+      "right": {
+        "image_key": "4020240147524.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_e9d7772f77e021ecbb28",
+      "right": {
+        "image_key": "4020240224799.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020250034709.png"
+      },
+      "pair_id": "vp_ebb9c842d67dab317353",
+      "right": {
+        "image_key": "4020250070435.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_ebbe666c1e02902820e8",
+      "right": {
+        "image_key": "4020250133645.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_f2f7459b100d0f8c85dc",
+      "right": {
+        "image_key": "4020240224799.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020230050697.png"
+      },
+      "pair_id": "vp_f529c2d5bcfc7970856f",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220058295.png"
+      },
+      "pair_id": "vp_f6dfdb7458eba1792d06",
+      "right": {
+        "image_key": "4020230050697.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240111677.png"
+      },
+      "pair_id": "vp_f701c3c94a27215667ca",
+      "right": {
+        "image_key": "4020240111685.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220167439.png"
+      },
+      "pair_id": "vp_f7f2364a2f430c8ac427",
+      "right": {
+        "image_key": "4020250020562.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020240047157.png"
+      },
+      "pair_id": "vp_f850feb0dde88bf8cd8c",
+      "right": {
+        "image_key": "4020240239622.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": false,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_f8f3f1c7cd661a9a7f59",
+      "right": {
+        "image_key": "4020230088952.png"
+      },
+      "split": "dev"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020210070072.png"
+      },
+      "pair_id": "vp_fb1e95263a9a4941e0fd",
+      "right": {
+        "image_key": "4020250027521.png"
+      },
+      "split": "frozen_holdout"
+    },
+    {
+      "annotation": {
+        "annotator_id": null,
+        "confidence": null,
+        "notes": null,
+        "visual_similarity": null
+      },
+      "frozen": true,
+      "left": {
+        "image_key": "4020220164027.png"
+      },
+      "pair_id": "vp_fcdb6d775fbbb5bbd60a",
+      "right": {
+        "image_key": "4020240226967.png"
+      },
+      "split": "frozen_holdout"
+    }
+  ],
+  "protocol": "visual-similarity-labeling-v1",
+  "schema_version": 1,
+  "selection_method": "nearest_index_embeddings",
+  "source": {
+    "image_set_sha256": "177a67d056f3a794598c7b85d5360950c7eea85e655977ecf5424aaea4cb7357",
+    "index_filename": "kipris.faiss",
+    "index_sha256": "8a8246b320f3d2b0bd2144f300d689716d690006e61387d682f8ecac91062565",
+    "metadata_filename": "kipris_metadata.json",
+    "metadata_sha256": "79c9e21b032871ccf0cfdefc686fde541e5378243072938ca9f6eb2b2be6669e"
+  },
+  "split_counts": {
+    "dev": 160,
+    "frozen_holdout": 40
+  }
+}

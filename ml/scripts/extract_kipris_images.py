@@ -28,7 +28,6 @@ from pathlib import Path
 
 from PIL import Image
 
-
 # === 노이즈 식별 임계값 ===
 # 같은 (w, h) 크기가 이 건수 이상의 PDF에 반복 등장하면 양식 요소로 간주
 THRESH_REPEAT_COUNT = 50
@@ -196,7 +195,11 @@ def main():
             print()
             # 선택된 로고들의 크기 분포 (참고용)
             areas = sorted([w * h for _, w, h, _ in successes])
-            print(f"  선택된 로고 면적 분포: min={areas[0]:,} median={areas[len(areas)//2]:,} max={areas[-1]:,}")
+            print(
+                "  선택된 로고 면적 분포: "
+                f"min={areas[0]:,} median={areas[len(areas) // 2]:,} "
+                f"max={areas[-1]:,}"
+            )
             pages_dist = Counter(p for _, _, _, p in successes)
             print(f"  로고 페이지 분포: {dict(pages_dist)}")
 
@@ -208,7 +211,6 @@ def main():
 
         print()
         print(f"  출력 폴더: {args.output_dir}")
-        png_count = len(list(args.output_dir.glob(f"{4*'?'}*.png"))) if args.output_dir.exists() else 0
         print(f"  생성된 PNG 수: {len(successes)}")
 
     finally:
