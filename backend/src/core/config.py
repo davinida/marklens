@@ -119,6 +119,7 @@ _FIELD_TO_ENV: dict[str, str] = {
     "cors_origins_raw": "MARKLENS_CORS_ORIGINS",
     "search_rate_limit": "MARKLENS_SEARCH_RATELIMIT",
     "namecheck_rate_limit": "MARKLENS_NAMECHECK_RATELIMIT",
+    "images_rate_limit": "MARKLENS_IMAGES_RATELIMIT",
     "api_key": "MARKLENS_API_KEY",
     "database_url": "DATABASE_URL",
     "environment": "MARKLENS_ENVIRONMENT",
@@ -164,6 +165,11 @@ class Settings(BaseSettings):
     namecheck_rate_limit: str = Field(
         default="30/minute", validation_alias="MARKLENS_NAMECHECK_RATELIMIT"
     )
+    # /images 는 결과 화면 하나가 최대 top_k(20)장을 연달아 받는 정적 경로라
+    # 한도를 넉넉히 두되, 유일한 무제한 경로로 남겨두지는 않는다.
+    images_rate_limit: str = Field(
+        default="120/minute", validation_alias="MARKLENS_IMAGES_RATELIMIT"
+    )
 
     # 정적 X-API-Key. 설정 시에만 /search·/name-check 에서 헤더 일치를 검증(불일치 401).
     # 미설정("")이면 완전 비활성 — 로컬 개발은 무인증 개방. (core/auth.py 참조)
@@ -208,7 +214,7 @@ class Settings(BaseSettings):
             )
         return v
 
-    @field_validator("search_rate_limit", "namecheck_rate_limit")
+    @field_validator("search_rate_limit", "namecheck_rate_limit", "images_rate_limit")
     @classmethod
     def _check_rate_limit(cls, v: str) -> str:
         return _validate_rate_limit(v)
@@ -284,9 +290,11 @@ SEARCH_MAX_CONCURRENCY: int = settings.search_max_concurrency
 # CORS 허용 오리진 리스트 (env: MARKLENS_CORS_ORIGINS)
 CORS_ALLOW_ORIGINS: list[str] = settings.cors_allow_origins
 
-# 인바운드 레이트리밋 (env: MARKLENS_SEARCH_RATELIMIT / MARKLENS_NAMECHECK_RATELIMIT)
+# 인바운드 레이트리밋 (env: MARKLENS_SEARCH_RATELIMIT / MARKLENS_NAMECHECK_RATELIMIT
+#                      / MARKLENS_IMAGES_RATELIMIT)
 SEARCH_RATE_LIMIT: str = settings.search_rate_limit
 NAMECHECK_RATE_LIMIT: str = settings.namecheck_rate_limit
+IMAGES_RATE_LIMIT: str = settings.images_rate_limit
 
 # 정적 X-API-Key (env: MARKLENS_API_KEY, 미설정 시 인증 비활성)
 API_KEY: str = settings.api_key

@@ -99,7 +99,7 @@ app.add_middleware(
 # === 라우터 등록 ===
 # X-API-Key 인증(require_api_key)은 MARKLENS_API_KEY 설정 시에만 활성(미설정이면 무인증).
 # /health 는 무인증 유지 — 로드밸런서·부하테스트가 키 없이 상태를 폴링해야 함.
-# 실제 처리 비용/외부 쿼터를 쓰는 /search·/name-check 에만 의존성을 주입한다.
+# /search·/name-check, 그리고 활성 시 /images(아래 라우트에 Depends 주입)에 인증을 건다.
 app.include_router(health.router)
 app.include_router(search.router, dependencies=[Depends(require_api_key)])
 app.include_router(namecheck.router, dependencies=[Depends(require_api_key)])
@@ -116,7 +116,8 @@ if config.PUBLIC_RESULT_IMAGES:
         include_in_schema=False,
         dependencies=[Depends(require_api_key)],
     )
-    def indexed_image(image_key: str) -> FileResponse:
+    @limiter.limit(config.IMAGES_RATE_LIMIT)  # 유일하게 무제한이던 경로 — IP 기준 한도
+    def indexed_image(request: Request, image_key: str) -> FileResponse:
         if image_key not in engine.state.image_path_set:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
         candidate = storage.local_path(image_key).resolve()

@@ -125,6 +125,14 @@ def test_rate_limit_blocks_over_quota_with_korean_message():
     assert "요청이 너무 많습니다" in resp.json()["detail"]
 
 
+def test_images_rate_limit_config_exists_and_is_validated():
+    """/images 도 한도 대상 — 기본값이 있고, 형식 오류는 설정 검증에서 거른다."""
+    assert config.IMAGES_RATE_LIMIT  # 기본 120/minute (main.py 의 /images 라우트가 사용)
+    config.Settings(MARKLENS_IMAGES_RATELIMIT="60/minute")  # 정상 형식 통과
+    with pytest.raises(ValueError):
+        config.Settings(MARKLENS_IMAGES_RATELIMIT="banana")
+
+
 # ====================================================================
 # CORS 오리진 파싱
 # ====================================================================

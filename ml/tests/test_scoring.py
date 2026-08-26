@@ -2,7 +2,7 @@
 
 import numpy as np
 import pytest
-from src.scoring import SIM_CAUTION, SIM_REVIEW, score_results
+from src.scoring import SIM_CAUTION, SIM_LOW, SIM_REVIEW, score_results
 
 STATUS_RANK = {
     "NO_CLOSE_MATCH": 0,
@@ -46,6 +46,16 @@ def test_display_top_k_does_not_change_status():
     short = _score([0.83])
     long = _score([0.83, 0.60, 0.40, 0.20])
     assert short["status_code"] == long["status_code"] == "STRONG_MATCH"
+
+
+def test_response_exposes_thresholds_as_single_source():
+    """판정 경계값이 응답에 실려 화면 색 구간이 이 값만 따르게 한다(중복 정의 방지)."""
+    result = _score([0.9, 0.1])
+    assert result["thresholds"] == {
+        "strong_match": float(SIM_CAUTION),
+        "possible_match": float(SIM_REVIEW),
+        "weak_match": float(SIM_LOW),
+    }
 
 
 def test_small_gap_never_downgrades_high_similarity():

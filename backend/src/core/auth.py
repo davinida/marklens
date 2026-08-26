@@ -7,11 +7,12 @@
 활성 조건: 환경변수 MARKLENS_API_KEY(=config.API_KEY)가 설정된 경우에만 검증.
 미설정이면 완전 비활성 — 기존처럼 무인증 개방(로컬 개발 편의).
 
-적용 범위(main.py 에서 라우터별 Depends 주입):
+적용 범위(main.py 에서 라우터/라우트별 Depends 주입):
 - 보호: /search, /name-check — 실제 CPU·외부 쿼터를 소모하는 엔드포인트.
+        /images 도 활성(PUBLIC_RESULT_IMAGES) 시 같은 키로 보호된다 — BFF 가
+        서버 측에서 키를 실어 프록시하므로 브라우저는 키를 알 필요가 없다.
 - 제외: /health(로드밸런서·부하테스트가 키 없이 폴링해야 함),
-        /docs·/openapi.json·/redoc(시연자가 API 스펙을 탐색해야 함),
-        /images 정적(응답에 담긴 이미지 URL 을 브라우저가 키 없이 렌더해야 함).
+        /docs·/openapi.json·/redoc(시연자가 API 스펙을 탐색해야 함).
   → 제외는 '이 의존성을 주입하지 않는 것'으로 자연히 처리된다(별도 예외 목록 불필요).
 """
 

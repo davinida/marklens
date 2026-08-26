@@ -157,4 +157,11 @@ def score_results(distances: np.ndarray) -> dict:
         "warnings": warnings,
         "scored_candidate_count": int(values.size),
         "threshold_version": "visual-v2-uncalibrated",
+        # 판정에 실제 사용한 경계값. 프런트 색 구간·눈금은 이 값을 그대로 쓰므로
+        # 재보정(threshold_version 교체) 시 이 파일만 고치면 표시가 함께 따라온다.
+        "thresholds": {
+            "strong_match": float(SIM_CAUTION),
+            "possible_match": float(SIM_REVIEW),
+            "weak_match": float(SIM_LOW),
+        },
     }

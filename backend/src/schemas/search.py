@@ -56,6 +56,13 @@ class GradeInfo(BaseModel):
     uncertainty_reasons: list[str] = Field(default_factory=list)
     scored_candidate_count: int
     threshold_version: str
+    thresholds: dict[str, float] = Field(
+        default_factory=dict,
+        description=(
+            "판정에 사용한 유사도 경계값 "
+            "(strong_match/possible_match/weak_match). 화면 색 구간의 단일 소스."
+        ),
+    )
     scope: str = "visual_similarity_only"
     calibrated: bool = False
     legal_conclusion: bool = False
