@@ -1,6 +1,8 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import TurnstileWidget from "@/components/TurnstileWidget";
+import TurnstileWidget, {
+  resetTurnstileConfigCache,
+} from "@/components/TurnstileWidget";
 
 const scriptState = vi.hoisted(() => ({
   onReady: null as (() => void) | null,
@@ -33,11 +35,37 @@ function stubConfigFetch(config: { siteKey: string; devBypass: boolean }) {
   );
 }
 
+// 모든 실패 응답을 소진한 뒤 성공 응답을 주는 fetch 스텁.
+function stubFlakyConfigFetch(
+  failures: number,
+  config: { siteKey: string; devBypass: boolean },
+) {
+  let calls = 0;
+  const fetchMock = vi.fn(async () => {
+    calls += 1;
+    if (calls <= failures) throw new Error("network down");
+    return { ok: true, json: async () => config };
+  });
+  vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+  return fetchMock;
+}
+
+// 백오프(500ms + 1500ms)를 모두 소화해 재시도 3회가 확정적으로 끝나게 한다.
+async function flushConfigRetries() {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2_100);
+  });
+}
+
 describe("TurnstileWidget", () => {
   afterEach(() => {
     delete window.turnstile;
     resizeCallback = null;
     scriptState.onReady = null;
+    // 설정 프로미스는 모듈 스코프에 캐시된다 — 비우지 않으면 앞 케이스의 응답이
+    // 다음 케이스로 샌다.
+    resetTurnstileConfigCache();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
@@ -118,22 +146,61 @@ describe("TurnstileWidget", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows a reload alert when the runtime config request fails", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: false,
-        status: 500,
-        json: async () => ({}),
-      })) as unknown as typeof fetch,
-    );
+  it("recovers from a transient config failure by retrying with backoff", async () => {
+    vi.useFakeTimers();
+    const fetchMock = stubFlakyConfigFetch(1, { siteKey: "", devBypass: true });
+    const onTokenChange = vi.fn();
+
+    render(<TurnstileWidget onTokenChange={onTokenChange} />);
+    await flushConfigRetries();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onTokenChange).toHaveBeenCalledWith("dev-bypass");
+    expect(
+      screen.getByText("개발용 자동 요청 확인이 적용됐어요."),
+    ).toBeInTheDocument();
+  });
+
+  it("offers a retry action instead of a reload when every attempt fails", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async () => ({
+      ok: false,
+      status: 500,
+      json: async () => ({}),
+    }));
+    vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 
     render(<TurnstileWidget onTokenChange={vi.fn()} />);
+    await flushConfigRetries();
 
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(
-      await screen.findByText(
-        "자동 요청 확인 설정을 불러오지 못했어요. 페이지를 새로고침해 주세요.",
-      ),
+      screen.getByText("자동 요청 확인 설정을 불러오지 못했어요."),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "다시 시도" }),
+    ).toBeInTheDocument();
+  });
+
+  it("reloads the runtime config when the retry button is pressed", async () => {
+    vi.useFakeTimers();
+    // 최초 3회(1회 + 재시도 2회)는 모두 실패하고, 버튼이 낸 4번째 요청이 성공한다.
+    const fetchMock = stubFlakyConfigFetch(3, { siteKey: "", devBypass: true });
+    const onTokenChange = vi.fn();
+
+    render(<TurnstileWidget onTokenChange={onTokenChange} />);
+    await flushConfigRetries();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(onTokenChange).not.toHaveBeenCalledWith("dev-bypass");
+
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await flushConfigRetries();
+
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(onTokenChange).toHaveBeenCalledWith("dev-bypass");
+    expect(
+      screen.getByText("개발용 자동 요청 확인이 적용됐어요."),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "다시 시도" })).toBeNull();
   });
 });

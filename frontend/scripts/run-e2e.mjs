@@ -55,7 +55,6 @@ async function startWindowsServer() {
       env: {
         ...process.env,
         MARKLENS_TURNSTILE_DEV_BYPASS: "1",
-        NEXT_PUBLIC_TURNSTILE_DEV_BYPASS: "1",
       },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,

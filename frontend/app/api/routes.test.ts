@@ -120,6 +120,26 @@ describe("same-origin API routes", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("falls back to the NEXT_PUBLIC site key when the server-only key is blank", async () => {
+    // `??` 는 빈 문자열을 '설정됨'으로 보므로, MARKLENS_ 키가 공란으로 존재하기만
+    // 해도 유효한 폴백이 영구 무시됐다. trim 후 빈 값은 미설정으로 취급해야 한다.
+    vi.stubEnv("MARKLENS_TURNSTILE_SITE_KEY", "   ");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", " public-site-key ");
+
+    const response = await getTurnstileConfig(
+      new Request("http://localhost/api/turnstile-config", {
+        headers: { "x-request-id": "edge-turnstile-2" },
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      siteKey: "public-site-key",
+      devBypass: true, // beforeEach 의 MARKLENS_TURNSTILE_DEV_BYPASS=1
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("rejects unsafe image path segments before contacting the backend", async () => {
     const response = await getImage(
       new Request("http://localhost/api/images/../secret.png", {

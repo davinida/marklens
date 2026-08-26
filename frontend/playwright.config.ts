@@ -37,7 +37,6 @@ export default defineConfig({
     timeout: 120_000,
     env: {
       MARKLENS_TURNSTILE_DEV_BYPASS: "1",
-      NEXT_PUBLIC_TURNSTILE_DEV_BYPASS: "1",
     },
   },
   projects: [

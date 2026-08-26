@@ -14,18 +14,22 @@ npm run dev
 ```
 
 `.env.example`을 참고해 로컬 환경 변수를 설정하세요. 실제 Cloudflare Turnstile을
-쓰지 않는 로컬 개발에서는 아래 두 값을 모두 `1`로 설정할 수 있습니다.
+쓰지 않는 로컬 개발에서는 아래 한 값만 설정하면 됩니다.
 
 ```dotenv
 MARKLENS_TURNSTILE_DEV_BYPASS=1
-NEXT_PUBLIC_TURNSTILE_DEV_BYPASS=1
 ```
 
-이 bypass는 `NODE_ENV=production`에서는 작동하지 않습니다. production에는 반드시
-`MARKLENS_TURNSTILE_SECRET_KEY`, `NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
-`MARKLENS_TURNSTILE_EXPECTED_HOSTNAMES`, `MARKLENS_BACKEND_URL`,
-`MARKLENS_BACKEND_API_KEY`를 설정해야 합니다. 백엔드 API key에는 `NEXT_PUBLIC_`
-접두사를 붙이지 마세요.
+위젯 설정 라우트(`/api/turnstile-config`)와 서버 검증이 모두 이 플래그 하나를
+읽습니다. 이 bypass는 `NODE_ENV=production`에서는 작동하지 않습니다.
+
+production에는 반드시 `MARKLENS_TURNSTILE_SECRET_KEY`,
+`MARKLENS_TURNSTILE_SITE_KEY`, `MARKLENS_TURNSTILE_EXPECTED_HOSTNAMES`,
+`MARKLENS_BACKEND_URL`, `MARKLENS_BACKEND_API_KEY`를 설정해야 합니다. 사이트 키는
+`NEXT_PUBLIC_TURNSTILE_SITE_KEY`로도 폴백되지만, `NEXT_PUBLIC_*`은 빌드 시점에
+인라인되므로 standalone 빌드에서는 그 경로로 키를 교체하려면 재빌드가 필요합니다.
+재빌드 없이 교체하려면 `MARKLENS_TURNSTILE_SITE_KEY`를 쓰세요. 백엔드 API key에는
+`NEXT_PUBLIC_` 접두사를 붙이지 마세요.
 
 ## Verification
 

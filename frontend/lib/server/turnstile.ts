@@ -26,10 +26,36 @@ export class TurnstileError extends Error {
   }
 }
 
-function developmentBypassEnabled(): boolean {
+/**
+ * 개발용 bypass 스위치. 검증(verifyTurnstile)과 위젯 런타임 설정
+ * (/api/turnstile-config)이 같은 조건을 봐야 "위젯은 bypass인데 서버는 아님"
+ * 같은 어긋남이 생기지 않는다 — 그래서 여기 한 곳에만 둔다.
+ */
+export function developmentBypassEnabled(): boolean {
   return (
     process.env.NODE_ENV !== "production" &&
     process.env.MARKLENS_TURNSTILE_DEV_BYPASS === "1"
+  );
+}
+
+/**
+ * 위젯에 내려줄 Turnstile 사이트 키를 요청 시점에 해석한다. 사이트 키는 설계상
+ * 공개 값이라 브라우저에 노출해도 안전하다.
+ *
+ * 서버 전용 MARKLENS_TURNSTILE_SITE_KEY 를 우선하고, 없으면 기존 로컬 셋업
+ * 호환을 위해 NEXT_PUBLIC_TURNSTILE_SITE_KEY 로 폴백한다. `??` 가 아니라 trim 후
+ * 빈 문자열을 "미설정"으로 취급하는 이유: `??` 는 빈 문자열을 '설정됨'으로 보기
+ * 때문에, MARKLENS_ 키가 공란으로 존재하기만 해도 유효한 폴백이 영구히 무시된다.
+ *
+ * 주의: Docker standalone 빌드에서 NEXT_PUBLIC_* 은 빌드 시점에 값이 인라인된다.
+ * 따라서 폴백 경로로는 "재빌드 없는 키 교체"가 되지 않는다. 런타임에 env 만
+ * 바꿔서 키를 교체하려면 MARKLENS_TURNSTILE_SITE_KEY 를 쓰라.
+ */
+export function getTurnstileSiteKey(): string {
+  return (
+    process.env.MARKLENS_TURNSTILE_SITE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim() ||
+    ""
   );
 }
 

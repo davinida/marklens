@@ -42,6 +42,55 @@ interface TurnstileConfig {
 
 const FLEXIBLE_MIN_WIDTH = 300;
 
+// 최초 1회 + 아래 지연만큼 기다린 재시도 2회 = 최대 3회.
+const CONFIG_RETRY_DELAYS_MS = [500, 1_500];
+
+// 세션 캐시. page.tsx 가 phase 전환마다 SearchForm(과 이 위젯)을 재마운트하므로,
+// 캐시가 없으면 no-store 요청을 전환할 때마다 다시 지불한다. StrictMode 의
+// 이중 마운트도 이 캐시가 흡수한다.
+let configPromise: Promise<TurnstileConfig> | null = null;
+
+async function requestConfig(): Promise<TurnstileConfig> {
+  const response = await fetch("/api/turnstile-config", { cache: "no-store" });
+  if (!response.ok) throw new Error(`turnstile-config ${response.status}`);
+  const data = (await response.json()) as Partial<TurnstileConfig>;
+  return {
+    siteKey: typeof data.siteKey === "string" ? data.siteKey.trim() : "",
+    devBypass: data.devBypass === true,
+  };
+}
+
+async function loadConfig(): Promise<TurnstileConfig> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= CONFIG_RETRY_DELAYS_MS.length; attempt += 1) {
+    if (attempt > 0) {
+      const wait = CONFIG_RETRY_DELAYS_MS[attempt - 1];
+      await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    try {
+      return await requestConfig();
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError;
+}
+
+function getConfig(): Promise<TurnstileConfig> {
+  configPromise ??= loadConfig().catch((error: unknown) => {
+    // 실패는 캐시하지 않는다 — "다시 시도" 나 다음 마운트가 새 요청을 낼 수 있어야
+    // 일시적 네트워크 장애가 검색을 영구히 막지 않는다.
+    configPromise = null;
+    throw error;
+  });
+  return configPromise;
+}
+
+/** 테스트 전용: 모듈 스코프 캐시를 비워 케이스 간 오염을 막는다. */
+export function resetTurnstileConfigCache(): void {
+  configPromise = null;
+}
+
 const TurnstileWidget = forwardRef<
   TurnstileHandle,
   { onTokenChange: (token: string | null) => void }
@@ -52,6 +101,7 @@ const TurnstileWidget = forwardRef<
   const previousSizeRef = useRef<WidgetSize | null>(null);
   const [config, setConfig] = useState<TurnstileConfig | null>(null);
   const [configError, setConfigError] = useState(false);
+  const [configAttempt, setConfigAttempt] = useState(0);
   const [scriptReady, setScriptReady] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [widgetSize, setWidgetSize] = useState<WidgetSize | null>(null);
@@ -59,25 +109,29 @@ const TurnstileWidget = forwardRef<
   const devBypass = config?.devBypass === true;
   const siteKey = config?.siteKey ?? "";
 
+  // 프로미스가 마운트 간에 공유되므로 abort 로 끊지 않고(다른 마운트의 로딩까지
+  // 죽는다) cancelled 플래그로 언마운트 후 setState 만 막는다.
   useEffect(() => {
-    const controller = new AbortController();
-    fetch("/api/turnstile-config", {
-      signal: controller.signal,
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(`turnstile-config ${response.status}`);
-        const data = (await response.json()) as Partial<TurnstileConfig>;
-        setConfig({
-          siteKey: typeof data.siteKey === "string" ? data.siteKey.trim() : "",
-          devBypass: data.devBypass === true,
-        });
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setConfigError(true);
-      });
-    return () => controller.abort();
-  }, []);
+    let cancelled = false;
+    getConfig().then(
+      (next) => {
+        if (!cancelled) setConfig(next);
+      },
+      () => {
+        if (!cancelled) setConfigError(true);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [configAttempt]);
+
+  const retryConfig = () => {
+    resetTurnstileConfigCache();
+    setConfigError(false);
+    setConfig(null);
+    setConfigAttempt((attempt) => attempt + 1);
+  };
 
   useEffect(() => {
     if (devBypass) onTokenChange("dev-bypass");
@@ -169,9 +223,18 @@ const TurnstileWidget = forwardRef<
 
   if (configError) {
     return (
-      <p role="alert" className="text-[12px] font-semibold text-caution-deep">
-        자동 요청 확인 설정을 불러오지 못했어요. 페이지를 새로고침해 주세요.
-      </p>
+      <div className="flex flex-col items-center gap-2">
+        <p role="alert" className="text-[12px] font-semibold text-caution-deep">
+          자동 요청 확인 설정을 불러오지 못했어요.
+        </p>
+        <button
+          type="button"
+          onClick={retryConfig}
+          className="press rounded-md bg-low-bg px-4 py-2 text-[13px] font-semibold text-sub"
+        >
+          다시 시도
+        </button>
+      </div>
     );
   }
 
