@@ -46,6 +46,23 @@ Browser
 
 ## 로컬 실행
 
+### 0. 새 컴퓨터 사전 준비
+
+| 도구 | 버전 | 비고 |
+| --- | --- | --- |
+| Python | 3.11 | 3.13은 `numpy<2` 휠이 없어 설치 실패 |
+| Node.js | 20.19 이상 (LTS 권장) | `frontend/package.json`의 engines 기준 |
+| PostgreSQL | 16 | **db 모드를 쓸 때만** 필요. `DATABASE_URL`을 설정하지 않는 file 모드는 설치 불필요 |
+
+PostgreSQL 설치 예시: Windows `winget install PostgreSQL.PostgreSQL.16` /
+macOS `brew install postgresql@16` / Ubuntu `sudo apt install postgresql-16`.
+
+- 최초 부팅 시 CLIP 가중치(ViT-B-32 laion2b, 약 578MB)를 사용자 홈의
+  huggingface 캐시로 자동 다운로드하므로 인터넷 연결이 필요합니다.
+- CLIP 가중치 로드에 시스템 커밋 메모리 여유가 약 5GB 필요합니다. 부족하면
+  서버가 로그 없이 종료됩니다 —
+  [`docs/MarkLens_트러블슈팅.md`](docs/MarkLens_트러블슈팅.md)의 TS-07 참고.
+
 ### 1. Python 환경
 
 Python 3.11을 사용합니다. Windows PowerShell 예시:
@@ -55,11 +72,29 @@ py -3.11 -m venv ml\venv
 ml\venv\Scripts\python.exe -m pip install `
   torch==2.13.0 torchvision==0.28.0 `
   --index-url https://download.pytorch.org/whl/cpu
+ml\venv\Scripts\python.exe -m pip install setuptools==83.0.0
 ml\venv\Scripts\python.exe -m pip install -c constraints.txt `
   -r ml\requirements.txt `
   -r backend\requirements.txt `
   -r backend\requirements-dev.txt
 ```
+
+macOS/Linux(bash) 예시:
+
+```bash
+python3.11 -m venv ml/venv
+ml/venv/bin/python -m pip install \
+  torch==2.13.0 torchvision==0.28.0 \
+  --index-url https://download.pytorch.org/whl/cpu
+ml/venv/bin/python -m pip install setuptools==83.0.0
+ml/venv/bin/python -m pip install -c constraints.txt \
+  -r ml/requirements.txt \
+  -r backend/requirements.txt \
+  -r backend/requirements-dev.txt
+```
+
+`setuptools==83.0.0` 단계는 CI(`.github/workflows/ci.yml`)·컨테이너 빌드
+(`deploy/backend.Dockerfile`)와 동일한 순서입니다.
 
 `ml/data/`는 Git에 포함되지 않습니다. 최소한 다음 파일이 필요합니다.
 
@@ -72,6 +107,37 @@ ml/data/images/*
 
 새 인덱스는 `kipris_manifest.json`까지 생성해야 합니다. production 모드는
 manifest가 없거나 모델·전처리·해시 계약이 다르면 기동하지 않습니다.
+
+#### ml/data 입수와 머신 간 이전
+
+`ml/data/`는 저작권 문제로 Git에 포함되지 않으며, 팀 공유 압축본으로 전달받아
+배치합니다. 데이터가 있는 머신에서 새 머신으로 옮기는 절차:
+
+1. 원본 머신에서 `ml/data` 전체를 압축합니다.
+   - PowerShell: `Compress-Archive -Path ml\data -DestinationPath marklens-data.zip`
+   - bash: `zip -r marklens-data.zip ml/data`
+2. 새 머신의 프로젝트 루트에 같은 구조(`ml/data/...`)로 풉니다.
+3. file 모드는 그대로 기동하면 됩니다. db 모드는 먼저 DB에 적재합니다:
+   `ml\venv\Scripts\python.exe -m backend.scripts.migrate_json_to_db --prune`
+4. 서버 기동 후 `/health`의 `index_size`·`trademark_count`·
+   `artifact_generation_id`가 원본 머신과 같은지 확인합니다.
+
+주의사항:
+
+- `ml/data/kipris_call_count.json`은 KIPRIS 월 쿼터 카운터입니다. 머신 간 값이
+  병합되지 않으므로 실제 수집을 수행한 머신의 값이 정본이며, 더 낮은 값으로
+  덮어쓰면 안 됩니다.
+- 2026-08 기준 1,000건 세대(generation `20260815T023540Z-0d79c662f4c8`)는 수집을
+  수행한 개발 머신에만 있습니다. 다른 머신은 위 이전 절차를 거치기 전까지
+  2026-07의 100건 레거시 세트로 동작합니다.
+
+이전 후 확인 목록(원본 머신과 대조):
+
+- [ ] `/health`의 `artifact_generation_id` 일치
+- [ ] `index_size` == `trademark_count` == 기대 건수
+- [ ] db 모드: `migrate_json_to_db --prune` 후 재기동 시 키 불일치 오류 없음
+- [ ] production 모드 기동은 `kipris_manifest.json`이 있어야 가능
+- [ ] 검색 스모크: 인덱스에 있는 이미지 1건 업로드 시 자기일치 유사도 ≈ 1.0
 
 ### 2. 환경변수
 
