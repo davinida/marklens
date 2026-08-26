@@ -5,7 +5,7 @@ import { imageUrl, searchTrademark } from "@/lib/api";
 
 const validResponse = {
   grade: {
-    grade_code: "SAFE",
+    grade_code: "LOW", // SAFE 는 2026-08 개정으로 계약에서 제거됨
     grade_name: "낮음",
     message: "충돌 가능성이 낮아요.",
     top1_similarity: 0.2,

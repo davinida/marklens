@@ -5,6 +5,7 @@ import { GET as getHealth } from "@/app/api/health/route";
 import { GET as getImage } from "@/app/api/images/[...path]/route";
 import { POST as checkName } from "@/app/api/name-check/route";
 import { POST as search } from "@/app/api/search/route";
+import { GET as getTurnstileConfig } from "@/app/api/turnstile-config/route";
 import { verifyTurnstile } from "@/lib/server/turnstile";
 
 describe("same-origin API routes", () => {
@@ -71,19 +72,17 @@ describe("same-origin API routes", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("falls back to the legacy GET name contract only for 404/405", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response(null, { status: 405 }))
-      .mockResolvedValueOnce(
-        Response.json({
-          query: "MarkLens",
-          total_found: 0,
-          registered_count: 0,
-          exact_registered_count: 0,
-          cached: true,
-          message: "없음",
-        }),
-      );
+  it("uses only the POST body contract for name-check (legacy GET fallback removed)", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({
+        query: "MarkLens",
+        total_found: 0,
+        registered_count: 0,
+        exact_registered_count: 0,
+        cached: true,
+        message: "없음",
+      }),
+    );
 
     const response = await checkName(
       new Request("http://localhost/api/name-check", {
@@ -94,16 +93,31 @@ describe("same-origin API routes", () => {
     );
 
     expect(response.status).toBe(200);
-    expect(fetch).toHaveBeenNthCalledWith(
-      1,
-      "https://backend.example/name-check",
-      expect.objectContaining({ method: "POST" }),
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, options] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe("https://backend.example/name-check");
+    expect(options).toEqual(expect.objectContaining({ method: "POST" }));
+    // 질의가 URL 에 실리는 legacy GET 폴백은 제거됨
+    expect(String(url)).not.toContain("name=");
+  });
+
+  it("serves the turnstile site key and bypass flag from runtime env", async () => {
+    vi.stubEnv("MARKLENS_TURNSTILE_SITE_KEY", " runtime-site-key ");
+
+    const response = await getTurnstileConfig(
+      new Request("http://localhost/api/turnstile-config", {
+        headers: { "x-request-id": "edge-turnstile-1" },
+      }),
     );
-    expect(fetch).toHaveBeenNthCalledWith(
-      2,
-      "https://backend.example/name-check?name=MarkLens",
-      expect.objectContaining({ method: "GET" }),
-    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("x-request-id")).toBe("edge-turnstile-1");
+    expect(await response.json()).toEqual({
+      siteKey: "runtime-site-key",
+      devBypass: true, // beforeEach 의 MARKLENS_TURNSTILE_DEV_BYPASS=1
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it("rejects unsafe image path segments before contacting the backend", async () => {

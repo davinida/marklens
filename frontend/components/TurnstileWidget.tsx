@@ -32,10 +32,14 @@ export interface TurnstileHandle {
   reset: () => void;
 }
 
-const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY?.trim();
-const DEV_BYPASS =
-  process.env.NODE_ENV !== "production" &&
-  process.env.NEXT_PUBLIC_TURNSTILE_DEV_BYPASS === "1";
+// 사이트 키와 bypass 여부는 빌드 시점 인라인(NEXT_PUBLIC_) 대신 요청 시점의
+// 서버 설정(/api/turnstile-config)에서 받는다. 빌드 후 키를 교체하거나 bypass 를
+// 전환해도 재빌드 없이 반영된다 — 과거에는 이 경우 위젯이 "설정 없음"으로 죽었다.
+interface TurnstileConfig {
+  siteKey: string;
+  devBypass: boolean;
+}
+
 const FLEXIBLE_MIN_WIDTH = 300;
 
 const TurnstileWidget = forwardRef<
@@ -46,16 +50,41 @@ const TurnstileWidget = forwardRef<
   const containerRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<WidgetId | null>(null);
   const previousSizeRef = useRef<WidgetSize | null>(null);
+  const [config, setConfig] = useState<TurnstileConfig | null>(null);
+  const [configError, setConfigError] = useState(false);
   const [scriptReady, setScriptReady] = useState(false);
   const [scriptError, setScriptError] = useState(false);
   const [widgetSize, setWidgetSize] = useState<WidgetSize | null>(null);
 
-  useEffect(() => {
-    if (DEV_BYPASS) onTokenChange("dev-bypass");
-  }, [onTokenChange]);
+  const devBypass = config?.devBypass === true;
+  const siteKey = config?.siteKey ?? "";
 
   useEffect(() => {
-    if (DEV_BYPASS || !SITE_KEY) return;
+    const controller = new AbortController();
+    fetch("/api/turnstile-config", {
+      signal: controller.signal,
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(`turnstile-config ${response.status}`);
+        const data = (await response.json()) as Partial<TurnstileConfig>;
+        setConfig({
+          siteKey: typeof data.siteKey === "string" ? data.siteKey.trim() : "",
+          devBypass: data.devBypass === true,
+        });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setConfigError(true);
+      });
+    return () => controller.abort();
+  }, []);
+
+  useEffect(() => {
+    if (devBypass) onTokenChange("dev-bypass");
+  }, [devBypass, onTokenChange]);
+
+  useEffect(() => {
+    if (devBypass || !siteKey) return;
     const wrapper = wrapperRef.current;
     if (!wrapper) return;
 
@@ -76,7 +105,7 @@ const TurnstileWidget = forwardRef<
 
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, []);
+  }, [devBypass, siteKey]);
 
   useEffect(() => {
     if (
@@ -90,8 +119,8 @@ const TurnstileWidget = forwardRef<
 
   useEffect(() => {
     if (
-      DEV_BYPASS ||
-      !SITE_KEY ||
+      devBypass ||
+      !siteKey ||
       !scriptReady ||
       scriptError ||
       !widgetSize ||
@@ -103,7 +132,7 @@ const TurnstileWidget = forwardRef<
     if (!container || widgetRef.current !== null) return;
 
     widgetRef.current = window.turnstile.render(container, {
-      sitekey: SITE_KEY,
+      sitekey: siteKey,
       action: TURNSTILE_ACTION,
       theme: "light",
       language: "ko",
@@ -123,11 +152,11 @@ const TurnstileWidget = forwardRef<
       }
       widgetRef.current = null;
     };
-  }, [onTokenChange, scriptError, scriptReady, widgetSize]);
+  }, [devBypass, onTokenChange, scriptError, scriptReady, siteKey, widgetSize]);
 
   useImperativeHandle(ref, () => ({
     reset() {
-      if (DEV_BYPASS) {
+      if (devBypass) {
         onTokenChange("dev-bypass");
         return;
       }
@@ -138,11 +167,27 @@ const TurnstileWidget = forwardRef<
     },
   }));
 
-  if (DEV_BYPASS) {
+  if (configError) {
+    return (
+      <p role="alert" className="text-[12px] font-semibold text-caution-deep">
+        자동 요청 확인 설정을 불러오지 못했어요. 페이지를 새로고침해 주세요.
+      </p>
+    );
+  }
+
+  if (config === null) {
+    return (
+      <p role="status" className="text-[12px] text-sub">
+        자동 요청 확인을 불러오는 중이에요.
+      </p>
+    );
+  }
+
+  if (devBypass) {
     return <p className="text-[12px] text-sub">개발용 자동 요청 확인이 적용됐어요.</p>;
   }
 
-  if (!SITE_KEY) {
+  if (!siteKey) {
     return (
       <p role="alert" className="text-[12px] font-semibold text-caution-deep">
         자동 요청 확인 설정이 없어 검색을 시작할 수 없어요.

@@ -1,15 +1,10 @@
-import { act, render, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TurnstileWidget from "@/components/TurnstileWidget";
 
 const scriptState = vi.hoisted(() => ({
   onReady: null as (() => void) | null,
 }));
-
-vi.hoisted(() => {
-  vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "test-site-key");
-  vi.stubEnv("NEXT_PUBLIC_TURNSTILE_DEV_BYPASS", "0");
-});
 
 vi.mock("next/script", () => ({
   default: function MockScript({ onReady }: { onReady?: () => void }) {
@@ -27,7 +22,18 @@ function emitResize(width: number) {
   );
 }
 
-describe("TurnstileWidget sizing", () => {
+// 사이트 키·bypass 는 빌드 인라인이 아니라 /api/turnstile-config 런타임 응답에서 온다.
+function stubConfigFetch(config: { siteKey: string; devBypass: boolean }) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => ({
+      ok: true,
+      json: async () => config,
+    })) as unknown as typeof fetch,
+  );
+}
+
+describe("TurnstileWidget", () => {
   afterEach(() => {
     delete window.turnstile;
     resizeCallback = null;
@@ -46,6 +52,7 @@ describe("TurnstileWidget sizing", () => {
     }
 
     vi.stubGlobal("ResizeObserver", ResizeObserverMock);
+    stubConfigFetch({ siteKey: "test-site-key", devBypass: false });
     const renderWidget = vi
       .fn()
       .mockReturnValueOnce("compact-widget")
@@ -59,6 +66,8 @@ describe("TurnstileWidget sizing", () => {
     const onTokenChange = vi.fn();
 
     const view = render(<TurnstileWidget onTokenChange={onTokenChange} />);
+    // 런타임 설정 로딩이 끝나야 Script 가 마운트된다
+    await waitFor(() => expect(scriptState.onReady).not.toBeNull());
     act(() => scriptState.onReady?.());
 
     expect(renderWidget).not.toHaveBeenCalled();
@@ -83,5 +92,48 @@ describe("TurnstileWidget sizing", () => {
 
     view.unmount();
     expect(removeWidget).toHaveBeenCalledWith("flexible-widget");
+  });
+
+  it("applies dev bypass from runtime config and emits the bypass token", async () => {
+    stubConfigFetch({ siteKey: "", devBypass: true });
+    const onTokenChange = vi.fn();
+
+    render(<TurnstileWidget onTokenChange={onTokenChange} />);
+
+    await waitFor(() =>
+      expect(onTokenChange).toHaveBeenCalledWith("dev-bypass"),
+    );
+    expect(
+      screen.getByText("개발용 자동 요청 확인이 적용됐어요."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the missing-config alert when runtime config has no site key", async () => {
+    stubConfigFetch({ siteKey: "", devBypass: false });
+
+    render(<TurnstileWidget onTokenChange={vi.fn()} />);
+
+    expect(
+      await screen.findByText("자동 요청 확인 설정이 없어 검색을 시작할 수 없어요."),
+    ).toBeInTheDocument();
+  });
+
+  it("shows a reload alert when the runtime config request fails", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      })) as unknown as typeof fetch,
+    );
+
+    render(<TurnstileWidget onTokenChange={vi.fn()} />);
+
+    expect(
+      await screen.findByText(
+        "자동 요청 확인 설정을 불러오지 못했어요. 페이지를 새로고침해 주세요.",
+      ),
+    ).toBeInTheDocument();
   });
 });

@@ -78,7 +78,6 @@ const LEGACY_STATUS: Record<GradeCode, StatusCode> = {
   CAUTION: "STRONG_MATCH",
   REVIEW: "POSSIBLE_MATCH",
   LOW: "WEAK_MATCH",
-  SAFE: "NO_CLOSE_MATCH",
 };
 
 function clampSimilarity(value: number): number {
@@ -91,16 +90,48 @@ export function similarityPercentage(value: number): number {
   return Math.floor(clampSimilarity(value) * 1000) / 10;
 }
 
-function simTone(similarity: number): string {
-  if (similarity >= 0.75) return "text-caution-deep";
-  if (similarity >= 0.55) return "text-review-deep";
+// 색 구간 경계값의 단일 소스는 백엔드 응답(grade.thresholds)이다. 아래 폴백은
+// 이 값을 아직 보내지 않는 구버전 백엔드 응답에서만 쓴다(visual-v2와 동일 값).
+export interface SimThresholds {
+  strong: number;
+  possible: number;
+  weak: number;
+}
+
+export const FALLBACK_THRESHOLDS: SimThresholds = {
+  strong: 0.75,
+  possible: 0.55,
+  weak: 0.45,
+};
+
+export function resolveThresholds(
+  thresholds: Record<string, number> | undefined,
+): SimThresholds | null {
+  const strong = thresholds?.strong_match;
+  const possible = thresholds?.possible_match;
+  const weak = thresholds?.weak_match;
+  if (
+    typeof strong === "number" &&
+    typeof possible === "number" &&
+    typeof weak === "number" &&
+    weak < possible &&
+    possible < strong
+  ) {
+    return { strong, possible, weak };
+  }
+  return null;
+}
+
+function simTone(similarity: number, t: SimThresholds): string {
+  if (similarity >= t.strong) return "text-caution-deep";
+  if (similarity >= t.possible) return "text-review-deep";
   return "text-blue-dark";
 }
 
-function simBar(similarity: number): string {
-  if (similarity >= 0.75) return "bg-caution";
-  if (similarity >= 0.55) return "bg-review";
-  if (similarity >= 0.45) return "bg-low";
+function simBar(similarity: number, t: SimThresholds): string {
+  if (similarity >= t.strong) return "bg-caution";
+  if (similarity >= t.possible) return "bg-review";
+  if (similarity >= t.weak) return "bg-low";
   return "bg-blue-dark";
 }
 
@@ -162,7 +193,13 @@ function Info({ label, value }: { label: string; value: string | null }) {
   );
 }
 
-function MatchRow({ match }: { match: SearchMatch }) {
+function MatchRow({
+  match,
+  thresholds,
+}: {
+  match: SearchMatch;
+  thresholds: SimThresholds;
+}) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
   const trademark = match.trademark;
@@ -203,7 +240,7 @@ function MatchRow({ match }: { match: SearchMatch }) {
                 : "상표 상세 정보가 연결되지 않았어요"}
             </span>
           </span>
-          <span className={`shrink-0 text-right ${simTone(match.similarity)}`}>
+          <span className={`shrink-0 text-right ${simTone(match.similarity, thresholds)}`}>
             <span className="block text-[18px] font-extrabold tnum">{score}%</span>
             <span className="block text-[9.5px] font-semibold">시각 유사도</span>
           </span>
@@ -215,7 +252,7 @@ function MatchRow({ match }: { match: SearchMatch }) {
         </span>
         <span className="mt-2.5 block h-1.5 overflow-hidden rounded-sm bg-low-bg">
           <span
-            className={`block h-full ${simBar(match.similarity)}`}
+            className={`block h-full ${simBar(match.similarity, thresholds)}`}
             style={{ width: `${score}%` }}
           />
         </span>
@@ -267,20 +304,30 @@ function MatchRow({ match }: { match: SearchMatch }) {
 function ScoreScale({
   value,
   thresholdVersion,
+  thresholds,
+  thresholdsFromPayload,
 }: {
   value: number;
   thresholdVersion?: string;
+  thresholds: SimThresholds;
+  thresholdsFromPayload: boolean;
 }) {
   const score = similarityPercentage(value);
-  const knownThresholds = thresholdVersion === "visual-v2-uncalibrated";
+  // 응답이 경계값을 실어 보내면 그대로 띠를 그린다. 구버전 응답은 폴백 값이
+  // 유효한 버전(visual-v2-uncalibrated)일 때만 띠를 그리고, 아니면 중립 바.
+  const knownThresholds =
+    thresholdsFromPayload || thresholdVersion === "visual-v2-uncalibrated";
   const thresholdsId = useId();
+  const weakPct = Math.round(thresholds.weak * 100);
+  const possiblePct = Math.round(thresholds.possible * 100);
+  const strongPct = Math.round(thresholds.strong * 100);
 
   return (
     <div>
       <div className="flex items-end justify-between gap-4">
         <div>
           <p className="text-[11px] font-semibold text-sub">최고 시각 유사도</p>
-          <p className={`mt-0.5 text-[28px] font-extrabold tnum ${simTone(value)}`}>
+          <p className={`mt-0.5 text-[28px] font-extrabold tnum ${simTone(value, thresholds)}`}>
             {score}%
           </p>
         </div>
@@ -305,10 +352,10 @@ function ScoreScale({
         <div className="flex h-3 overflow-hidden rounded-sm">
           {knownThresholds ? (
             <>
-              <span className="w-[45%] bg-blue/45" />
-              <span className="w-[10%] bg-low" />
-              <span className="w-[20%] bg-review" />
-              <span className="w-[25%] bg-caution" />
+              <span className="bg-blue/45" style={{ width: `${weakPct}%` }} />
+              <span className="bg-low" style={{ width: `${possiblePct - weakPct}%` }} />
+              <span className="bg-review" style={{ width: `${strongPct - possiblePct}%` }} />
+              <span className="bg-caution" style={{ width: `${100 - strongPct}%` }} />
             </>
           ) : (
             <span className="w-full bg-blue/55" />
@@ -319,13 +366,20 @@ function ScoreScale({
         <>
           <div aria-hidden className="relative mt-1.5 h-3 text-[9px] font-semibold text-sub tnum">
             <span className="absolute left-0">0</span>
-            <span className="absolute left-[45%] -translate-x-1/2">45</span>
-            <span className="absolute left-[55%] -translate-x-1/2">55</span>
-            <span className="absolute left-[75%] -translate-x-1/2">75</span>
+            <span className="absolute -translate-x-1/2" style={{ left: `${weakPct}%` }}>
+              {weakPct}
+            </span>
+            <span className="absolute -translate-x-1/2" style={{ left: `${possiblePct}%` }}>
+              {possiblePct}
+            </span>
+            <span className="absolute -translate-x-1/2" style={{ left: `${strongPct}%` }}>
+              {strongPct}
+            </span>
             <span className="absolute right-0">100</span>
           </div>
           <p id={thresholdsId} className="sr-only">
-            점수 구간은 45 미만, 45 이상 55 미만, 55 이상 75 미만, 75 이상입니다.
+            점수 구간은 {weakPct} 미만, {weakPct} 이상 {possiblePct} 미만, {possiblePct} 이상{" "}
+            {strongPct} 미만, {strongPct} 이상입니다.
           </p>
         </>
       )}
@@ -366,7 +420,13 @@ function EvidenceMetric({
   );
 }
 
-function MatchDistribution({ matches }: { matches: SearchMatch[] }) {
+function MatchDistribution({
+  matches,
+  thresholds,
+}: {
+  matches: SearchMatch[];
+  thresholds: SimThresholds;
+}) {
   const visible = matches.slice(0, 8);
   if (!visible.length) return null;
 
@@ -384,7 +444,7 @@ function MatchDistribution({ matches }: { matches: SearchMatch[] }) {
               <span className="text-[10px] font-bold text-sub tnum">#{match.rank}</span>
               <span className="relative h-5 overflow-hidden rounded-sm bg-low-bg">
                 <span
-                  className={`block h-full ${simBar(match.similarity)}`}
+                  className={`block h-full ${simBar(match.similarity, thresholds)}`}
                   style={{ width: `${score}%` }}
                 />
                 <span className="absolute inset-0 truncate px-2 text-[9.5px] font-semibold leading-5 text-ink mix-blend-multiply">
@@ -494,8 +554,10 @@ function AnalysisScope({ nameCheck }: { nameCheck?: NameCheckResult | null }) {
 function VisualComparison({
   queryPreview,
   topMatch,
+  thresholds,
 }: {
   queryPreview: string | null;
+  thresholds: SimThresholds;
   topMatch: SearchMatch | undefined;
 }) {
   const topName = topMatch ? matchName(topMatch) : "비교 후보 없음";
@@ -510,7 +572,7 @@ function VisualComparison({
             로고 나란히 비교
           </h2>
         </div>
-        <span className={`text-[24px] font-extrabold tnum ${topMatch ? simTone(topMatch.similarity) : "text-sub"}`}>
+        <span className={`text-[24px] font-extrabold tnum ${topMatch ? simTone(topMatch.similarity, thresholds) : "text-sub"}`}>
           {score}%
         </span>
       </div>
@@ -564,6 +626,8 @@ export default function ResultView({
   const statusCode = grade.status_code ?? LEGACY_STATUS[grade.grade_code];
   const statusName = grade.status_name ?? grade.grade_name;
   const view = GRADE_VIEW[statusCode];
+  const payloadThresholds = resolveThresholds(grade.thresholds);
+  const thresholds = payloadThresholds ?? FALLBACK_THRESHOLDS;
   const dataset = result.dataset_info;
   const topMatch = result.matches[0];
   const topScore = similarityPercentage(grade.top1_similarity);
@@ -649,7 +713,11 @@ export default function ResultView({
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.05fr)_minmax(360px,0.95fr)]">
         <div className="grid min-w-0 gap-4">
-          <VisualComparison queryPreview={queryPreview} topMatch={topMatch} />
+          <VisualComparison
+            queryPreview={queryPreview}
+            topMatch={topMatch}
+            thresholds={thresholds}
+          />
 
           <section aria-labelledby="evidence-title" className="border-y border-line bg-card px-5 py-5 sm:px-6">
             <div className="flex items-center gap-2">
@@ -667,6 +735,8 @@ export default function ResultView({
               <ScoreScale
                 value={grade.top1_similarity}
                 thresholdVersion={grade.threshold_version}
+                thresholds={thresholds}
+                thresholdsFromPayload={payloadThresholds !== null}
               />
             </div>
 
@@ -694,7 +764,7 @@ export default function ResultView({
               />
             </div>
 
-            <MatchDistribution matches={result.matches} />
+            <MatchDistribution matches={result.matches} thresholds={thresholds} />
             <AnalysisScope nameCheck={nameCheck} />
           </section>
         </div>
@@ -735,6 +805,7 @@ export default function ResultView({
                   <MatchRow
                     key={`${match.rank}-${match.이미지파일 ?? "none"}`}
                     match={match}
+                    thresholds={thresholds}
                   />
                 ))}
               </ul>

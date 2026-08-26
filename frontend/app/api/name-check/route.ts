@@ -26,24 +26,16 @@ async function callBackend(
   request: Request,
   requestId: string,
 ): Promise<Response> {
+  // 백엔드의 deprecated GET 경로가 제거되어(질의가 URL/프록시 로그에 남는 문제)
+  // 본문 기반 POST 계약만 사용한다 — GET 폴백도 함께 제거됨.
   const config = getBackendConfig();
   const headers = backendHeaders(config, requestId, {
     "content-type": "application/json",
   });
-  const post = await fetch(`${config.baseUrl}/name-check`, {
+  return fetch(`${config.baseUrl}/name-check`, {
     method: "POST",
     headers,
     body: JSON.stringify({ name }),
-    cache: "no-store",
-    redirect: "error",
-    signal: backendSignal(request.signal),
-  });
-
-  if (![404, 405].includes(post.status)) return post;
-
-  return fetch(`${config.baseUrl}/name-check?name=${encodeURIComponent(name)}`, {
-    method: "GET",
-    headers: backendHeaders(config, requestId),
     cache: "no-store",
     redirect: "error",
     signal: backendSignal(request.signal),

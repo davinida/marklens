@@ -29,7 +29,8 @@ export const SearchMatchSchema = z
   })
   .passthrough();
 
-export const GradeCodeSchema = z.enum(["CAUTION", "REVIEW", "LOW", "SAFE"]);
+// 백엔드 scoring 은 SAFE 를 절대 내보내지 않는다(2026-08 개정) — 수용 목록에서도 제거.
+export const GradeCodeSchema = z.enum(["CAUTION", "REVIEW", "LOW"]);
 export const StatusCodeSchema = z.enum([
   "STRONG_MATCH",
   "POSSIBLE_MATCH",
@@ -47,6 +48,8 @@ export const GradeInfoSchema = z
     uncertainty_reasons: z.array(z.string()).optional(),
     scored_candidate_count: z.number().int().positive().optional(),
     threshold_version: z.string().min(1).optional(),
+    // 판정에 사용한 경계값(단일 소스). 구버전 백엔드 호환을 위해 optional.
+    thresholds: z.record(z.string(), z.number().finite()).optional(),
     scope: z.literal("visual_similarity_only").optional(),
     calibrated: z.literal(false).optional(),
     legal_conclusion: z.literal(false).optional(),
