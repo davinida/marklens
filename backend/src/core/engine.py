@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import sys
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Optional
@@ -57,6 +58,9 @@ class EngineState:
     storage_mode: str = "file"  # "file" | "db" (config.STORAGE_MODE 복사본)
     trademark_count: int = 0  # /health 용. db 모드에선 startup 시점의 DB 건수
     artifact_generation_id: str | None = None
+    # 로딩(게시)마다 새로 찍는 식별자. 게시 데이터에 파생된 캐시(예: name-check 의
+    # local_image_url)를 재게시 시점에 자연 무효화하는 키로 쓴다.
+    load_token: str = ""
     ready: bool = False
 
 
@@ -365,6 +369,7 @@ def load_all() -> None:
     ImageDraw.Draw(_dummy).rectangle((16, 16, 48, 48), fill="black")
     encode_image(_dummy)
 
+    state.load_token = uuid.uuid4().hex
     state.ready = True
     logger.info(
         "리소스 로딩 완료: index=%d건, trademark=%d건, mode=%s",

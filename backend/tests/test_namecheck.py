@@ -37,7 +37,7 @@ def test_engine_file_lookup_normalizes_application_number(monkeypatch):
     assert result == {"4020210000001": trademark}
 
 
-def test_openapi_exposes_post_body_and_deprecates_get():
+def test_openapi_exposes_post_body_and_get_is_removed():
     app = FastAPI()
     app.include_router(namecheck.router)
     openapi = app.openapi()
@@ -45,7 +45,8 @@ def test_openapi_exposes_post_body_and_deprecates_get():
 
     assert "requestBody" in operations["post"]
     assert operations["post"].get("deprecated") is not True
-    assert operations["get"]["deprecated"] is True
+    # deprecated GET 호환 경로는 한 릴리스 유지 후 제거됨(질의가 URL 로그에 남는 문제)
+    assert "get" not in operations
     candidate_properties = openapi["components"]["schemas"]["NameCheckCandidate"][
         "properties"
     ]
@@ -151,6 +152,59 @@ def test_concurrent_same_name_uses_single_upstream_call(monkeypatch):
 
     assert calls == ["동시요청"]
     assert sorted(response.cached for response in responses) == [False, True]
+
+
+def test_concurrent_distinct_names_are_not_serialized(monkeypatch):
+    """전역 락 시절엔 서로 다른 질의도 줄 서서 기다렸다 — per-key 락 회귀 방지."""
+    _reset_cache(monkeypatch)
+    result = kipris_client.NameSearchResult([], 0, True)
+    slow_entered = threading.Event()
+    release_slow = threading.Event()
+    calls = []
+
+    def blocking_search(query):
+        calls.append(query)
+        if query == "느린질의":
+            slow_entered.set()
+            assert release_slow.wait(timeout=2)
+        return result
+
+    monkeypatch.setattr(kipris_client, "name_match_search", blocking_search)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        slow = pool.submit(namecheck._run_name_check, "느린질의")
+        assert slow_entered.wait(timeout=1)
+        # 느린 질의가 업스트림을 잡고 있는 동안에도 다른 질의는 완료돼야 한다
+        fast_response = pool.submit(namecheck._run_name_check, "빠른질의").result(
+            timeout=2
+        )
+        release_slow.set()
+        slow_response = slow.result(timeout=2)
+
+    assert sorted(calls) == ["느린질의", "빠른질의"]
+    assert fast_response.cached is False and slow_response.cached is False
+    # 사용이 끝난 질의 키 락은 참조 계수로 회수되어 무한 성장하지 않는다
+    assert namecheck._upstream_locks == {}
+
+
+def test_cache_expires_when_index_is_republished(monkeypatch):
+    """캐시 키에 게시 토큰(load_token)이 섞여, 재게시 후 이전 항목을 반환하지 않는다."""
+    _reset_cache(monkeypatch)
+    result = kipris_client.NameSearchResult([], 0, True)
+    calls = []
+    monkeypatch.setattr(
+        kipris_client,
+        "name_match_search",
+        lambda query: (calls.append(query), result)[1],
+    )
+    monkeypatch.setattr(engine.state, "load_token", "generation-1")
+
+    namecheck._run_name_check("재게시질의")
+    cached = namecheck._run_name_check("재게시질의")
+    assert cached.cached is True and len(calls) == 1
+
+    monkeypatch.setattr(engine.state, "load_token", "generation-2")
+    refreshed = namecheck._run_name_check("재게시질의")
+    assert refreshed.cached is False and len(calls) == 2
 
 
 def test_post_route_accepts_json_body(monkeypatch):

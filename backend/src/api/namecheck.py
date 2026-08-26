@@ -2,16 +2,18 @@
 POST /name-check — 입력 상표명의 동일 명칭 선행 등록상표 존재 여부 (백엔드-7).
 
 KIPRIS 상표명완전일치 API 를 실시간 호출하되, 동일 질의는 TTL 캐시로 재사용해
-월 1,000회 한도를 보호한다. 기존 GET 은 한 릴리스 동안 deprecated 로 유지한다.
+월 1,000회 한도를 보호한다. (deprecated GET 호환 경로는 한 릴리스 유지 후 제거됨)
 """
 
 import logging
 import os
 import threading
+from contextlib import contextmanager
 from datetime import datetime, timezone
+from typing import Iterator
 
 from cachetools import TTLCache
-from fastapi import APIRouter, HTTPException, Query, Request, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from ..core import appno, config, engine, kipris_client, storage
 from ..core.ratelimit import limiter
@@ -30,7 +32,14 @@ CACHE_MAX_ENTRIES: int = int(os.getenv("KIPRIS_NAME_CACHE_MAX", "1024"))
 # {정규화된 질의: summary dict}. TTLCache 는 스레드 안전하지 않아 락으로 감싼다.
 _cache: TTLCache = TTLCache(maxsize=CACHE_MAX_ENTRIES, ttl=CACHE_TTL_SEC)
 _cache_lock = threading.Lock()
-_upstream_lock = threading.Lock()
+
+# 캐시 미스의 업스트림 호출은 "같은 질의"끼리만 직렬화한다(single-flight).
+# 과거의 전역 락은 서로 다른 질의도 줄 세워, 느린 KIPRIS 응답(최대 5페이지 × 15초)
+# 하나가 모든 name-check 워커 스레드를 잡아두는 head-of-line 블로킹을 만들었다.
+_upstream_locks: dict[str, threading.Lock] = {}
+_upstream_lock_refs: dict[str, int] = {}
+_upstream_locks_guard = threading.Lock()
+
 SOURCE_NAME = "KIPRIS Plus trademarkNameMatchSearchInfo"
 # 상세 배열은 요약 집계와 별개로 응답 크기를 제한한다. 정확 일치·등록 후보를 먼저
 # 배치하며, 전체 검사 여부는 기존 complete/scanned_count 계약으로 계속 표현한다.
@@ -51,6 +60,38 @@ def _cache_get(key: str) -> dict | None:
 def _cache_put(key: str, value: dict) -> None:
     with _cache_lock:
         _cache[key] = value
+
+
+@contextmanager
+def _upstream_lock_for(key: str) -> Iterator[None]:
+    """질의 키별 single-flight 락. 참조 계수로 미사용 락을 즉시 회수해 무한 성장 방지."""
+    with _upstream_locks_guard:
+        lock = _upstream_locks.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _upstream_locks[key] = lock
+        _upstream_lock_refs[key] = _upstream_lock_refs.get(key, 0) + 1
+    try:
+        with lock:
+            yield
+    finally:
+        with _upstream_locks_guard:
+            remaining = _upstream_lock_refs.get(key, 1) - 1
+            if remaining <= 0:
+                _upstream_locks.pop(key, None)
+                _upstream_lock_refs.pop(key, None)
+            else:
+                _upstream_lock_refs[key] = remaining
+
+
+def _engine_state_token() -> str:
+    """캐시 키에 섞는 현재 게시 데이터 식별자.
+
+    캐시된 요약에는 현재 인덱스 기준의 local_image_url 이 붙어 있다(_build_candidates).
+    인덱스가 다시 게시되면(load_token 변경) 이전 항목이 키 불일치로 자연 만료되어,
+    최대 TTL(기본 24h) 동안 깨진 이미지 링크를 돌려주던 문제를 막는다.
+    """
+    return getattr(engine.state, "load_token", "") or "unloaded"
 
 
 def _to_message(summary: dict) -> str:
@@ -201,7 +242,8 @@ def _run_name_check(name: str) -> NameCheckResponse:
         )
     # KIPRIS가 대소문자·전각·호환문자를 동일한 검색으로 처리한다는 공급자 계약이
     # 없다. 서로 다른 원문 질의의 결과를 섞지 않도록 trim 이외에는 정규화하지 않는다.
-    cache_key = query
+    # 게시 데이터 식별자를 함께 묶어 인덱스 재게시 시 캐시가 자연 무효화되게 한다.
+    cache_key = f"{query}\x1f{_engine_state_token()}"
 
     cached = _cache_get(cache_key)
     if cached is not None:
@@ -209,8 +251,9 @@ def _run_name_check(name: str) -> NameCheckResponse:
         return NameCheckResponse(**payload, cached=True, message=_to_message(cached))
 
     # TTLCache itself is protected above, but a cache miss must also be
-    # single-flight or simultaneous requests consume the external quota twice.
-    with _upstream_lock:
+    # single-flight (per query key) or simultaneous requests consume the
+    # external quota twice.
+    with _upstream_lock_for(cache_key):
         cached = _cache_get(cache_key)
         if cached is not None:
             payload = {**cached, "query": query}
@@ -221,9 +264,10 @@ def _run_name_check(name: str) -> NameCheckResponse:
         try:
             result = kipris_client.name_match_search(query)
         except kipris_client.CallBudgetExceeded:
+            # 일일/월간 어느 예산이든 초과면 같은 429 — 상세 사유는 서버 로그로만.
             raise HTTPException(
                 status_code=429,
-                detail="이번 달 상표명 확인 한도에 도달했습니다.",
+                detail="상표명 확인 호출 한도에 도달했습니다. 한도 초기화 후 다시 시도하세요.",
             ) from None
         except kipris_client.KiprisConfigError as e:
             logger.warning(
@@ -274,11 +318,5 @@ def name_check_post(
     return _run_name_check(payload.name)
 
 
-@router.get("/name-check", response_model=NameCheckResponse, deprecated=True)
-@limiter.limit(config.NAMECHECK_RATE_LIMIT)
-def name_check(
-    request: Request,
-    name: str = Query(..., min_length=1, max_length=100, description="확인할 상표명"),
-) -> NameCheckResponse:
-    """한 릴리스 동안 유지하는 deprecated GET 호환 경로."""
-    return _run_name_check(name)
+# deprecated GET /name-check 은 예고대로 한 릴리스 유지 후 제거됨(2026-08) —
+# 질의가 URL/프록시 로그에 남는 문제 때문에 POST 본문 계약만 지원한다.

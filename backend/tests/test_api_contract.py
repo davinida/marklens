@@ -276,6 +276,6 @@ def test_images_missing_404(client):
 def test_name_check_without_key_503(client):
     if config.STORAGE_MODE and __import__("os").getenv("KIPRIS_ACCESS_KEY"):
         pytest.skip("KIPRIS 키가 설정된 환경 — 실호출 방지를 위해 skip")
-    r = client.get("/name-check", params={"name": "삼성전자"})
+    r = client.post("/name-check", json={"name": "삼성전자"})
     assert r.status_code == 503
     assert "KIPRIS" in r.json()["detail"]
