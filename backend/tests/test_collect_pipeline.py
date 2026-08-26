@@ -18,6 +18,7 @@ main() 은 항상 --dry-run + config.DATABASE_URL="" 로 이중 차단한다(실
 import json
 import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -371,6 +372,7 @@ def test_plan_is_offline_and_reports_budget(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cp.config, "DATABASE_URL", "")
     monkeypatch.setattr(kc, "ACCESS_KEY", "configured-secret")
     monkeypatch.setattr(kc.limiter, "used_this_month", lambda: 4)
+    monkeypatch.setattr(kc.limiter, "used_today", lambda: 4)
     monkeypatch.setattr(
         kc,
         "advanced_search_raw",
@@ -412,9 +414,95 @@ def test_plan_is_offline_and_reports_budget(tmp_path, monkeypatch, capsys):
     assert plan["search_timeout_seconds"] == 30.0
     assert plan["quota"]["used"] == 4
     assert plan["quota"]["remaining"] == 946
+    assert plan["quota"]["used_today"] == 4
+    assert plan["quota"]["daily_remaining"] == kc.DAILY_CALL_BUDGET - 4
+    assert plan["quota"]["daily_hard_max_fits"] is True
+    assert plan["warnings"] == []
     assert plan["environment"]["storage_target"] == "file-staging"
     assert plan["ready_for_collection"] is True
     assert not stage.exists()
+
+
+def _daily_budget_plan_argv(stage: Path) -> list[str]:
+    """일일 예산 분기 검증용 최소 --plan 인자 (search_min=1, counted_hard_max=2)."""
+    return [
+        "collect_pipeline",
+        "--applicant",
+        "주식회사 제너시스비비큐",
+        "--plan",
+        "--limit",
+        "50",
+        "--max-pages-per-source",
+        "1",
+        "--file-staging",
+        str(stage),
+    ]
+
+
+def _prepare_daily_budget_plan(
+    tmp_path, monkeypatch, *, daily_budget: int, used_today: int
+) -> Path:
+    data_dir = tmp_path / "data"
+    stage = data_dir / "staging" / "bbq_29_43.json"
+    monkeypatch.setattr(cp.paths, "ML_DATA_DIR", data_dir)
+    monkeypatch.setattr(cp.config, "DATABASE_URL", "")
+    monkeypatch.setattr(kc, "ACCESS_KEY", "configured-secret")
+    monkeypatch.setattr(kc, "DAILY_CALL_BUDGET", daily_budget)
+    monkeypatch.setattr(kc.limiter, "used_this_month", lambda: 4)
+    monkeypatch.setattr(kc.limiter, "used_today", lambda: used_today)
+    monkeypatch.setattr(
+        kc,
+        "advanced_search_raw",
+        lambda *_args, **_kwargs: pytest.fail("--plan must not call KIPRIS"),
+    )
+    monkeypatch.setattr(cp.sys, "argv", _daily_budget_plan_argv(stage))
+    return stage
+
+
+def test_plan_blocks_when_daily_budget_is_exhausted(tmp_path, monkeypatch, capsys):
+    # 월 잔여는 946회로 넉넉해도 오늘 예산이 끝났으면 통과시키면 안 된다 —
+    # 통과시키면 첫 호출에서 CallBudgetExceeded 로 [중단](exit 3) 한다.
+    _prepare_daily_budget_plan(
+        tmp_path, monkeypatch, daily_budget=80, used_today=80
+    )
+
+    assert cp.main() == 0
+    captured = capsys.readouterr()
+    plan = json.loads(captured.out.removeprefix("[계획] "))
+    assert plan["quota"]["remaining"] == 946
+    assert plan["quota"]["daily_budget"] == 80
+    assert plan["quota"]["used_today"] == 80
+    assert plan["quota"]["daily_remaining"] == 0
+    assert plan["quota"]["daily_hard_max_fits"] is False
+    assert plan["ready_for_api_preview"] is False
+    assert plan["ready_for_collection"] is False
+    assert "KIPRIS_DAILY_BUDGET" in plan["warnings"][0]
+    assert "[경고]" in captured.err
+
+
+def test_plan_warns_when_estimated_calls_exceed_daily_remaining(
+    tmp_path, monkeypatch, capsys
+):
+    # 오늘 1회만 남았고 예상 최대 호출은 2회 — 시작은 가능하니 막지 않되,
+    # 도중에 [중단] 후 다음 날 커서에서 이어받는다는 사실을 미리 알린다.
+    _prepare_daily_budget_plan(
+        tmp_path, monkeypatch, daily_budget=80, used_today=79
+    )
+
+    assert cp.main() == 0
+    captured = capsys.readouterr()
+    plan = json.loads(captured.out.removeprefix("[계획] "))
+    assert plan["estimated_calls"]["counted_hard_max"] == 2
+    assert plan["quota"]["daily_remaining"] == 1
+    assert plan["quota"]["daily_hard_max_fits"] is False
+    assert plan["ready_for_api_preview"] is True
+    assert plan["ready_for_collection"] is True
+    assert len(plan["warnings"]) == 1
+    warning = plan["warnings"][0]
+    assert "KIPRIS_DAILY_BUDGET" in warning
+    assert "[중단]" in warning
+    assert "커서" in warning
+    assert warning in captured.err
 
 
 def test_nice_class_filter_and_distribution_are_reported(

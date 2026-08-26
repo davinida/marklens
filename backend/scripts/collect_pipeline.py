@@ -1022,15 +1022,46 @@ def build_collection_plan(
 
     enrich_max = record_cap if enrich_biblio else 0
     used: int | None = None
+    used_today: int | None = None
     counter_error: str | None = None
     try:
         used = kipris_client.limiter.used_this_month()
+        used_today = kipris_client.limiter.used_today()
     except kipris_client.KiprisError as exc:
         counter_error = type(exc).__name__
 
     budget = kipris_client.MONTHLY_CALL_BUDGET
     remaining = max(0, budget - used) if used is not None else None
     counted_max = search_max + enrich_max
+
+    # 일일 예산은 월 예산과 별개의 가드다(0 이하면 비활성). 여기서 검사하지 않으면
+    # 월 잔여만 보고 통과시킨 뒤 예산이 걸리는 호출에서 [중단](exit 3)으로 끝난다.
+    daily_budget = kipris_client.DAILY_CALL_BUDGET
+    daily_enabled = daily_budget > 0
+    daily_remaining = (
+        max(0, daily_budget - used_today)
+        if daily_enabled and used_today is not None
+        else None
+    )
+    daily_allows_preview = not daily_enabled or (
+        daily_remaining is not None and daily_remaining >= search_min
+    )
+
+    warnings: list[str] = []
+    if daily_enabled and daily_remaining is not None and not target_already_met:
+        if daily_remaining < search_min:
+            warnings.append(
+                "오늘 남은 KIPRIS 호출 예산이 부족합니다 "
+                f"(일일 {daily_budget}회 중 {used_today}회 사용, 최소 필요 {search_min}회). "
+                "KIPRIS_DAILY_BUDGET 을 올리거나 자정(UTC) 초기화 후 다시 실행하세요."
+            )
+        elif counted_max > daily_remaining:
+            warnings.append(
+                f"예상 최대 호출 {counted_max}회가 오늘 남은 예산 {daily_remaining}회"
+                f"(일일 {daily_budget}회 중 {used_today}회 사용)를 초과합니다. "
+                "KIPRIS_DAILY_BUDGET 을 올리거나, 일일 예산이 소진되면 [중단] 후 "
+                "다음 날 재실행 시 커서에서 이어받게 됩니다."
+            )
 
     endpoint_safe = True
     endpoint_error: str | None = None
@@ -1061,6 +1092,7 @@ def build_collection_plan(
         and endpoint_safe
         and remaining is not None
         and remaining >= search_min
+        and daily_allows_preview
     )
     ready_for_collection = ready_for_api_preview and (
         database_configured or staging_ready
@@ -1102,8 +1134,14 @@ def build_collection_plan(
             "monthly_budget": budget,
             "used": used,
             "remaining": remaining,
+            "daily_budget": daily_budget,
+            "used_today": used_today,
+            "daily_remaining": daily_remaining,
             "counter_error": counter_error,
             "hard_max_fits": remaining is not None and counted_max <= remaining,
+            "daily_hard_max_fits": not daily_enabled or (
+                daily_remaining is not None and counted_max <= daily_remaining
+            ),
         },
         "environment": {
             "kipris_key_configured": key_configured,
@@ -1117,6 +1155,7 @@ def build_collection_plan(
         },
         "ready_for_api_preview": ready_for_api_preview,
         "ready_for_collection": ready_for_collection,
+        "warnings": warnings,
     }
 
 
@@ -1295,6 +1334,8 @@ def main() -> int:
             target_total=args.target_total,
         )
         print("[계획] " + json.dumps(plan, ensure_ascii=False, sort_keys=True))
+        for warning in plan["warnings"]:
+            print(f"[경고] {warning}", file=sys.stderr)
         return 0
 
     if args.file_staging:

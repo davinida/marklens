@@ -50,8 +50,17 @@ services:
       MARKLENS_SEARCH_CONCURRENCY: "2"
       MARKLENS_SEARCH_RATELIMIT: 120/minute
       MARKLENS_NAMECHECK_RATELIMIT: 60/minute
+      # /images 는 브라우저가 아니라 frontend BFF 가 서버사이드로 호출한다 — 백엔드에는
+      # 항상 frontend 컨테이너 단일 IP 로 보이므로 이 값은 IP별 한도가 아니라 사이트 전체
+      # 백스톱이다(클라이언트별 한도는 deploy/nginx.conf 의 images_per_ip 존이 담당).
+      # 검색 백스톱 120/minute × 결과 화면당 최대 top_k(20)장 = 2400/minute.
+      MARKLENS_IMAGES_RATELIMIT: ${MARKLENS_IMAGES_RATELIMIT:-2400/minute}
       KIPRIS_ACCESS_KEY: ${KIPRIS_ACCESS_KEY:?set rotated KIPRIS_ACCESS_KEY}
       KIPRIS_BASE_URL: https://plus.kipris.or.kr/
+      # 일일 호출 예산. 미캐시 name-check 1건 = 최대 5회 호출(NAME_SEARCH_MAX_PAGES)이라
+      # 기본 80 이면 하루 약 16건에서 소진된다. 정책값은 유지하되 조용히 걸리지 않도록
+      # 여기에 노출한다(0 이하면 일일 검사 비활성).
+      KIPRIS_DAILY_BUDGET: ${KIPRIS_DAILY_BUDGET:-80}
       KIPRIS_COUNTER_PATH: /state/kipris_call_count.json
       HF_HOME: /models/huggingface
     volumes:
