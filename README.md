@@ -110,26 +110,43 @@ manifest가 없거나 모델·전처리·해시 계약이 다르면 기동하지
 
 #### ml/data 입수와 머신 간 이전
 
-`ml/data/`는 저작권 문제로 Git에 포함되지 않으며, 팀 공유 압축본으로 전달받아
-배치합니다. 데이터가 있는 머신에서 새 머신으로 옮기는 절차:
+`ml/data/`는 저작권 문제로 이 공개 저장소에는 포함되지 않으며, 팀 전용
+private 저장소 <https://github.com/jhsoo0211/marklens-data> 로 관리합니다
+(협업자 권한 필요, 공개 재배포 금지).
 
-1. 원본 머신에서 `ml/data` 전체를 압축합니다.
-   - PowerShell: `Compress-Archive -Path ml\data -DestinationPath marklens-data.zip`
-   - bash: `zip -r marklens-data.zip ml/data`
-2. 새 머신의 프로젝트 루트에 같은 구조(`ml/data/...`)로 풉니다.
-3. file 모드는 그대로 기동하면 됩니다. db 모드는 먼저 DB에 적재합니다:
+입수 방법(셋 중 하나):
+
+- **A. git clone(권장)** — 프로젝트 루트에서
+  `git clone https://github.com/jhsoo0211/marklens-data.git ml/data`.
+  이후 갱신은 `git -C ml/data pull`로 받습니다.
+- **B. GitHub ZIP** — 저장소 페이지의 Code → Download ZIP을 받아 풀면
+  `marklens-data-main/` 폴더가 나옵니다. 그 안의 내용물(`images/`, `index/`,
+  `kipris_metadata.json` 등)이 프로젝트 루트의 `ml/data/` 바로 아래에 오도록
+  옮깁니다(최종 경로 예: `ml/data/index/kipris.faiss`).
+- **C. 팀 공유 압축본(오프라인 폴백)** — 데이터가 있는 머신에서 압축해 전달:
+  - PowerShell: `Compress-Archive -Path ml\data -DestinationPath marklens-data.zip`
+  - bash: `zip -r marklens-data.zip ml/data`
+
+  새 머신의 프로젝트 루트에 같은 구조(`ml/data/...`)로 풉니다.
+
+배치 후 공통 절차:
+
+1. file 모드는 그대로 기동하면 됩니다. db 모드는 먼저 DB에 적재합니다:
    `ml\venv\Scripts\python.exe -m backend.scripts.migrate_json_to_db --prune`
-4. 서버 기동 후 `/health`의 `index_size`·`trademark_count`·
+2. 서버 기동 후 `/health`의 `index_size`·`trademark_count`·
    `artifact_generation_id`가 원본 머신과 같은지 확인합니다.
 
 주의사항:
 
 - `ml/data/kipris_call_count.json`은 KIPRIS 월 쿼터 카운터입니다. 머신 간 값이
   병합되지 않으므로 실제 수집을 수행한 머신의 값이 정본이며, 더 낮은 값으로
-  덮어쓰면 안 됩니다.
-- 2026-08 기준 1,000건 세대(generation `20260815T023540Z-0d79c662f4c8`)는 수집을
-  수행한 개발 머신에만 있습니다. 다른 머신은 위 이전 절차를 거치기 전까지
-  2026-07의 100건 레거시 세트로 동작합니다.
+  덮어쓰면 안 됩니다. 같은 이유로 데이터 저장소에서는 `.gitignore`로 제외되어
+  있습니다 — 새 머신에 이 파일이 없어도 서빙은 되지만, **실제 수집은 정본
+  카운터가 있는 머신에서만** 수행하세요(없는 머신에서 수집하면 카운터가 0부터
+  시작해 월 쿼터를 초과 사용하게 됩니다).
+- 2026-08 기준 1,000건 세대(generation `20260815T023540Z-0d79c662f4c8`)는 데이터
+  저장소에 커밋되어 있습니다. 위 A/B 방법으로 받으면 되고, 데이터 저장소를
+  받지 않은 머신은 2026-07의 100건 레거시 세트로 동작합니다.
 
 이전 후 확인 목록(원본 머신과 대조):
 
