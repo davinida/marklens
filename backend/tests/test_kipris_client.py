@@ -1,5 +1,7 @@
 """KIPRIS 클라이언트 단위 테스트 — 전부 네트워크 없이 동작한다."""
 
+import json
+
 import pytest
 
 from backend.src.core import kipris_client as kc
@@ -478,3 +480,46 @@ def test_rate_limiter_budget_and_persistence(tmp_path):
     assert lim2.used_this_month() == 2
     with pytest.raises(CallBudgetExceeded):
         lim2.acquire()
+
+
+def test_rate_limiter_daily_budget_and_day_key_pruning(tmp_path):
+    counter = tmp_path / "count.json"
+    lim = RateLimiter(
+        counter_path=counter, monthly_budget=100, min_interval=0, daily_budget=2
+    )
+    lim.acquire()
+    lim.acquire()
+    with pytest.raises(CallBudgetExceeded, match="오늘"):
+        lim.acquire()
+    assert lim.used_today() == 2
+    assert lim.used_this_month() == 2
+
+    # 월 키("YYYY-MM")와 일 키("YYYY-MM-DD")가 같은 파일에 공존한다
+    counts = json.loads(counter.read_text(encoding="utf-8"))
+    assert counts[lim._month_key()] == 2
+    assert counts[lim._day_key()] == 2
+
+    # 보존 기간이 지난 일 키는 다음 쓰기에서 정리되고, 월 키는 남는다
+    counts["2000-01-01"] = 7
+    counts["2000-01"] = 7
+    counter.write_text(json.dumps(counts), encoding="utf-8")
+    lim2 = RateLimiter(
+        counter_path=counter, monthly_budget=100, min_interval=0, daily_budget=10
+    )
+    lim2.acquire()
+    remaining = json.loads(counter.read_text(encoding="utf-8"))
+    assert "2000-01-01" not in remaining
+    assert remaining["2000-01"] == 7
+    assert remaining[lim2._month_key()] == 3
+
+
+def test_rate_limiter_daily_budget_disabled_when_nonpositive(tmp_path):
+    lim = RateLimiter(
+        counter_path=tmp_path / "count.json",
+        monthly_budget=100,
+        min_interval=0,
+        daily_budget=0,
+    )
+    for _ in range(5):
+        lim.acquire()
+    assert lim.used_today() == 5

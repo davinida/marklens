@@ -35,11 +35,20 @@ import threading
 import time
 import unicodedata
 import xml.etree.ElementTree as ET
+from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, Optional
 from urllib.parse import urlsplit, urlunsplit
+
+# 호출 카운터는 API 서버와 수집 스크립트가 같은 파일을 공유한다(프로세스 2개 이상).
+# 스레드 락만으로는 프로세스 간 read-modify-write 가 겹쳐 증가분이 유실되므로
+# OS 파일 잠금을 함께 쓴다. 플랫폼별 구현만 여기서 고른다.
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 import httpx
 
@@ -104,6 +113,11 @@ BIBLIO_DETAIL_URL: str = os.getenv("KIPRIS_BIBLIO_DETAIL_URL", "") or _compose_u
 # 월 호출 예산. 공식 한도는 1,000회지만 수동 실험/재시도 여유로 50회를 남긴다.
 MONTHLY_CALL_BUDGET: int = int(os.getenv("KIPRIS_MONTHLY_BUDGET", "950"))
 
+# 일일 호출 예산 — 월 예산과 별개의 운영 가드. 하루짜리 폭주(데모 반복·버그 루프·
+# name-check 다건 질의: 1질의 최대 5콜)가 월 쿼터를 태우는 것을 막는다.
+# 0 이하로 설정하면 일일 검사를 끈다. 자정(UTC) 기준으로 초기화된다.
+DAILY_CALL_BUDGET: int = int(os.getenv("KIPRIS_DAILY_BUDGET", "80"))
+
 # 초당 50회 제한 → 요청 간 최소 간격. 여유를 두고 기본 0.1s (10 req/s).
 MIN_CALL_INTERVAL_SEC: float = float(os.getenv("KIPRIS_MIN_INTERVAL", "0.1"))
 
@@ -155,20 +169,28 @@ class CallBudgetExceeded(KiprisError):
 
 class RateLimiter:
     """
-    월 누적 카운터(파일 영속) + 요청 간 최소 간격을 강제한다.
+    월/일 누적 카운터(파일 영속) + 요청 간 최소 간격을 강제한다.
 
     사용: limiter.acquire() 를 API 호출 직전에 부른다.
-    파일 포맷: {"2026-07": 123, ...}  (월별 누적 호출 수)
+    파일 포맷: {"2026-07": 123, "2026-07-10": 8, ...}
+      - "YYYY-MM" 키 = 월별 누적, "YYYY-MM-DD" 키 = 일별 누적(오래된 날짜는 자동 정리).
+    잠금 계층: threading.Lock(프로세스 내) + OS 파일 잠금(프로세스 간 — API 서버와
+    수집 스크립트가 같은 카운터 파일을 공유하므로 둘 다 필요).
     """
+
+    _DAY_KEY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+    _DAY_KEY_RETENTION_DAYS = 35  # 한 달 조금 넘게 남겨 월말·월초 경계 디버깅에 쓴다
 
     def __init__(
         self,
         counter_path: Path = CALL_COUNTER_PATH,
         monthly_budget: int = MONTHLY_CALL_BUDGET,
         min_interval: float = MIN_CALL_INTERVAL_SEC,
+        daily_budget: int = DAILY_CALL_BUDGET,
     ):
         self.counter_path = counter_path
         self.monthly_budget = monthly_budget
+        self.daily_budget = daily_budget
         self.min_interval = min_interval
         self._lock = threading.Lock()
         self._last_call = 0.0
@@ -176,6 +198,46 @@ class RateLimiter:
     @staticmethod
     def _month_key() -> str:
         return datetime.now(timezone.utc).strftime("%Y-%m")
+
+    @staticmethod
+    def _day_key() -> str:
+        return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    @contextmanager
+    def _file_lock(self):
+        """카운터 파일에 대한 프로세스 간 배타 잠금 (Windows msvcrt / POSIX flock)."""
+        lock_path = self.counter_path.with_suffix(self.counter_path.suffix + ".lock")
+        try:
+            lock_path.parent.mkdir(parents=True, exist_ok=True)
+            handle = open(lock_path, "a+b")
+        except OSError as exc:
+            raise KiprisConfigError(
+                "KIPRIS 호출 카운터 잠금 파일을 열 수 없습니다."
+            ) from exc
+        try:
+            try:
+                if os.name == "nt":
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                else:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            except OSError as exc:
+                # msvcrt.LK_LOCK 은 약 10초 재시도 후 포기한다 — 다른 프로세스가
+                # 잠금을 오래 쥐고 있다는 뜻이므로 호출을 실패시키는 편이 안전하다.
+                raise KiprisConfigError(
+                    "KIPRIS 호출 카운터 잠금을 얻지 못했습니다 (다른 프로세스가 사용 중)."
+                ) from exc
+            yield
+        finally:
+            try:
+                if os.name == "nt":
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+            handle.close()
 
     def _load(self) -> dict:
         if not self.counter_path.exists():
@@ -193,33 +255,56 @@ class RateLimiter:
     def used_this_month(self) -> int:
         return int(self._load().get(self._month_key(), 0))
 
+    def used_today(self) -> int:
+        return int(self._load().get(self._day_key(), 0))
+
+    def _prune_stale_day_keys(self, counts: dict) -> None:
+        """보존 기간이 지난 일별 키를 제거한다 (월별 키는 그대로 둔다)."""
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(days=self._DAY_KEY_RETENTION_DAYS)
+        ).strftime("%Y-%m-%d")
+        for key in [k for k in counts if self._DAY_KEY_RE.match(str(k)) and k < cutoff]:
+            del counts[key]
+
     def acquire(self) -> None:
         """예산 검사 + 카운터 증가 + 초당 딜레이. 초과 시 CallBudgetExceeded."""
         with self._lock:
-            counts = self._load()
-            key = self._month_key()
-            used = int(counts.get(key, 0))
-            if used >= self.monthly_budget:
-                raise CallBudgetExceeded(
-                    f"이번 달 KIPRIS 호출 예산({self.monthly_budget}회)을 다 썼습니다 "
-                    f"(사용: {used}). 매월 1일 초기화."
-                )
-            counts[key] = used + 1
-            try:
-                self.counter_path.parent.mkdir(parents=True, exist_ok=True)
-                temporary = self.counter_path.with_suffix(
-                    self.counter_path.suffix + ".tmp"
-                )
-                temporary.write_text(
-                    json.dumps(counts, ensure_ascii=False, indent=2),
-                    encoding="utf-8",
-                )
-                os.replace(temporary, self.counter_path)
-            except OSError as exc:
-                raise KiprisConfigError(
-                    "KIPRIS 호출 카운터를 안전하게 저장할 수 없습니다."
-                ) from exc
-            # 초당 제한 — 마지막 호출로부터 최소 간격 보장
+            with self._file_lock():
+                counts = self._load()
+                month_key = self._month_key()
+                day_key = self._day_key()
+                used_month = int(counts.get(month_key, 0))
+                used_day = int(counts.get(day_key, 0))
+                if used_month >= self.monthly_budget:
+                    raise CallBudgetExceeded(
+                        f"이번 달 KIPRIS 호출 예산({self.monthly_budget}회)을 다 썼습니다 "
+                        f"(사용: {used_month}). 매월 1일 초기화."
+                    )
+                if self.daily_budget > 0 and used_day >= self.daily_budget:
+                    raise CallBudgetExceeded(
+                        f"오늘 KIPRIS 호출 예산({self.daily_budget}회)을 다 썼습니다 "
+                        f"(사용: {used_day}). 자정(UTC) 초기화 — 급하면 "
+                        f"KIPRIS_DAILY_BUDGET 를 올려 재시작하세요."
+                    )
+                counts[month_key] = used_month + 1
+                counts[day_key] = used_day + 1
+                self._prune_stale_day_keys(counts)
+                try:
+                    self.counter_path.parent.mkdir(parents=True, exist_ok=True)
+                    temporary = self.counter_path.with_suffix(
+                        self.counter_path.suffix + ".tmp"
+                    )
+                    temporary.write_text(
+                        json.dumps(counts, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                    os.replace(temporary, self.counter_path)
+                except OSError as exc:
+                    raise KiprisConfigError(
+                        "KIPRIS 호출 카운터를 안전하게 저장할 수 없습니다."
+                    ) from exc
+            # 초당 제한 — 마지막 호출로부터 최소 간격 보장.
+            # (파일 잠금 밖에서 대기해 다른 프로세스의 카운터 접근을 막지 않는다)
             elapsed = time.monotonic() - self._last_call
             if elapsed < self.min_interval:
                 time.sleep(self.min_interval - elapsed)

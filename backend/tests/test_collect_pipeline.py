@@ -655,6 +655,12 @@ def sandbox(tmp_path, monkeypatch):
         captured["rows"].extend(rows)
 
     monkeypatch.setattr(cp, "upsert_rows", fake_upsert)
+    # upsert 성공 후 자동 실행되는 dataset_info 갱신도 실 DB 접촉 없이 차단
+    monkeypatch.setattr(
+        cp,
+        "refresh_dataset_info",
+        lambda url: {"총_상표수": 0, "출원일자_범위": "", "데이터_기준": "", "생성일자": ""},
+    )
     monkeypatch.setattr(cp.config, "DATABASE_URL", "postgresql://fake/marklens")
     return {"images": images, "captured": captured}
 
@@ -1244,3 +1250,58 @@ def test_target_total_file_staging_counts_runtime_and_stage_union(
         "rows_per_page": 100,
     }
     assert cp.inspect_file_staging(stage) == (True, None)
+
+
+# --------------------------------------------------------------------
+# dataset_info 자동 갱신 (db 모드 수집 후 안내 문구 드리프트 방지)
+# --------------------------------------------------------------------
+
+def test_refresh_dataset_info_recomputes_from_db(monkeypatch):
+    """건수·출원일자 범위·생성일자는 실측으로, 데이터_기준 문구는 기존 값을 보존한다."""
+    import datetime as dt
+
+    import psycopg
+
+    executed = []
+
+    class FakeCursor:
+        _last = ""
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def execute(self, sql, params=None):
+            executed.append((sql, params))
+            self._last = sql
+
+        def fetchone(self):
+            if "count(*)" in self._last:
+                return (250, dt.date(2021, 4, 5), dt.date(2026, 5, 21))
+            return ({"데이터_기준": "KIPRIS 등록상표 공보(기존)", "출원일자_범위": "옛값"},)
+
+    class FakeConn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+        def commit(self):
+            pass
+
+    monkeypatch.setattr(psycopg, "connect", lambda url: FakeConn())
+
+    info = cp.refresh_dataset_info("postgresql://fake/marklens")
+
+    assert info["총_상표수"] == 250
+    assert info["출원일자_범위"] == "2021 ~ 2026"
+    assert info["데이터_기준"] == "KIPRIS 등록상표 공보(기존)"
+    assert info["생성일자"]  # 오늘 날짜 문자열 — 값 존재만 확인(시계 고정 없음)
+    upserts = [sql for sql, _ in executed if "INSERT INTO meta" in sql]
+    assert upserts and "dataset_info" in upserts[0]

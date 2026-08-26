@@ -724,6 +724,48 @@ def upsert_rows(rows: list, database_url: str) -> None:
         conn.commit()
 
 
+def refresh_dataset_info(database_url: str) -> dict:
+    """수집 성공 후 meta.dataset_info 를 DB 실측으로 갱신한다 (db 모드 전용).
+
+    과거에는 수동 갱신 안내만 출력해, 수집 뒤 /health·검색 응답의 "데이터 범위"
+    문구가 실제 적재 건수와 어긋난 채 방치될 수 있었다. 데이터_기준 문구는 기존
+    값을 보존하고 건수·출원일자 범위·생성일자만 실측으로 다시 쓴다.
+    테스트는 upsert_rows 처럼 이 함수를 monkeypatch 해 실 DB 를 건드리지 않는다.
+    """
+    from datetime import datetime, timezone
+
+    import psycopg
+    from psycopg.types.json import Jsonb
+
+    with psycopg.connect(database_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT count(*), min(application_date), max(application_date) "
+                "FROM trademark"
+            )
+            total, min_date, max_date = cur.fetchone()
+            cur.execute("SELECT value FROM meta WHERE key = 'dataset_info'")
+            row = cur.fetchone()
+            existing = row[0] if row and isinstance(row[0], dict) else {}
+            if min_date and max_date:
+                date_range = f"{min_date.year} ~ {max_date.year}"
+            else:
+                date_range = existing.get("출원일자_범위", "")
+            info = {
+                "총_상표수": int(total),
+                "출원일자_범위": date_range,
+                "데이터_기준": existing.get("데이터_기준", "KIPRIS 등록상표 공보"),
+                "생성일자": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            }
+            cur.execute(
+                "INSERT INTO meta (key, value) VALUES ('dataset_info', %s) "
+                "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+                (Jsonb(info),),
+            )
+        conn.commit()
+    return info
+
+
 def item_to_row(item: dict) -> tuple:
     """API item → trademark UPSERT 파라미터. (migrate 스크립트와 같은 컬럼 순서)"""
     from backend.scripts.migrate_json_to_db import parse_date
@@ -736,7 +778,9 @@ def item_to_row(item: dict) -> tuple:
         parse_date(item.get("RegistrationDate")),
         item.get("Title") or None,           # KIPRIS Title 은 한/영 혼재 — 한글명 슬롯에 원문 저장
         None,                                # 영문명은 공보 상세에서만 확보 가능 — 후속 보강
-        item.get("DrawingKindName") or None, # 도형/복합 구분 (오퍼레이션에 따라 없을 수 있음)
+        # 상표구분 — getAdvancedSearch 미제공. --enrich-biblio 시 서지상세로 충전,
+        # 미보강 수집에서는 의도된 NULL 이다.
+        item.get("DrawingKindName") or None,
         item.get("ApplicantName") or None,
         item.get("RegistrationRightholderName") or None,
         f"{app_no}.png",
@@ -1612,8 +1656,18 @@ def main() -> int:
                 "[참고] 운영 메타와 운영 인덱스는 변경하지 않았습니다."
             )
         else:
-            print("[참고] dataset_info(데이터 범위 안내 문구)는 백엔드-6 기준 확정 후 "
-                  "meta 테이블에서 갱신하세요.")
+            try:
+                info = refresh_dataset_info(config.DATABASE_URL)
+                print(
+                    f"[갱신] meta.dataset_info 를 DB 실측으로 갱신했습니다: "
+                    f"총 {info['총_상표수']}건, 범위 {info['출원일자_범위']}"
+                )
+            except Exception as exc:  # 수집 자체는 성공 — 안내 문구 갱신 실패는 경고로만
+                print(
+                    f"[경고] dataset_info 자동 갱신 실패({exc}) — "
+                    "meta 테이블에서 수동 갱신이 필요합니다.",
+                    file=sys.stderr,
+                )
     if aborted is not None:
         return 3  # 정상 종료가 아님을 호출자(배치 스크립트)가 알 수 있게
     if report["검색실패_출원인"] and not target_reached:
