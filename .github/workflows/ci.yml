@@ -121,8 +121,12 @@ jobs:
           MARKLENS_TURNSTILE_EXPECTED_HOSTNAMES: marklens.example.com
           KIPRIS_ACCESS_KEY: ci-placeholder-not-used
 
+      # nginx 는 config 테스트 시점에 upstream 호스트명을 해석한다. "frontend"는
+      # compose 네트워크 DNS 이름이라 단독 컨테이너에서는 host not found 로 실패
+      # → /etc/hosts 별칭을 줘서 어느 환경에서든 문법 검증이 돌게 한다.
       - name: Validate Nginx gateway syntax
         run: >-
           docker run --rm
+          --add-host frontend:127.0.0.1
           -v "$PWD/deploy/nginx.conf:/etc/nginx/nginx.conf:ro"
           nginx:1.29-alpine nginx -t
