@@ -175,5 +175,10 @@ scripts/*.log
 deploy/data/
 deploy/models/
 
+# 프론트-2 고시상품명칭 원본(KIPO, 라이선스·재배포 확인 전) + 생성 산출물
+# 커밋 여부는 다빈 검증(다빈-4) 후 결정 — 그 전까지는 스크립트·소스 URL만 커밋
+shared/goods_map/raw/
+shared/goods_map/goods_map.json
+
 # 코드 그래프 분석 도구 산출물/캐시 (로컬 전용 — 커밋 금지)
 graphify-out/
