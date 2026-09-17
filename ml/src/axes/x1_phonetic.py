@@ -106,6 +106,10 @@ G2P_EXCEPTIONS: Final[dict[str, str]] = {
     "baseball": "베이스볼",
     "together": "투게더",
     "coffee": "커피",  # 룰의 o→ㅗ 기본값(코피)이 맞지 않는 불규칙. 2026-09-17 결정
+    # 유명 브랜드 목록 교차 확인에서 승인한 외래어 관용 표기 (2026-09-17)
+    "paris": "파리",
+    "baguette": "바게뜨",
+    "republica": "리퍼블리카",
 }
 # 국내 브랜드·지명 로마자(samsung→삼성, seoul→서울)는 korean_brands 의 두 표에서 관리한다.
 

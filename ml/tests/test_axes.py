@@ -202,6 +202,23 @@ def test_v1_2_tables(a, b, op, threshold, reason):
         assert score == threshold, f"{a} / {b}: {score:.3f} ({reason})"
 
 
+@pytest.mark.parametrize(
+    ("a", "b", "op", "threshold", "reason"),
+    [
+        ("이랜드", "ELAND", "==", 1.0, "브랜드표 eland→이랜드"),
+        ("파리바게뜨", "PARIS BAGUETTE", ">=", 0.95, "예외 사전 paris→파리 + baguette→바게뜨"),
+        ("상미당", "SANGMIDANG", "==", 1.0, "브랜드표 sangmidang→상미당"),
+    ],
+)
+def test_brand_list_cross_check(a, b, op, threshold, reason):
+    """2026-09-17 유명 브랜드 목록(shared/famous_brands.txt) 교차 확인에서 승인한 항목."""
+    score = phonetic_similarity(a, b)
+    if op == ">=":
+        assert score >= threshold, f"{a} / {b}: {score:.3f} ({reason})"
+    else:
+        assert score == threshold, f"{a} / {b}: {score:.3f} ({reason})"
+
+
 def _load_report_module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "x1_report.py"
     spec = importlib.util.spec_from_file_location("x1_report_under_test", path)

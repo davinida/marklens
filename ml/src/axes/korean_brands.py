@@ -5,7 +5,7 @@
 
 - 키: 소문자 영문 토큰 / 값: 한글 표기. 룰 G2P 결과가 이미 같은 항목은 중복이라 넣지 않는다.
 - `KOREAN_BRAND_ROMANIZATION`: 씨앗 110개 중 룰과 같은 33개(kakao, naver 등)를 뺀 77개
-  (2026-09-17) + 로마자 캐기 승인분 10개 = 87개.
+  (2026-09-17) + 로마자 캐기 승인분 10개 + 유명 브랜드 목록 교차 확인 4개 = 91개.
 - `KOREAN_PLACE_ROMANIZATION`: 국내 지명 39개 중 룰과 같은 5개(sejong, insadong, songdo,
   sokcho, mokpo)를 뺀 34개. **이 지명 목록은 향후 식별력 필터(현저한 지리적 명칭)에서 재사용
   예정**이므로 값은 표준 지명 표기를 유지한다.
@@ -110,6 +110,11 @@ KOREAN_BRAND_ROMANIZATION: Final[dict[str, str]] = {
     "heyalfun": "헤이알펀",
     "honsul": "혼술",
     "sancheon": "산천",
+    # 유명 브랜드 목록(shared/famous_brands.txt) 교차 확인 승인분 (2026-09-17)
+    "sangmidang": "상미당",
+    "eland": "이랜드",
+    "woowa": "우아",
+    "baedal": "배달",
 }
 
 # 국내 지명 로마자(국어의 로마자 표기법 기준).
@@ -133,7 +138,6 @@ KOREAN_PLACE_ROMANIZATION: Final[dict[str, str]] = {
     "jongno": "종로",
     "yeouido": "여의도",
     # 시·군·구
-    "songdo": "송도",
     "haeundae": "해운대",
     "suwon": "수원",
     "seongnam": "성남",

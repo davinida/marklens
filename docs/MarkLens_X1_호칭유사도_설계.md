@@ -33,9 +33,9 @@
 | `PAIRED_THRESHOLD` | 0.8 | ⑤ 병기 판정. 낮추면 병기 오탐(다른 영문을 한글로 오인) ↑ |
 | `MAX_CANDIDATES` / `MAX_SYLLABLES` | 16 / 40 | ③ 조합 폭주 방지, 긴 슬로건형 상표명 상한 |
 | `UNIVERSAL_GENERIC` | 회사 형태·부가어·영문 기능어 31개 | 요부관찰. 상품 의존 보통명칭은 여기 넣지 않고 `extra_generic` 으로 |
-| `KOREAN_BRAND_ROMANIZATION` | 국내 브랜드 로마자 **87개** (`korean_brands.py`) | 룰로 읽을 수 없는 한국어 로마자(samsung, hyundai …). 씨앗 110개 중 룰 결과와 같은 33개(kakao, naver …)는 중복이라 제외한 77개 + 로마자 캐기 승인분 10개(gudaero, chengdamsu, yumbbokki, nakwon, luciel, netmarble, petitzel, heyalfun, honsul, sancheon). 룰보다 먼저 적용 |
+| `KOREAN_BRAND_ROMANIZATION` | 국내 브랜드 로마자 **91개** (`korean_brands.py`) | 룰로 읽을 수 없는 한국어 로마자(samsung, hyundai …). 씨앗 110개 중 룰 결과와 같은 33개(kakao, naver …)는 중복이라 제외한 77개 + 로마자 캐기 승인분 10개(gudaero, chengdamsu, yumbbokki, nakwon, luciel, netmarble, petitzel, heyalfun, honsul, sancheon) + 유명 브랜드 목록 교차 확인 4개(sangmidang, eland, woowa, baedal). 룰보다 먼저 적용 |
 | `KOREAN_PLACE_ROMANIZATION` | 국내 지명 로마자 **34개** (`korean_brands.py`) | 광역·서울 안 지명·시군·국호 39개 중 룰 결과와 같은 5개(sejong, insadong, songdo, sokcho, mokpo) 제외. 브랜드표와 같은 단계(룰보다 먼저). **향후 식별력 필터(현저한 지리적 명칭)에서 재사용 예정** |
-| `G2P_EXCEPTIONS` | 기능어·수사·약어 24개 + 외래어 관용 표기 12개 = 36개 | 룰로 맞추기 어려운 불규칙. 브랜드(hyundai/lotte/kia)는 브랜드 표로 이동. 관용 표기(pilates, ballet, etoile, curry, atelier, gourmet, poke, musical, salon, baseball, together)는 로마자 캐기에서 확인해 승인, coffee→커피 는 룰의 o→ㅗ 기본값이 맞지 않는 불규칙 |
+| `G2P_EXCEPTIONS` | 기능어·수사·약어 24개 + 외래어 관용 표기 15개 = 39개 | 룰로 맞추기 어려운 불규칙. 브랜드(hyundai/lotte/kia)는 브랜드 표로 이동. 관용 표기(pilates, ballet, etoile, curry, atelier, gourmet, poke, musical, salon, baseball, together)는 로마자 캐기에서 확인해 승인, coffee→커피 는 룰의 o→ㅗ 기본값이 맞지 않는 불규칙, paris·baguette·republica 는 유명 브랜드 목록 교차 확인에서 승인 |
 | `LETTER_READING_MAX_LEN` | **3** (v1: 5) | 낱자 읽기(에이비씨) 추가 기준. 모음 없는 토큰은 길이 무관. r 은 알/아르 두 후보 |
 
 점수 = max(0, 1 − 거리/최대거리), 최대거리 = Σ_{p<n} w[p]·2.5. 연산 비용에 `w[min(i, j)]` 를 곱해 대칭을 보장한다.
@@ -89,7 +89,7 @@
 
 | 단계 | 상태 | 내용 |
 |---|---|---|
-| 1. 표 | v1.1 적용, v1.2 확장 | `KOREAN_BRAND_ROMANIZATION` 87개 + `KOREAN_PLACE_ROMANIZATION` 34개, 토큰 완전일치, 룰보다 먼저. 벤치마크에서는 비활성 |
+| 1. 표 | v1.1 적용, v1.2·v1.3 확장 | `KOREAN_BRAND_ROMANIZATION` 91개 + `KOREAN_PLACE_ROMANIZATION` 34개, 토큰 완전일치, 룰보다 먼저. 벤치마크에서는 비활성 |
 | 2. DB 캐기 | v1.1 도구 제공 | `x1_mine_romanization.py`: 상표한글명 중 한영 혼재 194건에서 (영문 토큰 ≥3자, 한글 토큰) 쌍의 순수 룰 읽기와 음절 유사도를 계산. 0.4 ≤ 유사도 < 0.8 이면 "후보", 표에 이미 있으면 "확인됨". 첫 실행: 후보 84건, 확인됨 4건(samsung/삼성, samsung/삼성전자, asiana/아시아나항공, kumho/금호). **자동 반영 금지** — 사람이 승인해 표로 옮긴다. 후보에는 진짜 로마자(gudaero→그대로, chengdamsu→청담수, yumbbokki→얌볶이, woojin→우진, nakwon→낙원, netmarble→넷마블), 외래어 룰 공백(pilates, ballet, etoile, curry), 잡음(korean/조선 번역, cheese/치즈헤븐 부분 일치)이 섞여 있다. 1차 승인(v1.2): 브랜드표 10건, 예외 사전 11건 |
 | 3. 역로마자 | v2 계획 | 국어의 로마자 표기법(2000) 역변환 룰(eo→ㅓ, eu→ㅡ, ae→ㅐ, oe→ㅚ, g/d/b/j 어두 평음 등)로 "로마자처럼 보이는" 토큰의 읽기를 **추가 후보**로 생성. 최댓값 규칙이 있으므로 후보를 늘려도 기존 점수는 내려가지 않는다. 표·룰과의 우선순위, 오탐(영어 단어를 로마자로 오독) 억제 조건은 설계 필요 |
 
@@ -116,5 +116,6 @@
 ## 9. 변경 이력
 
 - **v1 (2026-09-17)**: 초판. 판례 5규칙 매핑, 룰 G2P, 가중 음절 레벤슈타인, 테스트 A/B 76건.
+- **v1.3 (2026-09-17, 브랜드 목록 교차 확인 반영)**: ① 브랜드표 +4(sangmidang, eland, woowa, baedal) → 91개 ② 예외 사전 +3 외래어 관용 표기(paris, baguette, republica) → 39개 ③ 지명표에서 룰 결과와 같은 songdo 제거(코드 35개 → 문서와 같은 34개) ④ 테스트 3건 추가(이랜드/ELAND 1.0, 파리바게뜨/PARIS BAGUETTE, 상미당/SANGMIDANG 1.0). 벤치마크는 순수 룰이라 15/20 유지.
 - **v1.2 (2026-09-17, 마무리)**: ① `COST_JUNG_MERGED` 0.25→0.1(게/개 0.900→0.960, 테스트 assert 전환) ② 브랜드표 +10(캐기 승인분) → 87개 ③ 예외 사전 +11 외래어 관용 표기 → 35개 ④ 지명표 34개 신설(브랜드표와 같은 단계) ⑤ 벤치마크 계약 테스트에 지명표 포함, 테스트 3건 추가 ⑥ coffee→커피 예외(서울커피/SEOUL COFFEE 0.927→1.000, 커피빈/COFFEE BEAN·스타벅스커피/STARBUCKS COFFEE 1.000 테스트 추가, xfail 0건). 점수 변화: C 쌍 v1.1 과 동일; 표본 30쌍 평균 0.3147→0.3111(−0.0035, 2쌍 변동: Sky touch/Airline Seoul 0.556→0.444, 실온K슐랭/K8 REFOREST 0.260→0.265); 벤치마크 평균 0.956→0.957(ORANGE 합류 비용).
 - **v1.1 (2026-09-17, 검토 반영)**: ① 분리관찰 후보에서 1글자 토큰 읽기 제외 ② 낱자 읽기 상한 5→3 ③ 유사 자모 확장 — 초성 (ㄴ,ㅁ), 중성 y/w 계열, 합류 쌍 별도 단계(0.25), 종성 비음 그룹(0.25) ④ 국내 브랜드 로마자 표 77개(룰보다 먼저) + 벤치마크 순수 룰 계약 ⑤ 로마자 후보 캐기 스크립트. 점수 변화: C 쌍 나이키/마이키 0.822→0.911, 리쥬/리주 0.867→0.933(나머지 14쌍 동일); 데이터 표본 30쌍 평균 0.356→0.315(−0.041, 10쌍 변동, 최대 하락 실온K슐랭/K8 REFOREST 1.000→0.260).
