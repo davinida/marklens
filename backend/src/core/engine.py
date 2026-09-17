@@ -23,8 +23,9 @@ from . import appno, config, paths
 logger = logging.getLogger(__name__)
 
 
-# === macOS Apple Silicon의 PyTorch + FAISS OpenMP 충돌 방지 ===
-# 이 줄은 ml 모듈을 import 하기 전에 효력 발생해야 함.
+# === macOS Apple Silicon의 PyTorch + FAISS 충돌 방지 ===
+# 이 줄은 ml 모듈을 import 하기 전에 효력 발생해야 함 (OpenMP 중복 로드 자체는
+# 이걸로 막히지만, 아래 import 순서도 별도로 반드시 지켜야 한다 — 다음 문단 참고).
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
 # ml/src 를 sys.path 에 추가하여 from src.X import Y 형태로 import.
@@ -32,15 +33,25 @@ os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 if str(paths.ML_ROOT) not in sys.path:
     sys.path.insert(0, str(paths.ML_ROOT))
 
-import faiss  # noqa: E402
-
-from src.embedding import (  # noqa: E402
+# 아래 두 import 그룹의 순서는 임의로 바꾸면 안 된다: macOS Apple Silicon 실측
+# 결과, faiss가 torch(→ src.embedding)보다 먼저 import되면 이후 어느 시점에
+# faiss.read_index()와 CLIP 워밍업을 같은 프로세스에서 호출할 때 SIGSEGV로
+# 죽는다(KMP_DUPLICATE_LIB_OK로 잡히는 OpenMP 중복 로드 에러와는 다른 별개
+# 충돌이며, 두 호출의 순서를 바꿔도 재현됨 — import 순서 자체가 원인). 반드시
+# src.embedding(torch/open_clip)을 먼저 import한 뒤 faiss를 import한다.
+# ruff의 I001(import 정렬)은 이 순서를 "정렬 안 됨"으로 보고 faiss를 앞으로
+# 옮기라고 제안하는데, 그렇게 --fix를 적용하면 위 SIGSEGV 버그가 되살아난다.
+# 반드시 noqa로 남겨둘 것 — 자동 정렬 대상 아님.
+from src.embedding import (  # noqa: E402, I001
     EMBEDDING_CONTRACT_VERSION,
     EMBEDDING_DIM,
     MODEL_NAME,
     PRETRAINED,
     encode_image,
 )
+
+import faiss  # noqa: E402
+
 from src.preprocess import DEFAULT_PREPROCESS_VERSION  # noqa: E402
 from src.scoring import score_results  # noqa: E402
 from src.search import load_index, search  # noqa: E402
@@ -362,6 +373,8 @@ def load_all() -> None:
     # ---- CLIP 모델 워밍업 ----
     # encode_image 가 _load_model() 을 lazy 호출. 작은 더미 이미지로 미리 트리거.
     # 이렇게 해두면 첫 요청에서 모델 로딩 시간이 사용자에게 노출되지 않음.
+    # (faiss와 torch의 import 순서 제약은 모듈 상단 주석 참고 — 여기서의 호출
+    # 순서 자체는 안전하다.)
     from PIL import Image as PILImage
     from PIL import ImageDraw
 
