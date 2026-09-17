@@ -1,6 +1,6 @@
 # Direct dependency versions verified together on 2026-08-14.
 # Install with: pip install -c constraints.txt -r ml/requirements.txt ...
-open_clip_torch==2.32.0
+open_clip_torch==3.3.0
 faiss-cpu==1.14.3
 torch==2.13.0
 torchvision==0.28.0
