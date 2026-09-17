@@ -120,6 +120,9 @@ _FIELD_TO_ENV: dict[str, str] = {
     "search_rate_limit": "MARKLENS_SEARCH_RATELIMIT",
     "namecheck_rate_limit": "MARKLENS_NAMECHECK_RATELIMIT",
     "images_rate_limit": "MARKLENS_IMAGES_RATELIMIT",
+    "phonetic_rate_limit": "MARKLENS_PHONETIC_RATELIMIT",
+    "phonetic_top_k_default": "MARKLENS_PHONETIC_TOP_K_DEFAULT",
+    "phonetic_min_similarity": "MARKLENS_PHONETIC_MIN_SIMILARITY",
     "api_key": "MARKLENS_API_KEY",
     "database_url": "DATABASE_URL",
     "environment": "MARKLENS_ENVIRONMENT",
@@ -170,6 +173,20 @@ class Settings(BaseSettings):
     images_rate_limit: str = Field(
         default="120/minute", validation_alias="MARKLENS_IMAGES_RATELIMIT"
     )
+    # /phonetic-search (X1 호칭 유사도): KIPRIS 쿼터와 무관한 로컬 CPU 계산(요청당 DB 전건
+    # ≈ 수백 ms)이라 무제한 노출만 피한다 — /name-check 와 같은 30/minute 기본.
+    phonetic_rate_limit: str = Field(
+        default="30/minute", validation_alias="MARKLENS_PHONETIC_RATELIMIT"
+    )
+    # /phonetic-search 기본 반환 건수(요청 top_k 미지정 시, 1~MAX_TOP_K)와 후보 유사도 하한.
+    # 하한 0.5 는 X1 설계 문서 §4 의 "무관한 상표 표본 평균 0.31" 과 판례 케이스(0.8 이상)
+    # 사이의 임시값 — 정답 데이터(다빈-1)로 재조정 예정.
+    phonetic_top_k_default: int = Field(
+        default=5, validation_alias="MARKLENS_PHONETIC_TOP_K_DEFAULT"
+    )
+    phonetic_min_similarity: float = Field(
+        default=0.5, validation_alias="MARKLENS_PHONETIC_MIN_SIMILARITY"
+    )
 
     # 정적 X-API-Key. 설정 시에만 /search·/name-check 에서 헤더 일치를 검증(불일치 401).
     # 미설정("")이면 완전 비활성 — 로컬 개발은 무인증 개방. (core/auth.py 참조)
@@ -214,10 +231,36 @@ class Settings(BaseSettings):
             )
         return v
 
-    @field_validator("search_rate_limit", "namecheck_rate_limit", "images_rate_limit")
+    @field_validator(
+        "search_rate_limit", "namecheck_rate_limit", "images_rate_limit", "phonetic_rate_limit"
+    )
     @classmethod
     def _check_rate_limit(cls, v: str) -> str:
         return _validate_rate_limit(v)
+
+    @field_validator("phonetic_top_k_default", mode="before")
+    @classmethod
+    def _check_phonetic_top_k(cls, v: object) -> int:
+        """1 ~ MAX_TOP_K 범위의 정수(요청 top_k 와 같은 상한)."""
+        try:
+            n = int(str(v).strip())
+        except (TypeError, ValueError):
+            raise ValueError(f"정수여야 합니다 (받은 값: {v!r}).")
+        if not MIN_TOP_K <= n <= MAX_TOP_K:
+            raise ValueError(f"{MIN_TOP_K}~{MAX_TOP_K} 범위여야 합니다 (받은 값: {n}).")
+        return n
+
+    @field_validator("phonetic_min_similarity", mode="before")
+    @classmethod
+    def _check_phonetic_min_similarity(cls, v: object) -> float:
+        """0.0 ~ 1.0 실수(X1 점수 범위)."""
+        try:
+            x = float(str(v).strip())
+        except (TypeError, ValueError):
+            raise ValueError(f"실수여야 합니다 (받은 값: {v!r}).")
+        if not 0.0 <= x <= 1.0:
+            raise ValueError(f"0.0~1.0 범위여야 합니다 (받은 값: {x}).")
+        return x
 
     @field_validator("database_url")
     @classmethod
@@ -295,6 +338,12 @@ CORS_ALLOW_ORIGINS: list[str] = settings.cors_allow_origins
 SEARCH_RATE_LIMIT: str = settings.search_rate_limit
 NAMECHECK_RATE_LIMIT: str = settings.namecheck_rate_limit
 IMAGES_RATE_LIMIT: str = settings.images_rate_limit
+
+# X1 호칭 유사도 /phonetic-search (env: MARKLENS_PHONETIC_RATELIMIT
+#   / MARKLENS_PHONETIC_TOP_K_DEFAULT / MARKLENS_PHONETIC_MIN_SIMILARITY)
+PHONETIC_RATE_LIMIT: str = settings.phonetic_rate_limit
+PHONETIC_TOP_K_DEFAULT: int = settings.phonetic_top_k_default
+PHONETIC_MIN_SIMILARITY: float = settings.phonetic_min_similarity
 
 # 정적 X-API-Key (env: MARKLENS_API_KEY, 미설정 시 인증 비활성)
 API_KEY: str = settings.api_key

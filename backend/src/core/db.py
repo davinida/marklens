@@ -152,6 +152,25 @@ def count_trademarks() -> int:
     return int(row[0])
 
 
+def fetch_phonetic_rows() -> list[dict]:
+    """X1 발음 캐시(core/phonetic_search.py)용 전건 조회 — 기동 시 1회, 필요한 컬럼만 읽는다."""
+    pool = _require_pool()
+    with pool.connection() as conn:
+        rows = conn.execute(
+            "SELECT application_no, name_ko, image_key, applicant, nice_classes FROM trademark"
+        ).fetchall()
+    return [
+        {
+            "출원번호": row[0],
+            "상표한글명": row[1],
+            "이미지파일": row[2],
+            "출원인": row[3],
+            "류": list(row[4] or []),
+        }
+        for row in rows
+    ]
+
+
 def fetch_all_image_keys() -> set[str]:
     """Return the authoritative DB image-key set for index reconciliation."""
     pool = _require_pool()

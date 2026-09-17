@@ -52,6 +52,7 @@ export default function Home() {
       markName: value.markName,
       topK: value.topK,
       nameCheck: value.nameCheck ?? null,
+      phonetic: value.phonetic ?? null,
     });
     setPhase({ name: "loading" });
 
@@ -119,6 +120,7 @@ export default function Home() {
             result={phase.data}
             queryPreview={queryPreview}
             nameCheck={draft?.nameCheck ?? null}
+            phonetic={draft?.phonetic ?? null}
             onReset={reset}
           />
         )}

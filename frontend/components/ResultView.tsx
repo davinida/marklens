@@ -15,6 +15,7 @@ import {
   Tags,
 } from "lucide-react";
 import NameCheckPanel from "@/components/NameCheckPanel";
+import PhoneticMatchesSection from "@/components/PhoneticMatchesSection";
 import { imageUrl } from "@/lib/api";
 import type {
   GradeCode,
@@ -22,7 +23,7 @@ import type {
   SearchResponse,
   StatusCode,
 } from "@/lib/api";
-import type { NameCheckResult } from "@/lib/contracts";
+import type { NameCheckResult, PhoneticSearchResponse } from "@/lib/contracts";
 
 const GRADE_VIEW: Record<
   StatusCode,
@@ -462,7 +463,13 @@ function MatchDistribution({
   );
 }
 
-function AnalysisScope({ nameCheck }: { nameCheck?: NameCheckResult | null }) {
+function AnalysisScope({
+  nameCheck,
+  phonetic,
+}: {
+  nameCheck?: NameCheckResult | null;
+  phonetic?: PhoneticSearchResponse | null;
+}) {
   const items = [
     {
       label: "외관",
@@ -487,9 +494,9 @@ function AnalysisScope({ nameCheck }: { nameCheck?: NameCheckResult | null }) {
     },
     {
       label: "호칭·관념",
-      state: "미분석",
-      detail: "발음·의미 비교 제외",
-      kind: "missing" as const,
+      state: phonetic ? "호칭만 조회됨" : "미분석",
+      detail: phonetic ? "X1 발음 유사도 · 의미 비교 제외" : "발음·의미 비교 제외",
+      kind: phonetic ? ("partial" as const) : ("missing" as const),
     },
     {
       label: "상품 견련성",
@@ -615,11 +622,13 @@ export default function ResultView({
   result,
   queryPreview,
   nameCheck,
+  phonetic,
   onReset,
 }: {
   result: SearchResponse;
   queryPreview: string | null;
   nameCheck?: NameCheckResult | null;
+  phonetic?: PhoneticSearchResponse | null;
   onReset: () => void;
 }) {
   const grade = result.grade;
@@ -765,7 +774,7 @@ export default function ResultView({
             </div>
 
             <MatchDistribution matches={result.matches} thresholds={thresholds} />
-            <AnalysisScope nameCheck={nameCheck} />
+            <AnalysisScope nameCheck={nameCheck} phonetic={phonetic} />
           </section>
         </div>
 
@@ -816,6 +825,16 @@ export default function ResultView({
             )}
           </section>
 
+          {phonetic && (
+            <section
+              data-phonetic-evidence
+              aria-labelledby="phonetic-evidence-title"
+              className="border-y border-line bg-card px-5 py-5"
+            >
+              <h2 id="phonetic-evidence-title" className="sr-only">호칭 유사도 분석</h2>
+              <PhoneticMatchesSection phase={{ name: "result", data: phonetic }} />
+            </section>
+          )}
         </div>
       </div>
 

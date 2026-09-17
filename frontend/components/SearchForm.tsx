@@ -3,14 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ImageCropDialog from "@/components/ImageCropDialog";
 import NameCheckPanel from "@/components/NameCheckPanel";
+import PhoneticMatchesSection, {
+  type PhoneticPhase,
+} from "@/components/PhoneticMatchesSection";
 import TurnstileWidget, {
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
 import {
   ApiError,
   checkTrademarkName,
+  searchPhonetic,
 } from "@/lib/api";
-import type { NameCheckResult } from "@/lib/contracts";
+import type { NameCheckResult, PhoneticSearchResponse } from "@/lib/contracts";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
@@ -22,6 +26,7 @@ export interface SearchDraft {
   markName: string;
   topK: number;
   nameCheck?: NameCheckResult | null;
+  phonetic?: PhoneticSearchResponse | null;
 }
 
 export interface SearchFormValue extends SearchDraft {
@@ -53,22 +58,45 @@ export default function SearchForm({
       ? { name: "result", data: initialValue.nameCheck }
       : { name: "idle" },
   );
+  const [phoneticPhase, setPhoneticPhase] = useState<PhoneticPhase>(() =>
+    initialValue?.phonetic
+      ? { name: "result", data: initialValue.phonetic }
+      : { name: "idle" },
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const nameAbortRef = useRef<AbortController | null>(null);
   const nameGenerationRef = useRef(0);
+  const phoneticAbortRef = useRef<AbortController | null>(null);
+  const phoneticGenerationRef = useRef(0);
+  // 이름 확인 직후 위젯을 리셋해 새 토큰이 오면 그 토큰으로 발음 검색을 보낸다.
+  // Turnstile 토큰은 1회용이라 name-check 가 쓴 토큰을 재사용할 수 없다.
+  const pendingPhoneticRef = useRef<{ name: string } | null>(null);
+  const runPhoneticRef = useRef<(name: string, token: string) => Promise<void>>(
+    async () => {},
+  );
   const preview = useObjectUrl(file);
   const pendingPreview = useObjectUrl(pendingFile);
 
-  const handleTokenChange = useCallback(
-    (token: string | null) => setTurnstileToken(token),
-    [],
-  );
+  const handleTokenChange = useCallback((token: string | null) => {
+    const pending = pendingPhoneticRef.current;
+    if (token && pending) {
+      // 이 토큰은 발음 검색이 소비한다 — 제출용 토큰은 그 호출이 끝난 뒤 다시 발급받는다.
+      pendingPhoneticRef.current = null;
+      setTurnstileToken(null);
+      void runPhoneticRef.current(pending.name, token);
+      return;
+    }
+    setTurnstileToken(token);
+  }, []);
 
   useEffect(
     () => () => {
       nameGenerationRef.current += 1;
       nameAbortRef.current?.abort();
+      phoneticGenerationRef.current += 1;
+      phoneticAbortRef.current?.abort();
+      pendingPhoneticRef.current = null;
     },
     [],
   );
@@ -91,6 +119,37 @@ export default function SearchForm({
     setPendingFile(next);
   };
 
+  const runPhoneticSearch = async (name: string, token: string) => {
+    phoneticAbortRef.current?.abort();
+    const controller = new AbortController();
+    phoneticAbortRef.current = controller;
+    const generation = ++phoneticGenerationRef.current;
+    setPhoneticPhase({ name: "loading" });
+
+    try {
+      const data = await searchPhonetic(name, token, controller.signal);
+      if (generation === phoneticGenerationRef.current) {
+        setPhoneticPhase({ name: "result", data });
+      }
+    } catch (error) {
+      if (controller.signal.aborted || generation !== phoneticGenerationRef.current) return;
+      setPhoneticPhase({
+        name: "error",
+        message:
+          error instanceof ApiError
+            ? error.message
+            : "발음 유사도를 계산하지 못했어요. 다시 시도해 주세요.",
+      });
+    } finally {
+      // 발음 검색이 쓴 토큰 대신 제출용 토큰을 다시 받는다.
+      turnstileRef.current?.reset();
+    }
+  };
+  // 최신 클로저를 ref 에 보관 — handleTokenChange 는 위젯 재렌더를 피하려고 identity 를 고정한다.
+  useEffect(() => {
+    runPhoneticRef.current = runPhoneticSearch;
+  });
+
   const runNameCheck = async () => {
     const name = markName.trim();
     if (!name) {
@@ -109,9 +168,15 @@ export default function SearchForm({
     const token = turnstileToken;
     setNamePhase({ name: "loading" });
     setTurnstileToken(null);
+    // 발음(호칭) 유사도 검색은 name-check 와 병렬로 보낸다. 토큰이 1회용이라 name-check 를
+    // 띄운 직후 위젯을 리셋해 새 토큰을 받고(handleTokenChange), 그 토큰으로 호출한다.
+    pendingPhoneticRef.current = { name };
+    setPhoneticPhase({ name: "loading" });
 
+    const nameCheckPromise = checkTrademarkName(name, token, controller.signal);
+    turnstileRef.current?.reset();
     try {
-      const data = await checkTrademarkName(name, token, controller.signal);
+      const data = await nameCheckPromise;
       if (generation === nameGenerationRef.current) {
         setNamePhase({ name: "result", data });
       }
@@ -139,6 +204,7 @@ export default function SearchForm({
       markName: markName.trim(),
       topK,
       nameCheck: namePhase.name === "result" ? namePhase.data : null,
+      phonetic: phoneticPhase.name === "result" ? phoneticPhase.data : null,
       turnstileToken: token,
     });
   };
@@ -255,8 +321,12 @@ export default function SearchForm({
             onChange={(event) => {
               nameGenerationRef.current += 1;
               nameAbortRef.current?.abort();
+              phoneticGenerationRef.current += 1;
+              phoneticAbortRef.current?.abort();
+              pendingPhoneticRef.current = null;
               setMarkName(event.target.value);
               setNamePhase({ name: "idle" });
+              setPhoneticPhase({ name: "idle" });
             }}
             placeholder="예: 몬테로사 MONTEROSA"
             className="min-w-0 flex-1 border-b-2 border-line pb-2 text-[17px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark"
@@ -287,6 +357,11 @@ export default function SearchForm({
           <p role="alert" className="mt-3 text-[12px] font-semibold text-caution-deep">
             {namePhase.message}
           </p>
+        )}
+        {phoneticPhase.name !== "idle" && (
+          <div className="mt-4 border-t border-line pt-4">
+            <PhoneticMatchesSection phase={phoneticPhase} live />
+          </div>
         )}
       </section>
 
