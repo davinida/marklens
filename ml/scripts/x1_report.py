@@ -63,6 +63,9 @@ REPORT_PAIRS: list[tuple[str, str, frozenset[str]]] = [
     ("애플", "APPLE", frozenset()),
     ("애플", "사과", frozenset()),
     ("KR", "케이알", frozenset()),
+    # 슬로건형(제거 후 4토큰 이상)은 전체관찰만 — 분리관찰 상한 도입(2026-09-17) 후 관찰용
+    ("창창대로 SCIENCE START-UP PARK", "스타박스", frozenset()),
+    ("HYUNDAI MOTOR GROUP Together for a better future", "현대", frozenset()),
 ]
 
 

@@ -26,6 +26,8 @@ torch·faiss·backend 를 import 하지 않고 표준 라이브러리만 사용�
     - 분리관찰(일부만으로도 호칭될 수 있다)
         → 제거 후 각 토큰의 2음절 이상 읽기를 독립 후보로 넣는다. 단, 알파벳·숫자 1글자
           토큰에서 나온 읽기("K"→케이)는 제외한다(무관한 상표를 1.0 으로 만드는 오탐 방지).
+          제거 후 토큰이 MAX_TOKENS_FOR_SPLIT(3)개를 넘는 슬로건형 표장은 전체관찰이 원칙이라
+          토큰 단독 후보를 만들지 않는다.
     - 불가분 결합의 예외(전체로만 불러야 하는 경우)
         → 제거 전 토큰 전체를 이어붙인 결합음을 항상 후보에 유지한다.
     - 요부관찰(식별력 없는 부분은 제외하고 대비)
@@ -134,6 +136,12 @@ MAX_CANDIDATES: Final = 16
 
 # 후보·비교에 쓰는 음절 수 상한(앞에서부터).
 MAX_SYLLABLES: Final = 40
+
+# 분리관찰 후보 (c)를 만드는 토큰 수 상한(제거 후 기준). 분리관찰은 일부만으로 자연스럽게
+# 호칭될 때 적용하는 법리이고, 다수 토큰의 슬로건형 표장은 전체관찰이 원칙이다. 이 값을
+# 넘으면(4개 이상) 토큰 단독 후보를 만들지 않고 전체 결합음 (a)(b)만 쓴다.
+# (창창대로 SCIENCE START-UP PARK 의 '스타트'가 독립 호칭이 되어 스타박스와 0.745 가 나오는 문제)
+MAX_TOKENS_FOR_SPLIT: Final = 3
 
 # ② 음절 위치별 가중치. 긴 쪽 음절 수 n 으로 고른다. "첫음절 2배"가 기준선이며 짧을수록 강조.
 #    - n<=2 : 첫음절 3배, 둘째 1.5배 (2음절 상표는 첫음절이 사실상 전부)
@@ -1092,7 +1100,9 @@ def _candidates_cached(name: str, extra_generic: frozenset[str]) -> tuple[str, .
         return ()
     survivors = _apply_paired_rule(pre, post)
     candidates = _combos(pre, survivors) + _combos(post, survivors)
-    for token in post:
+    # (c) 분리관찰 — 슬로건형(제거 후 MAX_TOKENS_FOR_SPLIT 초과)은 전체관찰만 하므로 생략한다.
+    split_tokens = post if len(post) <= MAX_TOKENS_FOR_SPLIT else ()
+    for token in split_tokens:
         if len(token) == 1 and _char_class(token) in ("L", "D"):
             continue  # 알파벳·숫자 1글자 토큰 유래 읽기는 분리관찰 후보에서 제외(결합음에는 포함)
         candidates.extend(r for r in survivors[token] if _syllable_count(r) >= 2)

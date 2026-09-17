@@ -219,6 +219,17 @@ def test_brand_list_cross_check(a, b, op, threshold, reason):
         assert score == threshold, f"{a} / {b}: {score:.3f} ({reason})"
 
 
+def test_slogan_marks_use_whole_observation_only():
+    """제거 후 4토큰 이상 슬로건형 표장은 분리관찰 후보 (c)를 만들지 않는다
+    (MAX_TOKENS_FOR_SPLIT=3)."""
+    slogan = "창창대로 SCIENCE START-UP PARK"
+    assert phonetic_similarity(slogan, "스타박스") <= 0.4
+    assert "스타트" not in pronunciation_candidates(slogan)
+    # 3토큰 이하는 그대로 분리관찰한다.
+    assert "현대" in pronunciation_candidates("HYUNDAI MOTOR GROUP")
+    assert "랑콤" in pronunciation_candidates("랑콤 파리")
+
+
 def _load_report_module():
     path = Path(__file__).resolve().parents[1] / "scripts" / "x1_report.py"
     spec = importlib.util.spec_from_file_location("x1_report_under_test", path)
