@@ -6,7 +6,7 @@
 pytest>=9.0.3,<10.0.0
 
 # Starlette 1.x TestClient runtime. 운영 KIPRIS 클라이언트의 httpx와 별도 설치한다.
-httpx2>=2.9.0,<3.0.0
+httpx2>=2.13.0,<3.0.0
 
 # 부하 베이스라인 (감사보고서 R13 — backend/tests/perf/locustfile.py)
 # 다축 확장 전 /search·/health 성능 기준점 측정용. 측정 절차·기록 템플릿은
