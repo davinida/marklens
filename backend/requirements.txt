@@ -14,7 +14,7 @@ fastapi>=0.115.0,<1.0.0
 pydantic-settings>=2.4.0,<3.0.0
 
 # ASGI 서버 (standard extras: httptools, watchfiles, uvloop, websockets 포함)
-uvicorn[standard]>=0.32.0,<1.0.0
+uvicorn[standard]>=0.52.4,<1.0.0
 
 # multipart/form-data 파일 업로드 처리 (FastAPI가 별도로 요구)
 python-multipart>=0.0.20,<1.0.0
