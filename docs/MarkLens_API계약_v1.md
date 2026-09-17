@@ -167,6 +167,75 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
 `GET /name-check?name=...`는 한 릴리스 동안만 유지되는 deprecated 호환 경로입니다.
 검색어가 URL·프록시 로그에 남을 수 있으므로 신규 호출은 사용하지 않습니다.
 
+## 호칭(발음) 유사도 검색 (X1 최소 통합, 2026-09-17)
+
+입력 상표명과 **로컬 DB(현재 게시 세대)** 상표명의 X1 호칭(발음) 유사도를 계산해 상위
+후보를 돌려줍니다. KIPRIS를 호출하지 않으며 키·네트워크 없이 동작합니다. 결과는 호칭 한
+축만 반영한 참고 정보이고 외관·관념·지정상품·법적 판단은 포함하지 않습니다.
+
+### 브라우저 API
+
+`POST /api/phonetic-search`
+
+```json
+{
+  "name": "스타박스",
+  "turnstileToken": "browser-token",
+  "top_k": 5
+}
+```
+
+`top_k`는 선택(1..20)입니다. BFF는 Turnstile을 검증한 뒤 토큰을 제거하고 내부
+`POST /phonetic-search`로 전달합니다. Turnstile 토큰은 1회용이므로 프런트는 `/api/name-check`
+와 같은 토큰을 재사용하지 않고 위젯을 리셋해 받은 새 토큰으로 이 요청을 보냅니다.
+
+### 내부 API
+
+`POST /phonetic-search`
+
+```json
+{ "name": "스타박스", "top_k": 5 }
+```
+
+`name`은 공백 제거 후 1..100자(공백만이면 422), `top_k` 미지정 시 서버 기본값
+`MARKLENS_PHONETIC_TOP_K_DEFAULT`(기본 5)를 씁니다. 후보 하한은
+`MARKLENS_PHONETIC_MIN_SIMILARITY`(기본 0.5), 한도는 `MARKLENS_PHONETIC_RATELIMIT`
+(기본 30/minute)이며 `/name-check`와 같은 API 키·요청 ID 규칙을 따릅니다.
+
+응답:
+
+```json
+{
+  "query": { "name": "스타박스", "has_pronunciation": true, "candidates": ["스타박스"] },
+  "matches": [
+    {
+      "rank": 1,
+      "similarity": 0.9636,
+      "출원번호": "4020210000001",
+      "상표한글명": "스타벅스",
+      "이미지URL": "/images/4020210000001.png",
+      "출원인": "스타벅스 코포레이션",
+      "류": [43]
+    }
+  ],
+  "searched_count": 947,
+  "excluded_no_pronunciation": 153,
+  "dataset_info": {},
+  "params": { "top_k": 5, "min_similarity": 0.5 },
+  "axis": "X1",
+  "note": "호칭(발음) 유사도만 반영한 참고 정보"
+}
+```
+
+- `query.candidates`는 입력의 발음 후보(설명용)입니다. 입력에 호칭이 없으면(기호만 등)
+  `has_pronunciation=false`, `matches=[]`로 200을 반환합니다.
+- `matches`는 `similarity` 내림차순(동점은 출원번호 순)이며 `min_similarity` 미만은
+  제외됩니다. `searched_count`는 발음 후보가 있어 비교한 DB 레코드 수,
+  `excluded_no_pronunciation`은 상표명이 없거나 호칭이 없어 제외한 수입니다.
+- `이미지URL`은 현재 인덱스에 있는 이미지만 연결하며 `/search`와 같은 `/images` 규칙을
+  따릅니다(브라우저는 `/api/images/...`로 접근).
+- 발음 후보 캐시는 서버 기동 시 만들고, 인덱스가 재게시되면 다음 요청에서 다시 만듭니다.
+
 ## 결과 이미지
 
 브라우저는 응답의 `/api/images/...`만 사용합니다. BFF는 안전한 path segment만
@@ -182,7 +251,7 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
 | 403 | Turnstile 토큰·action·hostname 검증 실패 |
 | 413 | 업로드 바이트 상한 초과 |
 | 415 | 지원하지 않는 MIME 또는 실제 이미지 형식 |
-| 422 | `top_k` 또는 스키마 검증 실패 |
+| 422 | `top_k` 또는 스키마 검증 실패, `/phonetic-search`의 공백 상표명 |
 | 429 | gateway/backend 요청 한도 또는 KIPRIS 월 예산 한도 |
 | 502 | KIPRIS/내부 upstream 응답 계약 실패 |
 | 503 | Turnstile·엔진·KIPRIS 설정·인덱스가 준비되지 않음 |

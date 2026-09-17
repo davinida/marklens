@@ -111,6 +111,7 @@
 - `extra_generic` — 식별력 필터(다빈-3)나 상품 정보에서 얻은 **상품 의존 보통명칭 집합**(예: `{"커피", "카페"}`)을 넘긴다. 양쪽 상표명에 같은 집합을 적용한다. 항목은 내부에서 NFKC·casefold 정규화되며 다중 토큰("커피 전문점")은 연속 열로 매칭한다.
 - `pronunciation_candidates(name)` — 디버깅·화면 표시용 후보 목록. 결과 화면에 "어떤 발음으로 비교했는지" 근거로 보여줄 수 있다.
 - 성능: 데이터 상표명 1,000쌍 0.21초(cold, v1 0.51초 — 낱자 읽기 감소로 후보가 줄어 빨라짐). 내부 lru_cache 로 반복 호출은 더 빠르다.
+- 서비스 연결(2026-09-17, 최소 통합): `backend/src/core/phonetic_search.py` 가 기동 시 DB 상표명 중 `has_pronunciation` 인 것만 `pronunciation_candidates` 로 캐시하고, `POST /phonetic-search` 가 입력과 각 레코드의 `phonetic_similarity` 상위 후보를 돌려준다(하한 `MARKLENS_PHONETIC_MIN_SIMILARITY` 기본 0.5). 프런트는 상표명 확인 패널에 "발음(호칭)이 비슷한 등록상표" 섹션으로 표시한다. 공개 함수 세 개만 사용하며 검색 등급에는 미반영.
 - 통합 시 주의: 점수는 교정 전 원점수다. 로지스틱 회귀 학습 전 §2 상수와 §5 보류 항목은 정답 데이터(다빈-1)로 재검토한다.
 
 ## 9. 변경 이력

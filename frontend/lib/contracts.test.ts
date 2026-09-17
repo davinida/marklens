@@ -178,3 +178,33 @@ describe("SearchResponseSchema", () => {
     ).toBe(false);
   });
 });
+
+describe("PhoneticSearchResponseSchema", () => {
+  it("parses the X1 phonetic-search contract and fills optional defaults", async () => {
+    const { PhoneticSearchResponseSchema } = await import("@/lib/contracts");
+    const parsed = PhoneticSearchResponseSchema.parse({
+      query: { name: "스타박스", has_pronunciation: true },
+      matches: [
+        { rank: 1, similarity: 0.96, 출원번호: "4020210000001", 상표한글명: "스타벅스" },
+      ],
+      searched_count: 947,
+      excluded_no_pronunciation: 153,
+      dataset_info: {
+        총_상표수: 1100,
+        출원일자_범위: "1962 ~ 2026",
+        데이터_기준: "KIPRIS 등록 상태 도형·복합상표",
+        생성일자: "2026-08-27",
+      },
+      params: { top_k: 5, min_similarity: 0.5 },
+      axis: "X1",
+      note: "호칭(발음) 유사도만 반영한 참고 정보",
+      extra_field: "ignored but kept",
+    });
+
+    expect(parsed.query.candidates).toEqual([]);
+    expect(parsed.matches[0].류).toEqual([]);
+    expect(parsed.matches[0].이미지URL).toBeUndefined();
+    expect(parsed.params.min_similarity).toBe(0.5);
+    expect(parsed.searched_count).toBe(947);
+  });
+});

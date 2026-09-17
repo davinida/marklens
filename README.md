@@ -23,7 +23,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 시각 후보 상태 | 구현 | 단조적 4개 상태, 교정 전 임시 임계값 |
 | 상표명 완전일치 확인 | 구현 | KIPRIS 실시간 조회, 후보 상세·상태 분포·완전성 표시. **검색과 별개 기능**(검색 점수에 반영되지 않음) |
 | KIPRIS 수집 및 인덱스 빌드 | 구현 | 체크포인트, authoritative key, manifest, 원자적 게시 |
-| 호칭 유사도 X1 | 라이브러리 구현 | `ml/src/axes/x1_phonetic.py`. **API·UI에는 아직 연결되지 않음** |
+| 호칭 유사도 X1 | 최소 연결 | `ml/src/axes/x1_phonetic.py` + `POST /phonetic-search`. 상표명 확인 패널에 "발음이 비슷한 등록상표" 섹션. 통합 점수에는 미반영 |
 | 상품↔유사군 변환표 | 도구 구현 | 파서·검증기 완료. `goods_map.json`은 라이선스 확인 전이라 미커밋(로컬 생성) |
 | 관념(X3)·상품 견련성(X4)·통합 모델 | 예정 | UI의 지정상품 입력도 현재 숨김 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
@@ -48,7 +48,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1) | `ml/src/axes/` | X3·X4 파일은 예정 |
 | 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 미착수 | — | 통합 모델 학습 전제 |
-| 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(90건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21. API·UI 미연결 |
+| 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(90건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21. 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 명칭 정책은 검토 중 |
 | 프론트-1 변경 시안 확정 | 지원 | 미착수 | — | 저장소에 시안 산출물 없음 |
@@ -74,7 +74,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 - 검색 입력은 **아직 이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음).
 - 상표명 확인(`/name-check`)은 검색과 분리된 별도 기능이며 검색 점수에 영향을 주지 않습니다.
-- X1은 `ml/src/axes/`의 순수 함수 라이브러리 상태이고 API·UI에 연결되지 않았습니다.
+- X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. 검색 점수·등급에는 반영되지 않습니다(통합 모델 예정).
 
 ## 구조
 
@@ -327,12 +327,14 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 |---|---|
 | `POST /api/search?top_k=5` | Turnstile 검증 후 이미지 검색 프록시 |
 | `POST /api/name-check` | `{ "name": "...", "turnstileToken": "..." }` 명칭 확인 프록시 |
+| `POST /api/phonetic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..20 }` X1 발음 유사 후보 프록시 |
 | `GET /api/health` | 외부용 BFF·FastAPI 준비 상태 |
 | `GET /api/images/{path}` | 결과 이미지 프록시 |
 | `GET /api/turnstile-config` | 위젯 사이트 키·dev bypass 설정 전달 |
 | `GET /health` | 내부 FastAPI 엔진·인덱스 상태 |
 | `POST /search` | 내부 이미지 검색 API (`file`, `top_k`) |
 | `POST /name-check` | 내부 명칭 확인 API |
+| `POST /phonetic-search` | 내부 X1 호칭 유사도 검색 (`name`, `top_k`). 로컬 DB 계산, KIPRIS 무관 |
 | `GET /images/{key}` | 인덱스에 포함된 결과 이미지만 제공. `MARKLENS_PUBLIC_RESULT_IMAGES=true`(로컬 기본)일 때만 등록 |
 | `GET /docs` | Swagger UI |
 
@@ -373,6 +375,9 @@ has_pronunciation("東洋")                                                # Fal
 phonetic_similarity("카페 봄", "봄", extra_generic=frozenset({"카페"}))  # 1.0
 ```
 
+- 서비스 연결(최소): `POST /phonetic-search`가 기동 시 DB 상표명의 발음 후보를 캐시해
+  입력 상표명과 비교한 상위 후보를 돌려주고, 상표명 확인 패널이 "발음(호칭)이 비슷한
+  등록상표" 섹션으로 보여 줍니다. 검색 등급·점수에는 아직 반영되지 않습니다.
 - 흐름: 정규화(회사 형태·부가어·기능어 제거) → 발음 후보(외래어 표기법 근사 룰
   G2P, 국내 브랜드 로마자표 91개·지명표 34개, 예외 사전 39개, 낱자·숫자 읽기,
   한영 병기 판정) → 후보 조합 → 위치 가중 음절 레벤슈타인 → 최댓값.

@@ -1,12 +1,16 @@
 import {
   parseNameCheckResponse,
+  PhoneticSearchResponseSchema,
   SearchResponseSchema,
   type NameCheckResult,
+  type PhoneticSearchResponse,
   type SearchResponse,
 } from "@/lib/contracts";
 
 export type {
   GradeCode,
+  PhoneticMatch,
+  PhoneticSearchResponse,
   SearchMatch,
   SearchResponse,
   StatusCode,
@@ -136,6 +140,38 @@ export async function checkTrademarkName(
       response.headers.get("x-request-id"),
     );
   }
+}
+
+/** X1 호칭(발음) 유사도 검색 — 로컬 DB 상표명과 비교한 상위 후보. name-check 와 별개 호출. */
+export async function searchPhonetic(
+  name: string,
+  turnstileToken: string,
+  signal?: AbortSignal,
+): Promise<PhoneticSearchResponse> {
+  let response: Response;
+  try {
+    response = await fetch("/api/phonetic-search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, turnstileToken }),
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    networkError(error);
+  }
+
+  const body = await assertOk(response);
+  const parsed = PhoneticSearchResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "발음 유사도 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
+      response.headers.get("x-request-id"),
+    );
+  }
+  return parsed.data;
 }
 
 const SAFE_IMAGE_SEGMENT = /^[\p{L}\p{N} ._-]+$/u;

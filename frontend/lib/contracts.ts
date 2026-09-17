@@ -430,3 +430,44 @@ export type SearchResponse = z.infer<typeof SearchResponseSchema>;
 export type SearchMatch = z.infer<typeof SearchMatchSchema>;
 export type GradeCode = z.infer<typeof GradeCodeSchema>;
 export type StatusCode = z.infer<typeof StatusCodeSchema>;
+
+// ---- X1 호칭(발음) 유사도 검색 (/api/phonetic-search) ----
+// 백엔드 /phonetic-search 응답. 한글 키는 /search 관례를 따르고 passthrough 로 추가 필드를 허용한다.
+export const PhoneticMatchSchema = z
+  .object({
+    rank: z.number().int().positive(),
+    similarity: z.number().finite(),
+    출원번호: z.string(),
+    상표한글명: z.string(),
+    이미지URL: NullableText,
+    출원인: NullableText,
+    류: z.array(z.number()).optional().default([]),
+  })
+  .passthrough();
+
+export const PhoneticSearchResponseSchema = z
+  .object({
+    query: z
+      .object({
+        name: z.string(),
+        has_pronunciation: z.boolean(),
+        candidates: z.array(z.string()).optional().default([]),
+      })
+      .passthrough(),
+    matches: z.array(PhoneticMatchSchema),
+    searched_count: z.number().int().nonnegative(),
+    excluded_no_pronunciation: z.number().int().nonnegative(),
+    dataset_info: DatasetInfoSchema.optional(),
+    params: z
+      .object({
+        top_k: z.number().int().positive(),
+        min_similarity: z.number().min(0).max(1),
+      })
+      .passthrough(),
+    axis: z.string().optional(),
+    note: z.string().optional(),
+  })
+  .passthrough();
+
+export type PhoneticMatch = z.infer<typeof PhoneticMatchSchema>;
+export type PhoneticSearchResponse = z.infer<typeof PhoneticSearchResponseSchema>;
