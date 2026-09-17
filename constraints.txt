@@ -9,7 +9,7 @@ numpy==1.26.4
 
 fastapi==0.139.0
 pydantic-settings==2.15.0
-uvicorn==0.51.0
+uvicorn==0.52.4
 python-multipart==0.0.32
 python-dotenv==1.2.2
 httpx==0.28.1
