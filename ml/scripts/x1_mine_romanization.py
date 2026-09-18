@@ -8,8 +8,9 @@
 후보 조건 (한 쌍이 여러 상표명에 나오면 출현수를 센다):
   - 영문 토큰 길이 ≥ 3, 기능어·회사형태(UNIVERSAL_GENERIC) 제외
   - 0.4 ≤ 유사도 < 0.8 → "후보" (병기로 보이는데 룰이 못 읽는 구간)
-  - 브랜드 표(KOREAN_BRAND_ROMANIZATION)에 이미 있는 영문 토큰은 "후보" 대신 "확인됨" 으로 표시.
-    표의 한글 값과 한글 토큰이 같은 쌍은 유사도 구간과 무관하게 "확인됨" (표가 DB 로 뒷받침됨).
+  - 브랜드 표·지명 표·예외 사전(G2P_EXCEPTIONS)에 이미 있는 영문 토큰은 "후보" 대신
+    "확인됨" 으로 표시. 표의 한글 값과 한글 토큰이 같은 쌍은 유사도 구간과 무관하게
+    "확인됨" (표가 DB 로 뒷받침됨).
 
 출력: ml/data/staging/x1_romanization_candidates.csv (영문, 한글, 룰읽기, 유사도, 출현수, 상태)
       빈도순 정렬 + 상위 50건 화면 출력.
@@ -34,8 +35,12 @@ ML_ROOT = Path(__file__).resolve().parent.parent
 if str(ML_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_ROOT))
 
-from src.axes.korean_brands import KOREAN_BRAND_ROMANIZATION  # noqa: E402
+from src.axes.korean_brands import (  # noqa: E402
+    KOREAN_BRAND_ROMANIZATION,
+    KOREAN_PLACE_ROMANIZATION,
+)
 from src.axes.x1_phonetic import (  # noqa: E402
+    G2P_EXCEPTIONS,
     _char_class,
     _normalize_tokens,
     _syllable_sim,
@@ -77,7 +82,11 @@ def mine(records: list[dict]) -> tuple[list[dict], int]:
         reading = g2p_benchmark(en)
         score = _syllable_sim(reading, ko) if reading else 0.0
         in_range = CANDIDATE_LOW <= score < CANDIDATE_HIGH
-        table_value = KOREAN_BRAND_ROMANIZATION.get(en)
+        table_value = (
+            KOREAN_BRAND_ROMANIZATION.get(en)
+            or KOREAN_PLACE_ROMANIZATION.get(en)
+            or G2P_EXCEPTIONS.get(en)
+        )
         if table_value is not None and (table_value == ko or in_range):
             status = "확인됨"
         elif table_value is None and in_range:

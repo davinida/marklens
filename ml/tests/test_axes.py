@@ -322,6 +322,31 @@ def test_rule_g2p_reads_common_words(a, b):
     assert phonetic_similarity(a, b) == 1.0
 
 
+@pytest.mark.parametrize(
+    ("a", "b", "op", "threshold", "reason"),
+    [
+        ("바른", "BARUN", "==", 1.0, "브랜드표 barun→바른"),
+        (
+            "ㅂㄹ 바른치과 BARUN DENTAL CLINIC",
+            "바른치과",
+            "==",
+            1.0,
+            "실제 DB 쌍 — 한글 토큰 분리관찰",
+        ),
+        ("휴식", "HUSIC", "==", 1.0, "브랜드표 husic→휴식"),
+        ("잇버거", "EAT BURGER", "==", 1.0, "예외 eat→잇 + 룰 burger→버거"),
+        ("차이니즈", "CHINESE", "==", 1.0, "예외 chinese→차이니즈"),
+    ],
+)
+def test_v1_4_1_mining_approvals(a, b, op, threshold, reason):
+    """2026-09-18 로마자 캐기 재분류 승인분(브랜드표 10, 예외 7)."""
+    score = phonetic_similarity(a, b)
+    if op == ">=":
+        assert score >= threshold, f"{a} / {b}: {score:.3f} ({reason})"
+    else:
+        assert score == threshold, f"{a} / {b}: {score:.3f} ({reason})"
+
+
 def test_pure_rule_benchmark_floor():
     """60단어 벤치마크(순수 룰, 표·예외 비활성)는 48건 이상 정확 일치를 유지한다
     (v1.4 기준 48/60)."""

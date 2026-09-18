@@ -135,6 +135,14 @@ G2P_EXCEPTIONS: Final[dict[str, str]] = {
     "research": "리서치",
     "crisis": "크라이시스",
     "evisu": "에비수",
+    # v1.4.1 (2026-09-18) 로마자 캐기 재분류에서 승인한 외래어 관용 표기
+    "santa": "산타",
+    "soccer": "사커",
+    "academy": "아카데미",
+    "guardians": "가디언즈",
+    "eat": "잇",
+    "chinese": "차이니즈",
+    "business": "비즈니스",
 }
 
 # ③ 복수 읽기 사전 — 문맥 없이 발음이 갈리는 영단어. 여러 호칭 중 하나만 유사해도 유사하므로
