@@ -385,7 +385,8 @@ phonetic_similarity("카페 봄", "봄", extra_generic=frozenset({"카페"}))  #
   다른 축만으로 판단합니다. `extra_generic`에는 식별력 필터(예정)가 넘길 상품
   의존 보통명칭 집합을 넣습니다.
 - 성능: 데이터 상표명 1,000쌍 0.21초(cold) — DB 전수 계산이 가능한 수준.
-  G2P 벤치마크 20단어는 순수 룰 기준 정확 일치 15/20.
+  G2P 벤치마크 60단어는 순수 룰 기준 정확 일치 48/60(브랜드·지명 로마자표와 예외 사전은
+  벤치마크에서 끔).
 - 설계·상수·한계·검토 대기 항목: [X1 설계 문서](docs/MarkLens_X1_호칭유사도_설계.md).
   점수표 재현: `ml/venv/bin/python ml/scripts/x1_report.py`.
 

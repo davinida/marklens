@@ -35,7 +35,8 @@
 | `UNIVERSAL_GENERIC` | 회사 형태·부가어·영문 기능어 31개 | 요부관찰. 상품 의존 보통명칭은 여기 넣지 않고 `extra_generic` 으로 |
 | `KOREAN_BRAND_ROMANIZATION` | 국내 브랜드 로마자 **91개** (`korean_brands.py`) | 룰로 읽을 수 없는 한국어 로마자(samsung, hyundai …). 씨앗 110개 중 룰 결과와 같은 33개(kakao, naver …)는 중복이라 제외한 77개 + 로마자 캐기 승인분 10개(gudaero, chengdamsu, yumbbokki, nakwon, luciel, netmarble, petitzel, heyalfun, honsul, sancheon) + 유명 브랜드 목록 교차 확인 4개(sangmidang, eland, woowa, baedal). 룰보다 먼저 적용 |
 | `KOREAN_PLACE_ROMANIZATION` | 국내 지명 로마자 **34개** (`korean_brands.py`) | 광역·서울 안 지명·시군·국호 39개 중 룰 결과와 같은 5개(sejong, insadong, songdo, sokcho, mokpo) 제외. 브랜드표와 같은 단계(룰보다 먼저). **향후 식별력 필터(현저한 지리적 명칭)에서 재사용 예정** |
-| `G2P_EXCEPTIONS` | 기능어·수사·약어 24개 + 외래어 관용 표기 15개 = 39개 | 룰로 맞추기 어려운 불규칙. 브랜드(hyundai/lotte/kia)는 브랜드 표로 이동. 관용 표기(pilates, ballet, etoile, curry, atelier, gourmet, poke, musical, salon, baseball, together)는 로마자 캐기에서 확인해 승인, coffee→커피 는 룰의 o→ㅗ 기본값이 맞지 않는 불규칙, paris·baguette·republica 는 유명 브랜드 목록 교차 확인에서 승인 |
+| `G2P_EXCEPTIONS` | 기능어·수사·약어 24개 + 외래어 관용 표기 32개 = 56개 | 룰로 맞추기 어려운 불규칙. 브랜드(hyundai/lotte/kia)는 브랜드 표로 이동. 관용 표기(pilates, ballet, etoile, curry, atelier, gourmet, poke, musical, salon, baseball, together)는 로마자 캐기에서 확인해 승인, coffee→커피 는 룰의 o→ㅗ 기본값이 맞지 않는 불규칙, paris·baguette·republica 는 유명 브랜드 목록 교차 확인에서 승인. v1.4: 벤치마크 60단어 검수에서 룰로 일반화할 수 없는 hot·good·big·love·living·express·bio 와 leisure·electro·saturday, 모음 사이 s 유성음 규칙의 예외 basic·asia·asian·genesis·research·crisis·evisu |
+| `G2P_MULTI` | 21개 | ③ 문맥 없이 발음이 갈리는 단어(live 라이브·리브, read 리드·레드, close 클로즈·클로스, wind, tear, bass, polish, bow, row, sow, minute, desert, wound, use, excuse, refuse, resume, dove, present, record). `_readings` 가 모든 읽기를 후보에 넣어 어느 쪽과도 1.0 |
 | `LETTER_READING_MAX_LEN` | **3** (v1: 5) | 낱자 읽기(에이비씨) 추가 기준. 모음 없는 토큰은 길이 무관. r 은 알/아르 두 후보 |
 | `MAX_TOKENS_FOR_SPLIT` | 3 | 제거 후 토큰이 이를 넘으면(4개 이상) 슬로건형으로 보고 영문·숫자 유래 단독 후보를 제한한다(전체관찰 원칙). c283a36 에서 전체 토큰에 적용하던 것을 v1.3.1 에서 영문·숫자로 한정 — 한글 토큰은 토큰 수와 무관하게 분리관찰(⑤) |
 | `SLOGAN_LEAD_TOKENS` | 2 | 슬로건형이라도 제거 후 앞 2개 토큰의 읽기는 단독 후보로 유지(브랜드가 앞에 오는 관행: HYUNDAI MOTOR GROUP Together … → 현대·모터). §5-5 검토 대기 |
@@ -43,7 +44,7 @@
 
 점수 = max(편집거리 점수, 포함 점수). 편집거리 점수 = max(0, 1 − 거리/최대거리), 최대거리 = Σ_{p<n} w[p]·2.5. 연산 비용에 `w[min(i, j)]` 를 곱해 대칭을 보장한다. 포함 점수는 접두·접미 조건을 만족할 때만 0.9 이상이며 짧은/긴 순서로 계산해 대칭이다.
 
-벤치마크 규칙: `x1_report.py` 의 20단어 표본은 `g2p_benchmark`(브랜드·지명 표와 예외 사전을 모두 끈 순수 룰)로 측정한다. 표에 단어를 넣어도 벤치마크가 오르지 않도록 테스트(`test_benchmark_disables_exception_and_brand_tables`)가 이 계약을 검증한다.
+벤치마크 규칙: `x1_report.py` 의 표본은 `g2p_benchmark`(브랜드·지명 표와 예외 사전을 모두 끈 순수 룰)로 측정한다. v1.4 에서 20단어 → 60단어(DB 빈출 일반 영단어 40개 추가, science·beauty·design 포함)로 늘렸고 순수 룰 48/60 이 하한이다(`test_pure_rule_benchmark_floor`). 표에 단어를 넣어도 벤치마크가 오르지 않도록 테스트(`test_benchmark_disables_exception_and_brand_tables`)가 이 계약을 검증한다.
 
 ## 3. 후보 생성 예시 (실측, v1.1)
 
@@ -61,7 +62,7 @@
 ## 4. 알려진 한계
 
 1. **한자 미지원(v1)**: 한자 토큰은 버린다. 순수 한자 상표명은 `has_pronunciation` False. 데이터 1,100건 중 한자 포함 1건(0.1%)이라 후순위.
-2. **G2P 는 근사**: 20단어 표본(순수 룰) 정확 일치 15/20, 평균 음절 유사도 0.957. 실패 유형은 한국 브랜드 로마자(SAMSUNG→샘성 — 브랜드 표로 보완), 불규칙 모음(COFFEE→코피 — 예외 사전으로 보완, NIKE→나이크), 어말 s(PARIS→파리스). 데이터 표본에서 관찰된 룰 공백 중 seoul·together·baseball·pilates·heyalfun 은 v1.2 에서 표·예외 사전으로 흡수했고, group→그라웁, airline→에얼린 은 미수정으로 남아 있다.
+2. **G2P 는 근사**: 60단어 표본(순수 룰) 정확 일치 48/60, 평균 음절 유사도 0.940 (v1 의 20단어는 15/20 그대로). v1.4 에서 룰로 고친 유형: sc+e/i 의 c 묵음과 첫 모음군 ie+n(science 사이언스·client), eau(beauty 뷰티), 모음 사이 s 유성음(design 디자인·music·cheese 치즈 — a 앞과 어말 묵음 e 앞은 제외), iend(friend 프렌드), 어말·자음 앞 alk(talk 토크), ea 특수(health 헬스·heaven 헤븐·head·weather·measure), 어말 -ment/-ance/-ence 약모음(entertainment 엔터테인먼트·performance 퍼포먼스), 첫 모음이 아닌 -ean(korean 코리안), 첫 모음 a+자음+ure(nature 네이처), 어말 -tial(essential 에센셜). 남은 실패 12건: 한국 브랜드 로마자(SAMSUNG — 브랜드 표), 불규칙 모음(COFFEE·NIKE·ORANGE), 어말 s(PARIS — 예외), 관용 받침·강세(HOT·GOOD·BIG·LOVE·LIVING·EXPRESS·BIO — 예외 사전). 데이터 표본에서 관찰된 룰 공백 중 group→그라웁, airline→에얼린 은 미수정.
 3. **보통명칭은 `extra_generic` 의존**: "블루 커피 / 레드 커피"는 `extra_generic={"커피"}` 없이는 토큰 후보 "커피"끼리 1.0 이 된다. 1글자 토큰 문제(실온K슐랭 / K8 REFOREST)는 v1.1 에서 해결했지만, **2글자 이상 공통 토큰(프로, 치킨, 클럽 등)은 여전히 1.0** 이 될 수 있다 → 식별력 필터(다빈-3)의 보통명칭 집합을 넘겨야 한다. v1.3.1 부터 `extra_generic` 은 토큰 읽기와도 대조하므로 한글 목록만 넘겨도 영문 표기(COFFEE)가 같이 제거된다("BLUE COFFEE / RED COFFEE" 1.000→0.473).
 4. **붙여쓴 결합어는 접두·접미만 분리**: v1.3.1 의 포함 검사로 "서울바쿠테 / 바쿠테" 0.474→0.960, "스타벅스 / 스타벅스커피" 0.701→0.967. 형태소 분석을 쓰지 않으므로 **가운데 포함**("더스타벅스카페"의 스타벅스)과 **2음절 요부**(스타/스타벅스 0.636)는 여전히 잡지 못한다.
 5. **불가분 결합은 근사**: 결합 여부를 판단하지 않고 "전체 결합음을 항상 후보에 유지"로 대신한다.
@@ -89,15 +90,9 @@
 
 `extra_generic` 을 원 토큰뿐 아니라 **토큰의 읽기**(coffee→커피)에도 적용하기로 했다(`_reads_as_generic`). `UNIVERSAL_GENERIC` 은 토큰 완전일치만 유지한다. "STARBUCKS COFFEE / 스타벅스"({"커피"}) 1.000, "BLUE COFFEE / RED COFFEE"({"커피"}) 0.473.
 
-### 5-5. `SLOGAN_LEAD_TOKENS` — 2번째 토큰이 일반 영어 단어일 때 (사람 결정 대기)
+### 5-5. `SLOGAN_LEAD_TOKENS` — 결정 완료 (2026-09-18, v1.4)
 
-앞 2개 토큰을 남기면 "창창대로 SCIENCE START-UP PARK" 의 science→스신스(2번째 토큰)가 단독 후보로 남아 `스타박스` 와 0.545 가 된다(테스트는 strict xfail). 실측 비교:
-
-| 선택지 | 창창대로 / 스타박스 | 잃는 것 | 표본 30쌍 평균 |
-|---|---:|---|---:|
-| 현재 `SLOGAN_LEAD_TOKENS`=2 | 0.545 | — | 0.2871 |
-| 1 로 낮춤 | 0.145 | HYUNDAI MOTOR GROUP Together … / 모터 1.000→0.145, T KIA Tigers … / 기아 1.000→0.101(첫 토큰 T 가 1글자라 제외되고 kia 가 2번째), SAMSUNG THUNDERS … / 썬더스 0.911→0.356 | 0.2638 |
-| 기준을 0.6 으로 완화 | 0.545 | 코드 변경 없음 | 0.2871 |
+원인은 science 의 룰 읽기 '스신스'였다. v1.4 G2P 보강으로 science→사이언스 가 되어 "창창대로 SCIENCE START-UP PARK / 스타박스" 는 0.545→**0.491**. 남은 0.49 는 '사이언스'와 '스타박스' 자체의 편집거리(사/스·언/박 유사)이며 서비스 하한 0.5 미만이라 후보에 오르지 않는다. 테스트는 strict xfail 을 풀고 `<= 0.5` 일반 assert 로 전환했다(0.4 기준은 실측상 불가). `SLOGAN_LEAD_TOKENS` 는 2 유지(1 로 낮추면 모터·기아·썬더스를 잃는다 — v1.3.1 실측).
 
 ## 6. 국내 브랜드 로마자 3단계 전략
 
@@ -131,6 +126,7 @@
 ## 9. 변경 이력
 
 - **v1 (2026-09-17)**: 초판. 판례 5규칙 매핑, 룰 G2P, 가중 음절 레벤슈타인, 테스트 A/B 76건.
+- **v1.4 (2026-09-18, 영문 G2P 룰 보강)**: ① 벤치마크 20→60단어(DB 빈출 일반 영단어 40개, science·beauty·design 포함), 순수 룰 35/60→48/60(기존 통과 단어 깨짐 0, 하한 테스트 추가) ② 룰 보강 — sc+e/i·첫 모음군 ie+n, eau, 모음 사이 s 유성음(a 앞·어말 묵음 e 앞 제외), iend, alk, ea 특수(ealth·eaven·eather·easure·어말 ead), 어말 -ment/-ance/-ence 약모음, -ean, a+자음+ure, -tial ③ 예외 사전 +17(hot·good·big·love·living·express·bio·leisure·electro·saturday + 유성음 규칙 예외 basic·asia·asian·genesis·research·crisis·evisu) → 56개 ④ `G2P_MULTI` 21개(live 라이브·리브 등, 모든 읽기를 후보로) ⑤ DB 영문 토큰 상위 100개 검수(맞음 89·틀림 2·애매 9, 보고서) ⑥ 로마자 캐기 재실행: 후보 70·확인됨 15(미승인 58행 재분류는 보고서) ⑦ §5-5 결정 완료(창창대로/스타박스 0.545→0.491, xfail 해제). 표본 30쌍 평균 0.2871 변화 없음, C 쌍은 창창대로만 변동. 테스트 118건.
 - **v1.3.1 (2026-09-18, 후보 규칙 보완 3건)**: ① 슬로건 상한(`MAX_TOKENS_FOR_SPLIT`=3, c283a36 도입)을 영문·숫자 유래 읽기에만 적용하고 한글 토큰은 항상 분리관찰(잇버거 EAT PREMIUM BURGER / 잇버거 0.316→1.000) + 앞 `SLOGAN_LEAD_TOKENS`(2)개 토큰 유지(HYUNDAI MOTOR GROUP Together … / 현대 0.231→1.000) ② 붙여쓴 결합어 접두·접미 포함 검사(`_contain_sim`, 서울바쿠테/바쿠테 0.474→0.960, 스타벅스/스타벅스커피 0.701→0.967, 스타/스타벅스 0.636 유지) ③ `extra_generic` 을 토큰 읽기와도 대조(BLUE COFFEE / RED COFFEE {커피} 1.000→0.473, STARBUCKS COFFEE / 스타벅스 {커피} 1.000). 표본 30쌍 평균 0.2537→0.2871(+0.0334, 6쌍 상승, 경고 없음). 미해결: 창창대로 SCIENCE START-UP PARK / 스타박스 0.545(§5-5, strict xfail). 테스트 105건(xfail 1).
 - **v1.3 (2026-09-17, 브랜드 목록 교차 확인 반영)**: ① 브랜드표 +4(sangmidang, eland, woowa, baedal) → 91개 ② 예외 사전 +3 외래어 관용 표기(paris, baguette, republica) → 39개 ③ 지명표에서 룰 결과와 같은 songdo 제거(코드 35개 → 문서와 같은 34개) ④ 테스트 3건 추가(이랜드/ELAND 1.0, 파리바게뜨/PARIS BAGUETTE, 상미당/SANGMIDANG 1.0). 벤치마크는 순수 룰이라 15/20 유지.
 - **v1.2 (2026-09-17, 마무리)**: ① `COST_JUNG_MERGED` 0.25→0.1(게/개 0.900→0.960, 테스트 assert 전환) ② 브랜드표 +10(캐기 승인분) → 87개 ③ 예외 사전 +11 외래어 관용 표기 → 35개 ④ 지명표 34개 신설(브랜드표와 같은 단계) ⑤ 벤치마크 계약 테스트에 지명표 포함, 테스트 3건 추가 ⑥ coffee→커피 예외(서울커피/SEOUL COFFEE 0.927→1.000, 커피빈/COFFEE BEAN·스타벅스커피/STARBUCKS COFFEE 1.000 테스트 추가, xfail 0건). 점수 변화: C 쌍 v1.1 과 동일; 표본 30쌍 평균 0.3147→0.3111(−0.0035, 2쌍 변동: Sky touch/Airline Seoul 0.556→0.444, 실온K슐랭/K8 REFOREST 0.260→0.265); 벤치마크 평균 0.956→0.957(ORANGE 합류 비용).

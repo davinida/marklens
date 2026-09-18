@@ -116,6 +116,51 @@ G2P_EXCEPTIONS: Final[dict[str, str]] = {
     "paris": "파리",
     "baguette": "바게뜨",
     "republica": "리퍼블리카",
+    # v1.4 (2026-09-18) 벤치마크 60단어·DB 빈출 토큰 검수 — 룰로 일반화할 수 없는 불규칙
+    "hot": "핫",  # 짧은 o: hot 핫 / top 톱 / dog 도그 가 제각각이라 룰 불가
+    "good": "굿",  # food 푸드 / wood 우드 와 달리 굿 만 받침
+    "big": "빅",  # pig 피그 / dig 디그 와 달리 빅 만 받침
+    "love": "러브",  # stove 스토브 / grove 그로브 와 갈림
+    "living": "리빙",  # driving 드라이빙 / diving 다이빙 과 갈림
+    "express": "익스프레스",  # 첫음절 강세 여부(expert 엑스퍼트)로 갈림
+    "bio": "바이오",  # radio 라디오 / studio 스튜디오 와 달리 bi- 접두
+    "leisure": "레저",
+    "electro": "일렉트로",
+    "saturday": "새터데이",
+    # 모음 사이 s 유성음 규칙(design 디자인)의 예외 — 무성음으로 굳은 단어
+    "basic": "베이식",
+    "asia": "아시아",
+    "asian": "아시안",
+    "genesis": "제네시스",
+    "research": "리서치",
+    "crisis": "크라이시스",
+    "evisu": "에비수",
+}
+
+# ③ 복수 읽기 사전 — 문맥 없이 발음이 갈리는 영단어. 여러 호칭 중 하나만 유사해도 유사하므로
+#    모든 읽기를 후보로 넣는다(_readings). 첫 항목이 대표 읽기.
+G2P_MULTI: Final[dict[str, tuple[str, ...]]] = {
+    "live": ("라이브", "리브"),
+    "read": ("리드", "레드"),
+    "lead": ("리드", "레드"),
+    "close": ("클로즈", "클로스"),
+    "wind": ("윈드", "와인드"),
+    "tear": ("티어", "테어"),
+    "bass": ("베이스", "배스"),
+    "polish": ("폴리시", "폴리쉬"),
+    "bow": ("보우", "바우"),
+    "row": ("로우", "라우"),
+    "sow": ("소우", "사우"),
+    "minute": ("미닛", "미뉴트"),
+    "desert": ("데저트", "디저트"),
+    "wound": ("운드", "와운드"),
+    "use": ("유즈", "유스"),
+    "excuse": ("익스큐즈", "익스큐스"),
+    "refuse": ("리퓨즈", "레퓨즈"),
+    "resume": ("레주메", "리줌"),
+    "dove": ("더브", "도브"),
+    "present": ("프레즌트", "프리젠트"),
+    "record": ("레코드", "리코드"),
 }
 # 국내 브랜드·지명 로마자(samsung→삼성, seoul→서울)는 korean_brands 의 두 표에서 관리한다.
 
@@ -534,6 +579,10 @@ def _scan_vowel(word: str, index: int, silent_e: int, multi: bool) -> tuple[list
         return [_v("ㅗ", True)], 1
 
     if c == "a":
+        if starts("alk") and (at_end(3) or is_c(ch(3)) or starts("alking")):
+            return [_v("ㅗ")], 2  # talk 토크, walk 워크, walking 워킹: l 묵음 (malko 말코 는 제외)
+        if starts("ance") and at_end(4) and groups_before >= 2:
+            return [_v("ㅓ")], 1  # performance 퍼포먼스 (강세 없는 어말 -ance)
         if starts("air") and (at_end(3) or is_c(ch(3))):
             return [_v("ㅔ"), _v("ㅓ")], 3
         if starts("ay", "ai"):
@@ -553,6 +602,8 @@ def _scan_vowel(word: str, index: int, silent_e: int, multi: bool) -> tuple[list
         c1, c2 = ch(1), ch(2)
         if is_c(c1) and c1 != "y" and index + 2 == silent_e:  # a + 자음 + 어말 e
             return [_v("ㅔ"), _v("ㅣ")], 1
+        if is_c(c1) and c1 not in ("y", "w") and groups_before == 0 and suffix_at(2, "ure"):
+            return [_v("ㅔ"), _v("ㅣ")], 1  # nature 네이처 (첫 모음일 때만; signature 는 제외)
         if (
             is_c(c1)
             and c1 not in ("y", "w", "g")
@@ -575,6 +626,20 @@ def _scan_vowel(word: str, index: int, silent_e: int, multi: bool) -> tuple[list
         return [_v("ㅏ", True)], 1
 
     if c == "e":
+        if starts("eau"):
+            return [_v("ㅠ")], 3  # beauty 뷰티
+        if starts("ealth", "ealm", "eaven", "eavy", "eather", "easure", "eadth"):
+            return [_v("ㅔ")], 2  # health 헬스, heaven 헤븐, weather 웨더, measure 메저
+        if starts("ead") and at_end(3):
+            return [_v("ㅔ")], 2  # head 헤드, bread 브레드 (read/lead 는 G2P_MULTI 로 리드 병기)
+        if starts("ean") and at_end(3) and groups_before >= 1:
+            return [_v("ㅣ"), _v("ㅏ")], 2  # korean 코리안 (jean 진·clean 클린 은 첫 모음이라 제외)
+        if starts("ence") and at_end(4) and groups_before >= 1:
+            return [_v("ㅓ")], 1  # difference 디퍼런스, silence 사일런스
+        if starts("ent") and at_end(3) and prev == "m" and groups_before >= 2:
+            return [_v("ㅓ")], 1  # entertainment 엔터테인먼트, management 매니지먼트
+        if starts("esign"):
+            return [_v("ㅣ")], 1  # design 디자인, resign 리자인
         if starts("ear"):
             return ([_v("ㅣ"), _v("ㅓ")], 3) if at_end(3) else ([_v("ㅓ")], 3)
         if starts("eer"):
@@ -606,6 +671,12 @@ def _scan_vowel(word: str, index: int, silent_e: int, multi: bool) -> tuple[list
     if c == "i":
         if starts("igh"):
             return [_v("ㅏ"), _v("ㅣ")], 3
+        if starts("iend"):
+            return [_v("ㅔ")], 2  # friend 프렌드
+        if starts("ie") and groups_before == 0 and ch(2) == "n" and is_c(ch(3)):
+            return [_v("ㅏ"), _v("ㅣ"), _v("ㅓ")], 2  # science 사이언스, client 클라이언트
+        if starts("ie") and groups_before == 0 and ch(2) == "t" and at_end(3):
+            return [_v("ㅏ"), _v("ㅣ"), _v("ㅓ")], 2  # diet 다이어트, quiet 콰이엇
         if starts("ie"):
             if at_end(2):
                 return ([_v("ㅣ")], 2) if multi else ([_v("ㅏ"), _v("ㅣ")], 2)
@@ -718,6 +789,10 @@ def _scan(word: str) -> list[_Seg]:
             segs.extend([_c("j"), _v("ㅓ")])
             index += 4
             continue
+        if rest.startswith("tial") and at_end(4):
+            segs.extend([_c("sh"), _v("ㅓ"), _c("l")])  # essential 에센셜, potential 포텐셜
+            index += 4
+            continue
         if rest.startswith("ci") and word[index + 2 : index + 3] in ("a", "o", "u") and groups >= 2:
             segs.append(_c("sh"))  # social 소셜, delicious 딜리셔스
             index += 1
@@ -739,6 +814,10 @@ def _scan(word: str) -> list[_Seg]:
         if rest.startswith("sch"):
             segs.extend([_c("s"), _c("k")])
             index += 3
+            continue
+        if rest.startswith("sc") and word[index + 2 : index + 3] in ("e", "i", "y"):
+            segs.append(_c("s"))  # science 사이언스, scene 신: e/i/y 앞 c 묵음
+            index += 2
             continue
         if rest.startswith("chr"):
             segs.append(_c("k"))
@@ -827,7 +906,14 @@ def _scan(word: str) -> list[_Seg]:
             continue
 
         # ----- 한 글자 자음 -----
-        if c == "c":
+        if c == "s" and index > 0 and prev in _VOWELS and (
+            (nxt in ("i", "e", "o", "u", "y") and index + 1 != silent_e)
+            or (index + 1 == silent_e and word.endswith(("eese", "ese")) and groups >= 2)
+        ):
+            # 모음 사이 s 는 유성음(design 디자인, music 뮤직, cheese 치즈). a 앞(monterosa)과
+            # 어말 묵음 e 앞(case 케이스)은 무성음 유지. 예외: basic·asia(G2P_EXCEPTIONS).
+            segs.append(_c("z"))
+        elif c == "c":
             segs.append(_c("s") if nxt in ("e", "i", "y") else _c("k"))
         elif c == "g":
             segs.append(_c("j") if _g_is_soft(word, index) else _c("g"))
@@ -1069,6 +1155,7 @@ def _readings(token: str) -> tuple[str, ...]:
             reading = _g2p_word(token)
             if reading:
                 readings.append(reading)
+        readings.extend(G2P_MULTI.get(token, ()))  # ③ 발음이 갈리는 단어는 읽기 전부
         if len(token) <= LETTER_READING_MAX_LEN or not any(ch in _VOWELS for ch in token):
             readings.extend(_letter_readings(token))
         return tuple(_dedupe(readings))

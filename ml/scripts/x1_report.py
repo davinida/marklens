@@ -36,13 +36,26 @@ from src.axes.x1_phonetic import (  # noqa: E402
 DEFAULT_BASELINE = ML_ROOT / "data" / "staging" / "x1_baseline_v1.json"
 MEAN_SHIFT_WARNING = 0.05
 
-# 정답은 외래어 표기법 기준.
+# 정답은 외래어 표기법 기준. v1 20단어 + v1.4(2026-09-18) DB 빈출 일반 영단어 40개 = 60단어.
+# 브랜드 고유명은 넣지 않는다(브랜드표는 벤치마크에서 꺼져 있다). 정답이 확실한 것만.
 G2P_SAMPLE: list[tuple[str, str]] = [
+    # --- v1 (20)
     ("STARBUCKS", "스타벅스"), ("MONTEROSA", "몬테로사"), ("SAMSUNG", "삼성"), ("COFFEE", "커피"),
     ("NIKE", "나이키"), ("APPLE", "애플"), ("GOOGLE", "구글"), ("BURGER", "버거"), ("KING", "킹"),
     ("STAR", "스타"), ("BLUE", "블루"), ("ORANGE", "오렌지"), ("CENTER", "센터"), ("PARIS", "파리"),
     ("GLOBAL", "글로벌"), ("TOUR", "투어"), ("PASS", "패스"), ("HOUSE", "하우스"),
     ("STUDIO", "스튜디오"), ("LEMON", "레몬"),
+    # --- v1.4 DB 빈출 일반 영단어 (40) — science·beauty·design 필수 포함
+    ("SCIENCE", "사이언스"), ("BEAUTY", "뷰티"), ("DESIGN", "디자인"), ("KITCHEN", "키친"),
+    ("FRIENDS", "프렌즈"), ("MOTORS", "모터스"), ("CLUB", "클럽"), ("LIFE", "라이프"),
+    ("TALK", "토크"), ("HEALTH", "헬스"), ("AIR", "에어"), ("PARK", "파크"),
+    ("TIGERS", "타이거스"), ("ENTERTAINMENT", "엔터테인먼트"), ("LOVE", "러브"), ("HOT", "핫"),
+    ("SKY", "스카이"), ("AUTO", "오토"), ("LIVING", "리빙"), ("MAKE", "메이크"),
+    ("FUTURE", "퓨처"), ("ESPRESSO", "에스프레소"), ("HEAVEN", "헤븐"), ("EXPRESS", "익스프레스"),
+    ("KOREAN", "코리안"), ("SPRING", "스프링"), ("GOOD", "굿"), ("SMART", "스마트"),
+    ("NATURE", "네이처"), ("BIO", "바이오"), ("SWEET", "스위트"), ("PERFORMANCE", "퍼포먼스"),
+    ("CHEESE", "치즈"), ("CLINIC", "클리닉"), ("ESSENTIAL", "에센셜"), ("BIG", "빅"),
+    ("KIDS", "키즈"), ("DAY", "데이"), ("SINCE", "신스"), ("CONTENTS", "콘텐츠"),
 ]
 
 # (A, B, extra_generic)
