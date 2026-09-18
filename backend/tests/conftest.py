@@ -26,6 +26,11 @@ if str(PROJECT_ROOT) not in sys.path:
 
 import pytest  # noqa: E402
 
+# macOS Apple Silicon: 아래 _build_fake_ml_env() 가 faiss 를 올리기 전에 torch 가 먼저 import
+# 돼 있어야 한다(순서가 바뀌면 이후 torch 연산·CLIP 로딩에서 SIGSEGV — backend/src/core/engine.py
+# 주석 참조). conftest 는 모든 테스트 모듈보다 먼저 로드되므로 여기서 순서를 고정한다.
+import torch  # noqa: E402, F401
+
 _REAL_INDEX = PROJECT_ROOT / "ml" / "data" / "index" / "kipris.faiss"
 FAKE_ML_MODE = bool(os.getenv("MARKLENS_FAKE_ML")) or not _REAL_INDEX.exists()
 

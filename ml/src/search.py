@@ -12,6 +12,16 @@ FAISS 기반 벡터 검색 모듈.
 from pathlib import Path
 from typing import Tuple, Union
 
+# isort: split
+# macOS Apple Silicon 에서는 faiss 가 torch 보다 먼저 import 되면 같은 프로세스의 이후 torch
+# 연산·CLIP 모델 로딩에서 SIGSEGV 로 죽는다(backend/src/core/engine.py 의 import 순서 주석
+# 참조). 이 모듈은 faiss 를 처음 올리는 진입점이 되기 쉬우므로(pytest 수집, 스크립트의 지연
+# import 등) 여기서 torch 를 먼저 import 해 순서를 고정한다. 쓰지 않는 import 이지만 순서
+# 자체가 목적이다. 위아래의 `# isort: split` 은 ruff 의 import 정렬(I001)이 이 줄을 faiss
+# 뒤로 옮기지 못하게 블록을 나누는 표시 — 지우지 말 것.
+import torch  # noqa: F401
+
+# isort: split
 import faiss
 import numpy as np
 

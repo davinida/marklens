@@ -218,12 +218,14 @@ private 저장소 <https://github.com/jhsoo0211/marklens-data> 로 관리합니�
   SIGSEGV(exit 139)가 사라졌습니다(같은 날 이 순서로 `/health` 정상, 옛 순서는
   여전히 exit 139 재현). 이 import 순서는 `# noqa: I001`로 고정돼 있으니 자동
   정렬로 되돌리지 마세요.
-- **`pytest`는 `OMP_NUM_THREADS=1`이 필요합니다.** 테스트 수집 단계에서
+- **`pytest`도 변수 없이 돕니다(2026-09-18 해결).** 이전에는 테스트 수집 단계에서
   `backend/tests/conftest.py`·`ml/tests/test_search.py`가 faiss를 먼저 올려 같은
-  충돌이 납니다(변수 없이 실행하면 `ml/tests/test_embedding.py`에서 exit 139).
-  ML 스크립트는 파일별 import 순서에 따라 다르며(`build_index.py`·
-  `kipris_search.py`는 torch 선행이라 문제없음) 세그폴트가 나면 같은 변수를
-  붙이세요. 근본 수정(`ml/src/search.py`에서 torch 선행 import)은 예정입니다.
+  충돌이 나(`ml/tests/test_embedding.py`에서 exit 139) `OMP_NUM_THREADS=1` 우회가
+  필요했습니다. 이제 `ml/src/search.py`가 torch를 faiss보다 먼저 import하고
+  `ml/tests/conftest.py`·`backend/tests/conftest.py`도 torch를 선행 import하므로
+  변수 없이 전체 pytest가 통과합니다. ML 스크립트는 모두 `src.search`를 통해
+  faiss를 올리므로 별도 조치가 필요 없습니다. 이 순서들도 `# isort: split`·
+  `# noqa`로 고정돼 있으니 자동 정렬로 되돌리지 마세요.
 - Linux·Windows·CI에는 해당 없습니다.
 
 ### 2. 환경변수
@@ -426,7 +428,7 @@ npm audit --omit=dev --audit-level=high
 ```
 
 ```bash
-export MARKLENS_FAKE_ML=1 OMP_NUM_THREADS=1   # OMP_NUM_THREADS는 Apple Silicon만
+export MARKLENS_FAKE_ML=1
 ml/venv/bin/python -m pytest -q
 ml/venv/bin/ruff check backend ml
 ml/venv/bin/python -m pip_audit --local --progress-spinner off

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Playwright 로컬 실행 산출물 (npm run test:e2e). frontend/.gitignore 에도 있음.
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 
