@@ -27,12 +27,16 @@ torch·faiss·backend 를 import 하지 않고 표준 라이브러리만 사용�
         → 제거 후 각 토큰의 2음절 이상 읽기를 독립 후보로 넣는다. 단, 알파벳·숫자 1글자
           토큰에서 나온 읽기("K"→케이)는 제외한다(무관한 상표를 1.0 으로 만드는 오탐 방지).
           제거 후 토큰이 MAX_TOKENS_FOR_SPLIT(3)개를 넘는 슬로건형 표장은 전체관찰이 원칙이라
-          토큰 단독 후보를 만들지 않는다.
+          영문·숫자 유래 읽기는 앞 SLOGAN_LEAD_TOKENS(2)개 토큰만 단독 후보로 남긴다. 한글
+          토큰은 토큰 수와 무관하게 단독 후보로 둔다(⑤ 병기 표장은 한글로 호칭).
+        → 후보 쌍에서 짧은 쪽이 긴 쪽의 접두·접미이면(CONTAIN_*) 포함 점수를 편집거리
+          점수와 비교해 큰 쪽을 쓴다 — 띄어쓰기 없이 붙은 결합어("스타벅스커피")의 분리관찰.
     - 불가분 결합의 예외(전체로만 불러야 하는 경우)
         → 제거 전 토큰 전체를 이어붙인 결합음을 항상 후보에 유지한다.
     - 요부관찰(식별력 없는 부분은 제외하고 대비)
         → 회사 형태·부가어·영문 기능어(UNIVERSAL_GENERIC)와 호출자가 넘기는 상품 의존
-          보통명칭(extra_generic)을 토큰 완전일치로 제거한다.
+          보통명칭(extra_generic)을 토큰 완전일치로 제거한다. extra_generic 은 토큰의
+          읽기(G2P·로마자표 결과)와도 대조한다("커피" 를 넘기면 COFFEE 도 제거).
 
 알려진 한계(v1): 한자 토큰 미지원(버림), G2P 는 외래어 표기법 근사, 붙여쓴 결합어는 분리하지
 못함, 보통명칭 판단은 extra_generic 에 의존, 불가분 결합은 "전체 결합음 유지"로 근사.
@@ -137,11 +141,26 @@ MAX_CANDIDATES: Final = 16
 # 후보·비교에 쓰는 음절 수 상한(앞에서부터).
 MAX_SYLLABLES: Final = 40
 
-# 분리관찰 후보 (c)를 만드는 토큰 수 상한(제거 후 기준). 분리관찰은 일부만으로 자연스럽게
-# 호칭될 때 적용하는 법리이고, 다수 토큰의 슬로건형 표장은 전체관찰이 원칙이다. 이 값을
-# 넘으면(4개 이상) 토큰 단독 후보를 만들지 않고 전체 결합음 (a)(b)만 쓴다.
-# (창창대로 SCIENCE START-UP PARK 의 '스타트'가 독립 호칭이 되어 스타박스와 0.745 가 나오는 문제)
+# 분리관찰 후보 (c)를 만드는 토큰 수 상한(제거 후 기준) — 영문·숫자 유래 읽기에만 적용한다.
+# 분리관찰은 일부만으로 자연스럽게 호칭될 때 적용하는 법리이고, 다수 토큰의 슬로건형 표장은
+# 전체관찰이 원칙이다. 이 값을 넘으면(4개 이상) 영문·숫자 토큰의 단독 후보는 앞
+# SLOGAN_LEAD_TOKENS 개만 남긴다. 한글 토큰은 토큰 수와 무관하게 단독 후보를 유지한다
+# (판례 ⑤ — 한영 병기 표장은 한글로 호칭. "잇버거 EAT PREMIUM BURGER" 의 호칭은 잇버거).
+# (창창대로 SCIENCE START-UP PARK 의 '스타트'가 독립 호칭이 되어 스타박스와 0.745 가 나오던 문제)
 MAX_TOKENS_FOR_SPLIT: Final = 3
+
+# 영문 슬로건형이라도 제거 후 앞 N 개 토큰의 읽기는 분리관찰 후보에 남긴다 — 브랜드가 앞에
+# 오는 관행(HYUNDAI MOTOR GROUP Together for a better future → 현대·모터).
+SLOGAN_LEAD_TOKENS: Final = 2
+
+# 붙여쓴 결합어 포함 검사(분리관찰): 후보 쌍에서 짧은 쪽이 긴 쪽의 접두 또는 접미이고, 짧은 쪽이
+# CONTAIN_MIN_SYLLABLES 음절 이상, 길이 비율(짧/긴)이 CONTAIN_MIN_COVERAGE 이상이면 포함 점수
+# CONTAIN_BASE_SCORE + (1 − CONTAIN_BASE_SCORE) × 비율을 편집거리 점수와 비교해 큰 쪽을 쓴다.
+# 띄어쓰기 없이 붙은 결합어에서도 요부가 같으면 유사("스타벅스커피"). 2음절 접두(스타/스타벅스)는
+# 불가분 결합으로 보아 제외한다.
+CONTAIN_MIN_SYLLABLES: Final = 3
+CONTAIN_MIN_COVERAGE: Final = 0.5
+CONTAIN_BASE_SCORE: Final = 0.9
 
 # ② 음절 위치별 가중치. 긴 쪽 음절 수 n 으로 고른다. "첫음절 2배"가 기준선이며 짧을수록 강조.
 #    - n<=2 : 첫음절 3배, 둘째 1.5배 (2음절 상표는 첫음절이 사실상 전부)
@@ -308,21 +327,43 @@ def _basic_normalize(text: str) -> str:
 @functools.lru_cache(maxsize=256)
 def _generic_sets(
     extra_generic: frozenset[str],
-) -> tuple[frozenset[str], tuple[tuple[str, ...], ...]]:
-    """extra_generic 항목을 상표명과 같은 정규화·토큰화로 바꾼다 (단일 토큰 / 다중 토큰 열)."""
+) -> tuple[frozenset[str], tuple[tuple[str, ...], ...], frozenset[str]]:
+    """extra_generic 항목을 상표명과 같은 정규화·토큰화로 바꾼다.
+
+    Returns:
+        (단일 토큰 집합(UNIVERSAL_GENERIC 포함), 다중 토큰 열, 읽기 대조용 단일 토큰 집합).
+        읽기 대조는 호출자가 넘긴 extra_generic 항목에만 적용한다
+        (UNIVERSAL_GENERIC 은 토큰 완전일치만).
+    """
     singles = set(UNIVERSAL_GENERIC)
+    reading_targets: set[str] = set()
     sequences: list[tuple[str, ...]] = []
     for item in extra_generic:
         tokens = _tokenize(_clean_chars(_basic_normalize(str(item))))
         if len(tokens) == 1:
             singles.add(tokens[0])
+            reading_targets.add(tokens[0])
         elif len(tokens) > 1:
             sequences.append(tuple(tokens))
-    return frozenset(singles), tuple(sequences)
+    return frozenset(singles), tuple(sequences), frozenset(reading_targets)
+
+
+def _reads_as_generic(token: str, reading_targets: frozenset[str]) -> bool:
+    """영문·숫자 토큰의 읽기(G2P·로마자표·낱자·숫자 읽기) 중 하나가 extra_generic 항목이면 True.
+
+    요부관찰: 호출자가 한글 보통명칭("커피")만 넘겨도 영문 표기(COFFEE→커피)가 같이 제거된다.
+    한글 토큰은 토큰 완전일치로 이미 걸러지므로 여기서는 보지 않는다.
+    """
+    if not reading_targets or _char_class(token[0]) == "H":
+        return False
+    return any(reading in reading_targets for reading in _readings(token))
 
 
 def _remove_generic(
-    tokens: list[str], singles: frozenset[str], sequences: tuple[tuple[str, ...], ...]
+    tokens: list[str],
+    singles: frozenset[str],
+    sequences: tuple[tuple[str, ...], ...],
+    reading_targets: frozenset[str] = frozenset(),
 ) -> list[str]:
     kept: list[str] = []
     index = 0
@@ -333,8 +374,9 @@ def _remove_generic(
         if matched is not None:
             index += len(matched)
             continue
-        if tokens[index] not in singles:
-            kept.append(tokens[index])
+        token = tokens[index]
+        if token not in singles and not _reads_as_generic(token, reading_targets):
+            kept.append(token)
         index += 1
     return kept
 
@@ -349,8 +391,8 @@ def _normalize_tokens(name: str, extra_generic: frozenset[str]) -> tuple[list[st
     text = _COMPANY_MARK_RE.sub(" ", _basic_normalize(name))
     tokens = _tokenize(_clean_chars(text))
     pre = [tok for index, tok in enumerate(tokens) if index == 0 or tok != tokens[index - 1]]
-    singles, sequences = _generic_sets(extra_generic)
-    post = _remove_generic(pre, singles, sequences)
+    singles, sequences, reading_targets = _generic_sets(extra_generic)
+    post = _remove_generic(pre, singles, sequences, reading_targets)
     if not post:
         post = list(pre)
     return pre, post
@@ -1100,11 +1142,15 @@ def _candidates_cached(name: str, extra_generic: frozenset[str]) -> tuple[str, .
         return ()
     survivors = _apply_paired_rule(pre, post)
     candidates = _combos(pre, survivors) + _combos(post, survivors)
-    # (c) 분리관찰 — 슬로건형(제거 후 MAX_TOKENS_FOR_SPLIT 초과)은 전체관찰만 하므로 생략한다.
-    split_tokens = post if len(post) <= MAX_TOKENS_FOR_SPLIT else ()
-    for token in split_tokens:
-        if len(token) == 1 and _char_class(token) in ("L", "D"):
-            continue  # 알파벳·숫자 1글자 토큰 유래 읽기는 분리관찰 후보에서 제외(결합음에는 포함)
+    # (c) 분리관찰. 한글 토큰은 항상(⑤ 병기 표장은 한글로 호칭), 영문·숫자 유래 읽기는
+    # 슬로건형(제거 후 MAX_TOKENS_FOR_SPLIT 초과)이면 앞 SLOGAN_LEAD_TOKENS 개 토큰만.
+    slogan = len(post) > MAX_TOKENS_FOR_SPLIT
+    for index, token in enumerate(post):
+        if _char_class(token[0]) != "H":
+            if len(token) == 1:
+                continue  # 알파벳·숫자 1글자 토큰 유래 읽기는 제외(결합음에는 포함)
+            if slogan and index >= SLOGAN_LEAD_TOKENS:
+                continue
         candidates.extend(r for r in survivors[token] if _syllable_count(r) >= 2)
     result: list[str] = []
     for candidate in _dedupe(candidates):
@@ -1207,6 +1253,23 @@ def _syllable_sim(x: str, y: str) -> float:
     return _syllable_sim_cached(x, y)
 
 
+def _contain_sim(x: str, y: str) -> float:
+    """붙여쓴 결합어 포함 점수(분리관찰). 조건에 안 맞으면 0.0. 대칭.
+
+    x, y 는 음절만 남긴 후보 문자열이라 len 이 곧 음절 수다. 짧은 쪽이 긴 쪽의 접두 또는 접미이고
+    CONTAIN_MIN_SYLLABLES 음절 이상, 길이 비율이 CONTAIN_MIN_COVERAGE 이상일 때만 점수를 준다.
+    """
+    short, long_ = (x, y) if len(x) <= len(y) else (y, x)
+    if len(short) < CONTAIN_MIN_SYLLABLES or len(short) == len(long_):
+        return 0.0
+    if not (long_.startswith(short) or long_.endswith(short)):
+        return 0.0
+    ratio = len(short) / len(long_)
+    if ratio < CONTAIN_MIN_COVERAGE:
+        return 0.0
+    return CONTAIN_BASE_SCORE + (1.0 - CONTAIN_BASE_SCORE) * ratio
+
+
 # =====================================================================================
 # 공개 인터페이스 (규약)
 # =====================================================================================
@@ -1241,7 +1304,8 @@ def phonetic_similarity(
 ) -> float:
     """호칭(발음) 유사도. 0.0~1.0, 높을수록 유사. 대칭·결정적이며 어떤 문자열에도 예외 없이 반환.
 
-    ③ 양쪽 발음 후보의 모든 쌍에 _syllable_sim 을 적용한 최댓값. 후보가 한쪽이라도 비면 0.0.
+    ③ 양쪽 발음 후보의 모든 쌍에 _syllable_sim(편집거리)과 _contain_sim(붙여쓴 결합어 포함)을
+    적용한 최댓값. 후보가 한쪽이라도 비면 0.0.
 
     Args:
         name_a: 상표명 A.
@@ -1256,7 +1320,7 @@ def phonetic_similarity(
     best = 0.0
     for x in candidates_a:
         for y in candidates_b:
-            score = _syllable_sim(x, y)
+            score = max(_syllable_sim(x, y), _contain_sim(x, y))
             if score > best:
                 best = score
                 if best >= 1.0:

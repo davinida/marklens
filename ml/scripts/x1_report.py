@@ -66,6 +66,10 @@ REPORT_PAIRS: list[tuple[str, str, frozenset[str]]] = [
     # 슬로건형(제거 후 4토큰 이상)은 전체관찰만 — 분리관찰 상한 도입(2026-09-17) 후 관찰용
     ("창창대로 SCIENCE START-UP PARK", "스타박스", frozenset()),
     ("HYUNDAI MOTOR GROUP Together for a better future", "현대", frozenset()),
+    # v1.3.1 (2026-09-18): 병기형 한글 토큰 분리관찰, 결합어 포함 검사, extra_generic 읽기
+    ("잇버거 EAT PREMIUM BURGER", "잇버거", frozenset()),
+    ("BLUE COFFEE", "RED COFFEE", frozenset({"커피"})),
+    ("STARBUCKS COFFEE", "스타벅스", frozenset({"커피"})),
 ]
 
 
