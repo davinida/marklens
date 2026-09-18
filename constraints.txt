@@ -7,7 +7,7 @@ torchvision==0.28.0
 pillow==12.3.0
 numpy==1.26.4
 
-fastapi==0.139.0
+fastapi==0.141.1
 pydantic-settings==2.15.0
 uvicorn==0.51.0
 python-multipart==0.0.32
