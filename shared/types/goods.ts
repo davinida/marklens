@@ -13,6 +13,12 @@ export interface GoodsMapEntry {
    * (예: 화장품 = ["G1201", "S120907", "S128302"]).
    */
   similarity_codes: string[];
+  /**
+   * 제35류 도소매업 6종("OOO 도매업/소매업/중개업/판매대행업/판매알선업/구매대행업")을
+   * 하나로 합친 항목에만 있다. 합쳐진 원 명칭 전부(접미사 순, 중복 없음).
+   * 상품 검색은 name 과 함께 이 값도 대조해야 "화장품 소매업" 같은 원 명칭으로 찾을 수 있다.
+   */
+  aliases?: string[];
 }
 
 export type GoodsMap = GoodsMapEntry[];
