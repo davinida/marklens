@@ -5,7 +5,7 @@
 원본: 지식재산처 고시상품명칭 13판(2026)
   https://www.kipo.go.kr/ko/kpoContFileDown.do?seq=26&fileNum=19
   (지식재산처 홈페이지 > 지식재산제도 > 분류코드조회 > 상품분류코드 에서도 찾을 수 있음)
-  ※ 직접 다운로드 링크는 403(WAF) — 브라우저로 접속해 내려받아야 함.
+  ※ 헤더 없는 curl 은 403(WAF)이 날 수 있음 — README §1의 UA·referer 예시 또는 브라우저로 받는다.
 
 사용법:
     # 1) 먼저 실제 컬럼 구조를 모른 채로 파싱하면 안 되므로, 시트/헤더를 확인한다.
@@ -18,6 +18,7 @@
 
 출력 스키마 (1:N 필수 — 한 상품에 유사군 코드가 여러 개 붙을 수 있음):
     [{ "name": "화장품", "nice_class": 3, "similarity_codes": ["G1201", "S120907", "S128302"] }]
+    제35류 도소매업 6종을 하나로 합친 항목에만 "aliases": [합쳐진 원 명칭 6개] 가 추가된다.
 """
 
 from __future__ import annotations
@@ -28,15 +29,22 @@ import re
 import sys
 from pathlib import Path
 
-try:
-    from openpyxl import load_workbook
-except ImportError:
-    print(
-        "openpyxl이 없습니다. 먼저 설치하세요:\n"
-        "  ml/venv/bin/python -m pip install -r shared/goods_map/requirements.txt",
-        file=sys.stderr,
-    )
-    raise
+
+def _load_workbook(path: Path):
+    """엑셀을 읽기 전용으로 연다. openpyxl 은 inspect/convert 를 실제로 돌릴 때만 필요하므로
+    여기서 지연 import 한다 — 순수 함수(_collapse_class35_services 등)의 단위 테스트가
+    openpyxl 이 없는 CI 에서도 이 모듈을 import 할 수 있게 하기 위함이다."""
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        print(
+            "openpyxl이 없습니다. 먼저 설치하세요:\n"
+            "  ml/venv/bin/python -m pip install -r shared/goods_map/requirements.txt",
+            file=sys.stderr,
+        )
+        raise
+    return load_workbook(path, read_only=True, data_only=True)
+
 
 # 유사군코드 형식: 문자(류 그룹) + 숫자 4자리 내외 (예: G1201, S120907, M1201)
 CODE_RE = re.compile(r"[A-Za-z]\d{3,7}")
@@ -64,7 +72,7 @@ def _find_header_row(rows: list[tuple], max_scan: int = 15) -> int:
 
 
 def inspect(path: Path, max_rows: int = 5) -> None:
-    wb = load_workbook(path, read_only=True, data_only=True)
+    wb = _load_workbook(path)
     print(f"파일: {path}")
     print(f"시트 목록: {wb.sheetnames}\n")
     for name in wb.sheetnames:
@@ -107,7 +115,8 @@ def _collapse_class35_services(
     merged: dict[tuple[str, int], set[str]]
 ) -> list[dict]:
     suffix_re = re.compile("(" + "|".join(_CLASS35_SERVICE_SUFFIXES) + ")$")
-    groups: dict[str, dict[str, tuple[str, ...]]] = {}
+    # base 상품 -> {접미사: (원 명칭, 코드)}. 원 명칭은 병합 항목의 aliases 로 보존한다.
+    groups: dict[str, dict[str, tuple[str, tuple[str, ...]]]] = {}
     passthrough: dict[tuple[str, int], set[str]] = {}
 
     for (name, nice_class), codes in merged.items():
@@ -116,7 +125,7 @@ def _collapse_class35_services(
             passthrough[(name, nice_class)] = codes
             continue
         base = name[: -len(m.group(1))].strip()
-        groups.setdefault(base, {})[m.group(1)] = tuple(sorted(codes))
+        groups.setdefault(base, {})[m.group(1)] = (name, tuple(sorted(codes)))
 
     result = [
         {"name": name, "nice_class": nice_class, "similarity_codes": sorted(codes)}
@@ -124,23 +133,26 @@ def _collapse_class35_services(
     ]
 
     for base, by_suffix in groups.items():
-        code_sets = set(by_suffix.values())
+        code_sets = {codes for _name, codes in by_suffix.values()}
         if len(code_sets) == 1 and len(by_suffix) == len(_CLASS35_SERVICE_SUFFIXES):
-            # 6종 전부 존재 + 코드 완전히 동일 -> 하나로 합친다
+            # 6종 전부 존재 + 코드 완전히 동일 -> 하나로 합친다.
+            # 합쳐진 원 명칭 전부를 aliases 로 보존한다(접미사 상수 순, 중복 없음).
+            # 프론트-6 상품 검색이 원 명칭("화장품 소매업")으로도 찾을 수 있게 하기 위함.
             (codes,) = code_sets
             result.append(
                 {
                     "name": f"{base} 판매업(도소매·중개·대행)",
                     "nice_class": 35,
                     "similarity_codes": list(codes),
+                    "aliases": [by_suffix[suffix][0] for suffix in _CLASS35_SERVICE_SUFFIXES],
                 }
             )
         else:
-            # 일부만 존재하거나 접미사별로 코드가 다르면 정보 손실 방지를 위해 원본 유지
-            for suffix, codes in by_suffix.items():
+            # 일부만 존재하거나 접미사별로 코드가 다르면 정보 손실 방지를 위해 원 명칭 그대로 유지
+            for original_name, codes in by_suffix.values():
                 result.append(
                     {
-                        "name": f"{base}{suffix}",
+                        "name": original_name,
                         "nice_class": 35,
                         "similarity_codes": list(codes),
                     }
@@ -158,7 +170,7 @@ def convert(
     codes_col: str,
     sheet: str | None,
 ) -> None:
-    wb = load_workbook(path, read_only=True, data_only=True)
+    wb = _load_workbook(path)
     sheets = [sheet] if sheet else wb.sheetnames
 
     entries: list[dict] = []
