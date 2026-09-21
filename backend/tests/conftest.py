@@ -38,6 +38,34 @@ _EMBED_DIM = 512
 _N_RECORDS = 10
 _fake_vectors = None  # numpy 배열 (지연 생성)
 
+# 상품↔유사군 변환표 픽스처(10건). 제35류 병합 항목 2건은 원 명칭 aliases 6개씩 —
+# test_goods_api.py 가 검색·alias 적중·류 필터를 이 내용으로 단언한다. 가짜 모드에서 매 TestClient
+# 기동마다 실제 91,591건 파일을 읽지 않게 하는 목적도 있다(lifespan 이 항상 변환표를 적재한다).
+_CLASS35_SUFFIXES = ("도매업", "소매업", "중개업", "판매대행업", "판매알선업", "구매대행업")
+
+
+def _class35_entry(base: str, code: str) -> dict:
+    return {
+        "name": f"{base} 판매업(도소매·중개·대행)",
+        "nice_class": 35,
+        "similarity_codes": [code],
+        "aliases": [f"{base} {suffix}" for suffix in _CLASS35_SUFFIXES],
+    }
+
+
+_GOODS_MAP_FIXTURE = [
+    {"name": "화장품", "nice_class": 3, "similarity_codes": ["G1201", "S120907", "S128302"]},
+    _class35_entry("화장품", "S2012"),
+    {"name": "화장품용 스펀지", "nice_class": 21, "similarity_codes": ["G4001"]},
+    {"name": "기능성 화장품", "nice_class": 3, "similarity_codes": ["G1201"]},
+    {"name": "커피", "nice_class": 30, "similarity_codes": ["G0502"]},
+    _class35_entry("커피", "S2039"),
+    {"name": "의류", "nice_class": 25, "similarity_codes": ["G430301", "G450101"]},
+    {"name": "신발", "nice_class": 25, "similarity_codes": ["G4503"]},
+    {"name": "장갑", "nice_class": 25, "similarity_codes": ["G4501"]},
+    {"name": "장갑", "nice_class": 28, "similarity_codes": ["G5701"]},
+]
+
 
 def _build_fake_ml_env(base: Path) -> None:
     """임시 디렉토리에 인덱스/메타/이미지로 구성된 완전한 가짜 ML 데이터셋 생성."""
@@ -106,6 +134,9 @@ def _build_fake_ml_env(base: Path) -> None:
         ),
         encoding="utf-8",
     )
+    (base / "goods_map.json").write_text(
+        json.dumps(_GOODS_MAP_FIXTURE, ensure_ascii=False), encoding="utf-8"
+    )
 
 
 def pytest_configure(config):
@@ -122,6 +153,7 @@ def pytest_configure(config):
     _build_fake_ml_env(base)
     os.environ["MARKLENS_DATA_DIR"] = str(base)
     os.environ["MARKLENS_IMAGES_DIR"] = str(base / "images")
+    os.environ["MARKLENS_GOODS_MAP_PATH"] = str(base / "goods_map.json")
     os.environ["DATABASE_URL"] = ""  # 가짜 모드는 항상 file 모드로
 
 

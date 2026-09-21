@@ -471,3 +471,44 @@ export const PhoneticSearchResponseSchema = z
 
 export type PhoneticMatch = z.infer<typeof PhoneticMatchSchema>;
 export type PhoneticSearchResponse = z.infer<typeof PhoneticSearchResponseSchema>;
+
+// ---- 상품↔유사군 변환표 검색 (/api/goods/search, /api/goods/classes) — 프론트-6 지정상품 입력 UI용 ----
+// 백엔드 /goods/* 응답. 필드는 shared/types/goods.ts 의 GoodsMapEntry + matched_alias(원 명칭으로 잡힌 경우).
+export const GoodsMatchSchema = z
+  .object({
+    name: z.string().min(1),
+    nice_class: z.number().int().min(1).max(45),
+    similarity_codes: z.array(z.string()),
+    matched_alias: z.string().nullable().optional().default(null),
+  })
+  .passthrough();
+
+export const GoodsSearchResponseSchema = z
+  .object({
+    query: z.string(),
+    matches: z.array(GoodsMatchSchema),
+    total: z.number().int().nonnegative(),
+    source: z.string().optional(),
+  })
+  .passthrough();
+
+export const GoodsClassSchema = z
+  .object({
+    nice_class: z.number().int().min(1).max(45),
+    title: z.string(),
+    count: z.number().int().nonnegative(),
+  })
+  .passthrough();
+
+export const GoodsClassesResponseSchema = z
+  .object({
+    classes: z.array(GoodsClassSchema),
+    total_entries: z.number().int().nonnegative().optional(),
+    source: z.string().optional(),
+  })
+  .passthrough();
+
+export type GoodsMatch = z.infer<typeof GoodsMatchSchema>;
+export type GoodsSearchResponse = z.infer<typeof GoodsSearchResponseSchema>;
+export type GoodsClass = z.infer<typeof GoodsClassSchema>;
+export type GoodsClassesResponse = z.infer<typeof GoodsClassesResponseSchema>;

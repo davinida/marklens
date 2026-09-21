@@ -236,6 +236,74 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
   따릅니다(브라우저는 `/api/images/...`로 접근).
 - 발음 후보 캐시는 서버 기동 시 만들고, 인덱스가 재게시되면 다음 요청에서 다시 만듭니다.
 
+## 상품 검색·류 목록 (상품↔유사군 변환표, 프론트-6 지정상품 입력용, 2026-09-21)
+
+지식재산처 고시상품명칭 13판(2026)을 변환한 로컬 변환표(`shared/goods_map/goods_map.json.gz`,
+91,591건, 제35류 병합 항목 38,433건에 원 명칭 `aliases` 230,598개)에서 상품명을 찾아 유사군
+코드를 돌려줍니다. KIPRIS를 호출하지 않는 읽기 전용 조회입니다. `similarity_codes`는 X4 상품
+견련성(자카드) 계산의 입력이며 법적 유사 판단이 아닙니다.
+
+### 브라우저 API
+
+`GET /api/goods/search?q=화장품 소매업&limit=20&nice_class=35`
+
+| 파라미터 | 형식 | 필수 | 설명 |
+|---|---|---|---|
+| `q` | string 1..50자 | 예 | 앞뒤 공백 제거 후 1자 이상(공백만이면 422). `name`과 원 명칭 `aliases`에 부분 일치 |
+| `limit` | 1..50 | 아니오 | 기본 20 |
+| `nice_class` | 1..45 | 아니오 | 류 번호로 좁히기 |
+
+`GET /api/goods/classes` — NICE 45개 류의 명칭과 변환표 항목 수(정적 데이터, 성공 응답은 1시간 캐시).
+
+두 라우트는 Turnstile 토큰을 요구하지 않습니다. 읽기 전용 로컬 조회(KIPRIS 쿼터·CPU 모델
+미사용)이고 개인정보·질의 저장이 없으며, 자동완성이 키 입력마다 호출하므로 1회용 토큰과 맞지
+않기 때문입니다(`/api/images`·`/api/health`와 같은 부류). 남용 방지는 백엔드 IP 한도
+`MARKLENS_GOODS_RATELIMIT`(기본 60/minute)와 gateway 한도가 맡습니다. BFF는 파라미터를 검증한
+뒤 서버 키를 붙여 내부 `GET /goods/search`, `GET /goods/classes`로 전달합니다.
+
+### 내부 API
+
+`GET /goods/search?q=화장품 소매업&limit=3`
+
+```json
+{
+  "query": "화장품 소매업",
+  "matches": [
+    {
+      "name": "화장품 판매업(도소매·중개·대행)",
+      "nice_class": 35,
+      "similarity_codes": ["S2012"],
+      "matched_alias": "화장품 소매업"
+    }
+  ],
+  "total": 61,
+  "source": "고시상품명칭 13판(2026)"
+}
+```
+
+- 순위: 정확 일치 > 접두 > 부분. 같은 순위에서는 `name` 일치가 alias 일치보다 앞이고 `name`이
+  짧은 순 → 가나다순. NFKC·대소문자·연속 공백을 정규화해 비교합니다.
+- `matched_alias`는 `name`이 아니라 제35류 병합 항목의 원 명칭(alias)으로 잡혔을 때만 값이
+  있고 그 외 `null`입니다. `total`은 `limit`과 무관한 전체 일치 건수입니다.
+- 일치가 없으면 `matches=[]`, `total=0`으로 200을 반환합니다. 실측(2026-09-21, 1,100건 서버):
+  "화장품 소매업" 61건 12ms, "커피" 214건 6ms, 1글자 광범위 질의("업" 53,991건) 46ms.
+
+`GET /goods/classes`
+
+```json
+{
+  "classes": [{ "nice_class": 3, "title": "화장품·세제", "count": 1331 }],
+  "total_entries": 91591,
+  "source": "고시상품명칭 13판(2026)"
+}
+```
+
+45개 류 전부를 번호순으로 돌려주며 `title`은 서버 상수(NICE 류 요약 명칭)입니다.
+
+변환표는 서버 기동 시 적재합니다(`MARKLENS_GOODS_MAP_PATH`, 기본 `shared/goods_map/goods_map.json.gz`
+→ `.json`). 파일이 없어도 서버는 기동하며 이 두 엔드포인트만 503과 이유를 반환합니다(`/name-check`가
+KIPRIS 키 없이 503을 내는 것과 같은 방식). 다른 엔드포인트에는 영향이 없습니다.
+
 ## 결과 이미지
 
 브라우저는 응답의 `/api/images/...`만 사용합니다. BFF는 안전한 path segment만
@@ -251,10 +319,10 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
 | 403 | Turnstile 토큰·action·hostname 검증 실패 |
 | 413 | 업로드 바이트 상한 초과 |
 | 415 | 지원하지 않는 MIME 또는 실제 이미지 형식 |
-| 422 | `top_k` 또는 스키마 검증 실패, `/phonetic-search`의 공백 상표명 |
+| 422 | `top_k` 또는 스키마 검증 실패, `/phonetic-search`의 공백 상표명, `/goods/search`의 공백·범위 밖 파라미터 |
 | 429 | gateway/backend 요청 한도 또는 KIPRIS 월 예산 한도 |
 | 502 | KIPRIS/내부 upstream 응답 계약 실패 |
-| 503 | Turnstile·엔진·KIPRIS 설정·인덱스가 준비되지 않음 |
+| 503 | Turnstile·엔진·KIPRIS 설정·인덱스가 준비되지 않음, 상품↔유사군 변환표 파일 없음(`/goods/*`) |
 | 504 | Turnstile 또는 내부 upstream 응답 시간 초과 |
 
 서버 오류 응답에는 내부 예외, 요청 URL, KIPRIS 키 또는 검색어를 포함하지 않습니다.

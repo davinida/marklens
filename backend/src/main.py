@@ -21,9 +21,10 @@ from .core.logging_conf import setup_logging
 # 앱/라우터 import 전에 로깅부터 구성 (import 시점 로그도 같은 포맷으로)
 setup_logging()
 
+from .api import goods as goods_api  # noqa: E402
 from .api import health, namecheck, search  # noqa: E402
 from .api import phonetic_search as phonetic_search_api  # noqa: E402
-from .core import config, engine, kipris_client, phonetic_search, storage  # noqa: E402
+from .core import config, engine, goods, kipris_client, phonetic_search, storage  # noqa: E402
 from .core.auth import require_api_key  # noqa: E402
 from .core.ratelimit import limiter, rate_limit_exceeded_handler  # noqa: E402
 from .core.request_id import RequestIdMiddleware  # noqa: E402
@@ -35,7 +36,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     startup: 모델 + 인덱스 + 메타데이터 1회 로딩, 이어서 X1 발음 캐시(상표명 → 발음 후보) 구축.
-    실패 시 명확한 메시지와 함께 서버 기동을 중단합니다.
+    실패 시 명확한 메시지와 함께 서버 기동을 중단합니다. 상품↔유사군 변환표(/goods/*)는
+    없어도 기동하며 해당 엔드포인트만 503 을 냅니다.
     """
     try:
         try:
@@ -44,6 +46,7 @@ async def lifespan(app: FastAPI):
         except Exception:
             logger.exception("[FATAL] startup 리소스 로딩 실패")
             raise
+        goods.load_all()  # 예외를 내지 않는다 — 변환표가 없으면 state.error 만 남기고 /goods/* 503
         yield
     finally:
         # startup 중간 실패에도 이미 열린 DB/HTTP 자원을 정리한다.
@@ -101,12 +104,13 @@ app.add_middleware(
 # === 라우터 등록 ===
 # X-API-Key 인증(require_api_key)은 MARKLENS_API_KEY 설정 시에만 활성(미설정이면 무인증).
 # /health 는 무인증 유지 — 로드밸런서·부하테스트가 키 없이 상태를 폴링해야 함.
-# /search·/name-check·/phonetic-search, 그리고 활성 시 /images(아래 라우트에 Depends 주입)에
-# 인증을 건다.
+# /search·/name-check·/phonetic-search·/goods/*, 그리고 활성 시 /images(아래 라우트에 Depends
+# 주입)에 인증을 건다.
 app.include_router(health.router)
 app.include_router(search.router, dependencies=[Depends(require_api_key)])
 app.include_router(namecheck.router, dependencies=[Depends(require_api_key)])
 app.include_router(phonetic_search_api.router, dependencies=[Depends(require_api_key)])
+app.include_router(goods_api.router, dependencies=[Depends(require_api_key)])
 
 # === 검색 결과 이미지 ===
 # 디렉터리 전체를 정적 마운트하지 않고 현재 인덱스에 포함된 키만 제공한다.

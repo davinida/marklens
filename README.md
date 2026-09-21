@@ -24,8 +24,9 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 상표명 완전일치 확인 | 구현 | KIPRIS 실시간 조회, 후보 상세·상태 분포·완전성 표시. **검색과 별개 기능**(검색 점수에 반영되지 않음) |
 | KIPRIS 수집 및 인덱스 빌드 | 구현 | 체크포인트, authoritative key, manifest, 원자적 게시 |
 | 호칭 유사도 X1 | 최소 연결 | `ml/src/axes/x1_phonetic.py` + `POST /phonetic-search`. 상표명 확인 패널에 "발음이 비슷한 등록상표" 섹션. 통합 점수에는 미반영 |
-| 상품↔유사군 변환표 | 도구 구현 | 파서·검증기 완료. `goods_map.json`은 라이선스 확인 전이라 미커밋(로컬 생성) |
-| 관념(X3)·상품 견련성(X4)·통합 모델 | 예정 | UI의 지정상품 입력도 현재 숨김 |
+| 상품↔유사군 변환표·상품 검색 API | 구현 | 파서·검증기 + 로더(`ml/src/axes/goods_map.py`) + `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`). `goods_map.json(.gz)`은 라이선스 확인 전이라 미커밋(로컬 생성). 지정상품 입력 화면(프론트-6)은 예정 |
+| 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
+| 관념(X3)·통합 모델 | 예정 | UI의 지정상품 입력도 현재 숨김 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
 | 공개 클라우드 배포 | 템플릿만 제공 | 실제 도메인·TLS·계정 배포는 하지 않음 |
 
@@ -46,7 +47,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 | 항목 | 담당 | 상태 | 위치 | 비고 |
 |---|---|---|---|---|
-| 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1) | `ml/src/axes/` | X3·X4 파일은 예정 |
+| 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X4) | `ml/src/axes/` | X3 파일은 예정 |
 | 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 미착수 | — | 통합 모델 학습 전제 |
 | 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(90건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21. 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
@@ -56,9 +57,9 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 프론트-3 유명 로고 브랜드 목록 | 지원 | 부분 | `shared/famous_brands.txt` | DRAFT 39건(출원인명), 아직 수집 전 |
 | 프론트-4 화면 골격(3층 결과 화면) | 현수 | 완료 | `frontend/app/page.tsx`, `frontend/components/ResultView.tsx` | |
 | 프론트-5 백엔드 1차 연동 | 현수 | 완료 | `frontend/app/api/*`(BFF) | |
-| 프론트-6 지정상품 입력 UI | 지원 | 미착수 | — | 프론트-2 후 |
+| 프론트-6 지정상품 입력 UI | 지원 | 부분 | `GET /goods/search`·`/goods/classes`, BFF `frontend/app/api/goods/*`, `lib/api.ts` `searchGoods`·`fetchGoodsClasses` | 2026-09-21 API·zod 계약 준비. 화면은 미착수 |
 | 프론트-7 관념 X3 | 지원 | 미착수 | — | |
-| 프론트-8 상품 견련성 X4 | 지원 | 미착수 | — | DB 스키마의 `similarity_codes TEXT[]`만 준비 |
+| 프론트-8 상품 견련성 X4 | 지원 | **완료(축 함수)** | `ml/src/axes/x4_goods.py`, `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21. 서비스 적용은 DB 유사군 백필(현재 100/1,100건) 후 |
 | 프론트-9 통합 모델·재보정 | 지원 | 미착수 | — | 로지스틱 회귀 예정 |
 | 백엔드-1 PostgreSQL 설계 | 현수 | 완료 | `backend/migrations/001_init.sql` | |
 | 백엔드-2 JSON→DB 마이그레이션 | 현수 | 완료 | `backend/scripts/migrate_json_to_db.py` | |
@@ -89,7 +90,7 @@ Browser
 - `frontend/`: Next.js UI, 수동 크롭, Turnstile 검증, BFF(`app/api/*`)
 - `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인 API, KIPRIS 수집 스크립트(`scripts/`)
 - `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구
-- `ml/src/axes/`: 다축 모델의 축 함수 — X1 호칭 유사도(`x1_phonetic.py`, 브랜드·지명 로마자표 `korean_brands.py`). X3·X4는 예정
+- `ml/src/axes/`: 다축 모델의 축 함수 — X1 호칭 유사도(`x1_phonetic.py`, 브랜드·지명 로마자표 `korean_brands.py`), X4 상품 견련성(`x4_goods.py`), 변환표 로더(`goods_map.py`). X3는 예정
 - `ml/evaluation/`: 200-pair 라벨링 팩과 강건성 평가 계약
 - `shared/`: 프런트·백엔드 공용 자산 — `goods_map/`(상품↔유사군 변환표 파서·검증기), `famous_brands.txt`(유명 브랜드 출원인 목록 DRAFT), `types/goods.ts`(변환표 타입)
 - `scripts/`: 개발 서버 통합 시작·종료(`dev-start.sh`/`.ps1`, `dev-stop.sh`/`.ps1`)
@@ -330,6 +331,8 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `POST /api/search?top_k=5` | Turnstile 검증 후 이미지 검색 프록시 |
 | `POST /api/name-check` | `{ "name": "...", "turnstileToken": "..." }` 명칭 확인 프록시 |
 | `POST /api/phonetic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..20 }` X1 발음 유사 후보 프록시 |
+| `GET /api/goods/search?q=&limit=&nice_class=` | 상품↔유사군 변환표 검색 프록시(프론트-6). 읽기 전용이라 Turnstile 불필요 |
+| `GET /api/goods/classes` | NICE 45개 류 명칭·변환표 항목 수 프록시 |
 | `GET /api/health` | 외부용 BFF·FastAPI 준비 상태 |
 | `GET /api/images/{path}` | 결과 이미지 프록시 |
 | `GET /api/turnstile-config` | 위젯 사이트 키·dev bypass 설정 전달 |
@@ -337,6 +340,8 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `POST /search` | 내부 이미지 검색 API (`file`, `top_k`) |
 | `POST /name-check` | 내부 명칭 확인 API |
 | `POST /phonetic-search` | 내부 X1 호칭 유사도 검색 (`name`, `top_k`). 로컬 DB 계산, KIPRIS 무관 |
+| `GET /goods/search` | 내부 상품 검색 (`q` 1~50자, `limit` 1~50, `nice_class` 1~45). 변환표 파일 없으면 503 |
+| `GET /goods/classes` | 내부 NICE 45개 류 목록 |
 | `GET /images/{key}` | 인덱스에 포함된 결과 이미지만 제공. `MARKLENS_PUBLIC_RESULT_IMAGES=true`(로컬 기본)일 때만 등록 |
 | `GET /docs` | Swagger UI |
 
@@ -360,7 +365,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | X1 호칭 | 두 상표명의 발음 유사도. 판례 5규칙(호칭 최우선, 첫음절 강세, 여러 호칭 중 최댓값, 외국어의 국내 발음, 한영 병기 시 한글 우선) | **완료** — 라이브러리 |
 | X2 외관 | OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색 | 완료 — 현재 서비스 |
 | X3 관념 | 상표명 의미를 사전학습 한국어 언어모델 임베딩으로 비교 | 예정 |
-| X4 상품 견련성 | 유사군 코드 집합 간 자카드 계수 | 예정 |
+| X4 상품 견련성 | 유사군 코드 집합 간 자카드 계수 | **완료** — 라이브러리(서비스 적용은 DB 유사군 백필 후) |
 | 통합 | 4축 점수를 로지스틱 회귀로 결합해 0~100% 위험 확률. 특허법원 심결 데이터로 가중치 학습 | 예정 |
 
 축 함수 공통 규약: 위치 `ml/src/axes/`, 입력은 상표명 문자열 2개(X1·X3) 또는
@@ -392,6 +397,24 @@ phonetic_similarity("카페 봄", "봄", extra_generic=frozenset({"카페"}))  #
 - 설계·상수·한계·검토 대기 항목: [X1 설계 문서](docs/MarkLens_X1_호칭유사도_설계.md).
   점수표 재현: `ml/venv/bin/python ml/scripts/x1_report.py`.
 
+### X4 상품 견련성 (`ml/src/axes/x4_goods.py`)
+
+```python
+import sys; sys.path.insert(0, "ml")   # 프로젝트 루트에서
+from src.axes.goods_map import load_goods_map
+from src.axes.x4_goods import goods_similarity, has_goods
+gm = load_goods_map()                                                          # shared/goods_map/goods_map.json.gz
+goods_similarity(gm.codes_for("화장품", 3), {"G1201", "S120907", "G1202"})     # 0.5
+has_goods(set())                                                               # False → X4 결측 처리
+```
+
+- 자카드 = |교집합| ÷ |합집합|. 유사군 코드는 근사 기준이며 제35류 도소매업("화장품" vs "화장품
+  소매업" = 0.0)은 개별 판단 사항입니다.
+- 서비스 연결: 상품 검색 API `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`)가 변환표에서
+  상품명·원 명칭(aliases)을 찾아 유사군 코드를 돌려줍니다(2026-09-21 실측: 적재 약 0.5초, 검색 수 ms).
+  DB 1,100건 중 유사군 보유는 100건뿐이라 DB 전건 X4 계산은 유사군 백필 후에 가능합니다.
+- 설계·한계·실측: [X4 설계 문서](docs/MarkLens_X4_상품견련성_설계.md).
+
 ### 상품↔유사군 변환표 (`shared/goods_map/`)
 
 지식재산처 고시상품명칭 13판(2026) xlsx를 `[상품명, 류, 유사군코드 배열]` 1:N
@@ -401,8 +424,9 @@ inspect`/`convert` → `validate_goods_map.py` 순이며 명령은
 검증에서 91,591건, Nice 45/45류, 유사군 2개 이상 5,798건을 원본과 대조했습니다.
 
 `goods_map.json`과 원본 xlsx는 공공누리 유형(재배포 가능 여부) 확인 전이라
-커밋하지 않고 각자 로컬에서 생성합니다(`.gitignore`). 소비 측은 프론트-6(지정상품
-입력 UI)과 X4 자카드 계산이며 둘 다 예정입니다. 타입은 `shared/types/goods.ts`.
+커밋하지 않고 각자 로컬에서 생성합니다(`.gitignore`, `--gzip`으로 `.gz`도 생성). 소비 측은
+로더 `ml/src/axes/goods_map.py`(백엔드 `/goods/*` 상품 검색 API, X4 입력)이며 지정상품 입력
+화면(프론트-6)은 예정입니다. 타입은 `shared/types/goods.ts`.
 
 ### 유명 브랜드 목록 (`shared/famous_brands.txt`)
 
@@ -538,6 +562,7 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
 
 - [전체 문서 색인](docs/README.md)
 - [X1 호칭 유사도 설계](docs/MarkLens_X1_호칭유사도_설계.md)
+- [X4 상품 견련성 설계](docs/MarkLens_X4_상품견련성_설계.md)
 - [상품↔유사군 변환표 절차](shared/goods_map/README.md)
 - [2026-2학기 16주 계획과 4주 단위 제출 문서](docs/course/2026-2/README.md)
 - [2026-08 기술 재감사 보고서](docs/MarkLens_기술감사보고서_2026-08.md)

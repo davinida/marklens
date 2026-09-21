@@ -123,6 +123,8 @@ _FIELD_TO_ENV: dict[str, str] = {
     "phonetic_rate_limit": "MARKLENS_PHONETIC_RATELIMIT",
     "phonetic_top_k_default": "MARKLENS_PHONETIC_TOP_K_DEFAULT",
     "phonetic_min_similarity": "MARKLENS_PHONETIC_MIN_SIMILARITY",
+    "goods_rate_limit": "MARKLENS_GOODS_RATELIMIT",
+    "goods_map_path": "MARKLENS_GOODS_MAP_PATH",
     "api_key": "MARKLENS_API_KEY",
     "database_url": "DATABASE_URL",
     "environment": "MARKLENS_ENVIRONMENT",
@@ -188,6 +190,16 @@ class Settings(BaseSettings):
         default=0.5, validation_alias="MARKLENS_PHONETIC_MIN_SIMILARITY"
     )
 
+    # /goods/search·/goods/classes (상품↔유사군 변환표, 프론트-6): KIPRIS·CPU 모델과 무관한
+    # 로컬 메모리 조회(수 ms)지만 자동완성이 키 입력마다 부르므로 무제한은 피한다 —
+    # 사람 타자 속도 + 디바운스를 가정한 60/minute 기본.
+    goods_rate_limit: str = Field(
+        default="60/minute", validation_alias="MARKLENS_GOODS_RATELIMIT"
+    )
+    # 변환표 파일 경로. 비우면 로더 기본(shared/goods_map/goods_map.json.gz → .json).
+    # 파일이 없어도 서버는 기동하고 /goods/* 만 503 을 낸다(core/goods.py).
+    goods_map_path: str = Field(default="", validation_alias="MARKLENS_GOODS_MAP_PATH")
+
     # 정적 X-API-Key. 설정 시에만 /search·/name-check 에서 헤더 일치를 검증(불일치 401).
     # 미설정("")이면 완전 비활성 — 로컬 개발은 무인증 개방. (core/auth.py 참조)
     api_key: str = Field(default="", validation_alias="MARKLENS_API_KEY")
@@ -232,7 +244,11 @@ class Settings(BaseSettings):
         return v
 
     @field_validator(
-        "search_rate_limit", "namecheck_rate_limit", "images_rate_limit", "phonetic_rate_limit"
+        "search_rate_limit",
+        "namecheck_rate_limit",
+        "images_rate_limit",
+        "phonetic_rate_limit",
+        "goods_rate_limit",
     )
     @classmethod
     def _check_rate_limit(cls, v: str) -> str:
@@ -344,6 +360,10 @@ IMAGES_RATE_LIMIT: str = settings.images_rate_limit
 PHONETIC_RATE_LIMIT: str = settings.phonetic_rate_limit
 PHONETIC_TOP_K_DEFAULT: int = settings.phonetic_top_k_default
 PHONETIC_MIN_SIMILARITY: float = settings.phonetic_min_similarity
+
+# 상품↔유사군 변환표 /goods/* (env: MARKLENS_GOODS_RATELIMIT / MARKLENS_GOODS_MAP_PATH)
+GOODS_RATE_LIMIT: str = settings.goods_rate_limit
+GOODS_MAP_PATH: str = settings.goods_map_path.strip()
 
 # 정적 X-API-Key (env: MARKLENS_API_KEY, 미설정 시 인증 비활성)
 API_KEY: str = settings.api_key

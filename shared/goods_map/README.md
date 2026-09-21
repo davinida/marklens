@@ -52,8 +52,12 @@ ml/venv/bin/python shared/goods_map/parse_goods_map.py inspect \
 ml/venv/bin/python shared/goods_map/parse_goods_map.py convert \
     shared/goods_map/raw/고시상품명칭13판.xlsx \
     --name-col "지정상품(국문)" --class-col "NICE분류" --codes-col "유사군코드" \
-    --out shared/goods_map/goods_map.json
+    --out shared/goods_map/goods_map.json --gzip
 ```
+
+`--gzip`을 붙이면 `goods_map.json.gz`(약 1.8MB)도 만든다. 백엔드와 로더
+`ml/src/axes/goods_map.py`는 `.gz` → `.json` 순으로 찾으므로(환경변수 `MARKLENS_GOODS_MAP_PATH`로
+덮어쓰기 가능) 서버를 쓰려면 이 명령까지 실행해 둔다. 파일이 없어도 서버는 뜨고 `/goods/*`만 503이다.
 
 출력 스키마 (`shared/types/goods.ts`의 `GoodsMap`과 동일):
 
@@ -135,9 +139,11 @@ ml/venv/bin/python shared/goods_map/validate_goods_map.py \
 2. `shared/goods_map/goods_map.json` 커밋 여부를 팀과 결정 (공공데이터 재배포 가능 여부
    확인 후) — 확정되면 `.gitignore`의 해당 줄을 제거
    - 공공누리 확인 결과 기록: (미확인 — 확인한 사람·날짜·유형·근거 URL을 여기에 적는다)
-3. 프론트-6에서 `goods_map.json`을 정적 import(또는 `/public`에 두고 fetch)해 상품 검색
-   UI에 연결
-4. 프론트-8에서 같은 파일의 `similarity_codes`로 두 유사군 집합의 자카드 계수 계산
+3. 프론트-6 상품 검색 UI는 `GET /api/goods/search`·`/api/goods/classes`(백엔드 `/goods/*`,
+   `frontend/lib/api.ts`의 `searchGoods`·`fetchGoodsClasses`)를 쓴다 — 2026-09-21 API·계약 준비,
+   화면은 미착수. `name`과 `aliases`를 함께 대조하며 alias로 잡히면 `matched_alias`를 준다.
+4. 프론트-8 X4 자카드는 `ml/src/axes/x4_goods.py`(`goods_similarity`, 2026-09-21)로 구현됐고,
+   상품명 → 유사군 코드는 로더 `ml/src/axes/goods_map.py`의 `codes_for`가 맡는다.
 
 ## 파일 구성
 
@@ -148,5 +154,6 @@ shared/goods_map/
 ├ parse_goods_map.py      # inspect / convert
 ├ validate_goods_map.py   # 구조 검증 + 검색 데모
 ├ raw/                    # 원본 엑셀 (gitignore, 로컬 전용)
-└ goods_map.json          # 변환 산출물 (gitignore, 커밋 여부는 위 §5 참고)
+├ goods_map.json          # 변환 산출물 (gitignore, 커밋 여부는 위 §5 참고)
+└ goods_map.json.gz       # --gzip 압축본 (gitignore) — 백엔드·로더가 우선 읽음
 ```
