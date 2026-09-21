@@ -4,7 +4,8 @@
 
 - x1_phonetic: 호칭(발음) 유사도 — 상표명 문자열 2개 입력
 - x3_semantic: 관념 유사도 (구현 예정)
-- x4_goods:    상품 견련성 (구현 예정)
+- x4_goods:    상품 견련성 — 유사군 코드 집합 2개 입력(자카드)
+- goods_map:   축 함수는 아님. 상품명 → 유사군 코드 변환표 로더(X4 입력·상품 검색 API 데이터)
 
 무거운 모듈(torch 등)을 이 패키지에서 자동 import 하지 않도록 재수출은 하지 않는다.
 `from src.axes.x1_phonetic import phonetic_similarity` 처럼 축 모듈을 직접 import 한다.

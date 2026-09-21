@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { imageUrl, searchTrademark } from "@/lib/api";
+import { imageUrl, searchGoods, searchTrademark } from "@/lib/api";
 
 const validResponse = {
   grade: {
@@ -89,6 +89,55 @@ describe("searchTrademark", () => {
         "token",
       ),
     ).rejects.toEqual(
+      expect.objectContaining({ status: 502, name: "ApiError" }),
+    );
+  });
+});
+
+describe("searchGoods", () => {
+  beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
+
+  it("queries the same-origin route without a Turnstile token and parses the contract", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          query: "화장품 소매업",
+          matches: [
+            {
+              name: "화장품 판매업(도소매·중개·대행)",
+              nice_class: 35,
+              similarity_codes: ["S2012"],
+              matched_alias: "화장품 소매업",
+            },
+          ],
+          total: 1,
+          source: "고시상품명칭 13판(2026)",
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const result = await searchGoods("화장품 소매업", { limit: 5, niceClass: 35 });
+
+    expect(result.total).toBe(1);
+    expect(result.matches[0].matched_alias).toBe("화장품 소매업");
+    const [url, options] = vi.mocked(fetch).mock.calls[0];
+    expect(url).toBe(
+      "/api/goods/search?q=%ED%99%94%EC%9E%A5%ED%92%88+%EC%86%8C%EB%A7%A4%EC%97%85&limit=5&nice_class=35",
+    );
+    expect(options?.credentials).toBe("same-origin");
+    expect(new Headers(options?.headers).has("x-turnstile-token")).toBe(false);
+  });
+
+  it("fails closed when the goods contract is malformed", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ matches: "nope" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    await expect(searchGoods("커피")).rejects.toEqual(
       expect.objectContaining({ status: 502, name: "ApiError" }),
     );
   });

@@ -14,7 +14,8 @@
     # 2) 확인한 컬럼명(또는 열 문자, 예: "B")을 지정해 변환한다.
     python parse_goods_map.py convert raw/고시상품명칭_13판.xlsx \\
         --name-col 상품명 --class-col 류 --codes-col 유사군코드 \\
-        --out goods_map.json
+        --out goods_map.json --gzip
+    # --gzip: goods_map.json.gz 도 만든다 — 백엔드·로더(ml/src/axes/goods_map.py)가 우선 읽는 파일
 
 출력 스키마 (1:N 필수 — 한 상품에 유사군 코드가 여러 개 붙을 수 있음):
     [{ "name": "화장품", "nice_class": 3, "similarity_codes": ["G1201", "S120907", "S128302"] }]
@@ -24,6 +25,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import re
 import sys
@@ -169,6 +171,7 @@ def convert(
     class_col: str | None,
     codes_col: str,
     sheet: str | None,
+    gzip_out: bool = False,
 ) -> None:
     wb = _load_workbook(path)
     sheets = [sheet] if sheet else wb.sheetnames
@@ -236,13 +239,19 @@ def convert(
     result = _collapse_class35_services(merged)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(
-        json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    text = json.dumps(result, ensure_ascii=False, indent=2)
+    out_path.write_text(text, encoding="utf-8")
 
     multi = sum(1 for e in result if len(e["similarity_codes"]) > 1)
     print(f"변환 완료: {len(result)}건 (유사군 2개 이상 = {multi}건, 건너뜀 = {skipped}행)")
     print(f"저장: {out_path}")
+    if gzip_out:
+        # 로더(ml/src/axes/goods_map.py)·백엔드가 우선 읽는 압축본. mtime=0 → 같은 입력이면 같은 바이트.
+        gz_path = out_path.with_name(out_path.name + ".gz")
+        with gz_path.open("wb") as raw:
+            with gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0) as handle:
+                handle.write(text.encode("utf-8"))
+        print(f"gzip 저장: {gz_path} ({gz_path.stat().st_size / 1e6:.1f}MB)")
 
 
 def main() -> None:
@@ -260,6 +269,11 @@ def main() -> None:
     p_convert.add_argument("--name-col", required=True, help="상품명 컬럼 (헤더 텍스트 또는 'B' 같은 열 문자)")
     p_convert.add_argument("--class-col", default=None, help="류 컬럼. 없으면 시트 이름에서 추정")
     p_convert.add_argument("--codes-col", required=True, help="유사군코드 컬럼")
+    p_convert.add_argument(
+        "--gzip",
+        action="store_true",
+        help="goods_map.json.gz 도 함께 생성(백엔드·로더가 우선 읽는 파일)",
+    )
 
     args = parser.parse_args()
 
@@ -273,6 +287,7 @@ def main() -> None:
             class_col=args.class_col,
             codes_col=args.codes_col,
             sheet=args.sheet,
+            gzip_out=args.gzip,
         )
 
 

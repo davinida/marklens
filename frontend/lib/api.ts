@@ -1,13 +1,21 @@
 import {
+  GoodsClassesResponseSchema,
+  GoodsSearchResponseSchema,
   parseNameCheckResponse,
   PhoneticSearchResponseSchema,
   SearchResponseSchema,
+  type GoodsClassesResponse,
+  type GoodsSearchResponse,
   type NameCheckResult,
   type PhoneticSearchResponse,
   type SearchResponse,
 } from "@/lib/contracts";
 
 export type {
+  GoodsClass,
+  GoodsClassesResponse,
+  GoodsMatch,
+  GoodsSearchResponse,
   GradeCode,
   PhoneticMatch,
   PhoneticSearchResponse,
@@ -168,6 +176,73 @@ export async function searchPhonetic(
     throw new ApiError(
       502,
       "발음 유사도 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
+      response.headers.get("x-request-id"),
+    );
+  }
+  return parsed.data;
+}
+
+/**
+ * 상품↔유사군 변환표 검색 (프론트-6 지정상품 입력). 정확 > 접두 > 부분 순이며 원 명칭(alias)으로
+ * 잡히면 matched_alias 에 그 명칭이 온다. Turnstile 토큰이 필요 없다(app/api/goods/search 주석).
+ * 자동완성에 쓸 때는 디바운스(300ms 안팎)와 2글자 이상 조건을 두는 것이 좋다 — 백엔드 한도가
+ * 기본 60/minute 이고 1글자 광범위 질의는 결과가 수만 건이다(서버 실측 약 50ms).
+ */
+export async function searchGoods(
+  query: string,
+  options: { limit?: number; niceClass?: number; signal?: AbortSignal } = {},
+): Promise<GoodsSearchResponse> {
+  const params = new URLSearchParams({ q: query });
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.niceClass !== undefined) {
+    params.set("nice_class", String(options.niceClass));
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/goods/search?${params}`, {
+      method: "GET",
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: options.signal,
+    });
+  } catch (error) {
+    networkError(error);
+  }
+
+  const body = await assertOk(response);
+  const parsed = GoodsSearchResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "상품 검색 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
+      response.headers.get("x-request-id"),
+    );
+  }
+  return parsed.data;
+}
+
+/** NICE 45개 류의 명칭·변환표 항목 수 (류 선택 UI용, 정적 데이터). */
+export async function fetchGoodsClasses(
+  signal?: AbortSignal,
+): Promise<GoodsClassesResponse> {
+  let response: Response;
+  try {
+    response = await fetch("/api/goods/classes", {
+      method: "GET",
+      credentials: "same-origin",
+      signal,
+    });
+  } catch (error) {
+    networkError(error);
+  }
+
+  const body = await assertOk(response);
+  const parsed = GoodsClassesResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "상품 분류 목록의 응답 형식이 예상과 달라 표시할 수 없어요.",
       response.headers.get("x-request-id"),
     );
   }
