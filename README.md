@@ -8,12 +8,12 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 결과는 참고 정보입니다. 상표 등록 가능성, 침해 여부, 법적 위험 확률 또는 검색
 범위 밖 권리의 부재를 판정하지 않습니다.
 
-| 항목 | 2026-09-17 현재 |
+| 항목 | 2026-09-22 현재 |
 |---|---|
-| 마지막 갱신 | 2026-09-17 (`main` = `develop` = `087a843`) |
+| 마지막 갱신 | 2026-09-22 (`main` = `develop` = `b6b9bba`) |
 | 데이터 | KIPRIS 등록상표 1,100건, generation `20260827T035002Z-25f84a6eeb26` (2026-08-27) |
-| 테스트 | Python `440 passed, 1 skipped` · 프런트 Vitest `41 passed` · Playwright 스펙 3개 × 뷰포트 3개 |
-| CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — PR #20·#21 |
+| 테스트 | Python `541 passed, 1 skipped` · 프런트 Vitest `52 passed` · Playwright 스펙 3개 × 뷰포트 3개 |
+| CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — PR #22·#23·#24(2026-09-21 develop) |
 
 ## 현재 범위
 
@@ -40,7 +40,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 데이터 구성과 평가 한계는 [모델·데이터 카드](docs/MarkLens_모델카드_데이터카드.md)를
 먼저 확인하세요(2026-08-15 1,000건 세대 기준으로 작성됨).
 
-## 구현 현황 (방학 분배 항목 기준, 2026-09-17)
+## 구현 현황 (방학 분배 항목 기준, 2026-09-22)
 
 항목 번호는 `docs/MarkLens_작업가이드_*.md`의 분배 계획을 따릅니다.
 상태: 완료 / 부분 / 미착수 / 보류.
@@ -49,9 +49,9 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X4) | `ml/src/axes/` | X3 파일은 예정 |
 | 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 미착수 | — | 통합 모델 학습 전제 |
-| 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(90건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21. 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
+| 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21. 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
-| 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 명칭 정책은 검토 중 |
+| 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
 | 프론트-1 변경 시안 확정 | 지원 | 미착수 | — | 저장소에 시안 산출물 없음 |
 | 프론트-2 상품↔유사군 변환표 | 지원 | 부분 | `shared/goods_map/`, `shared/types/goods.ts` | 파서·검증기 완료(PR #19). JSON 미커밋 — 공공누리 확인 중 |
 | 프론트-3 유명 로고 브랜드 목록 | 지원 | 부분 | `shared/famous_brands.txt` | DRAFT 39건(출원인명), 아직 수집 전 |
@@ -81,14 +81,14 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 ```text
 Browser
-  -> Next.js same-origin BFF (/api/search, /api/name-check, /api/images, /api/health, /api/turnstile-config)
+  -> Next.js same-origin BFF (/api/search, /api/name-check, /api/phonetic-search, /api/goods/search, /api/goods/classes, /api/images, /api/health, /api/turnstile-config)
   -> private FastAPI
   -> OpenCLIP + FAISS index
   -> PostgreSQL / KIPRIS Plus
 ```
 
 - `frontend/`: Next.js UI, 수동 크롭, Turnstile 검증, BFF(`app/api/*`)
-- `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인 API, KIPRIS 수집 스크립트(`scripts/`)
+- `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인·발음 유사도·상품 검색 API, KIPRIS 수집 스크립트(`scripts/`)
 - `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구
 - `ml/src/axes/`: 다축 모델의 축 함수 — X1 호칭 유사도(`x1_phonetic.py`, 브랜드·지명 로마자표 `korean_brands.py`), X4 상품 견련성(`x4_goods.py`), 변환표 로더(`goods_map.py`). X3는 예정
 - `ml/evaluation/`: 200-pair 라벨링 팩과 강건성 평가 계약
@@ -362,7 +362,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 
 | 축 | 내용 | 상태 |
 |---|---|---|
-| X1 호칭 | 두 상표명의 발음 유사도. 판례 5규칙(호칭 최우선, 첫음절 강세, 여러 호칭 중 최댓값, 외국어의 국내 발음, 한영 병기 시 한글 우선) | **완료** — 라이브러리 |
+| X1 호칭 | 두 상표명의 발음 유사도. 판례 5규칙(호칭 최우선, 첫음절 강세, 여러 호칭 중 최댓값, 외국어의 국내 발음, 한영 병기 시 한글 우선) | **완료** — 서비스 연결(`/phonetic-search`, 검색 등급에는 미반영) |
 | X2 외관 | OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색 | 완료 — 현재 서비스 |
 | X3 관념 | 상표명 의미를 사전학습 한국어 언어모델 임베딩으로 비교 | 예정 |
 | X4 상품 견련성 | 유사군 코드 집합 간 자카드 계수 | **완료** — 라이브러리(서비스 적용은 DB 유사군 백필 후) |
@@ -386,7 +386,7 @@ phonetic_similarity("카페 봄", "봄", extra_generic=frozenset({"카페"}))  #
   입력 상표명과 비교한 상위 후보를 돌려주고, 상표명 확인 패널이 "발음(호칭)이 비슷한
   등록상표" 섹션으로 보여 줍니다. 검색 등급·점수에는 아직 반영되지 않습니다.
 - 흐름: 정규화(회사 형태·부가어·기능어 제거) → 발음 후보(외래어 표기법 근사 룰
-  G2P, 국내 브랜드 로마자표 91개·지명표 34개, 예외 사전 39개, 낱자·숫자 읽기,
+  G2P, 국내 브랜드 로마자표 101개·지명표 34개, 예외 사전 63개, 복수 읽기 사전 21개, 낱자·숫자 읽기,
   한영 병기 판정) → 후보 조합 → 위치 가중 음절 레벤슈타인 → 최댓값.
 - `has_pronunciation`이 False인 상표(순수 도형·한자만)는 X1을 결측으로 두고
   다른 축만으로 판단합니다. `extra_generic`에는 식별력 필터(예정)가 넘길 상품
@@ -462,9 +462,9 @@ npm run typecheck && npm run lint && npm test && npm run test:e2e && npm run bui
 npm audit --omit=dev --audit-level=high
 ```
 
-2026-09-17 검증(`main` = `develop` = `087a843`): Python `440 passed, 1 skipped`
-(X1 90건 포함), ruff 통과, frontend Vitest `41 passed`(12 파일), Playwright는
-스펙 3개 × 뷰포트 3개(320x568, 667x375, desktop)를 같은 날 CI에서 통과했습니다.
+2026-09-22 검증(`main` = `develop` = `b6b9bba`): Python `541 passed, 1 skipped`
+(X1 123건 포함), ruff 통과, frontend Vitest `52 passed`(15 파일), Playwright는
+스펙 3개 × 뷰포트 3개(320x568, 667x375, desktop)를 2026-09-21 CI(PR #24 병합)에서 통과했습니다.
 file 모드 서버 스모크에서 `/health`가 `index_size`·`trademark_count` 1,100과
 generation `20260827T035002Z-25f84a6eeb26`을 반환했습니다. 이 검증에서 KIPRIS
 `/name-check`는 호출하지 않았습니다. 직전 기록(2026-08-15, 1,000건 세대)은 Python
