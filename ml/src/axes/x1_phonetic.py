@@ -50,7 +50,7 @@ from typing import Final
 
 from .korean_brands import KOREAN_BRAND_ROMANIZATION, KOREAN_PLACE_ROMANIZATION
 
-__all__ = ["phonetic_similarity", "has_pronunciation", "pronunciation_candidates"]
+__all__ = ["phonetic_similarity", "has_pronunciation", "pronunciation_candidates", "normalize_name"]
 
 
 # =====================================================================================
@@ -1392,6 +1392,26 @@ def pronunciation_candidates(
 def has_pronunciation(name: str, *, extra_generic: frozenset[str] = frozenset()) -> bool:
     """한글 음절 1개 이상인 발음 후보가 하나라도 있으면 True (순수 도형·한자만·기호만이면 False)."""
     return bool(_candidates_cached(_as_text(name), frozenset(extra_generic)))
+
+
+def normalize_name(name: str, *, extra_generic: frozenset[str] = frozenset()) -> list[str]:
+    """상표명 → 요부관찰 정규화 토큰 목록(표기 기준, 발음 변환 없음). 다른 축(X3 관념)과 공유한다.
+
+    _normalize_tokens 의 "제거 후" 토큰과 같다: NFKC·casefold → 회사표시 기호 제거 → 기호를
+    공백으로 → 한글/영문/숫자 경계 토큰화(한자·기타 문자 토큰은 버림) → 연속 중복 제거 →
+    회사 형태·부가어·영문 기능어(UNIVERSAL_GENERIC)와 extra_generic 제거(단일 토큰 항목은 영문
+    토큰의 읽기와도 대조). 전부 제거되면 제거 전 토큰을 돌려준다. 어떤 입력에도 예외 없이
+    목록을 돌려준다(None·빈 문자열 → []).
+
+    Args:
+        name: 상표명 문자열.
+        extra_generic: 호출자가 넘기는 상품 의존 보통명칭 집합(phonetic_similarity 와 같은 의미).
+
+    Returns:
+        정규화 토큰 목록(영문은 소문자). 예: "(주)스타벅스 코리아" → ["스타벅스"].
+    """
+    _, post = _normalize_tokens(_as_text(name), frozenset(extra_generic))
+    return list(post)
 
 
 def phonetic_similarity(
