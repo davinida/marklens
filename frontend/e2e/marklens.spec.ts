@@ -101,6 +101,31 @@ const SEMANTIC_RESULT = {
   model: "e2e-fixture",
 };
 
+const GOODS_SEARCH_RESULT = {
+  query: "커피",
+  matches: [
+    { name: "커피", nice_class: 30, similarity_codes: ["G0502"], matched_alias: null },
+    {
+      name: "커피전문점업",
+      nice_class: 43,
+      similarity_codes: ["S120602", "G0502"],
+      matched_alias: null,
+    },
+  ],
+  total: 2,
+  offset: 0,
+  source: "E2E fixture",
+};
+
+const GOODS_CLASSES_RESULT = {
+  classes: [
+    { nice_class: 30, title: "커피·과자", count: 1 },
+    { nice_class: 43, title: "음식점·숙박", count: 1 },
+  ],
+  total_entries: 2,
+  source: "E2E fixture",
+};
+
 const NAME_CHECK_RESULT = {
   query: "BBQ",
   total_found: 3,
@@ -319,5 +344,60 @@ test("name evidence opens and remains visible in the result dashboard", async ({
   await expect(page.locator("[data-phonetic-evidence]")).toBeVisible();
   await expect(page.locator("[data-semantic-evidence]")).toBeVisible();
   await expect(page.getByText("호칭·관념 조회됨")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("selected goods survive the search and appear in the result summary", async ({ page }) => {
+  await page.route("**/api/goods/search?*", async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        url.searchParams.get("q") === "커피"
+          ? GOODS_SEARCH_RESULT
+          : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
+      ),
+    });
+  });
+  await page.route("**/api/goods/classes", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(GOODS_CLASSES_RESULT),
+    });
+  });
+  await page.route("**/api/search?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(SEARCH_RESULT),
+    });
+  });
+
+  const picker = page.getByRole("combobox", { name: "지정상품 검색" });
+  await picker.fill("커피");
+  await page.getByRole("option", { name: /^커피 제30류/ }).click();
+  await page.getByRole("option", { name: /커피전문점업/ }).click();
+  await expect(page.getByRole("button", { name: "커피 제거" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "커피전문점업 제거" })).toBeVisible();
+  await expect(page.getByText("선택 2개")).toBeVisible();
+  await expect(page.getByText("유사군 2개")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await chooseLogo(page);
+  await page
+    .getByRole("dialog", { name: "분석할 로고 영역 선택" })
+    .getByRole("button", { name: "전체 이미지 사용" })
+    .click();
+  await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "가까운 시각 후보를 찾지 못했어요" }),
+  ).toBeVisible();
+  await expect(page.locator("[data-goods-summary]")).toContainText(
+    "선택한 지정상품: 커피, 커피전문점업 (유사군 2개)",
+  );
+  await expect(page.getByText("지정상품 2개 선택(유사군 2개) · 검색 반영 전")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });

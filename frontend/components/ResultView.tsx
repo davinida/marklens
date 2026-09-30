@@ -18,6 +18,7 @@ import NameCheckPanel from "@/components/NameCheckPanel";
 import PhoneticMatchesSection from "@/components/PhoneticMatchesSection";
 import SemanticMatchesSection from "@/components/SemanticMatchesSection";
 import { imageUrl } from "@/lib/api";
+import { goodsCodeUnion, goodsSummaryText, type SelectedGood } from "@/lib/goods";
 import type {
   GradeCode,
   SearchMatch,
@@ -472,10 +473,12 @@ function AnalysisScope({
   nameCheck,
   phonetic,
   semantic,
+  goods,
 }: {
   nameCheck?: NameCheckResult | null;
   phonetic?: PhoneticSearchResponse | null;
   semantic?: SemanticSearchResponse | null;
+  goods?: SelectedGood[] | null;
 }) {
   const items = [
     {
@@ -522,7 +525,10 @@ function AnalysisScope({
     {
       label: "상품 견련성",
       state: "미분석",
-      detail: "지정상품 충돌 비교 제외",
+      detail:
+        goods && goods.length > 0
+          ? `지정상품 ${goods.length}개 선택(유사군 ${goodsCodeUnion(goods).length}개) · 검색 반영 전`
+          : "지정상품 충돌 비교 제외",
       kind: "missing" as const,
     },
   ];
@@ -645,6 +651,7 @@ export default function ResultView({
   nameCheck,
   phonetic,
   semantic,
+  goods,
   onReset,
 }: {
   result: SearchResponse;
@@ -652,6 +659,7 @@ export default function ResultView({
   nameCheck?: NameCheckResult | null;
   phonetic?: PhoneticSearchResponse | null;
   semantic?: SemanticSearchResponse | null;
+  goods?: SelectedGood[] | null;
   onReset: () => void;
 }) {
   const grade = result.grade;
@@ -727,6 +735,16 @@ export default function ResultView({
           </div>
         </div>
 
+        {goods && goods.length > 0 && (
+          <p
+            data-goods-summary
+            className="mt-3 border-t border-current/10 pt-3 text-[12px] leading-relaxed text-sub"
+          >
+            <span className="font-bold text-ink">선택한 지정상품:</span> {goodsSummaryText(goods)}
+            <span className="ml-1">· 검색 점수에는 아직 반영되지 않아요(유사군 백필 후)</span>
+          </p>
+        )}
+
         {(grade.warnings.length > 0 || grade.uncertain) && (
           <div className="mt-4 grid gap-2 border-t border-current/10 pt-3 sm:grid-cols-2">
             {grade.warnings.map((warning) => (
@@ -797,7 +815,12 @@ export default function ResultView({
             </div>
 
             <MatchDistribution matches={result.matches} thresholds={thresholds} />
-            <AnalysisScope nameCheck={nameCheck} phonetic={phonetic} semantic={semantic} />
+            <AnalysisScope
+              nameCheck={nameCheck}
+              phonetic={phonetic}
+              semantic={semantic}
+              goods={goods}
+            />
           </section>
         </div>
 

@@ -37,6 +37,21 @@ describe("same-origin /api/goods/*", () => {
     expect(options).toEqual(expect.objectContaining({ method: "GET", cache: "no-store" }));
   });
 
+  it("lists a class without a query and forwards the offset", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      Response.json({ query: "", matches: [], total: 3, offset: 20, source: "fixture" }),
+    );
+
+    const response = await searchGoods(
+      new Request("http://localhost/api/goods/search?q=%20&nice_class=25&offset=20&limit=20"),
+    );
+
+    expect(response.status).toBe(200);
+    const [url] = vi.mocked(fetch).mock.calls[0];
+    // 공백 q 는 버리고 류 번호·offset 만 보낸다(류 목록 보기)
+    expect(url).toBe("https://backend.example/goods/search?limit=20&offset=20&nice_class=25");
+  });
+
   it("rejects a blank, over-long or out-of-range query before contacting the backend", async () => {
     for (const query of [
       "?q=",
@@ -45,6 +60,8 @@ describe("same-origin /api/goods/*", () => {
       "?q=커피&limit=0",
       "?q=커피&limit=51",
       "?q=커피&nice_class=46",
+      "?q=커피&offset=-1",
+      "?nice_class=0",
       "",
     ]) {
       const response = await searchGoods(

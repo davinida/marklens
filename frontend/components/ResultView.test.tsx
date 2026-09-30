@@ -75,9 +75,19 @@ describe("ResultView canonical status", () => {
           checkedAt: null,
           source: "KIPRIS fixture",
         }}
+        goods={[
+          { name: "커피", nice_class: 30, similarity_codes: ["G0502"] },
+          { name: "커피전문점업", nice_class: 43, similarity_codes: ["S120602", "G0502"] },
+        ]}
         onReset={vi.fn()}
       />,
     );
+
+    // 검색 조건 요약: 선택한 지정상품과 유사군 합집합 수(검색 점수에는 미반영)
+    expect(document.querySelector("[data-goods-summary]")).toHaveTextContent(
+      "선택한 지정상품: 커피, 커피전문점업 (유사군 2개)",
+    );
+    expect(screen.getByText("지정상품 2개 선택(유사군 2개) · 검색 반영 전")).toBeVisible();
 
     expect(
       screen.getByRole("heading", { name: "가까운 시각 후보를 찾지 못했어요" }),

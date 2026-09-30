@@ -101,11 +101,21 @@ def _require() -> GoodsMap:
     return state.goods_map
 
 
-def search(query: str, limit: int, nice_class: int | None) -> tuple[list[Match], int, float]:
-    """(상위 limit 개, 전체 일치 건수, 소요 ms). 정규화·순위는 로더에 맡긴다."""
+def search(
+    query: str, limit: int, nice_class: int | None, offset: int = 0
+) -> tuple[list[Match], int, float]:
+    """(offset 부터 limit 개, 전체 일치 건수, 소요 ms). 정규화·순위는 로더에 맡긴다."""
     goods_map = _require()
     started = time.perf_counter()
-    matches, total = goods_map.search_with_total(query, limit, nice_class)
+    matches, total = goods_map.search_with_total(query, limit, nice_class, offset)
+    return matches, total, (time.perf_counter() - started) * 1000
+
+
+def list_class(nice_class: int, offset: int, limit: int) -> tuple[list[Match], int, float]:
+    """한 류의 항목을 이름순으로 offset 부터 limit 개 (검색어 없이 류 탐색). (목록, 전체 수, ms)."""
+    goods_map = _require()
+    started = time.perf_counter()
+    matches, total = goods_map.list_class(nice_class, offset, limit)
     return matches, total, (time.perf_counter() - started) * 1000
 
 

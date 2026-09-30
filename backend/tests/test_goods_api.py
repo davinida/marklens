@@ -96,7 +96,9 @@ def test_search_strips_query_and_handles_no_match(client):
     assert body["matches"][0]["name"] == "커피"
 
     body = client.get("/goods/search", params={"q": "없는상품"}).json()
-    assert body == {"query": "없는상품", "matches": [], "total": 0, "source": goods.SOURCE}
+    assert body == {
+        "query": "없는상품", "matches": [], "total": 0, "offset": 0, "source": goods.SOURCE,
+    }
 
 
 @pytest.mark.parametrize(
@@ -111,10 +113,48 @@ def test_search_strips_query_and_handles_no_match(client):
         {"q": "커피", "nice_class": 0},
         {"q": "커피", "nice_class": 46},
         {"q": "커피", "nice_class": "x"},
+        {"q": "커피", "offset": -1},
+        {"nice_class": 25, "offset": 100_001},
     ],
 )
 def test_invalid_params_are_422(client, params):
     assert client.get("/goods/search", params=params).status_code == 422
+
+
+def test_missing_query_and_class_is_422_with_reason(client):
+    """q 도 nice_class 도 없으면(공백 q 포함) 422 + 이유. 류 번호만 있으면 목록 보기로 200."""
+    for params in ({}, {"q": ""}, {"q": "   "}):
+        response = client.get("/goods/search", params=params)
+        assert response.status_code == 422
+        assert "nice_class" in response.json()["detail"]
+    assert client.get("/goods/search", params={"q": "  ", "nice_class": 25}).status_code == 200
+
+
+def test_class_listing_without_query_is_sorted_by_name(client):
+    body = client.get("/goods/search", params={"nice_class": 25}).json()
+    assert body["query"] == ""
+    assert body["total"] == 3 and body["offset"] == 0
+    assert [m["name"] for m in body["matches"]] == ["신발", "의류", "장갑"]  # 가나다순
+    assert all(m["matched_alias"] is None for m in body["matches"])
+    assert body["matches"][0]["similarity_codes"] == ["G4503"]
+    assert body["source"] == goods.SOURCE
+    # 항목이 없는 류는 빈 목록 + total 0
+    empty = client.get("/goods/search", params={"nice_class": 44}).json()
+    assert empty["matches"] == [] and empty["total"] == 0
+
+
+def test_offset_pages_listing_and_search(client):
+    page = client.get("/goods/search", params={"nice_class": 25, "offset": 1, "limit": 1}).json()
+    assert [m["name"] for m in page["matches"]] == ["의류"]
+    assert page["total"] == 3 and page["offset"] == 1
+    beyond = client.get("/goods/search", params={"nice_class": 25, "offset": 3}).json()
+    assert beyond["matches"] == [] and beyond["total"] == 3 and beyond["offset"] == 3
+    # 검색에도 같은 offset 이 적용된다(순위 목록의 페이지 넘김)
+    first = client.get("/goods/search", params={"q": "화장품", "limit": 2}).json()
+    second = client.get("/goods/search", params={"q": "화장품", "limit": 2, "offset": 2}).json()
+    assert [m["name"] for m in first["matches"]] == ["화장품", "화장품용 스펀지"]
+    assert [m["name"] for m in second["matches"]] == [COSMETICS_35, "기능성 화장품"]
+    assert first["total"] == second["total"] == 4 and second["offset"] == 2
 
 
 def test_classes_returns_all_45_with_titles_and_counts(client):

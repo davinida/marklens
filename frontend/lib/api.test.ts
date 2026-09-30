@@ -129,6 +129,32 @@ describe("searchGoods", () => {
     expect(new Headers(options?.headers).has("x-turnstile-token")).toBe(false);
   });
 
+  it("omits an empty query and sends offset only when positive (class listing)", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(
+        JSON.stringify({ query: "", matches: [], total: 3, offset: 20, source: "fixture" }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const result = await searchGoods("  ", { niceClass: 25, offset: 20, limit: 20 });
+
+    expect(result.offset).toBe(20);
+    expect(vi.mocked(fetch).mock.calls[0][0]).toBe(
+      "/api/goods/search?limit=20&nice_class=25&offset=20",
+    );
+
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ query: "커피", matches: [], total: 0 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const defaults = await searchGoods("커피", { offset: 0 });
+    expect(defaults.offset).toBe(0); // 응답에 offset 이 없으면 0
+    expect(vi.mocked(fetch).mock.calls[1][0]).toBe("/api/goods/search?q=%EC%BB%A4%ED%94%BC");
+  });
+
   it("fails closed when the goods contract is malformed", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(JSON.stringify({ matches: "nope" }), {

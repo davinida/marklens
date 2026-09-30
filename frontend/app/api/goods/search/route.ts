@@ -22,11 +22,17 @@ export const dynamic = "force-dynamic";
  * gateway 한도가 맡는다. 검색어가 GET 쿼리에 실리지만 상품명이라 /name-check 의 상표명처럼
  * 보호할 값이 아니다.
  */
-const QuerySchema = z.object({
-  q: z.string().trim().min(1).max(50),
-  limit: z.coerce.number().int().min(1).max(50).optional(),
-  nice_class: z.coerce.number().int().min(1).max(45).optional(),
-});
+// q 는 nice_class 가 있을 때 생략(또는 공백) 가능 — 그 류의 항목을 이름순으로 나열(offset 으로 더 보기).
+const QuerySchema = z
+  .object({
+    q: z.string().trim().max(50),
+    limit: z.coerce.number().int().min(1).max(50).optional(),
+    offset: z.coerce.number().int().min(0).max(100_000).optional(),
+    nice_class: z.coerce.number().int().min(1).max(45).optional(),
+  })
+  .refine((value) => value.q.length > 0 || value.nice_class !== undefined, {
+    message: "q 또는 nice_class 필요",
+  });
 
 export async function GET(request: Request): Promise<Response> {
   const requestId = getRequestId(request.headers);
@@ -34,19 +40,24 @@ export async function GET(request: Request): Promise<Response> {
   const parsed = QuerySchema.safeParse({
     q: params.get("q") ?? "",
     limit: params.get("limit") ?? undefined,
+    offset: params.get("offset") ?? undefined,
     nice_class: params.get("nice_class") ?? undefined,
   });
   if (!parsed.success) {
     return jsonError(
       422,
-      "상품명 검색어는 1자에서 50자 사이로 입력해 주세요. (limit 1~50, nice_class 1~45)",
+      "상품명 검색어(1~50자) 또는 류 번호(nice_class 1~45)가 필요해요. (limit 1~50, offset 0 이상)",
       requestId,
     );
   }
 
-  const upstreamParams = new URLSearchParams({ q: parsed.data.q });
+  const upstreamParams = new URLSearchParams();
+  if (parsed.data.q) upstreamParams.set("q", parsed.data.q);
   if (parsed.data.limit !== undefined) {
     upstreamParams.set("limit", String(parsed.data.limit));
+  }
+  if (parsed.data.offset !== undefined) {
+    upstreamParams.set("offset", String(parsed.data.offset));
   }
   if (parsed.data.nice_class !== undefined) {
     upstreamParams.set("nice_class", String(parsed.data.nice_class));
