@@ -50,7 +50,7 @@ def test_search_contract_and_ranking(client):
     body = response.json()
 
     assert body["query"] == "화장품"
-    assert body["source"] == goods.SOURCE == "고시상품명칭 13판(2026)"
+    assert body["source"] == goods.SOURCE == "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형"
     assert body["total"] == 4
     # 정확 > 접두(짧은 name 먼저) > 부분
     assert [m["name"] for m in body["matches"]] == [

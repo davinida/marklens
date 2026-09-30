@@ -241,7 +241,8 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
 지식재산처 고시상품명칭 13판(2026)을 변환한 로컬 변환표(`shared/goods_map/goods_map.json.gz`,
 91,591건, 제35류 병합 항목 38,433건에 원 명칭 `aliases` 230,598개)에서 상품명을 찾아 유사군
 코드를 돌려줍니다. KIPRIS를 호출하지 않는 읽기 전용 조회입니다. `similarity_codes`는 X4 상품
-견련성(자카드) 계산의 입력이며 법적 유사 판단이 아닙니다.
+견련성(자카드) 계산의 입력이며 법적 유사 판단이 아닙니다. 변환표는 공공누리 제1유형(출처표시)으로
+저장소에 포함되어 있고(`shared/goods_map/README.md` §5) `source` 필드가 출처 표시를 겸합니다.
 
 ### 브라우저 API
 
@@ -277,7 +278,7 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
     }
   ],
   "total": 61,
-  "source": "고시상품명칭 13판(2026)"
+  "source": "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형"
 }
 ```
 
@@ -294,7 +295,7 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
 {
   "classes": [{ "nice_class": 3, "title": "화장품·세제", "count": 1331 }],
   "total_entries": 91591,
-  "source": "고시상품명칭 13판(2026)"
+  "source": "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형"
 }
 ```
 

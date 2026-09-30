@@ -15,7 +15,7 @@ describe("same-origin /api/goods/*", () => {
 
   it("forwards the validated query with the API key and without a Turnstile token", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      Response.json({ query: "화장품", matches: [], total: 0, source: "고시상품명칭 13판(2026)" }),
+      Response.json({ query: "화장품", matches: [], total: 0, source: "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형" }),
     );
 
     const response = await searchGoods(
@@ -57,7 +57,7 @@ describe("same-origin /api/goods/*", () => {
 
   it("proxies the class list with the API key and caches successful responses", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      Response.json({ classes: [], total_entries: 0, source: "고시상품명칭 13판(2026)" }),
+      Response.json({ classes: [], total_entries: 0, source: "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형" }),
     );
 
     const response = await getClasses(

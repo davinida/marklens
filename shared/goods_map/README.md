@@ -24,7 +24,7 @@
       "https://www.kipo.go.kr/ko/kpoContFileDown.do?seq=26&fileNum=19"
   ```
 - 받은 파일은 `shared/goods_map/raw/`에 둔다 (이 폴더는 `.gitignore`에 있어 커밋되지
-  않음 — 공공데이터 재배포 가능 여부를 다빈이 확인하기 전까지는 원본을 커밋하지 않는다).
+  않음 — 원본 13MB는 저장소에 넣지 않고 파싱본 `goods_map.json.gz`만 포함한다, §5).
   실제 파일명: `shared/goods_map/raw/고시상품명칭13판.xlsx` (13.3MB, 시트 7개).
 
 ## 2. 구조 확인 (inspect) — 이미 확인 완료, 아래는 재현용
@@ -55,9 +55,10 @@ ml/venv/bin/python shared/goods_map/parse_goods_map.py convert \
     --out shared/goods_map/goods_map.json --gzip
 ```
 
-`--gzip`을 붙이면 `goods_map.json.gz`(약 1.8MB)도 만든다. 백엔드와 로더
-`ml/src/axes/goods_map.py`는 `.gz` → `.json` 순으로 찾으므로(환경변수 `MARKLENS_GOODS_MAP_PATH`로
-덮어쓰기 가능) 서버를 쓰려면 이 명령까지 실행해 둔다. 파일이 없어도 서버는 뜨고 `/goods/*`만 503이다.
+`--gzip`을 붙이면 `goods_map.json.gz`(약 1.9MB)도 만든다. 백엔드와 로더
+`ml/src/axes/goods_map.py`는 `.gz` → `.json` 순으로 찾는다(환경변수 `MARKLENS_GOODS_MAP_PATH`로
+덮어쓰기 가능). `.gz`는 저장소에 포함돼 있어(§5) clone만으로 적재되며, 새 판을 받아 재변환할 때
+이 명령까지 실행한다. 파일이 없어도 서버는 뜨고 `/goods/*`만 503이다.
 
 출력 스키마 (`shared/types/goods.ts`의 `GoodsMap`과 동일):
 
@@ -133,16 +134,28 @@ ml/venv/bin/python shared/goods_map/validate_goods_map.py \
 있고 35류 6개 시트에는 없음). 2026-09-19부터 이 12건은 원문 띄어쓰기를 그대로 유지한다
 (이전 변환은 "과외 중개업"을 "과외중개업"처럼 붙여 썼음 — 5건 해당).
 
-## 5. 다음 단계
+## 5. 라이선스 확인 결과와 다음 단계
 
-1. 다빈에게 검증 요청 (다빈-4: 1:N 구조 표본 확인)
-2. `shared/goods_map/goods_map.json` 커밋 여부를 팀과 결정 (공공데이터 재배포 가능 여부
-   확인 후) — 확정되면 `.gitignore`의 해당 줄을 제거
-   - 공공누리 확인 결과 기록: (미확인 — 확인한 사람·날짜·유형·근거 URL을 여기에 적는다)
-3. 프론트-6 상품 검색 UI는 `GET /api/goods/search`·`/api/goods/classes`(백엔드 `/goods/*`,
+**확인 결과 (확인일 2026-09-30, 확인자 최다빈)**
+
+- 원본 페이지(kipo.go.kr 상품분류코드 > 고시상품명칭/유사상품 심사기준) 하단의 공공누리 배지는
+  **제1유형(출처표시)** — 변경·재배포가 가능하며 출처를 표시하면 된다.
+- 공공데이터포털의 "지식재산처_유사상품 심사기준"(2020 등록, PDF)은 제4유형으로 등록돼 있으나,
+  이는 심사기준 PDF에 대한 것으로 본 변환표의 원본(엑셀)과 다른 문서다. 심사기준 PDF는 저장소에
+  포함하지 않는다.
+- 보강 근거: 저작권법 제7조 2호 — 국가의 고시·공고는 보호받지 못하는 저작물이다.
+- **결정**: 파싱본 `goods_map.json.gz`를 저장소에 포함한다(`.gitignore`에서 해제, 2026-09-30).
+  원본 xlsx(`raw/`)와 24MB짜리 `goods_map.json`은 계속 무시한다(각자 로컬 생성). 출처 표기:
+  "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형" — README와 `/goods/*` 응답의 `source`
+  필드에 같은 문구를 쓴다.
+- 상업적 이용 시에는 공공누리 유형과 지식재산처 이용 조건을 다시 확인할 것을 권고한다.
+
+**다음 단계**
+
+1. 프론트-6 상품 검색 UI는 `GET /api/goods/search`·`/api/goods/classes`(백엔드 `/goods/*`,
    `frontend/lib/api.ts`의 `searchGoods`·`fetchGoodsClasses`)를 쓴다 — 2026-09-21 API·계약 준비,
    화면은 미착수. `name`과 `aliases`를 함께 대조하며 alias로 잡히면 `matched_alias`를 준다.
-4. 프론트-8 X4 자카드는 `ml/src/axes/x4_goods.py`(`goods_similarity`, 2026-09-21)로 구현됐고,
+2. 프론트-8 X4 자카드는 `ml/src/axes/x4_goods.py`(`goods_similarity`, 2026-09-21)로 구현됐고,
    상품명 → 유사군 코드는 로더 `ml/src/axes/goods_map.py`의 `codes_for`가 맡는다.
 
 ## 파일 구성
@@ -154,6 +167,6 @@ shared/goods_map/
 ├ parse_goods_map.py      # inspect / convert
 ├ validate_goods_map.py   # 구조 검증 + 검색 데모
 ├ raw/                    # 원본 엑셀 (gitignore, 로컬 전용)
-├ goods_map.json          # 변환 산출물 (gitignore, 커밋 여부는 위 §5 참고)
-└ goods_map.json.gz       # --gzip 압축본 (gitignore) — 백엔드·로더가 우선 읽음
+├ goods_map.json          # 변환 산출물 (gitignore — 24MB, 로컬 생성)
+└ goods_map.json.gz       # --gzip 압축본 (저장소 포함, 공공누리 제1유형 — §5) — 백엔드·로더가 우선 읽음
 ```

@@ -24,7 +24,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 상표명 완전일치 확인 | 구현 | KIPRIS 실시간 조회, 후보 상세·상태 분포·완전성 표시. **검색과 별개 기능**(검색 점수에 반영되지 않음) |
 | KIPRIS 수집 및 인덱스 빌드 | 구현 | 체크포인트, authoritative key, manifest, 원자적 게시 |
 | 호칭 유사도 X1 | 최소 연결 | `ml/src/axes/x1_phonetic.py` + `POST /phonetic-search`. 상표명 확인 패널에 "발음이 비슷한 등록상표" 섹션. 통합 점수에는 미반영 |
-| 상품↔유사군 변환표·상품 검색 API | 구현 | 파서·검증기 + 로더(`ml/src/axes/goods_map.py`) + `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`). `goods_map.json(.gz)`은 라이선스 확인 전이라 미커밋(로컬 생성). 지정상품 입력 화면(프론트-6)은 예정 |
+| 상품↔유사군 변환표·상품 검색 API | 구현 | 파서·검증기 + 로더(`ml/src/axes/goods_map.py`) + `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`). 변환표 `goods_map.json.gz` 저장소 포함(공공누리 제1유형, 출처표시). 지정상품 입력 화면(프론트-6)은 예정 |
 | 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
 | 관념(X3)·통합 모델 | 예정 | UI의 지정상품 입력도 현재 숨김 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
@@ -53,7 +53,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
 | 프론트-1 변경 시안 확정 | 지원 | 미착수 | — | 저장소에 시안 산출물 없음 |
-| 프론트-2 상품↔유사군 변환표 | 지원 | 부분 | `shared/goods_map/`, `shared/types/goods.ts` | 파서·검증기 완료(PR #19). JSON 미커밋 — 공공누리 확인 중 |
+| 프론트-2 상품↔유사군 변환표 | 지원 | 부분 | `shared/goods_map/`, `shared/types/goods.ts` | 파서·검증기 완료(PR #19), 원 명칭 aliases 보존(PR #23). 변환표 gz 포함(공공누리 제1유형, 출처표시, 2026-09-30 확인) |
 | 프론트-3 유명 로고 브랜드 목록 | 지원 | 부분 | `shared/famous_brands.txt` | DRAFT 39건(출원인명), 아직 수집 전 |
 | 프론트-4 화면 골격(3층 결과 화면) | 현수 | 완료 | `frontend/app/page.tsx`, `frontend/components/ResultView.tsx` | |
 | 프론트-5 백엔드 1차 연동 | 현수 | 완료 | `frontend/app/api/*`(BFF) | |
@@ -423,8 +423,9 @@ inspect`/`convert` → `validate_goods_map.py` 순이며 명령은
 [`shared/goods_map/README.md`](shared/goods_map/README.md)에 있습니다. 2026-09-17
 검증에서 91,591건, Nice 45/45류, 유사군 2개 이상 5,798건을 원본과 대조했습니다.
 
-`goods_map.json`과 원본 xlsx는 공공누리 유형(재배포 가능 여부) 확인 전이라
-커밋하지 않고 각자 로컬에서 생성합니다(`.gitignore`, `--gzip`으로 `.gz`도 생성). 소비 측은
+변환표 `goods_map.json.gz`는 저장소에 포함되어 있습니다(공공누리 제1유형·출처표시, 2026-09-30
+확인 — 근거는 [`shared/goods_map/README.md`](shared/goods_map/README.md) §5). 원본 xlsx와 24MB
+`goods_map.json`은 `.gitignore`로 두고 각자 로컬에서 생성합니다(`--gzip`으로 `.gz` 재생성). 소비 측은
 로더 `ml/src/axes/goods_map.py`(백엔드 `/goods/*` 상품 검색 API, X4 입력)이며 지정상품 입력
 화면(프론트-6)은 예정입니다. 타입은 `shared/types/goods.ts`.
 
@@ -543,8 +544,9 @@ TLS edge는 외부의 `X-MarkLens-Client-IP`를 제거한 뒤 검증한 원격 I
 KIPRIS 원본, 이미지, FAISS 인덱스와 모델 캐시는 저장소에 포함되지 않습니다.
 KIPRIS 콘텐츠의 공개 재배포 또는 수익 목적 사용은 별도 권리 확인이 필요합니다.
 production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
-고시상품명칭 원본 xlsx와 변환 산출물 `shared/goods_map/goods_map.json`도 공공누리
-유형을 확인하기 전까지 커밋하지 않습니다.
+고시상품명칭 변환표 `shared/goods_map/goods_map.json.gz`는 공공누리 제1유형(출처표시)으로
+포함하며 출처는 "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형"입니다. 원본 xlsx는
+포함하지 않습니다.
 
 ## 브랜치·협업
 

@@ -111,7 +111,7 @@ describe("searchGoods", () => {
             },
           ],
           total: 1,
-          source: "고시상품명칭 13판(2026)",
+          source: "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형",
         }),
         { status: 200, headers: { "content-type": "application/json" } },
       ),

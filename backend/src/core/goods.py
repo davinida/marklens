@@ -29,7 +29,7 @@ from src.axes.goods_map import (  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
-SOURCE = SOURCE_LABEL  # 응답 source 필드: "고시상품명칭 13판(2026)"
+SOURCE = SOURCE_LABEL  # 응답 source 필드: "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형"
 
 
 @dataclass

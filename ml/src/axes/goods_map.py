@@ -37,9 +37,10 @@ DEFAULT_CANDIDATES: tuple[Path, ...] = (
 )
 ENV_PATH = "MARKLENS_GOODS_MAP_PATH"
 
-# 변환표 원본 판 표기. 파일 안에 판 정보가 없어 상수로 둔다 — 14판으로 바꾸면 여기와
-# shared/goods_map/README.md 를 같이 고친다.
-SOURCE_LABEL = "고시상품명칭 13판(2026)"
+# 변환표 원본·이용허락 표기(응답 source 필드). 공공누리 제1유형의 출처 표시를 여기서 이행한다.
+# 파일 안에 판 정보가 없어 상수로 둔다 — 14판으로 바꾸면 여기와 shared/goods_map/README.md §5 를
+# 같이 고친다.
+SOURCE_LABEL = "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형"
 
 # NICE 국제상품분류 45개 류의 요약 명칭(지식재산처 류 제목을 화면용으로 줄인 것).
 NICE_CLASS_TITLES: dict[int, str] = {
