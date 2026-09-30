@@ -1,30 +1,44 @@
 {
   "_comment": [
     "다빈-1 심결례 수집(trials_collect.py list --kind) 의 심판종류(trialDesc) 설정.",
-    "trialDesc 의 정확한 값은 KIPRIS 명세 캡처에서 확인되지 않았다(항목별검색 샘플: 특허 '거절결정불복',",
-    "서지상세 샘플: 상표 무효심판 2013당419 의 cdDesc '무효'). 첫 실호출(1개월치)로 응답의 trialDesc 값 집합을",
-    "확인한 뒤 trialDesc 를 고정하고 verified 를 true 로 바꾼다. 그 전에는 list 실호출에 --allow-unverified 가 필요하다.",
-    "candidates 는 응답 원문 → kind 역매핑에도 쓴다(kind_for_trial_desc)."
+    "2026-09-30 실호출(2024-01, 상표·특허심판원 전체 203건)에서 확인한 값으로 고정: 취소 97, 거절결정불복 93,",
+    "무효 11, 권리범위확인(적극적) 1, 권리범위확인(소극적) 1. '취소'(불사용취소 등)는 유사 판단 사례가 아니라 제외.",
+    "trialDesc 가 배열이면 list 는 값마다 1회씩 호출한다(월당 호출 = 값 개수). candidates 는 응답 원문 → kind 역매핑용."
   ],
   "refusal": {
     "label": "거절결정불복",
     "trialDesc": "거절결정불복",
-    "candidates": ["거절결정불복", "거절결정불복심판", "상표거절결정불복"],
-    "verified": false
+    "candidates": [
+      "거절결정불복"
+    ],
+    "verified": true,
+    "verified_at": "2026-09-30",
+    "count_202401": 93
   },
   "invalidation": {
     "label": "등록무효",
     "trialDesc": "무효",
-    "candidates": ["무효", "등록무효", "무효심판", "상표등록무효"],
-    "verified": false
+    "candidates": [
+      "무효",
+      "등록무효"
+    ],
+    "verified": true,
+    "verified_at": "2026-09-30",
+    "count_202401": 11
   },
   "scope": {
     "label": "권리범위확인",
-    "trialDesc": "권리범위확인",
-    "candidates": [
-      "권리범위확인", "권리범위확인(적극)", "권리범위확인(소극)",
-      "적극적권리범위확인", "소극적권리범위확인", "적극적 권리범위확인", "소극적 권리범위확인"
+    "trialDesc": [
+      "권리범위확인(적극적)",
+      "권리범위확인(소극적)"
     ],
-    "verified": false
+    "candidates": [
+      "권리범위확인(적극적)",
+      "권리범위확인(소극적)",
+      "권리범위확인"
+    ],
+    "verified": true,
+    "verified_at": "2026-09-30",
+    "count_202401": 2
   }
 }

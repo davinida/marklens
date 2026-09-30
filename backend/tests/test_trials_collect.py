@@ -16,34 +16,89 @@ from backend.src.core import kipris_client as kc
 
 KINDS = Path(tc.KINDS_CONFIG_PATH)
 
-# 항목별검색 캡처 샘플 형식(특허 1건) + 실측 2013당419(상표 무효) 1건, totalCount 2
-XML_LIST = """<?xml version="1.0" encoding="UTF-8"?>
+# 2026-09-30 실응답(2024-01 목록 203건 중 법인 당사자 2건: 거절결정불복 Y · 무효). 태그 사이에만
+# 줄바꿈을 넣었다(원본은 한 줄).
+XML_LIST = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <response>
-<header><requestMsgID></requestMsgID><responseTime>2014-10-31 11:05:34.534</responseTime>
-<responseMsgID></responseMsgID><successYN></successYN><resultCode>00</resultCode>
-<resultMsg>NORMAL SERVICE.</resultMsg></header>
-<body><items>
-<item><applicationNumber>1020070001615</applicationNumber><defendant></defendant>
-<plaintiff>주식회사 비즈모델라인</plaintiff><registrationNumber></registrationNumber>
-<title>알에프 리더형 휴대폰</title><trialDecisionDoc></trialDecisionDoc>
-<trialDesc>거절결정불복</trialDesc><trialFlag>특허심판원</trialFlag>
-<trialNumber>2007101234567</trialNumber><trialStatus>심결</trialStatus></item>
-<item><applicationNumber>4020080049731</applicationNumber><defendant>홍길동</defendant>
-<plaintiff>루이비똥 말레띠에</plaintiff><registrationNumber>4009157630000</registrationNumber>
-<title>LV</title><trialDecisionDoc>Y</trialDecisionDoc>
-<trialDesc>무효</trialDesc><trialFlag>특허심판원</trialFlag>
-<trialNumber>2013100000419</trialNumber><trialStatus>심결</trialStatus></item>
-<numOfRows>500</numOfRows><pageNo>1</pageNo><totalCount>2</totalCount>
-</items></body></response>
-"""
+<header>
+<requestMsgID>
+</requestMsgID>
+<responseTime>2026-09-30 19:22:55.2255</responseTime>
+<responseMsgID>
+</responseMsgID>
+<successYN>Y</successYN>
+<resultCode>00</resultCode>
+<resultMsg>NORMAL SERVICE.</resultMsg>
+</header>
+<body>
+<items>
+<item>
+<appReferenceNumber>
+</appReferenceNumber>
+<applicationNumber>4020210004125</applicationNumber>
+<defendant>
+</defendant>
+<internationalRegisterNumber>
+</internationalRegisterNumber>
+<plaintiff>주식회사 인큐텐</plaintiff>
+<regReferenceNumber>
+</regReferenceNumber>
+<registrationNumber>
+</registrationNumber>
+<title>Dr.Qmin</title>
+<trialDecisionDoc>Y</trialDecisionDoc>
+<trialDesc>거절결정불복</trialDesc>
+<trialFlag>특허심판원</trialFlag>
+<trialNumber>2022101002112</trialNumber>
+<trialStatus>심결</trialStatus>
+</item>
+<item>
+<appReferenceNumber>
+</appReferenceNumber>
+<applicationNumber>4020200070750</applicationNumber>
+<defendant>팜어스 농업회사법인 주식회사</defendant>
+<internationalRegisterNumber>
+</internationalRegisterNumber>
+<plaintiff>농업회사법인 주식회사 옻가네</plaintiff>
+<regReferenceNumber>
+</regReferenceNumber>
+<registrationNumber>4017268290000</registrationNumber>
+<title>홍삼 콜라겐 3300</title>
+<trialDecisionDoc>Y</trialDecisionDoc>
+<trialDesc>무효</trialDesc>
+<trialFlag>특허심판원</trialFlag>
+<trialNumber>2022100002719</trialNumber>
+<trialStatus>확정</trialStatus>
+</item>
+<numOfRows>500</numOfRows>
+<pageNo>1</pageNo>
+<totalCount>2</totalCount>
+</items>
+</body>
+</response>"""
 
-# 심판(결)문 응답 — 2026-07 실측 형식
-XML_DOC = """<response><header><requestMsgID/><responseTime>2026-07-06 13:25:24</responseTime>
-<responseMsgID/><successYN>Y</successYN><resultCode>00</resultCode>
-<resultMsg>NORMAL SERVICE.</resultMsg></header><body><item>
-<fileName>2013100000419.PDF</fileName><kind>S11907</kind><openYN>Y</openYN>
-<path>http://plus.kipris.or.kr/openapi/fileToss.jsp?arg=abc123</path></item></body></response>
-"""
+# 심판(결)문 실응답(2022원2112, fileToss 링크는 마스킹)
+XML_DOC = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<response>
+<header>
+<requestMsgID>
+</requestMsgID>
+<responseTime>2026-09-30 19:24:00.240</responseTime>
+<responseMsgID>
+</responseMsgID>
+<successYN>Y</successYN>
+<resultCode>00</resultCode>
+<resultMsg>NORMAL SERVICE.</resultMsg>
+</header>
+<body>
+<item>
+<fileName>2022101002112.PDF</fileName>
+<kind>S10221</kind>
+<openYN>Y</openYN>
+<path>http://plus.kipris.or.kr/openapi/fileToss.jsp?arg=MASKED</path>
+</item>
+</body>
+</response>"""
 XML_DOC_CLOSED = XML_DOC.replace("<openYN>Y</openYN>", "<openYN>N</openYN>")
 
 # 2013당419 구조(실측 기록)를 따른 픽스처 — 저명상표(구법 7조1항 10호) 사례 → 3등급
@@ -183,16 +238,16 @@ def _rows(path: Path) -> list[dict]:
 def test_parse_search_page_capture_sample():
     items, total = tc.parse_search_page(XML_LIST)
     assert total == 2
-    assert [it["trialNumber"] for it in items] == ["2007101234567", "2013100000419"]
-    assert items[1]["trialDesc"] == "무효" and items[1]["trialDecisionDoc"] == "Y"
+    assert [it["trialNumber"] for it in items] == ["2022101002112", "2022100002719"]
+    assert items[0]["trialDesc"] == "거절결정불복" and items[0]["trialDecisionDoc"] == "Y"
+    assert items[0]["applicationNumber"] == "4020210004125" and items[0]["trialStatus"] == "심결"
+    assert items[1]["trialDesc"] == "무효" and items[1]["trialFlag"] == "특허심판원"
 
 
 def test_parse_doc_response_measured_format():
     doc = tc.parse_doc_response(XML_DOC)
-    assert doc == {
-        "fileName": "2013100000419.PDF", "kind": "S11907", "openYN": "Y",
-        "path": "http://plus.kipris.or.kr/openapi/fileToss.jsp?arg=abc123",
-    }
+    assert doc["fileName"] == "2022101002112.PDF" and doc["kind"] == "S10221"
+    assert doc["openYN"] == "Y" and doc["path"].startswith("http://plus.kipris.or.kr/")
     with pytest.raises(kc.KiprisError):
         tc.parse_doc_response(XML_DOC.replace("<resultCode>00", "<resultCode>31"))
 
@@ -215,9 +270,11 @@ def test_is_trademark_item_prefix_filter(item, expected):
 def test_kind_for_trial_desc_mapping():
     kinds = tc.load_kinds(KINDS)
     assert set(kinds) == {"refusal", "invalidation", "scope"}
+    assert all(spec["verified"] for spec in kinds.values())  # 2026-09-30 실측으로 확정
+    assert tc.trial_desc_values(kinds["scope"]) == ["권리범위확인(적극적)", "권리범위확인(소극적)"]
     assert tc.kind_for_trial_desc("거절결정불복", kinds) == "refusal"
     assert tc.kind_for_trial_desc("등록무효", kinds) == "invalidation"
-    assert tc.kind_for_trial_desc("권리범위확인(소극)", kinds) == "scope"
+    assert tc.kind_for_trial_desc("권리범위확인(소극적)", kinds) == "scope"
     assert tc.kind_for_trial_desc("상표 무효 심판", kinds) == "invalidation"  # 휴리스틱
     assert tc.kind_for_trial_desc("기피", kinds) == ""
 
@@ -249,9 +306,9 @@ def test_list_writes_trademarks_only_idempotent_and_counts_quota(tmp_path, capsy
     session = _session(tmp_path, transport, max_calls=10)
     assert tc.run_list(_list_args(tmp_path), session) == 0
     rows = _rows(session.paths.list_csv)
-    assert [r["심판번호"] for r in rows] == ["2013100000419"]  # 특허(10…)는 제외, 2개월 중복 제거
-    assert rows[0]["종류"] == "무효" and rows[0]["출원번호"] == "4020080049731"
-    assert rows[0]["심결문유무"] == "Y" and json.loads(rows[0]["원본JSON"])["title"] == "LV"
+    assert [r["심판번호"] for r in rows] == ["2022101002112", "2022100002719"]  # 2개월 중복 제거
+    assert rows[0]["종류"] == "거절결정불복" and rows[0]["출원번호"] == "4020210004125"
+    assert rows[0]["심결문유무"] == "Y" and json.loads(rows[0]["원본JSON"])["title"] == "Dr.Qmin"
     assert [c["trialDate"] for c in calls] == ["202401", "202402"]
     assert session.api_calls == 2
     quota = json.loads(session.paths.quota.read_text(encoding="utf-8"))
@@ -277,9 +334,22 @@ def test_list_hard_cap_stops_and_keeps_partial_progress(tmp_path):
 
 
 def test_list_refuses_unverified_kind_without_flag(tmp_path):
+    unverified = tmp_path / "kinds.json"
+    unverified.write_text(json.dumps({"refusal": {"trialDesc": "거절결정불복", "verified": False}}),
+                          encoding="utf-8")
     session = _session(tmp_path, lambda url, params: XML_LIST)
-    assert tc.run_list(_list_args(tmp_path, allow_unverified=False), session) == 2
+    args = _list_args(tmp_path, allow_unverified=False, kinds_config=unverified)
+    assert tc.run_list(args, session) == 2
     assert session.api_calls == 0
+
+
+def test_list_calls_once_per_trial_desc_value_for_scope(tmp_path):
+    seen: list[str] = []
+    session = _session(tmp_path, lambda url, params: seen.append(params["trialDesc"]) or XML_LIST,
+                       max_calls=10)
+    assert tc.run_list(_list_args(tmp_path, kind="scope", to="202401"), session) == 0
+    assert seen == ["권리범위확인(적극적)", "권리범위확인(소극적)"]  # 실측값 2개 → 월 2회
+    assert (session.paths.raw_xml_dir / "list_scope_202401_d1_p1.xml").exists()
 
 
 def test_list_paginates_when_total_exceeds_rows(tmp_path):
@@ -287,7 +357,7 @@ def test_list_paginates_when_total_exceeds_rows(tmp_path):
 
     def transport(url, params):
         seen.append(params["pageNo"])
-        return XML_LIST.replace("<totalCount>2", "<totalCount>3")
+        return XML_LIST.replace("<totalCount>2<", "<totalCount>3<")
 
     session = _session(tmp_path, transport, max_calls=10)
     args = _list_args(tmp_path, to="202401", rows=2)
@@ -387,7 +457,7 @@ def test_dry_run_makes_no_network_calls(tmp_path, monkeypatch, capsys):
                   "--from", "201201", "--to", "202609", "--dry-run"])
     out = capsys.readouterr().out
     assert rc == 0
-    assert "177개월" in out and "실호출 0회" in out and "미검증" in out
+    assert "177개월" in out and "실호출 0회" in out and "verified=True" in out
     assert not (tmp_path / "quota.json").exists()
 
     _write_list(tc.TrialPaths(tmp_path), ["2013100000419"])
@@ -504,3 +574,222 @@ def test_extract_roundtrip_with_pymupdf(tmp_path):
     text = (tmp_path / "text" / "2013100000419.txt").read_text(encoding="utf-8")
     assert "2013100000419" in text
     assert [r["심판번호"] for r in _rows(tmp_path / "prefilter.csv")] == ["2013100000419"]
+
+
+# ---------------- 2단계 추가: 종류 필터 없는 list · fetch 대상 선정 · 서지상세 ----------------
+
+XML_BIBLIO = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<response>
+<header>
+<requestMsgID>
+</requestMsgID>
+<responseTime>2026-09-30 19:26:43.2643</responseTime>
+<responseMsgID>
+</responseMsgID>
+<successYN>Y</successYN>
+<resultCode>00</resultCode>
+<resultMsg>NORMAL SERVICE.</resultMsg>
+</header>
+<body>
+<item>
+<bibliographicSummaryInfo>
+<appReferenceNumber>
+</appReferenceNumber>
+<appealFg> </appealFg>
+<applicationNumber>4020210004125</applicationNumber>
+<buCd>70702</buCd>
+<cdDesc>거절결정불복</cdDesc>
+<conclusiveDate> </conclusiveDate>
+<conclusiveResultCode> </conclusiveResultCode>
+<conclusiveStatusCode> </conclusiveStatusCode>
+<conclusiveTrialDivision> </conclusiveTrialDivision>
+<eventindication>2021년 상표등록출원 제0004125호 거절결정불복</eventindication>
+<evtNo>4020210004125</evtNo>
+<instanceDivision>특허심판원</instanceDivision>
+<internationalRegisterNumber> </internationalRegisterNumber>
+<inventionTitle> </inventionTitle>
+<offcAppealFg> </offcAppealFg>
+<oppositionDate> </oppositionDate>
+<oppositionTrialNumber> </oppositionTrialNumber>
+<originalTrialNumber>2022101002112</originalTrialNumber>
+<path>MASKED</path>
+<regReferenceNumber>
+</regReferenceNumber>
+<registerNumber> </registerNumber>
+<rightDivisionCode>상표등록출원</rightDivisionCode>
+<trialDecision> </trialDecision>
+<trialDecisionCode>취소환송</trialDecisionCode>
+<trialDecisionDate>2024.01.17</trialDecisionDate>
+<trialFlag>거절결정불복</trialFlag>
+<trialNumber>2022101002112</trialNumber>
+<trialNumberNm>2022원2112</trialNumberNm>
+<trialRequestCount>1</trialRequestCount>
+<trialRequestDate>2022.11.18</trialRequestDate>
+<trialRequestPurpose>원결정을 파기한다. 상표출원번호 40-2021-0004125호를 등록결정하기로 한다.
+라는 취지의 심결을 구하는 바입니다.</trialRequestPurpose>
+<trialStatusCode>심결</trialStatusCode>
+</bibliographicSummaryInfo>
+<relatedTrialNumberArray/>
+<specifyCtegoryCodeInfoArray/>
+<supplementaryDecisionInfo>
+</supplementaryDecisionInfo>
+</item>
+</body>
+</response>"""
+
+
+def test_list_without_kind_omits_trial_desc_and_tracks_all(tmp_path):
+    calls: list[dict] = []
+
+    def transport(url, params):
+        calls.append(params)
+        return XML_LIST
+
+    session = _session(tmp_path, transport, max_calls=10)
+    args = _list_args(tmp_path, kind="", to="202401", allow_unverified=False)
+    assert tc.run_list(args, session) == 0  # 필터 없음 → 검증 게이트 없음
+    assert "trialDesc" not in calls[0] and calls[0]["tradeMark"] == "true"
+    assert (session.paths.raw_xml_dir / "list_all_202401_p1.xml").exists()
+    progress = json.loads(session.paths.list_progress.read_text(encoding="utf-8"))
+    assert progress["all"]["202401"]["done"] is True
+    assert tc.build_search_params("", "202401", 1, 500).get("trialDesc") is None
+
+
+def test_select_fetch_targets_priority_doc_and_trial_filter():
+    kinds = tc.load_kinds(KINDS)
+    rows = [
+        {"심판번호": "1", "종류": "무효", "심결문유무": "Y"},
+        {"심판번호": "2", "종류": "거절결정불복", "심결문유무": "N"},
+        {"심판번호": "3", "종류": "거절결정불복", "심결문유무": "Y"},
+        {"심판번호": "4", "종류": "권리범위확인", "심결문유무": "Y"},
+    ]
+    picked = tc.select_fetch_targets(rows, 3, ["refusal", "scope"], True, set(), kinds)
+    assert [r["심판번호"] for r in picked] == ["3", "2", "4"]  # 종류 우선 → Y 우선 → 원순서
+    picked = tc.select_fetch_targets(rows, 0, [], False, {"4", "1"}, kinds)
+    assert [r["심판번호"] for r in picked] == ["1", "4"]  # --trial 지정 건만, 원순서 유지
+    plain = tc.select_fetch_targets(rows, 2, [], False, set(), kinds)
+    assert [r["심판번호"] for r in plain] == ["1", "2"]
+
+
+def test_parse_biblio_response_capture_sample():
+    parsed = tc.parse_biblio_response(XML_BIBLIO)
+    assert parsed["cdDesc"] == "거절결정불복" and parsed["trialDecisionCode"] == "취소환송"
+    assert parsed["conclusiveResultCode"] == ""  # 미확정 건은 비어 있다(2026-09-30 실측 4/4)
+    assert parsed["trialStatusCode"] == "심결" and parsed["trialDecisionDate"] == "2024.01.17"
+    assert parsed["applicationNumber"] == "4020210004125"
+
+
+def test_biblio_saves_raw_and_json_and_counts_calls(tmp_path, capsys):
+    session = _session(tmp_path, lambda url, params: XML_BIBLIO, max_calls=5)
+    args = argparse.Namespace(trial=["2022101002112", "2022101002112"])
+    assert tc.run_biblio(args, session) == 0
+    assert session.api_calls == 1  # 중복 심판번호는 한 번만
+    assert (tmp_path / "raw_xml" / "biblio_2022101002112.xml").exists()
+    saved = json.loads((tmp_path / "biblio" / "2022101002112.json").read_text(encoding="utf-8"))
+    assert saved["trialDecisionCode"] == "취소환송"
+    assert tc.summarize_calls(session.paths.calls_log) == {
+        "list": 0, "doc": 0, "biblio": 1, "download": 0, "기타": 0,
+    }
+    assert "취소환송" in capsys.readouterr().out
+
+
+# 2024-01 실제 심결문(2022원2112) 레이아웃을 본뜬 픽스처 — PyMuPDF 가 한글 사이 공백을 지우고,
+# 선등록상표가 "나. 원결정이유및선등록상표" 아래 "(2)" 로 들어가며 소제목이 "(다) 소결" 형태다.
+TEXT_2024 = """1/9
+1. 기초사실
+주       문
+원결정을취소하고, 이사건출원을특허청심사관에게보내어다시심사에부친다.
+청 구 취 지
+주문과같다.
+이       유
+2/9
+가. 이사건출원상표
+(1) 출원번호/출원일: 제40-2021-4125호/2021. 1. 8.
+(2) 표
+장:
+(3) 지정상품: 상품류구분제32류의커큐민성분을함유한청량음료, 커큐민을주
+원료로하는숙취해소음료
+나. 원결정이유및선등록상표
+(1) 원결정이유
+이사건출원상표는아래(2) 선등록상표와표장및지정상품이동일·유사하여상
+표법제34조제1항제7호에해당하여등록받을수없다.
+(2) 선등록상표
+(가) 등록번호/출원일/등록일: 상표등록제1276201호/2017. 1. 19./2017. 8. 11.
+(다) 지정상품
+- 상품류구분제29류의가공된과일및채소
+(라) 등록권리자: 주식회사가나다
+2. 청구인의주장요지
+이사건출원상표는선등록상표와호칭이현저하게차이가있다.
+3. 이사건출원상표가상표법제34조제1항제7호에해당하는지여부
+가. 판단기준
+그리고상표의구성부분이요부인지여부는그부분
+이주지ㆍ저명하거나일반수요자에게강한인상을주는부분인지등의요소를따져보되,
+나. 구체적판단
+(1) 표장의유사여부
+(다) 소결
+그렇다면이사건출원상표와선등록상표는전체적으로표장이유사하다고볼수없다.
+다. 소결론
+따라서이사건출원상표는선등록상표와표장이유사하지않으므로, 그지정상품
+이유사한지여부에관하여는나아가살펴볼필요없이상표법제34조제1항제7호에
+해당하지않는다.
+4. 결론
+그러므로원결정을취소하고, 이사건출원을다시심사에부치기로하여주문과
+같이심결한다.
+"""
+
+
+def test_analyze_text_2024_layout_without_spaces():
+    analysis = tc.analyze_text(TEXT_2024)
+    assert analysis["주문결과"] == "취소"
+    assert analysis["이사건_구분"] == "출원상표"
+    assert analysis["이사건_출원번호"] == "4020210004125"  # 제40-2021-4125호 → 일련번호 0 채움
+    assert analysis["이사건_등록번호"] == ""  # 선등록 번호를 이 사건 번호로 잘못 잡지 않는다
+    assert analysis["이사건_지정상품"].startswith("상품류구분제32류의")
+    assert analysis["선등록_등록번호"] == "1276201"
+    assert analysis["판단절"] == "판단기준|구체적판단|소결론"
+    assert analysis["거절이유조문"] == "34-7"
+    assert analysis["결론조문"] == "34-7:부정"
+    # 요부 판단기준 판례 문구 때문에 저명·주지 플래그가 켜진다 → 원 규칙은 2등급, 문구 제외 시 1등급
+    assert analysis["본문_저명"] == 1 and analysis["본문_주지"] == 1
+    assert analysis["본문_저명주지_실질"] == 0
+    assert tc.classify(analysis) == ("2", "결론 7호이나 본문에 저명·주지")
+    assert tc.classify(analysis, ignore_boilerplate=True)[0] == "1"
+    assert tc.estimate_similarity("refusal", analysis) == ("비유사", "결론 7호 부정")
+
+
+TEXT_EXPIRED = TEXT_2024.replace(
+    "다. 소결론\n따라서이사건출원상표는선등록상표와표장이유사하지않으므로, 그지정상품\n"
+    "이유사한지여부에관하여는나아가살펴볼필요없이상표법제34조제1항제7호에\n해당하지않는다.\n",
+    "다. 소결론\n선등록상표는 2023. 12. 1. 존속기간만료로소멸되었으므로이사건출원상표는더이상\n"
+    "상표법제34조제1항제7호에해당하지않게되었다.\n",
+)
+
+
+def test_analyze_text_expired_prior_mark_and_regulation_phrasing():
+    analysis = tc.analyze_text(TEXT_EXPIRED)
+    assert analysis["결론조문"] == "34-7:부정"  # "더 이상 … 해당하지 않게 되었다"
+    assert analysis["선등록소멸취소"] == 1
+    phrased = TEXT_2024.replace(
+        "상표법제34조제1항제7호에\n해당하지않는다", "상표법제34조제1항제7호의규정에해당한다"
+    )
+    assert tc.analyze_text(phrased)["결론조문"] == "34-7:긍정"
+
+
+def test_registration_number_variants_and_conclusion_fallback():
+    text = TEXT_2024.replace("상표등록제1276201호", "서비스표등록제0456789호")
+    assert tc.analyze_text(text)["선등록_등록번호"] == "0456789"
+    # 소결 제목 없이 판단 절 마지막 문단에 결론이 있는 경우 → 판단 절 끝에서 폴백 추출
+    no_heading = TEXT_2024.replace("다. 소결론\n", "").replace("(다) 소결\n", "")
+    assert tc.analyze_text(no_heading)["결론조문"] == "34-7:부정"
+
+
+def test_analyze_text_madrid_subject_heading():
+    text = TEXT_2024.replace(
+        "가. 이사건출원상표\n(1) 출원번호/출원일: 제40-2021-4125호/2021. 1. 8.",
+        "가. 이사건국제등록출원상표\n(1) 국제등록번호/국제등록일: 제1576380호/2021. 1. 8.",
+    )
+    analysis = tc.analyze_text(text)
+    assert analysis["이사건_구분"] == "국제등록출원상표"
+    assert analysis["이사건_국제등록번호"] == "1576380" and analysis["이사건_출원번호"] == ""
+    assert analysis["이사건_지정상품"].startswith("상품류구분제32류")
+

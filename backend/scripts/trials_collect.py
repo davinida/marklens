@@ -45,17 +45,20 @@
         accessKey(샘플), docsStart/docsCount 페이징, items/TotalSearchCount/TrialInfo.
         샘플에서 trialDecisionDoc=N, trialStatus=심결 확인
 
-미확인(다음 단계 실호출 2~3회로 검증)
-    ① 항목별검색 인증 파라미터명(ServiceKey/accessKey — 샘플 URL 잘림)
-       → KIPRIS_TRIAL_SEARCH_AUTH_PARAM
-    ② trialDesc 정확한 값(거절결정불복 / 무효·등록무효 / 권리범위확인 적극·소극)
-       → trials_kinds.json 의 verified 를 확인 뒤 true 로. 그 전 실행은 --allow-unverified 필요
-    ③ numOfRows 최댓값·기본값(캡처 잘림) → KIPRIS_TRIAL_ROWS(기본 500). 응답 numOfRows 로 확인
-    ④ trialStatus 값 집합 — 샘플 "심결" 1개뿐. 결과(인용/기각)는 심결문 주문으로 판독한다
-    ⑤ trialDecisionDoc 의미 — openapi/rest 샘플 "N", kipo-api 샘플 빈 값 → Y/N 문서 유무로 추정
-    ⑥ 심결문 응답 kind 코드(S11907·S10221)의 의미(심결문/경정결정문 구분?)
-    ⑦ PDF 다운로드(fileToss)가 호출 카운트에 포함되는지 → 마이페이지 사용량으로 확인한 뒤
-       KIPRIS_TRIAL_COUNT_DOWNLOADS 조정
+2026-09-30 실호출 검증 결과(2024-01 상표·특허심판원 203건, 총 45회)
+    ① 항목별검색 인증 파라미터 = ServiceKey (첫 호출 성공). 심결문·서지상세도 ServiceKey.
+    ② trialDesc 값: 취소 97 · 거절결정불복 93 · 무효 11 · 권리범위확인(적극적) 1 ·
+       권리범위확인(소극적) 1
+       → trials_kinds.json verified=true. 권리범위확인은 값 2개라 월 2회 호출.
+    ③ numOfRows=500 그대로 적용됨(203건 1페이지, 응답 numOfRows 500).
+    ④ trialStatus 는 확정 106 · 심결 97 — 결과(인용/기각) 정보 없음 → 심결문 주문 또는 서지상세로
+       판독.
+    ⑤ trialDecisionDoc = Y 192 · N 11 (Y/N 문서 유무 플래그).
+    ⑥ 심결문 kind 는 20건 모두 S10221(심결문). 목록 응답 항목명은 lowerCamel
+       (internationalRegisterNumber, regReferenceNumber).
+    ⑦ 서지상세: 미확정(심결) 건은 conclusiveResultCode 가 비고 trialDecisionCode(기각/취소환송)가
+       PDF 주문과 4/4 일치. 다운로드의 서버 카운트 포함 여부는 여전히 미확인(마이페이지로 확인).
+    ⑧ 출원번호 앞자리 40 170 · 41 18 · 45 13 · 70 1 · 44 1 — 70/44 는 현재 필터에서 빠진다.
 """
 
 from __future__ import annotations
@@ -91,10 +94,14 @@ SEARCH_URL: str = os.getenv("KIPRIS_TRIAL_SEARCH_URL", "") or kc._compose_url(
 DOC_URL: str = os.getenv("KIPRIS_TRIAL_DOC_URL", "") or kc._compose_url(
     kc.KIPRIS_BASE_URL, JUDGMENT_SERVICE_PATH + "getJudDocumentInfoSearch"
 )
+BIBLIO_URL: str = os.getenv("KIPRIS_TRIAL_BIBLIO_URL", "") or kc._compose_url(
+    kc.KIPRIS_BASE_URL, JUDGMENT_SERVICE_PATH + "getBibliographyDetailInfoSearch"
+)
 # 인증 파라미터명. 심결문·서지 캡처 샘플은 ServiceKey — 항목별검색은 미확인이라 env 로 바꿀 수
 # 있게 둔다.
 SEARCH_AUTH_PARAM: str = os.getenv("KIPRIS_TRIAL_SEARCH_AUTH_PARAM", "ServiceKey")
 DOC_AUTH_PARAM: str = os.getenv("KIPRIS_TRIAL_DOC_AUTH_PARAM", "ServiceKey")
+BIBLIO_AUTH_PARAM: str = os.getenv("KIPRIS_TRIAL_BIBLIO_AUTH_PARAM", "ServiceKey")
 
 
 def _env_int(name: str, default: int) -> int:
@@ -171,6 +178,10 @@ class TrialPaths:
     def calls_log(self) -> Path:
         return self.base / "calls.log"
 
+    @property
+    def biblio_dir(self) -> Path:
+        return self.base / "biblio"
+
 
 DEFAULT_PATHS = TrialPaths(paths.ML_DATA_DIR / "trials")
 
@@ -181,8 +192,8 @@ LIST_COLUMNS = [
 FETCH_LOG_COLUMNS = ["심판번호", "결과", "파일명", "kind", "일시"]
 LABEL_COLUMNS = [
     "심판번호", "종류", "심판상태", "심결월", "상표A_번호", "상표A_명칭", "상표B_번호",
-    "지정상품_원문", "조문플래그", "결론조문", "자동등급", "등급사유", "유사여부_추정", "추정근거",
-    "유사여부_확정", "판단축", "제외사유", "메모",
+    "지정상품_원문", "조문플래그", "결론조문", "자동등급", "등급사유", "등급_보일러플레이트제외",
+    "참고표시", "유사여부_추정", "추정근거", "유사여부_확정", "판단축", "제외사유", "메모",
 ]
 
 
@@ -195,11 +206,17 @@ def load_kinds(path: Path = KINDS_CONFIG_PATH) -> dict[str, dict]:
     return {k: v for k, v in payload.items() if not k.startswith("_")}
 
 
+def trial_desc_values(spec: dict) -> list[str]:
+    """설정의 trialDesc(문자열 또는 배열)를 값 목록으로."""
+    value = spec.get("trialDesc", "")
+    return [v for v in (value if isinstance(value, list) else [value]) if v]
+
+
 def kind_for_trial_desc(trial_desc: str, kinds: dict[str, dict]) -> str:
     """응답의 trialDesc 원문 → kind 키(refusal/invalidation/scope). 못 찾으면 ''."""
     text = (trial_desc or "").strip()
     for key, spec in kinds.items():
-        if text == spec.get("trialDesc") or text in spec.get("candidates", []):
+        if text in trial_desc_values(spec) or text in spec.get("candidates", []):
             return key
     if "거절" in text:
         return "refusal"
@@ -389,9 +406,9 @@ def month_range(start: str, end: str) -> list[str]:
 
 
 def build_search_params(trial_desc: str, month: str, page_no: int, rows: int) -> dict:
-    """상표만·특허심판원만·결정계+당사자계, 심결일자 월 단위."""
-    return {
-        "trialDesc": trial_desc,
+    """상표만·특허심판원만·결정계+당사자계, 심결일자 월 단위. trial_desc 가 비면 종류 필터 없음."""
+    params: dict = {"trialDesc": trial_desc} if trial_desc else {}
+    params.update({
         "trialDate": month,
         "tradeMark": "true",
         "patent": "false",
@@ -406,7 +423,8 @@ def build_search_params(trial_desc: str, month: str, page_no: int, rows: int) ->
         "interParties": "true",
         "pageNo": str(page_no),
         "numOfRows": str(rows),
-    }
+    })
+    return params
 
 
 def _read_csv(path: Path) -> list[dict]:
@@ -458,34 +476,45 @@ def _save_raw(paths_: TrialPaths, name: str, xml_text: str) -> Path:
 
 def run_list(args: argparse.Namespace, session: Session) -> int:
     kinds = load_kinds(args.kinds_config)
-    if args.kind not in kinds:
-        print(f"[오류] --kind 는 {', '.join(kinds)} 중 하나여야 합니다.", file=sys.stderr)
+    kind = getattr(args, "kind", "") or ""
+    if kind and kind not in kinds:
+        print(f"[오류] --kind 는 {', '.join(kinds)} 중 하나여야 합니다(생략 = 전체).",
+              file=sys.stderr)
         return 2
-    spec = kinds[args.kind]
-    trial_desc = spec["trialDesc"]
+    spec = kinds[kind] if kind else None
+    trial_descs = trial_desc_values(spec) if spec else [""]  # "" = 종류 필터 없음
+    trial_desc = trial_descs[0]
+    verified = bool(spec.get("verified")) if spec else True  # 필터 없음 = 검증할 값 없음
+    progress_key = kind or "all"
     months = month_range(getattr(args, "from"), args.to)
     progress = load_progress(session.paths.list_progress)
-    done = progress.get(args.kind, {})
+    done = progress.get(progress_key, {})
     pending = [m for m in months if not done.get(m, {}).get("done")]
     rows_per_page = args.rows
 
-    print(f"## list --kind {args.kind} (trialDesc={trial_desc!r}, verified={spec.get('verified')})")
+    label = "종류 필터 없음"
+    if kind:
+        label = f"--kind {kind} (trialDesc={trial_descs!r}, verified={verified})"
+    print(f"## list {label}")
     print(f"- 기간 {months[0]}~{months[-1]} {len(months)}개월, 미완료 {len(pending)}개월")
-    print(f"- 호출 계획: 월 1회 × {len(pending)}회 (numOfRows={rows_per_page}; totalCount 가 "
-          f"넘으면 페이지 추가 호출 = ceil(totalCount/{rows_per_page}) - 1)")
+    planned = len(trial_descs) * len(pending)
+    print(f"- 호출 계획: 월 {len(trial_descs)}회 × {len(pending)}개월 = {planned}회 "
+          f"(numOfRows={rows_per_page}; totalCount 가 "
+          f"넘으면 페이지 추가 호출 = ceil(totalCount/{rows_per_page}) - 1, "
+          f"월당 최대 {args.max_pages}쪽)")
     print(f"- 요청: GET {SEARCH_URL} 인증 {SEARCH_AUTH_PARAM} · "
           f"키 {'있음' if access_key() else '없음'}")
     sample_month = pending[0] if pending else months[0]
     print(f"- 파라미터 예: {build_search_params(trial_desc, sample_month, 1, rows_per_page)}")
     print(f"- 예산: {session.budget_line()}")
-    if not spec.get("verified"):
+    if not verified:
         print("- 주의: trialDesc 값이 미검증 상태(trials_kinds.json verified=false) — 실호출은 "
               "--allow-unverified 로만 가능. 첫 실호출 1개월치로 응답의 trialDesc 값 집합을 확인해 "
               "고정하세요.")
     if session.dry_run:
         print("[dry-run] 실호출 0회 — 위 계획만 출력하고 종료합니다.")
         return 0
-    if not spec.get("verified") and not args.allow_unverified:
+    if not verified and not args.allow_unverified:
         print("[중단] trialDesc 미검증 — --allow-unverified 를 붙이거나 trials_kinds.json 을 "
               "확정하세요.", file=sys.stderr)
         return 2
@@ -497,36 +526,40 @@ def run_list(args: argparse.Namespace, session: Session) -> int:
         page, total = 1, None
         pages_done = 0
         try:
-            while True:
-                params = build_search_params(trial_desc, month, page, rows_per_page)
-                xml_text = session.api_get(SEARCH_URL, params, SEARCH_AUTH_PARAM)
-                _save_raw(session.paths, f"list_{args.kind}_{month}_p{page}.xml", xml_text)
-                items, total = parse_search_page(xml_text)
-                pages_done = page
-                rows = []
-                for item in items:
-                    if not is_trademark_item(item):
-                        excluded += 1
-                        continue
-                    row = item_to_list_row(item, month)
-                    if row["심판번호"] and row["심판번호"] not in existing:
-                        existing.add(row["심판번호"])
-                        rows.append(row)
-                _append_csv(session.paths.list_csv, LIST_COLUMNS, rows)
-                added += len(rows)
-                needed = math.ceil(total / rows_per_page) if total else 1
-                if not items or page >= needed or page >= args.max_pages:
-                    break
-                page += 1
+            for index, desc in enumerate(trial_descs):
+                suffix = f"_d{index}" if len(trial_descs) > 1 else ""
+                page = 1
+                while True:
+                    params = build_search_params(desc, month, page, rows_per_page)
+                    xml_text = session.api_get(SEARCH_URL, params, SEARCH_AUTH_PARAM)
+                    _save_raw(session.paths, f"list_{progress_key}_{month}{suffix}_p{page}.xml",
+                              xml_text)
+                    items, total = parse_search_page(xml_text)
+                    pages_done += 1
+                    rows = []
+                    for item in items:
+                        if not is_trademark_item(item):
+                            excluded += 1
+                            continue
+                        row = item_to_list_row(item, month)
+                        if row["심판번호"] and row["심판번호"] not in existing:
+                            existing.add(row["심판번호"])
+                            rows.append(row)
+                    _append_csv(session.paths.list_csv, LIST_COLUMNS, rows)
+                    added += len(rows)
+                    needed = math.ceil(total / rows_per_page) if total else 1
+                    if not items or page >= needed or page >= args.max_pages:
+                        break
+                    page += 1
         except HardCapReached as exc:
             print(f"[중단] {exc}")
             exit_code = 3
-            progress.setdefault(args.kind, {})[month] = {
+            progress.setdefault(progress_key, {})[month] = {
                 "total": total, "pages": pages_done, "done": False,
             }
             save_progress(session.paths.list_progress, progress)
             break
-        progress.setdefault(args.kind, {})[month] = {
+        progress.setdefault(progress_key, {})[month] = {
             "total": total,
             "pages": pages_done,
             "done": True,
@@ -567,11 +600,39 @@ def pending_fetch_rows(paths_: TrialPaths, *, skip_no_doc: bool, retry_failed: b
     return pending
 
 
+def select_fetch_targets(
+    pending: list[dict],
+    limit: int,
+    kind_priority: list[str],
+    prefer_doc: bool,
+    trials: set[str],
+    kinds: dict[str, dict],
+) -> list[dict]:
+    """대상 선정: --trial 지정 건만 / 종류 우선순위 / 심결문유무 Y 우선 (안정 정렬)."""
+    if trials:
+        pending = [row for row in pending if row["심판번호"] in trials]
+
+    def sort_key(row: dict) -> tuple[int, int]:
+        kind = kind_for_trial_desc(row.get("종류", ""), kinds)
+        rank = kind_priority.index(kind) if kind in kind_priority else len(kind_priority)
+        has_doc = 0 if row.get("심결문유무", "").upper() == "Y" else 1
+        return (rank if kind_priority else 0, has_doc if prefer_doc else 0)
+
+    ordered = sorted(pending, key=sort_key) if (kind_priority or prefer_doc) else list(pending)
+    return ordered[:limit] if limit else ordered
+
+
 def run_fetch(args: argparse.Namespace, session: Session) -> int:
     pending = pending_fetch_rows(
         session.paths, skip_no_doc=args.skip_no_doc, retry_failed=args.retry_failed
     )
-    targets = pending[: args.limit] if args.limit else pending
+    raw_priority = getattr(args, "kind_priority", "") or ""
+    priority = [k.strip() for k in raw_priority.split(",") if k.strip()]
+    targets = select_fetch_targets(
+        pending, args.limit, priority, bool(getattr(args, "prefer_doc", False)),
+        set(getattr(args, "trial", None) or []),
+        load_kinds(getattr(args, "kinds_config", KINDS_CONFIG_PATH)),
+    )
     per_item = 2 if COUNT_DOWNLOADS else 1
     listed = len(_read_csv(session.paths.list_csv))
     print(f"## fetch (list.csv {listed}건, PDF 미수신 {len(pending)}건)")
@@ -639,10 +700,24 @@ _ARTICLE_33_RE = re.compile(r"(?:상표법\s*)?제\s*(33|6)\s*조(?:\s*제\s*1\s
 _CONCLUSION_RE = re.compile(
     r"제\s*(34|7)\s*조\s*제\s*1\s*항\s*제\s*(\d{1,2})\s*호"
     r"(?:\s*(?:및|,|와|과|또는)\s*(?:제\s*)?(\d{1,2})\s*호)?"
-    r"\s*(?:에(?:는|도)?\s*)?(?:각각\s*)?"
+    r"(?:\s*의\s*규정)?\s*(?:에(?:는|도)?\s*)?(?:각각\s*)?(?:더\s*이상\s*)?"
     r"(해당\s*(?:하지\s*(?:아니|않)|되지\s*(?:아니|않)|하[여지므]|한다|되[어므]|됨|함|되어야|한|되는))"
 )
+# 선등록상표 소멸·무효 등으로 7호 적용이 없어져 원결정이 취소된 사례 — 유사 판단이 없는 취소
+# (제외 후보 표시용)
+_PRIOR_MARK_GONE_RE = re.compile(
+    r"(?:소멸|말소|무효\s*심결|무효로\s*되|존속기간\s*만료|포기)[\s\S]{0,120}?"
+    r"(?:더\s*이상|않게\s*되|해당하지)"
+)
+# 등록번호 표기: 상표등록 제N호 / 서비스표등록 제N호 / 국제상표(등록) 제N호 / 국제등록 제N호
+_REG_NUMBER_RE = re.compile(r"(?:상표|서비스표|국제상표|국제)\s*등록\s*제\s*([\d\-]+)\s*호")
 _HEADING_RE = re.compile(r"^\s*([가-힣]\.)\s*(.+?)\s*$", re.MULTILINE)
+_TOP_HEADING = r"(?m)^\s*\d+\.\s*\S"
+_ANY_HEADING = r"(?m)^\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.|\d+\.)\s*\S"
+_PRIOR_MARK = r"(?:선등록|선사용|선출원|비교대상|인용)\s*(?:상표|서비스표|표장)"
+# 요부 판단기준의 판례 문구("…주지ㆍ저명하거나 일반수요자에게 강한 인상을…") — 인지도 사례가
+# 아니어도 거의 모든 7호 심결문에 등장한다. 본문_저명주지_실질 은 이 문구를 뺀 뒤의 언급 여부.
+_FAME_BOILERPLATE_RE = re.compile(r"주지\s*[ㆍ·․,]?\s*저명\s*하거나")
 _SECTION_TITLES = ("소결론", "소결", "결론", "판단")
 KEYWORDS = {"저명": "저명", "주지": "주지", "부정한목적": "부정한 목적", "식별력": "식별력"}
 
@@ -668,15 +743,28 @@ def _find_block(text: str, start_pattern: str, end_patterns: tuple[str, ...]) ->
 
 
 def _conclusion_blocks(text: str) -> list[str]:
-    """'소결'·'소결론'·'결론'·'판단' 제목의 절 본문 — 실제 적용 조문은 여기서 읽는다."""
+    """'소결'·'소결론'·'결론' 제목의 절 본문 — 실제 적용 조문은 여기서 읽는다.
+
+    제목 표시는 (1)·(가)·가.·1. 네 가지를 모두 받는다(2024년 심결문은 "(다) 소결", "다. 소결론").
+    """
     blocks: list[str] = []
     for match in re.finditer(
-        r"(?m)^\s*(?:\(\d+\)|[가-힣]\.|\d+\.)\s*(?:소\s*결\s*론|소\s*결|결\s*론)\b[^\n]*$", text
+        r"(?m)^\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.|\d+\.)\s*(?:소\s*결\s*론|소\s*결|결\s*론)\b[^\n]*$",
+        text,
     ):
         rest = text[match.end():]
-        stop = re.search(r"(?m)^\s*(?:\(\d+\)|[가-힣]\.|\d+\.)\s*\S", rest)
+        stop = re.search(_ANY_HEADING, rest)
         blocks.append(rest[: stop.start()] if stop else rest)
     return blocks
+
+
+def _application_number(block: str) -> str:
+    """'제40-2021-4125호'(일련번호 0 채움 안 됨)·'40-2020-0012345'·13자리 형태를 13자리로."""
+    match = re.search(r"(4[015])\s*-\s*(\d{4})\s*-\s*(\d{1,7})\s*호", block)
+    if match:
+        return f"{match.group(1)}{match.group(2)}{int(match.group(3)):07d}"
+    match = re.search(r"(?:출원번호|제)\s*(4[015]\d{11})", block)
+    return match.group(1) if match else ""
 
 
 def _refusal_ground_block(text: str) -> str:
@@ -714,33 +802,45 @@ def analyze_text(text: str) -> dict:
     result["주문"] = " ".join(order.split())[:200]
     result["주문결과"] = _decision_result(order)
 
+    # "가. 이 사건 등록상표"(2013) / "가. 이사건출원상표"(2024, 공백 없음) → 다음 제목 앞까지
     subject = _find_block(
         text,
-        r"(?m)^\s*[가-힣]\.\s*이\s*사건\s*(?:등록|출원|국제등록)?\s*상표",
-        (r"(?m)^\s*[나-힣]\.\s*(?:선등록|선사용|선출원|비교대상|인용)", r"(?m)^\s*\d+\.\s*\S"),
+        r"(?m)^\s*[가-힣]\.\s*이\s*사건\s*(?:국제등록\s*출원|등록|출원|국제등록)?\s*(?:상표|서비스표)",
+        (r"(?m)^\s*[나-힣]\.\s*\S", _TOP_HEADING),
     )
-    kind_match = re.search(r"이\s*사건\s*(등록|출원|국제등록)?\s*상표", text)
+    kind_match = re.search(r"이\s*사건\s*(국제등록\s*출원|등록|출원|국제등록)?\s*상표", text)
     result["이사건_구분"] = (kind_match.group(1) or "") + "상표" if kind_match else ""
-    reg = re.search(r"상표등록\s*제\s*([\d\-]+)\s*호", subject)
+    reg = _REG_NUMBER_RE.search(subject)
     result["이사건_등록번호"] = _digits(reg.group(1)) if reg else ""
-    app = re.search(r"(?:출원번호|제)\s*(4[015]-?\d{4}-?\d{7})", subject)
-    result["이사건_출원번호"] = _digits(app.group(1)) if app else ""
-    goods = re.search(r"지정상품\s*[:：]?\s*(.+?)(?=\n\s*\(\d+\)|\n\s*[가-힣]\.|\Z)", subject, re.S)
+    result["이사건_출원번호"] = _application_number(subject)
+    intl = re.search(r"국제등록번호[^\n]*?제\s*(\d{5,8})\s*호", subject)
+    result["이사건_국제등록번호"] = intl.group(1) if intl else ""
+    goods = re.search(
+        r"지정상품\s*[:：]?\s*(.+?)(?=\n\s*\(\d+\)|\n\s*\([가-힣]\)|\n\s*[가-힣]\.|\Z)",
+        subject, re.S,
+    )
     result["이사건_지정상품"] = " ".join(goods.group(1).split())[:300] if goods else ""
 
+    # 선등록상표 영역: 제목에 '선등록상표'가 든 첫 줄("나. 선등록상표 1", "나. 원결정이유및선등록
+    # 상표", "(2) 선등록상표")부터 다음 최상위 번호 제목("2. 당사자의 주장" 등)까지.
+    prior_region = _find_block(
+        text,
+        r"(?m)^\s*(?:\(\d+\)|[가-힣]\.|\d+\.)\s*[^\n]*?" + _PRIOR_MARK,
+        (_TOP_HEADING,),
+    )
     prior_numbers: list[str] = []
-    for block in re.finditer(
-        r"(?m)^[ \t]*[가-힣]\.[ \t]*(?:선등록|선사용|선출원|비교대상|인용)[ \t]*(?:상표|서비스표)?"
-        r"[ \t]*\d*[^\n]*\n(.*?)(?=^\s*[가-힣]\.\s|^\s*\d+\.\s|\Z)",
-        text, re.S,
-    ):
-        for number in re.findall(r"상표등록\s*제\s*([\d\-]+)\s*호", block.group(1)):
-            digits = _digits(number)
-            if digits and digits not in prior_numbers:
-                prior_numbers.append(digits)
+    for number in _REG_NUMBER_RE.findall(prior_region):
+        digits = _digits(number)
+        if digits and digits != result["이사건_등록번호"] and digits not in prior_numbers:
+            prior_numbers.append(digits)
     result["선등록_등록번호"] = "|".join(prior_numbers)
 
-    judgment = _find_block(text, r"(?m)^\s*\d+\.\s*판\s*단\s*$", (r"(?m)^\s*\d+\.\s*결\s*론\s*$",))
+    # 판단 절: "3. 판단"(2013) 또는 "3. 이사건출원상표가…해당하는지여부"(2024) → "N. 결론" 전까지
+    judgment = _find_block(
+        text,
+        r"(?m)^\s*\d+\.\s*[^\n]*?(?:판\s*단|해당하는지\s*여부)[^\n]*$",
+        (r"(?m)^\s*\d+\.\s*결\s*론\s*$",),
+    )
     result["판단절"] = "|".join(
         " ".join(m.group(2).split())[:80] for m in _HEADING_RE.finditer(judgment)
     )
@@ -756,13 +856,20 @@ def analyze_text(text: str) -> dict:
         result[f"본문_{key.replace('-', '_')}"] = 1 if key in body_articles else 0
     for key, word in KEYWORDS.items():
         result[f"본문_{key}"] = 1 if re.search(word.replace(" ", r"\s*"), text) else 0
+    without_boilerplate = _FAME_BOILERPLATE_RE.sub("", text)
+    result["본문_저명주지_실질"] = 1 if re.search(r"저명|주지", without_boilerplate) else 0
 
     conclusions: dict[str, str] = {}
     blocks = _conclusion_blocks(text)
+    # 폴백: '소결' 제목 없이 판단 절 마지막 문단에 결론이 오는 심결문(2024-01 실측 20건 중 6건)
+    if judgment and not any(_CONCLUSION_RE.search(block) for block in blocks):
+        blocks = blocks + [judgment[-600:]]
     for block in blocks:
         for match in _CONCLUSION_RE.finditer(block):
             law, number, extra, verb = match.groups()
             polarity = "부정" if re.search(r"(아니|않)", verb) else "긍정"
+            if re.search(r"않게\s*되", block[match.end():match.end() + 12]):
+                polarity = "부정"
             for raw in (number, extra):
                 if raw:
                     key = _norm_article(law, int(raw))
@@ -773,6 +880,9 @@ def analyze_text(text: str) -> dict:
             conclusions["33"] = "부정" if lacks else "긍정"
     result["결론절추출"] = 1 if blocks else 0
     result["결론조문"] = "|".join(f"{k}:{v}" for k, v in conclusions.items())
+    result["선등록소멸취소"] = 1 if (
+        result["주문결과"] == "취소" and _PRIOR_MARK_GONE_RE.search(text)
+    ) else 0
 
     ground = _refusal_ground_block(text)
     ground_articles = []
@@ -790,8 +900,8 @@ PREFILTER_COLUMNS = [
     "심판번호", "텍스트길이", "추출실패", "주문", "주문결과", "이사건_구분", "이사건_등록번호",
     "이사건_출원번호", "이사건_지정상품", "선등록_등록번호", "판단절",
     "본문_34_7", "본문_34_9", "본문_34_11", "본문_34_12", "본문_34_13", "본문_33",
-    "본문_저명", "본문_주지", "본문_부정한목적", "본문_식별력", "결론절추출", "결론조문",
-    "거절이유조문",
+    "이사건_국제등록번호", "본문_저명", "본문_주지", "본문_부정한목적", "본문_식별력",
+    "본문_저명주지_실질", "결론절추출", "결론조문", "거절이유조문", "선등록소멸취소",
 ]
 
 
@@ -837,12 +947,21 @@ def parse_conclusions(value: str) -> dict[str, str]:
     return conclusions
 
 
-def classify(analysis: dict) -> tuple[str, str]:
-    """(자동등급, 사유). 1=순수 유사 사례 후보, 2=검토 필요, 3=제외 후보."""
+def classify(analysis: dict, *, ignore_boilerplate: bool = False) -> tuple[str, str]:
+    """(자동등급, 사유). 1=순수 유사 사례 후보, 2=검토 필요, 3=제외 후보.
+
+    ignore_boilerplate=True 면 저명·주지 언급을 요부 판단기준 판례 문구를 뺀 뒤(본문_저명주지_실질)
+    로 판단한다 — 규칙 변경 후보의 효과를 보는 참고 열(등급_보일러플레이트제외)용. 정식 등급은
+    원 규칙이다.
+    """
     conclusions = parse_conclusions(analysis.get("결론조문", ""))
     fame_in_conclusion = [k for k in FAME_ARTICLES if k in conclusions]
     fame_keys = (("본문_저명", "저명"), ("본문_주지", "주지"), ("본문_부정한목적", "부정한 목적"))
     fame_in_body = [name for key, name in fame_keys if str(analysis.get(key, "0")) == "1"]
+    if ignore_boilerplate:
+        fame_in_body = [n for n in fame_in_body if n == "부정한 목적"]
+        if str(analysis.get("본문_저명주지_실질", "0")) == "1":
+            fame_in_body.append("저명·주지(문구 제외 후)")
     if fame_in_conclusion:
         return "3", "결론에 인지도 조문 " + ",".join(fame_in_conclusion)
     if conclusions and all(key == "33" for key in conclusions):
@@ -899,11 +1018,20 @@ def build_sheet_rows(
                 **base,
                 "상표A_번호": row.get("등록번호") or row.get("출원번호", ""),
                 "상표B_번호": "", "지정상품_원문": "", "조문플래그": "", "결론조문": "",
-                "자동등급": "", "등급사유": "텍스트 미추출", "유사여부_추정": "", "추정근거": "",
+                "자동등급": "", "등급사유": "텍스트 미추출", "등급_보일러플레이트제외": "",
+                "참고표시": "", "유사여부_추정": "", "추정근거": "",
             })
             continue
         grade, reason = classify(analysis)
+        variant_grade, _ = classify(analysis, ignore_boilerplate=True)
         guess, basis = estimate_similarity(kind, analysis)
+        notes = []
+        if analysis.get("주문결과") == "각하":
+            notes.append("각하(본안 판단 없음)")
+        if str(analysis.get("선등록소멸취소", "0")) == "1":
+            notes.append("선등록상표 소멸로 취소(유사 판단 없음)")
+        if analysis.get("이사건_국제등록번호"):
+            notes.append("국제등록출원")
         flags = [key.replace("본문_", "").replace("_", "-") for key in analysis
                  if key.startswith("본문_") and str(analysis[key]) == "1"]
         subject_number = (analysis.get("이사건_등록번호") or row.get("등록번호")
@@ -919,6 +1047,8 @@ def build_sheet_rows(
                 "결론조문": analysis.get("결론조문", ""),
                 "자동등급": grade,
                 "등급사유": reason,
+                "등급_보일러플레이트제외": variant_grade,
+                "참고표시": "; ".join(notes),
                 "유사여부_추정": guess,
                 "추정근거": basis,
             })
@@ -938,11 +1068,92 @@ def run_sheet(args: argparse.Namespace, session: Session) -> int:
 
 
 # ====================================================================
+# biblio — 서지상세 1회/건 (결과 판독의 대안 평가: conclusiveResultCode·trialDecision vs PDF 주문)
+# ====================================================================
+
+BIBLIO_KEY_FIELDS = (
+    "trialNumber", "cdDesc", "trialStatusCode", "conclusiveResultCode", "conclusiveStatusCode",
+    "conclusiveDate", "trialDecisionCode", "trialDecision", "trialDecisionDate", "eventindication",
+    "applicationNumber", "registerNumber", "rightDivisionCode", "inventionTitle", "path",
+)
+
+
+def parse_biblio_response(xml_text: str) -> dict:
+    """서지상세 응답 → bibliographicSummaryInfo 의 모든 자식 + 지정분류코드(clssCd) 목록."""
+    kc.check_result_code(xml_text)
+    root = ET.fromstring(xml_text)
+    summary = kc._find_first(root, "bibliographicSummaryInfo")
+    result: dict = {}
+    if summary is not None:
+        for child in summary:
+            result[kc._local_name(child.tag)] = " ".join((child.text or "").split())
+    result["clssCd"] = [
+        (el.text or "").strip() for el in root.iter() if kc._local_name(el.tag) == "clssCd"
+    ]
+    return result
+
+
+def run_biblio(args: argparse.Namespace, session: Session) -> int:
+    trials = list(dict.fromkeys(args.trial or []))
+    prefilter = {row["심판번호"]: row for row in _read_csv(session.paths.prefilter_csv)}
+    print(f"## biblio {len(trials)}건 → 호출 {len(trials)}회 "
+          f"(GET {BIBLIO_URL} 인증 {BIBLIO_AUTH_PARAM})")
+    print(f"- 예산: {session.budget_line()}")
+    if session.dry_run:
+        print("[dry-run] 실호출 0회 — 위 계획만 출력하고 종료합니다.")
+        return 0
+    session.paths.biblio_dir.mkdir(parents=True, exist_ok=True)
+    exit_code = 0
+    try:
+        for number in trials:
+            xml_text = session.api_get(BIBLIO_URL, {"trialNumber": number}, BIBLIO_AUTH_PARAM)
+            _save_raw(session.paths, f"biblio_{number}.xml", xml_text)
+            parsed = parse_biblio_response(xml_text)
+            (session.paths.biblio_dir / f"{number}.json").write_text(
+                json.dumps(parsed, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
+            shown = {k: parsed.get(k, "") for k in BIBLIO_KEY_FIELDS if k != "path"}
+            print(f"  {number}: {json.dumps(shown, ensure_ascii=False)}")
+            row = prefilter.get(number)
+            if row:
+                print(f"    ↔ PDF 주문결과={row.get('주문결과')} 주문={row.get('주문', '')[:60]}")
+    except HardCapReached as exc:
+        print(f"[중단] {exc}")
+        exit_code = 3
+    print(f"- 호출 {session.api_calls}회 → {session.paths.biblio_dir}")
+    return exit_code
+
+
+# ====================================================================
 # status
 # ====================================================================
 
+def summarize_calls(log_path: Path) -> dict[str, int]:
+    """calls.log 를 오퍼레이션별로 센다(list/doc/biblio/download)."""
+    counts = {"list": 0, "doc": 0, "biblio": 0, "download": 0, "기타": 0}
+    if not log_path.exists():
+        return counts
+    for line in log_path.read_text(encoding="utf-8").splitlines():
+        parts = line.split("\t")
+        what, note = (parts[1], parts[2]) if len(parts) >= 3 else ("", "")
+        if what == "download":
+            counts["download"] += 1
+        elif note.startswith("getAdvancedSearch"):
+            counts["list"] += 1
+        elif note.startswith("getJudDocumentInfoSearch"):
+            counts["doc"] += 1
+        elif note.startswith("getBibliographyDetailInfoSearch"):
+            counts["biblio"] += 1
+        else:
+            counts["기타"] += 1
+    return counts
+
+
 def run_status(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
+    calls = summarize_calls(paths_.calls_log)
+    print(f"- calls.log: list {calls['list']} · 심결문 {calls['doc']} · 서지 {calls['biblio']} · "
+          f"다운로드 {calls['download']} · 기타 {calls['기타']} (합계 {sum(calls.values())})")
     list_rows = _read_csv(paths_.list_csv)
     pdfs = len(list(paths_.pdf_dir.glob("*.pdf"))) if paths_.pdf_dir.exists() else 0
     texts = len(list(paths_.text_dir.glob("*.txt"))) if paths_.text_dir.exists() else 0
@@ -983,8 +1194,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_list = sub.add_parser("list", help="월별 항목별검색 → list.csv")
     common(p_list)
-    p_list.add_argument("--kind", required=True,
-                        help="refusal | invalidation | scope (trials_kinds.json)")
+    p_list.add_argument("--kind", default="",
+                        help="refusal | invalidation | scope (trials_kinds.json). 생략 = 필터 없음")
     p_list.add_argument("--from", required=True, metavar="YYYYMM")
     p_list.add_argument("--to", required=True, metavar="YYYYMM")
     p_list.add_argument("--rows", type=int, default=DEFAULT_ROWS, help="numOfRows(최댓값 미확인)")
@@ -1001,6 +1212,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="목록의 심결문유무(trialDecisionDoc)가 N 인 건 건너뜀(의미 미확인, 기본 끔)",
     )
     p_fetch.add_argument("--retry-failed", action="store_true", help="fetch_log 의 실패 건 재시도")
+    p_fetch.add_argument("--trial", action="append", metavar="심판번호",
+                         help="이 심판번호만 대상(반복 지정)")
+    p_fetch.add_argument("--kind-priority", default="",
+                         help="종류 우선순위, 예: refusal,scope,invalidation")
+    p_fetch.add_argument("--prefer-doc", action="store_true", help="심결문유무 Y 인 건을 먼저")
 
     p_extract = sub.add_parser("extract", help="PDF → 텍스트 + prefilter.csv")
     common(p_extract)
@@ -1008,6 +1224,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_sheet = sub.add_parser("sheet", help="labels.csv 초안")
     common(p_sheet)
+    p_biblio = sub.add_parser("biblio", help="서지상세 조회(1회/건) — 결과·주문 대조용")
+    common(p_biblio)
+    p_biblio.add_argument("--trial", action="append", required=True, metavar="심판번호")
     sub.add_parser("status", help="예산·진행 요약")
     return ap
 
@@ -1020,7 +1239,7 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=getattr(args, "dry_run", False),
     )
     runners = {"list": run_list, "fetch": run_fetch, "extract": run_extract,
-               "sheet": run_sheet, "status": run_status}
+               "sheet": run_sheet, "biblio": run_biblio, "status": run_status}
     try:
         return runners[args.command](args, session)
     except kc.CallBudgetExceeded as exc:
