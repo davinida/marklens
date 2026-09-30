@@ -54,6 +54,7 @@ export default function Home() {
       nameCheck: value.nameCheck ?? null,
       phonetic: value.phonetic ?? null,
       semantic: value.semantic ?? null,
+      goods: value.goods ?? null,
     });
     setPhase({ name: "loading" });
 
@@ -123,6 +124,7 @@ export default function Home() {
             nameCheck={draft?.nameCheck ?? null}
             phonetic={draft?.phonetic ?? null}
             semantic={draft?.semantic ?? null}
+            goods={draft?.goods ?? null}
             onReset={reset}
           />
         )}

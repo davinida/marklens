@@ -25,7 +25,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 상표명 완전일치 확인 | 구현 | KIPRIS 실시간 조회, 후보 상세·상태 분포·완전성 표시. **검색과 별개 기능**(검색 점수에 반영되지 않음) |
 | KIPRIS 수집 및 인덱스 빌드 | 구현 | 체크포인트, authoritative key, manifest, 원자적 게시 |
 | 호칭 유사도 X1 | 최소 연결 | `ml/src/axes/x1_phonetic.py` + `POST /phonetic-search`. 상표명 확인 패널에 "발음이 비슷한 등록상표" 섹션. 통합 점수에는 미반영 |
-| 상품↔유사군 변환표·상품 검색 API | 구현 | 파서·검증기 + 로더(`ml/src/axes/goods_map.py`) + `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`). 변환표 `goods_map.json.gz` 저장소 포함(공공누리 제1유형, 출처표시). 지정상품 입력 화면(프론트-6)은 미착수 |
+| 상품↔유사군 변환표·상품 검색 API | 구현 | 파서·검증기 + 로더(`ml/src/axes/goods_map.py`) + `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`). 변환표 `goods_map.json.gz` 저장소 포함(공공누리 제1유형, 출처표시). 지정상품 입력 화면(프론트-6)은 구현(`GoodsPicker`), `/search` 연동은 유사군 백필 후 |
 | 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
 | 관념 X3 | 최소 연결 | `ml/src/axes/x3_semantic.py` 다국어 임베딩(paraphrase-multilingual-MiniLM-L12-v2) + 관념 게이트(wordfreq) + `POST /semantic-search`. 상표명 확인 패널에 "관념 유사 후보" 섹션(발음 섹션과 병렬 요청). 통합 점수에는 미반영 |
 | 통합 모델 | 설계 초안 | [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)(2026-10-01): 판례가 정한 구조, 로지스틱 회귀 입력, 검증 계획. 구현·학습은 정답 데이터 라벨링 후. UI의 지정상품 입력도 현재 숨김 |
@@ -62,7 +62,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 프론트-3 유명 로고 브랜드 목록 | 지원 | 부분 | `shared/famous_brands.txt` | DRAFT 39건(출원인명), 아직 수집 전 |
 | 프론트-4 화면 골격(3층 결과 화면) | 현수 | 완료 | `frontend/app/page.tsx`, `frontend/components/ResultView.tsx` | 이후 추가: 상표명 패널의 발음 유사·관념 유사 두 섹션(병렬 요청, 1회용 Turnstile 토큰을 발음 → 관념 순으로 소비), 결과 화면 분석 범위의 "호칭·관념 조회됨" 표시(PR #22·#26) |
 | 프론트-5 백엔드 1차 연동 | 현수 | 완료 | `frontend/app/api/*`(BFF) | |
-| 프론트-6 지정상품 입력 UI | 다빈 | 부분 | `GET /goods/search`·`/goods/classes`, BFF `frontend/app/api/goods/*`, `lib/api.ts` `searchGoods`·`fetchGoodsClasses` | 2026-09-21 API·zod 계약 준비(PR #24). 화면은 미착수 |
+| 프론트-6 지정상품 입력 UI | 다빈 | **완료(범위 ②: 입력·선택·결과 요약)** | `frontend/components/GoodsPicker.tsx`(+테스트), `lib/goods.ts`, `SearchForm.tsx`·`ResultView.tsx`, `GET /goods/search`(q 선택·offset)·`/goods/classes`, BFF `frontend/app/api/goods/*`, `lib/api.ts` `searchGoods`·`fetchGoodsClasses` | 2026-09-21 API·zod 계약(PR #24) → 2026-10-01 화면: 상품명 검색(디바운스 250ms·2글자 이상·류 배지·alias 표시·키보드) + 분류로 찾기(45류, 검색어 없이 목록·더 보기) + 선택 칩(최대 20, 유사군 합집합). 이름 확인·검색을 거쳐도 유지, 결과 화면 상단에 요약. ③ `/search` 연동은 유사군 백필 후 |
 | 프론트-7 관념 X3 | 다빈 | **완료(축 함수 v1.3 + 최소 연결)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`(219건), `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md`, `backend/src/core/semantic_search.py`, `backend/src/api/semantic_search.py`, `frontend/components/SemanticMatchesSection.tsx` | PR #25·#26(2026-09-30). MiniLM-L12-v2 + wordfreq 표제어 게이트(합성어 폴백, 영문 3자 이상, 1음절 명사 목록), 하한 0.55. `POST /semantic-search`(BFF `/api/semantic-search`)로 상표명 확인 패널에 연결, 관념 없는 입력은 안내 문구. 통합 모델 전 |
 | 프론트-8 상품 견련성 X4 | 다빈 | **완료(축 함수)** | `ml/src/axes/x4_goods.py`, `ml/src/axes/goods_map.py`(로더), `backend/src/api/goods.py`(상품 검색 API), `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21(PR #24). 서비스 적용은 DB 유사군 백필(현재 100/1,100건) 후 |
 | 프론트-9 통합 모델·재보정 | 다빈 | 설계 초안 | `docs/MarkLens_통합모델_설계.md` | 2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획·결정 대기). 구현·학습은 정답 데이터 라벨링 후 |
@@ -355,7 +355,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `POST /api/name-check` | `{ "name": "...", "turnstileToken": "..." }` 명칭 확인 프록시 | 〃 |
 | `POST /api/phonetic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..20 }` X1 발음 유사 후보 프록시 | 〃 |
 | `POST /api/semantic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..5 }` X3 관념 유사 후보 프록시 | 〃 |
-| `GET /api/goods/search?q=&limit=&nice_class=` | 상품↔유사군 변환표 검색 프록시(프론트-6). 읽기 전용이라 Turnstile 불필요 | 〃 |
+| `GET /api/goods/search?q=&limit=&offset=&nice_class=` | 상품↔유사군 변환표 검색 프록시(프론트-6). `nice_class`가 있으면 `q` 생략 가능(류 목록). 읽기 전용이라 Turnstile 불필요 | 〃 |
 | `GET /api/goods/classes` | NICE 45개 류 명칭·변환표 항목 수 프록시(성공 응답 1시간 캐시) | 〃 |
 | `GET /api/health` | 외부용 BFF·FastAPI 준비 상태 | — |
 | `GET /api/images/{path}` | 결과 이미지 프록시 | 〃 |
@@ -365,7 +365,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `POST /name-check` | 내부 명칭 확인 API(KIPRIS 실시간) | 30/minute (`MARKLENS_NAMECHECK_RATELIMIT`) + KIPRIS 월 예산 |
 | `POST /phonetic-search` | 내부 X1 호칭 유사도 검색 (`name`, `top_k` ≤ 20). 로컬 DB 계산, KIPRIS 무관 | 30/minute (`MARKLENS_PHONETIC_RATELIMIT`) |
 | `POST /semantic-search` | 내부 X3 관념 유사도 검색 (`name`, `top_k` ≤ 5). 기동 시 임베딩 캐시, `MARKLENS_X3_ENABLED=0`이면 503 | 30/minute (`MARKLENS_X3_RATELIMIT`) |
-| `GET /goods/search` | 내부 상품 검색 (`q` 1~50자, `limit` 1~50, `nice_class` 1~45). 변환표 파일 없으면 503 | 60/minute (`MARKLENS_GOODS_RATELIMIT`) |
+| `GET /goods/search` | 내부 상품 검색 (`q` 1~50자, `limit` 1~50, `offset` 0 이상, `nice_class` 1~45). `q` 없이 `nice_class`만 주면 그 류의 항목을 이름순으로 나열, 둘 다 없으면 422. 변환표 파일 없으면 503 | 60/minute (`MARKLENS_GOODS_RATELIMIT`) |
 | `GET /goods/classes` | 내부 NICE 45개 류 목록 | 60/minute (〃) |
 | `GET /images/{key}` | 인덱스에 포함된 결과 이미지만 제공. `MARKLENS_PUBLIC_RESULT_IMAGES=true`(로컬 기본)일 때만 등록 | 120/minute (`MARKLENS_IMAGES_RATELIMIT`) |
 | `GET /docs` | Swagger UI | 없음 |
@@ -547,7 +547,9 @@ inspect`/`convert` → `validate_goods_map.py` 순이며 명령은
 확인 — 근거는 [`shared/goods_map/README.md`](shared/goods_map/README.md) §5). 원본 xlsx와 24MB
 `goods_map.json`은 `.gitignore`로 두고 각자 로컬에서 생성합니다(`--gzip`으로 `.gz` 재생성). 소비 측은
 로더 `ml/src/axes/goods_map.py`(백엔드 `/goods/*` 상품 검색 API, X4 입력)이며 지정상품 입력
-화면(프론트-6)은 미착수입니다. 타입은 `shared/types/goods.ts`.
+화면(프론트-6)은 `frontend/components/GoodsPicker.tsx`로 구현됐고(상표명 패널 아래 세 번째 입력 영역),
+선택 결과는 검색 폼 상태와 결과 화면 요약에만 쓰입니다 — `/search` 요청에 유사군을 보내는 연동(③)은
+유사군 백필 후입니다. 타입은 `shared/types/goods.ts`.
 
 ### 유명 브랜드 목록 (`shared/famous_brands.txt`)
 
@@ -706,9 +708,9 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
 
 ## 팀
 
-- 최다빈 — 데이터·법리·모델 총괄(정답 데이터, X1 호칭, 식별력 필터)
+- 최다빈 — 데이터·법리·모델 총괄(정답 데이터, X1 호칭·X3 관념·X4 상품, 통합 모델 설계, 식별력 필터)
 - 정현수 — 데이터 인프라·백엔드(수집, DB, API, 배포)
-- 배지원 — 화면·모델(프런트, 변환표, X3 관념·X4 상품·통합 모델)
+- 배지원 — 화면·변환표(프런트, 변환표 파서, 통합 모델 참여)
 
 본 프로젝트는 건국대학교 컴퓨터공학부 졸업프로젝트이며 비상업적 교육·연구
 목적으로 개발됩니다.

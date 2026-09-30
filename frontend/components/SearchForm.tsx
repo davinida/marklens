@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import GoodsPicker from "@/components/GoodsPicker";
 import ImageCropDialog from "@/components/ImageCropDialog";
 import NameCheckPanel from "@/components/NameCheckPanel";
 import PhoneticMatchesSection, {
@@ -23,6 +24,7 @@ import type {
   PhoneticSearchResponse,
   SemanticSearchResponse,
 } from "@/lib/contracts";
+import { goodsCodeUnion, type SelectedGood } from "@/lib/goods";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
@@ -36,10 +38,14 @@ export interface SearchDraft {
   nameCheck?: NameCheckResult | null;
   phonetic?: PhoneticSearchResponse | null;
   semantic?: SemanticSearchResponse | null;
+  /** 지정상품 선택(프론트-6). 이름 확인·검색을 거쳐도 유지되고 폼 초기화(다른 로고 비교하기)에서만 비운다. */
+  goods?: SelectedGood[] | null;
 }
 
 export interface SearchFormValue extends SearchDraft {
   turnstileToken: string;
+  /** 선택한 지정상품의 유사군 코드 합집합 — /search 연동(범위 ③, 유사군 백필 후) 입력용 파생값. */
+  goodsCodes: string[];
 }
 
 type NamePhase =
@@ -80,6 +86,10 @@ export default function SearchForm({
       ? { name: "result", data: initialValue.semantic }
       : { name: "idle" },
   );
+  const [selectedGoods, setSelectedGoods] = useState<SelectedGood[]>(
+    () => initialValue?.goods ?? [],
+  );
+  const goodsCodes = useMemo(() => goodsCodeUnion(selectedGoods), [selectedGoods]);
   const inputRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const nameAbortRef = useRef<AbortController | null>(null);
@@ -265,6 +275,8 @@ export default function SearchForm({
       nameCheck: namePhase.name === "result" ? namePhase.data : null,
       phonetic: phoneticPhase.name === "result" ? phoneticPhase.data : null,
       semantic: semanticPhase.name === "result" ? semanticPhase.data : null,
+      goods: selectedGoods,
+      goodsCodes,
       turnstileToken: token,
     });
   };
@@ -431,6 +443,21 @@ export default function SearchForm({
             <SemanticMatchesSection phase={semanticPhase} live />
           </div>
         )}
+      </section>
+
+      <section aria-labelledby="goods-title" className="rise rise-3 rounded-lg bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="goods-title" className="text-[13px] font-semibold text-sub">
+            지정상품
+          </h2>
+          <span className="rounded-full bg-blue-bg px-2.5 py-0.5 text-[11px] font-bold text-blue-dark tnum">
+            선택 {selectedGoods.length}개
+          </span>
+        </div>
+        <p id="goods-help" className="mt-1 text-[11px] leading-relaxed text-sub">
+          상표를 쓸 상품·서비스를 고르세요. 여러 개 가능
+        </p>
+        <GoodsPicker value={selectedGoods} onChange={setSelectedGoods} describedBy="goods-help" />
       </section>
 
       <section aria-labelledby="count-title" className="rise rise-3 rounded-lg bg-card p-5">

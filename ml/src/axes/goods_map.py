@@ -94,6 +94,7 @@ NICE_CLASS_TITLES: dict[int, str] = {
 _SEP = "\x00"
 
 TIER_EXACT, TIER_PREFIX, TIER_PARTIAL = 0, 1, 2
+TIER_LIST = 3  # 검색이 아니라 류 목록(list_class)으로 나온 항목
 
 
 def normalize(text: str) -> str:
@@ -200,6 +201,14 @@ class GoodsMap:
         for entry in self.entries:
             counts[entry.nice_class] = counts.get(entry.nice_class, 0) + 1
         self._class_counts = counts
+        # 류 탐색 UI의 목록 보기용: 류별 항목 번호를 name 가나다순으로 미리 정렬해 둔다.
+        by_class: dict[int, list[int]] = {}
+        for index, entry in enumerate(self.entries):
+            by_class.setdefault(entry.nice_class, []).append(index)
+        self._by_class: dict[int, tuple[int, ...]] = {
+            nice_class: tuple(sorted(indexes, key=lambda i: self.entries[i].name))
+            for nice_class, indexes in by_class.items()
+        }
         # 같은 순위 안의 정렬 기준(name 짧은 순 → 가나다 순)을 항목별 순위 번호로 미리 계산해
         # 검색 때 sort key 를 싸게 만든다(부분 일치 5만 건짜리 질의에서 체감됨).
         by_name = sorted(
@@ -257,9 +266,12 @@ class GoodsMap:
         )
 
     def search_with_total(
-        self, query: str, limit: int = 20, nice_class: int | None = None
+        self, query: str, limit: int = 20, nice_class: int | None = None, offset: int = 0
     ) -> tuple[list[Match], int]:
-        """search() 와 같되 전체 일치 건수(total)도 돌려준다 — API 응답의 total 용."""
+        """search() 와 같되 전체 일치 건수(total)도 돌려준다 — API 응답의 total 용.
+
+        offset 은 순위 목록에서 건너뛸 개수(페이지 넘김). total 은 offset 과 무관한 전체 일치 수.
+        """
         needle = normalize(query)
         if not needle:
             return [], 0
@@ -272,13 +284,37 @@ class GoodsMap:
                 matched_alias=alias,
                 tier=tier,
             )
-            for index, tier, _via, alias in ranked[: max(limit, 0)]
+            for index, tier, _via, alias in ranked[max(offset, 0) : max(offset, 0) + max(limit, 0)]
         ]
         return matches, len(ranked)
 
     def search(self, query: str, limit: int = 20, nice_class: int | None = None) -> list[Match]:
         """name·aliases 부분 일치 상위 limit 개 (정확 > 접두 > 부분)."""
         return self.search_with_total(query, limit, nice_class)[0]
+
+    def list_class(
+        self, nice_class: int, offset: int = 0, limit: int = 20
+    ) -> tuple[list[Match], int]:
+        """한 류의 항목을 name 가나다순으로 offset 부터 limit 개 (류 탐색 UI의 목록 보기용).
+
+        Returns:
+            (해당 구간의 Match 목록 — matched_alias 는 None, tier 는 TIER_LIST — 와
+            그 류의 전체 항목 수).
+            없는 류·범위 밖 offset 은 빈 목록.
+        """
+        indexes = self._by_class.get(nice_class, ())
+        start = max(offset, 0)
+        page = indexes[start : start + max(limit, 0)]
+        return [
+            Match(
+                name=self.entries[index].name,
+                nice_class=self.entries[index].nice_class,
+                similarity_codes=self.entries[index].similarity_codes,
+                matched_alias=None,
+                tier=TIER_LIST,
+            )
+            for index in page
+        ], len(indexes)
 
     def classes(self) -> list[dict[str, int]]:
         """45개 류 전부의 항목 수 (없는 류는 0)."""

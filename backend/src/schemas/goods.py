@@ -22,9 +22,14 @@ class GoodsMatch(BaseModel):
 class GoodsSearchResponse(BaseModel):
     """GET /goods/search 응답 본문."""
 
-    query: str = Field(..., description="앞뒤 공백을 제거한 검색어")
+    query: str = Field(
+        ..., description="앞뒤 공백을 제거한 검색어. 류 목록 보기(q 생략)면 빈 문자열"
+    )
     matches: list[GoodsMatch]
-    total: int = Field(..., description="limit 과 무관한 전체 일치 건수")
+    total: int = Field(
+        ..., description="limit·offset 과 무관한 전체 일치 건수(류 목록이면 그 류의 항목 수)"
+    )
+    offset: int = Field(0, ge=0, description="matches 가 시작하는 위치(0부터)")
     source: str = Field(..., description="변환표 원본 판, 예: '고시상품명칭 13판(2026)'")
 
 

@@ -531,6 +531,7 @@ export const GoodsSearchResponseSchema = z
     query: z.string(),
     matches: z.array(GoodsMatchSchema),
     total: z.number().int().nonnegative(),
+    offset: z.number().int().nonnegative().optional().default(0),
     source: z.string().optional(),
   })
   .passthrough();
