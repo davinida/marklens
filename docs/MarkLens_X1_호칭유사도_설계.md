@@ -120,12 +120,14 @@
 - `has_pronunciation(name)` — 한글 음절 후보가 하나라도 있으면 True. False 인 상표(순수 도형·한자만·기호만)는 X1 을 결측 처리하고 다른 축만으로 판단한다.
 - `extra_generic` — 식별력 필터(다빈-3)나 상품 정보에서 얻은 **상품 의존 보통명칭 집합**(예: `{"커피", "카페"}`)을 넘긴다. 양쪽 상표명에 같은 집합을 적용한다. 항목은 내부에서 NFKC·casefold 정규화되며 다중 토큰("커피 전문점")은 연속 열로 매칭한다. 단일 토큰 항목은 영문·숫자 토큰의 읽기와도 대조되므로 한글 목록만 넘겨도 된다(COFFEE→커피).
 - `pronunciation_candidates(name)` — 디버깅·화면 표시용 후보 목록. 결과 화면에 "어떤 발음으로 비교했는지" 근거로 보여줄 수 있다.
+- `normalize_name(name, *, extra_generic=frozenset())` (v1.5, 2026-09-30) — X1 내부 정규화의 "제거 후" 토큰 목록(표기 기준, 영문 소문자, 발음 변환 없음). X3 관념 축이 같은 요부관찰 정규화를 쓰기 위해 공개했다. X1 점수·후보에는 영향이 없다.
 - 성능: 데이터 상표명 1,000쌍 0.21초(cold, v1 0.51초 — 낱자 읽기 감소로 후보가 줄어 빨라짐). 내부 lru_cache 로 반복 호출은 더 빠르다.
 - 서비스 연결(2026-09-17, 최소 통합): `backend/src/core/phonetic_search.py` 가 기동 시 DB 상표명 중 `has_pronunciation` 인 것만 `pronunciation_candidates` 로 캐시하고, `POST /phonetic-search` 가 입력과 각 레코드의 `phonetic_similarity` 상위 후보를 돌려준다(하한 `MARKLENS_PHONETIC_MIN_SIMILARITY` 기본 0.5). 프런트는 상표명 확인 패널에 "발음(호칭)이 비슷한 등록상표" 섹션으로 표시한다. 공개 함수 세 개만 사용하며 검색 등급에는 미반영.
 - 통합 시 주의: 점수는 교정 전 원점수다. 로지스틱 회귀 학습 전 §2 상수와 §5 보류 항목은 정답 데이터(다빈-1)로 재검토한다.
 
 ## 9. 변경 이력
 
+- **v1.5 (2026-09-30, X3 연동)**: 공개 헬퍼 `normalize_name` 추가 — `_normalize_tokens` 의 제거 후 토큰을 그대로 돌려준다. 상수·표·점수 변화 없음(테스트 123건 유지, X3 테스트가 파이프라인 동일성을 검증). 공개 API 는 네 개.
 - **v1 (2026-09-17)**: 초판. 판례 5규칙 매핑, 룰 G2P, 가중 음절 레벤슈타인, 테스트 A/B 76건.
 - **v1.4.1 (2026-09-18, 로마자 캐기 승인분 반영)**: ① 브랜드표 +10(barun, youngmi, maemaeland, makerssaem, rairice, pilalier, median, defat, husic, regen) → 101개 ② 예외 사전 +7(santa, soccer, academy, guardians, eat, chinese, business) → 63개 ③ 캐기 도구가 "확인됨" 판정에 브랜드표뿐 아니라 지명표·예외 사전도 보게 수정 ④ 테스트 5건 추가(바른/BARUN, 실제 DB 쌍 "ㅂㄹ 바른치과 BARUN DENTAL CLINIC"/바른치과, 휴식/HUSIC, 잇버거/EAT BURGER, 차이니즈/CHINESE — "바른치과 / BARUN DENTAL" 0.636 은 §4-5 한계로 기록). 벤치마크는 순수 룰이라 48/60 유지.
 - **v1.4 (2026-09-18, 영문 G2P 룰 보강)**: ① 벤치마크 20→60단어(DB 빈출 일반 영단어 40개, science·beauty·design 포함), 순수 룰 35/60→48/60(기존 통과 단어 깨짐 0, 하한 테스트 추가) ② 룰 보강 — sc+e/i·첫 모음군 ie+n, eau, 모음 사이 s 유성음(a 앞·어말 묵음 e 앞 제외), iend, alk, ea 특수(ealth·eaven·eather·easure·어말 ead), 어말 -ment/-ance/-ence 약모음, -ean, a+자음+ure, -tial ③ 예외 사전 +17(hot·good·big·love·living·express·bio·leisure·electro·saturday + 유성음 규칙 예외 basic·asia·asian·genesis·research·crisis·evisu) → 56개 ④ `G2P_MULTI` 21개(live 라이브·리브 등, 모든 읽기를 후보로) ⑤ DB 영문 토큰 상위 100개 검수(맞음 89·틀림 2·애매 9, 보고서) ⑥ 로마자 캐기 재실행: 후보 70·확인됨 15(미승인 58행 재분류는 보고서) ⑦ §5-5 결정 완료(창창대로/스타박스 0.545→0.491, xfail 해제). 표본 30쌍 평균 0.2871 변화 없음, C 쌍은 창창대로만 변동. 테스트 118건.
