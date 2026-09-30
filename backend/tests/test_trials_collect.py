@@ -259,6 +259,8 @@ def test_parse_doc_response_measured_format():
         ({"applicationNumber": "41-2020-0000001"}, True),
         ({"applicationNumber": "4520200000001"}, True),
         ({"applicationNumber": "1020070001615"}, False),
+        ({"applicationNumber": "7020200001707"}, True),  # 국제상표(마드리드) 포함
+        ({"applicationNumber": "4420190000002"}, False),  # 지리적표시 단체표장 제외
         ({"applicationNumber": "", "registrationNumber": "4009157630000"}, True),
         ({"applicationNumber": "", "registrationNumber": ""}, False),
     ],
@@ -519,7 +521,15 @@ def _analysis(conclusion: str, **flags) -> dict:
 
 def test_classify_rules():
     assert tc.classify(_analysis("34-7:긍정"))[0] == "1"
-    assert tc.classify(_analysis("34-7:긍정", 본문_주지=1)) == ("2", "결론 7호이나 본문에 주지")
+    assert tc.classify(_analysis("34-7:긍정", 본문_주지=1))[0] == "1"  # 문구 제외가 기본
+    assert tc.classify(_analysis("34-7:긍정", 본문_주지=1), ignore_boilerplate=False) == (
+        "2", "결론 7호이나 본문에 주지",
+    )
+    assert tc.classify(_analysis("34-7:긍정", 본문_저명주지_실질=1)) == (
+        "2", "결론 7호이나 본문에 저명·주지(문구 제외 후)",
+    )
+    assert tc.classify(_analysis("34-7:긍정", 주문결과="각하")) == ("3", "각하(본안 판단 없음)")
+    assert tc.classify(_analysis("34-7:부정", 선등록소멸취소=1))[0] == "3"
     assert tc.classify(_analysis(""))[0] == "2"
     assert tc.classify(_analysis("34-7:긍정|34-13:긍정"))[0] == "3"
     assert tc.classify(_analysis("34-12:부정"))[0] == "3"
@@ -550,14 +560,37 @@ def test_build_sheet_rows_splits_prior_marks_and_marks_missing_text():
          "상표명칭": "커피", "출원번호": "4020200012345", "등록번호": ""},
     ]
     prefilter = [{"심판번호": "A", **tc.analyze_text(TEXT_FAME)}]
-    rows = tc.build_sheet_rows(list_rows, prefilter, kinds)
+    rows = tc.build_sheet_rows(list_rows, prefilter, kinds, include_missing=True)
     assert [(r["심판번호"], r["상표B_번호"]) for r in rows] == [
         ("A", "123456"), ("A", "234567"), ("B", ""),
     ]
     assert rows[0]["상표A_번호"] == "915763" and rows[0]["자동등급"] == "3"
     assert "34-11" in rows[0]["조문플래그"] and "저명" in rows[0]["조문플래그"]
     assert rows[2]["등급사유"] == "텍스트 미추출" and rows[2]["상표A_번호"] == "4020200012345"
-    assert set(tc.LABEL_COLUMNS) >= {"유사여부_확정", "판단축", "제외사유", "메모"}
+    assert len(tc.build_sheet_rows(list_rows, prefilter, kinds)) == 2  # 기본은 추출된 건만
+    assert set(tc.LABEL_COLUMNS) >= {"유사여부_확정", "판단축", "제외사유", "메모", "family"}
+
+
+def test_family_dedupe_keeps_first_grade_one_only():
+    kinds = tc.load_kinds(KINDS)
+    def row(number, title, app, plaintiff):
+        return {"심판번호": number, "종류": "거절결정불복", "심판상태": "심결", "심결월": "202401",
+                "상표명칭": title, "출원번호": app, "등록번호": "", "청구인": plaintiff}
+
+    list_rows = [
+        row("2022101002117", "닥터큐민", "4020210004128", "주식회사 인큐텐"),
+        row("2022101002110", "Dr.Qmin", "4020210004087", "주식회사인큐텐"),
+        row("2022101002011", "XSR", "", "다른회사"),
+    ]
+    similar = tc.analyze_text(TEXT_2024)
+    numbers = ("2022101002117", "2022101002110", "2022101002011")
+    prefilter = [{"심판번호": n, **similar} for n in numbers]
+    rows = {r["심판번호"]: r for r in tc.build_sheet_rows(list_rows, prefilter, kinds)}
+    assert rows["2022101002110"]["자동등급"] == "1"  # 심판번호 순 첫 건
+    assert rows["2022101002117"]["자동등급"] == "2" and "중복" in rows["2022101002117"]["참고표시"]
+    assert rows["2022101002110"]["family"] == rows["2022101002117"]["family"]
+    assert rows["2022101002011"]["자동등급"] == "1"
+    assert rows["2022101002011"]["family"] != rows["2022101002110"]["family"]
 
 
 def test_extract_roundtrip_with_pymupdf(tmp_path):
@@ -749,11 +782,11 @@ def test_analyze_text_2024_layout_without_spaces():
     assert analysis["판단절"] == "판단기준|구체적판단|소결론"
     assert analysis["거절이유조문"] == "34-7"
     assert analysis["결론조문"] == "34-7:부정"
-    # 요부 판단기준 판례 문구 때문에 저명·주지 플래그가 켜진다 → 원 규칙은 2등급, 문구 제외 시 1등급
+    # 요부 판단기준 판례 문구 때문에 저명·주지 플래그가 켜진다 → 기본(문구 제외) 1등급, 원 규칙 2
     assert analysis["본문_저명"] == 1 and analysis["본문_주지"] == 1
     assert analysis["본문_저명주지_실질"] == 0
-    assert tc.classify(analysis) == ("2", "결론 7호이나 본문에 저명·주지")
-    assert tc.classify(analysis, ignore_boilerplate=True)[0] == "1"
+    assert tc.classify(analysis) == ("1", "결론 7호, 인지도 언급 없음")
+    assert tc.classify(analysis, ignore_boilerplate=False) == ("2", "결론 7호이나 본문에 저명·주지")
     assert tc.estimate_similarity("refusal", analysis) == ("비유사", "결론 7호 부정")
 
 
@@ -792,4 +825,93 @@ def test_analyze_text_madrid_subject_heading():
     assert analysis["이사건_구분"] == "국제등록출원상표"
     assert analysis["이사건_국제등록번호"] == "1576380" and analysis["이사건_출원번호"] == ""
     assert analysis["이사건_지정상품"].startswith("상품류구분제32류")
+
+
+def test_footnotes_and_international_mark_numbers():
+    with_footnote = TEXT_2024.replace(
+        "(다) 소결\n그렇다면",
+        "(다) 소결\n1) 각주본문 상표법제34조제1항제12호에해당한다.\n2/9\n그렇다면",
+    )
+    assert tc.analyze_text(with_footnote)["본문_34_12"] == 0  # 각주 줄은 제거된다
+    intl = TEXT_2024.replace("상표등록제1276201호", "국제상표1487520")
+    assert tc.analyze_text(intl)["선등록_등록번호"] == "1487520"
+
+
+def test_list_all_kinds_writes_list_all_and_reuses_saved_raw(tmp_path):
+    calls: list[dict] = []
+    session = _session(tmp_path, lambda url, params: calls.append(params) or XML_LIST, max_calls=10)
+    (tmp_path / "raw_xml").mkdir()
+    (tmp_path / "raw_xml" / "list_all_202401_p1.xml").write_text(XML_LIST, encoding="utf-8")
+    args = _list_args(tmp_path, kind="", to="202402", all_kinds=True)
+    assert tc.run_list(args, session) == 0
+    assert [c["trialDate"] for c in calls] == ["202402"]  # 202401 은 저장된 원본 재사용
+    rows = _rows(tmp_path / "list_all.csv")
+    assert sorted(r["종류"] for r in rows) == ["거절결정불복", "무효"]  # 전 종류 보관
+    progress = json.loads((tmp_path / "list_progress.json").read_text(encoding="utf-8"))
+    assert set(progress["all_kinds"]) == {"202401", "202402"}
+    assert not (tmp_path / "list.csv").exists()
+
+
+def test_fetch_queue_follows_csv_order_and_skips_done(tmp_path, monkeypatch):
+    monkeypatch.setattr(tc, "COUNT_DOWNLOADS", False)
+    calls: list[dict] = []
+    session = _session(tmp_path, lambda url, params: calls.append(params) or XML_DOC,
+                       downloader=_fake_pdf_downloader, max_calls=10)
+    queue = tmp_path / "queue.csv"
+    tc._write_csv(queue, ["심판번호", "kind"], [{"심판번호": "3", "kind": "refusal"},
+                                                {"심판번호": "1", "kind": "scope"},
+                                                {"심판번호": "2", "kind": "scope"}])
+    _fake_pdf_downloader("", tmp_path / "pdf" / "1.pdf")  # 이미 받은 건
+    args = argparse.Namespace(limit=0, skip_no_doc=False, retry_failed=False, queue=str(queue))
+    assert tc.run_fetch(args, session) == 0
+    assert [c["trialNumber"] for c in calls] == ["3", "2"]
+
+
+def test_select_sample_stratification_rules():
+    kinds = tc.load_kinds(KINDS)
+    rows = []
+    for month in ("202301", "202302", "202303"):
+        rows.append({"심판번호": f"s{month}", "종류": "권리범위확인(적극적)", "심결월": month,
+                     "청구인": "A", "심결문유무": "Y"})
+        for i in range(3):
+            rows.append({"심판번호": f"i{month}{i}", "종류": "무효", "심결월": month,
+                         "청구인": "B", "심결문유무": "Y"})
+            rows.append({"심판번호": f"r{month}{i}", "종류": "거절결정불복", "심결월": month,
+                         "청구인": "같은청구인" if i < 2 else "다른청구인", "심결문유무": "Y"})
+    rows.append({"심판번호": "n1", "종류": "무효", "심결월": "202304", "청구인": "C",
+                 "심결문유무": "N"})
+    rows.append({"심판번호": "x1", "종류": "취소", "심결월": "202304", "청구인": "C",
+                 "심결문유무": "Y"})
+    quotas = {"scope": 2, "invalidation": 4, "refusal": 6}
+    picked = tc.select_sample(rows, kinds, quotas, {"s202303"})
+    scope = [r["심판번호"] for r in picked if r["kind"] == "scope"]
+    assert scope == ["s202302", "s202301"]  # 최신순, 제외 건 빠짐
+    invalid = [r["심결월"] for r in picked if r["kind"] == "invalidation"]
+    assert invalid == ["202301", "202302", "202303", "202301"]  # 월 분산 라운드로빈
+    refusal = [r["심판번호"] for r in picked if r["kind"] == "refusal"]
+    assert refusal == ["r2023010", "r2023020", "r2023030", "r2023012", "r2023022", "r2023032"]
+    assert all(r["kind"] != "" for r in picked) and "x1" not in {r["심판번호"] for r in picked}
+
+
+def test_network_error_is_retried_and_each_attempt_counts(tmp_path, monkeypatch):
+    monkeypatch.setattr(tc, "NETWORK_BACKOFF_SEC", 0.0)
+    attempts: list[int] = []
+
+    def flaky(url, params):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise kc.KiprisNetworkError("끊김")
+        return XML_LIST
+
+    session = _session(tmp_path, flaky, max_calls=10)
+    assert tc.run_list(_list_args(tmp_path, kind="", to="202401"), session) == 0
+    assert len(attempts) == 2 and session.api_calls == 2  # 실패한 시도도 호출로 센다
+
+    def down(url, params):
+        raise kc.KiprisNetworkError("x")
+
+    always_down = _session(tmp_path, down)
+    with pytest.raises(kc.KiprisNetworkError):
+        tc.run_list(_list_args(tmp_path, kind="", to="202402"), always_down)
+    assert always_down.api_calls == tc.NETWORK_RETRIES + 1
 

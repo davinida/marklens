@@ -65,11 +65,13 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import math
 import os
 import re
 import sys
+import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -121,7 +123,8 @@ COUNT_DOWNLOADS: bool = os.getenv("KIPRIS_TRIAL_COUNT_DOWNLOADS", "1").strip().l
 # 페이지당 건수. 최댓값 미확인 — 상표 getAdvancedSearch 는 500 이 상한(실측)이라 같은 값을 기본으로.
 DEFAULT_ROWS: int = _env_int("KIPRIS_TRIAL_ROWS", 500)
 DEFAULT_MAX_CALLS: int = 50
-TRADEMARK_NUMBER_PREFIXES: tuple[str, ...] = ("40", "41", "45")
+# 40 상표 · 41 서비스표 · 45 상표서비스표 · 70 국제상표(마드리드). 44(지리적표시 단체표장)는 제외.
+TRADEMARK_NUMBER_PREFIXES: tuple[str, ...] = ("40", "41", "45", "70")
 KINDS_CONFIG_PATH: Path = Path(__file__).with_name("trials_kinds.json")
 
 
@@ -141,6 +144,10 @@ class TrialPaths:
     @property
     def list_csv(self) -> Path:
         return self.base / "list.csv"
+
+    @property
+    def list_all_csv(self) -> Path:
+        return self.base / "list_all.csv"
 
     @property
     def list_progress(self) -> Path:
@@ -192,7 +199,7 @@ LIST_COLUMNS = [
 FETCH_LOG_COLUMNS = ["심판번호", "결과", "파일명", "kind", "일시"]
 LABEL_COLUMNS = [
     "심판번호", "종류", "심판상태", "심결월", "상표A_번호", "상표A_명칭", "상표B_번호",
-    "지정상품_원문", "조문플래그", "결론조문", "자동등급", "등급사유", "등급_보일러플레이트제외",
+    "지정상품_원문", "조문플래그", "결론조문", "자동등급", "등급사유", "등급_원규칙", "family",
     "참고표시", "유사여부_추정", "추정근거", "유사여부_확정", "판단축", "제외사유", "메모",
 ]
 
@@ -233,6 +240,12 @@ def kind_for_trial_desc(trial_desc: str, kinds: dict[str, dict]) -> str:
 
 class HardCapReached(RuntimeError):
     """--max-calls 하드캡 도달 — 정상 종료 신호."""
+
+
+# 일시적 네트워크 오류(연결 끊김 등)는 잠시 기다렸다가 재시도한다. 각 시도는 호출로 센다.
+# 2026-09-30 실측: 129개월 목록 호출 중 58번째에서 1회 통신 실패 → 재시도 없이는 배치가 멈춘다.
+NETWORK_RETRIES = 2
+NETWORK_BACKOFF_SEC = 3.0
 
 
 Transport = Callable[[str, dict], str]
@@ -330,6 +343,19 @@ class Session:
             f"이번 실행 하드캡 {self.max_calls}회 · "
             f"다운로드 카운트 {'포함' if COUNT_DOWNLOADS else '제외'} · 카운터 {self.paths.quota}"
         )
+
+
+def api_get_with_retry(session: "Session", url: str, params: dict, auth_param: str) -> str:
+    for attempt in range(NETWORK_RETRIES + 1):
+        try:
+            return session.api_get(url, params, auth_param)
+        except kc.KiprisNetworkError as exc:
+            if attempt >= NETWORK_RETRIES:
+                raise
+            wait = NETWORK_BACKOFF_SEC * (attempt + 1)
+            print(f"  [재시도 {attempt + 1}/{NETWORK_RETRIES}] {exc} — {wait:.0f}s 뒤")
+            time.sleep(wait)
+    raise AssertionError("unreachable")
 
 
 # ====================================================================
@@ -481,18 +507,21 @@ def run_list(args: argparse.Namespace, session: Session) -> int:
         print(f"[오류] --kind 는 {', '.join(kinds)} 중 하나여야 합니다(생략 = 전체).",
               file=sys.stderr)
         return 2
+    all_kinds = bool(getattr(args, "all_kinds", False))
     spec = kinds[kind] if kind else None
     trial_descs = trial_desc_values(spec) if spec else [""]  # "" = 종류 필터 없음
     trial_desc = trial_descs[0]
     verified = bool(spec.get("verified")) if spec else True  # 필터 없음 = 검증할 값 없음
-    progress_key = kind or "all"
+    progress_key = kind or ("all_kinds" if all_kinds else "all")
+    raw_prefix = kind or "all"  # 원본 파일명은 필터 없는 호출끼리 공유(재사용)
+    output_csv = session.paths.list_all_csv if all_kinds else session.paths.list_csv
     months = month_range(getattr(args, "from"), args.to)
     progress = load_progress(session.paths.list_progress)
     done = progress.get(progress_key, {})
     pending = [m for m in months if not done.get(m, {}).get("done")]
     rows_per_page = args.rows
 
-    label = "종류 필터 없음"
+    label = "종류 필터 없음" + (" → list_all.csv(전 종류 보관)" if all_kinds else "")
     if kind:
         label = f"--kind {kind} (trialDesc={trial_descs!r}, verified={verified})"
     print(f"## list {label}")
@@ -519,8 +548,8 @@ def run_list(args: argparse.Namespace, session: Session) -> int:
               "확정하세요.", file=sys.stderr)
         return 2
 
-    existing = {row["심판번호"] for row in _read_csv(session.paths.list_csv)}
-    added = excluded = 0
+    existing = {row["심판번호"] for row in _read_csv(output_csv)}
+    added = excluded = reused = 0
     exit_code = 0
     for month in pending:
         page, total = 1, None
@@ -530,10 +559,17 @@ def run_list(args: argparse.Namespace, session: Session) -> int:
                 suffix = f"_d{index}" if len(trial_descs) > 1 else ""
                 page = 1
                 while True:
-                    params = build_search_params(desc, month, page, rows_per_page)
-                    xml_text = session.api_get(SEARCH_URL, params, SEARCH_AUTH_PARAM)
-                    _save_raw(session.paths, f"list_{progress_key}_{month}{suffix}_p{page}.xml",
-                              xml_text)
+                    raw_name = f"list_{raw_prefix}_{month}{suffix}_p{page}.xml"
+                    raw_path = session.paths.raw_xml_dir / raw_name
+                    if raw_path.exists():  # 저장된 원본 재사용 — 호출하지 않는다
+                        xml_text = raw_path.read_text(encoding="utf-8")
+                        reused += 1
+                    else:
+                        params = build_search_params(desc, month, page, rows_per_page)
+                        xml_text = api_get_with_retry(
+                            session, SEARCH_URL, params, SEARCH_AUTH_PARAM
+                        )
+                        _save_raw(session.paths, raw_name, xml_text)
                     items, total = parse_search_page(xml_text)
                     pages_done += 1
                     rows = []
@@ -545,7 +581,7 @@ def run_list(args: argparse.Namespace, session: Session) -> int:
                         if row["심판번호"] and row["심판번호"] not in existing:
                             existing.add(row["심판번호"])
                             rows.append(row)
-                    _append_csv(session.paths.list_csv, LIST_COLUMNS, rows)
+                    _append_csv(output_csv, LIST_COLUMNS, rows)
                     added += len(rows)
                     needed = math.ceil(total / rows_per_page) if total else 1
                     if not items or page >= needed or page >= args.max_pages:
@@ -567,8 +603,8 @@ def run_list(args: argparse.Namespace, session: Session) -> int:
         }
         save_progress(session.paths.list_progress, progress)
         print(f"  {month}: totalCount={total} 페이지 {pages_done}")
-    print(f"- 결과: 신규 {added}건 추가(특허 등 제외 {excluded}건), 호출 {session.api_calls}회 → "
-          f"{session.paths.list_csv}")
+    print(f"- 결과: 신규 {added}건 추가(앞자리 필터 제외 {excluded}건), "
+          f"호출 {session.api_calls}회, 원본 재사용 {reused}쪽 → {output_csv}")
     return exit_code
 
 
@@ -622,10 +658,28 @@ def select_fetch_targets(
     return ordered[:limit] if limit else ordered
 
 
+def queued_fetch_rows(paths_: TrialPaths, queue_path: Path, *, retry_failed: bool) -> list[dict]:
+    """--queue CSV(심판번호 열 필수) 순서대로, 이미 받은 PDF·실패 기록은 건너뛴다."""
+    failed = {r["심판번호"] for r in _read_csv(paths_.fetch_log) if r.get("결과") != "ok"}
+    pending = []
+    for row in _read_csv(queue_path):
+        number = row.get("심판번호", "").strip()
+        if not number or (paths_.pdf_dir / f"{number}.pdf").exists():
+            continue
+        if number in failed and not retry_failed:
+            continue
+        pending.append(row)
+    return pending
+
+
 def run_fetch(args: argparse.Namespace, session: Session) -> int:
-    pending = pending_fetch_rows(
-        session.paths, skip_no_doc=args.skip_no_doc, retry_failed=args.retry_failed
-    )
+    queue = getattr(args, "queue", None)
+    if queue:
+        pending = queued_fetch_rows(session.paths, Path(queue), retry_failed=args.retry_failed)
+    else:
+        pending = pending_fetch_rows(
+            session.paths, skip_no_doc=args.skip_no_doc, retry_failed=args.retry_failed
+        )
     raw_priority = getattr(args, "kind_priority", "") or ""
     priority = [k.strip() for k in raw_priority.split(",") if k.strip()]
     targets = select_fetch_targets(
@@ -634,8 +688,9 @@ def run_fetch(args: argparse.Namespace, session: Session) -> int:
         load_kinds(getattr(args, "kinds_config", KINDS_CONFIG_PATH)),
     )
     per_item = 2 if COUNT_DOWNLOADS else 1
-    listed = len(_read_csv(session.paths.list_csv))
-    print(f"## fetch (list.csv {listed}건, PDF 미수신 {len(pending)}건)")
+    listed = len(_read_csv(Path(queue))) if queue else len(_read_csv(session.paths.list_csv))
+    print(f"## fetch ({'queue ' + str(queue) if queue else 'list.csv'} {listed}건, "
+          f"PDF 미수신 {len(pending)}건)")
     print(f"- 이번 대상 {len(targets)}건(--limit {args.limit or '없음'}) → 호출 {len(targets)}회 + "
           f"다운로드 {len(targets)}회 = 카운트 {len(targets) * per_item}회")
     print(f"- 요청: GET {DOC_URL} 인증 {DOC_AUTH_PARAM} · 키 {'있음' if access_key() else '없음'}")
@@ -651,7 +706,7 @@ def run_fetch(args: argparse.Namespace, session: Session) -> int:
     try:
         for row in targets:
             number = row["심판번호"]
-            xml_text = session.api_get(DOC_URL, {"trialNumber": number}, DOC_AUTH_PARAM)
+            xml_text = api_get_with_retry(session, DOC_URL, {"trialNumber": number}, DOC_AUTH_PARAM)
             _save_raw(session.paths, f"doc_{number}.xml", xml_text)
             doc = parse_doc_response(xml_text)
             if doc["openYN"].upper() != "Y" or not doc["path"]:
@@ -710,7 +765,37 @@ _PRIOR_MARK_GONE_RE = re.compile(
     r"(?:더\s*이상|않게\s*되|해당하지)"
 )
 # 등록번호 표기: 상표등록 제N호 / 서비스표등록 제N호 / 국제상표(등록) 제N호 / 국제등록 제N호
-_REG_NUMBER_RE = re.compile(r"(?:상표|서비스표|국제상표|국제)\s*등록\s*제\s*([\d\-]+)\s*호")
+_REG_NUMBER_RE = re.compile(
+    r"(?:(?:상표|서비스표|국제상표|국제)\s*등록\s*제\s*([\d\-]+)\s*호"
+    r"|국제\s*상표\s*제?\s*(\d{6,8}))"
+)
+# 각주("1) …")와 쪽 표시("3/9") — 각주 본문이 소결 문단 안에 끼어 들어오는 것을 막는다(2024-01 실측)
+_FOOTNOTE_START_RE = re.compile(r"^\s*\d{1,2}\)\s*\S")
+_PAGE_MARK_RE = re.compile(r"^\s*\d{1,3}/\d{1,3}\s*$")
+
+
+def _registration_numbers(block: str) -> list[str]:
+    numbers: list[str] = []
+    for first, second in _REG_NUMBER_RE.findall(block):
+        digits = _digits(first or second)
+        if digits and digits not in numbers:
+            numbers.append(digits)
+    return numbers
+
+
+def _strip_footnotes(text: str) -> str:
+    """각주 표시 줄부터 다음 쪽 표시·제목 줄 앞까지 제거한다."""
+    kept: list[str] = []
+    skipping = False
+    for line in text.splitlines():
+        if _FOOTNOTE_START_RE.match(line):
+            skipping = True
+            continue
+        if skipping and (_PAGE_MARK_RE.match(line) or re.match(_ANY_HEADING, line)):
+            skipping = False
+        if not skipping:
+            kept.append(line)
+    return "\n".join(kept)
 _HEADING_RE = re.compile(r"^\s*([가-힣]\.)\s*(.+?)\s*$", re.MULTILINE)
 _TOP_HEADING = r"(?m)^\s*\d+\.\s*\S"
 _ANY_HEADING = r"(?m)^\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.|\d+\.)\s*\S"
@@ -794,6 +879,7 @@ def _decision_result(order: str) -> str:
 def analyze_text(text: str) -> dict:
     """심결문 텍스트 → 정규식 추출 결과(prefilter.csv 한 행). 2013당419 구조를 기준으로 삼는다."""
     result: dict = {"텍스트길이": len(text), "추출실패": 1 if len(text.strip()) < 200 else 0}
+    text = _strip_footnotes(text)
     order = _find_block(
         text,
         r"(?m)^\s*주\s*문\s*$",
@@ -810,8 +896,8 @@ def analyze_text(text: str) -> dict:
     )
     kind_match = re.search(r"이\s*사건\s*(국제등록\s*출원|등록|출원|국제등록)?\s*상표", text)
     result["이사건_구분"] = (kind_match.group(1) or "") + "상표" if kind_match else ""
-    reg = _REG_NUMBER_RE.search(subject)
-    result["이사건_등록번호"] = _digits(reg.group(1)) if reg else ""
+    subject_numbers = _registration_numbers(subject)
+    result["이사건_등록번호"] = subject_numbers[0] if subject_numbers else ""
     result["이사건_출원번호"] = _application_number(subject)
     intl = re.search(r"국제등록번호[^\n]*?제\s*(\d{5,8})\s*호", subject)
     result["이사건_국제등록번호"] = intl.group(1) if intl else ""
@@ -828,11 +914,9 @@ def analyze_text(text: str) -> dict:
         r"(?m)^\s*(?:\(\d+\)|[가-힣]\.|\d+\.)\s*[^\n]*?" + _PRIOR_MARK,
         (_TOP_HEADING,),
     )
-    prior_numbers: list[str] = []
-    for number in _REG_NUMBER_RE.findall(prior_region):
-        digits = _digits(number)
-        if digits and digits != result["이사건_등록번호"] and digits not in prior_numbers:
-            prior_numbers.append(digits)
+    prior_numbers = [
+        n for n in _registration_numbers(prior_region) if n != result["이사건_등록번호"]
+    ]
     result["선등록_등록번호"] = "|".join(prior_numbers)
 
     # 판단 절: "3. 판단"(2013) 또는 "3. 이사건출원상표가…해당하는지여부"(2024) → "N. 결론" 전까지
@@ -861,9 +945,10 @@ def analyze_text(text: str) -> dict:
 
     conclusions: dict[str, str] = {}
     blocks = _conclusion_blocks(text)
-    # 폴백: '소결' 제목 없이 판단 절 마지막 문단에 결론이 오는 심결문(2024-01 실측 20건 중 6건)
+    # 폴백: '소결' 제목 없이 판단 절 본문에 결론이 오는 심결문(2024-01 실측 20건 중 6건)
+    # → 판단 절 전체에서 찾는다
     if judgment and not any(_CONCLUSION_RE.search(block) for block in blocks):
-        blocks = blocks + [judgment[-600:]]
+        blocks = blocks + [judgment]
     for block in blocks:
         for match in _CONCLUSION_RE.finditer(block):
             law, number, extra, verb = match.groups()
@@ -947,13 +1032,17 @@ def parse_conclusions(value: str) -> dict[str, str]:
     return conclusions
 
 
-def classify(analysis: dict, *, ignore_boilerplate: bool = False) -> tuple[str, str]:
+def classify(analysis: dict, *, ignore_boilerplate: bool = True) -> tuple[str, str]:
     """(자동등급, 사유). 1=순수 유사 사례 후보, 2=검토 필요, 3=제외 후보.
 
-    ignore_boilerplate=True 면 저명·주지 언급을 요부 판단기준 판례 문구를 뺀 뒤(본문_저명주지_실질)
-    로 판단한다 — 규칙 변경 후보의 효과를 보는 참고 열(등급_보일러플레이트제외)용. 정식 등급은
-    원 규칙이다.
+    2026-09-30 3단계 규칙: 각하와 선등록상표 소멸·무효 취소는 3등급(유사 판단 없음), 저명·주지
+    언급은 요부 판단기준 판례 문구("주지ㆍ저명하거나…")를 뺀 뒤(본문_저명주지_실질)로 판단한다.
+    ignore_boilerplate=False 는 이전 규칙(참고 열 등급_원규칙)용.
     """
+    if analysis.get("주문결과") == "각하":
+        return "3", "각하(본안 판단 없음)"
+    if str(analysis.get("선등록소멸취소", "0")) == "1":
+        return "3", "유사 판단 없음(선등록상표 소멸·무효로 취소)"
     conclusions = parse_conclusions(analysis.get("결론조문", ""))
     fame_in_conclusion = [k for k in FAME_ARTICLES if k in conclusions]
     fame_keys = (("본문_저명", "저명"), ("본문_주지", "주지"), ("본문_부정한목적", "부정한 목적"))
@@ -996,12 +1085,25 @@ def estimate_similarity(kind: str, analysis: dict) -> tuple[str, str]:
     return guess, f"주문 {result}({kind})" if guess else ""
 
 
+def family_key(plaintiff: str, prior_numbers: list[str]) -> str:
+    """청구인 + 선등록번호 집합의 해시 — 같은 청구인이 같은 선등록상표를 두고 낸 연속 사건 묶음."""
+    name = "".join((plaintiff or "").split()).casefold()  # 공백 차이("주식회사 X"/"주식회사X") 무시
+    payload = name + "|" + "|".join(sorted(set(prior_numbers)))
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:8]
+
+
 def build_sheet_rows(
-    list_rows: list[dict], prefilter_rows: list[dict], kinds: dict[str, dict]
+    list_rows: list[dict],
+    prefilter_rows: list[dict],
+    kinds: dict[str, dict],
+    *,
+    include_missing: bool = False,
 ) -> list[dict]:
+    """labels.csv 행. 같은 family 는 첫 건(심판번호 순)만 1등급을 유지하고 나머지는 '중복'."""
     analyses = {row["심판번호"]: row for row in prefilter_rows}
     sheet: list[dict] = []
-    for row in list_rows:
+    first_of_family: dict[str, str] = {}
+    for row in sorted(list_rows, key=lambda r: r["심판번호"]):
         number = row["심판번호"]
         analysis = analyses.get(number)
         kind = kind_for_trial_desc(row.get("종류", ""), kinds)
@@ -1014,18 +1116,27 @@ def build_sheet_rows(
             "유사여부_확정": "", "판단축": "", "제외사유": "", "메모": "",
         }
         if analysis is None:
-            sheet.append({
-                **base,
-                "상표A_번호": row.get("등록번호") or row.get("출원번호", ""),
-                "상표B_번호": "", "지정상품_원문": "", "조문플래그": "", "결론조문": "",
-                "자동등급": "", "등급사유": "텍스트 미추출", "등급_보일러플레이트제외": "",
-                "참고표시": "", "유사여부_추정": "", "추정근거": "",
-            })
+            if include_missing:
+                sheet.append({
+                    **base,
+                    "상표A_번호": row.get("등록번호") or row.get("출원번호", ""),
+                    "상표B_번호": "", "지정상품_원문": "", "조문플래그": "", "결론조문": "",
+                    "자동등급": "", "등급사유": "텍스트 미추출", "등급_원규칙": "", "family": "",
+                    "참고표시": "", "유사여부_추정": "", "추정근거": "",
+                })
             continue
         grade, reason = classify(analysis)
-        variant_grade, _ = classify(analysis, ignore_boilerplate=True)
+        old_grade, _ = classify(analysis, ignore_boilerplate=False)
         guess, basis = estimate_similarity(kind, analysis)
         notes = []
+        prior_list = [p for p in (analysis.get("선등록_등록번호") or "").split("|") if p]
+        family = family_key(row.get("청구인", ""), prior_list)
+        if family in first_of_family:
+            notes.append(f"중복(family 첫 건 {first_of_family[family]})")
+            if grade == "1":
+                grade, reason = "2", f"family 중복(첫 건 {first_of_family[family]})"
+        else:
+            first_of_family[family] = number
         if analysis.get("주문결과") == "각하":
             notes.append("각하(본안 판단 없음)")
         if str(analysis.get("선등록소멸취소", "0")) == "1":
@@ -1036,7 +1147,7 @@ def build_sheet_rows(
                  if key.startswith("본문_") and str(analysis[key]) == "1"]
         subject_number = (analysis.get("이사건_등록번호") or row.get("등록번호")
                           or analysis.get("이사건_출원번호") or row.get("출원번호", ""))
-        prior = [p for p in (analysis.get("선등록_등록번호") or "").split("|") if p] or [""]
+        prior = prior_list or [""]
         for prior_number in prior:  # 선등록상표가 여러 건이면 행을 나눈다
             sheet.append({
                 **base,
@@ -1047,7 +1158,8 @@ def build_sheet_rows(
                 "결론조문": analysis.get("결론조문", ""),
                 "자동등급": grade,
                 "등급사유": reason,
-                "등급_보일러플레이트제외": variant_grade,
+                "등급_원규칙": old_grade,
+                "family": family,
                 "참고표시": "; ".join(notes),
                 "유사여부_추정": guess,
                 "추정근거": basis,
@@ -1057,13 +1169,99 @@ def build_sheet_rows(
 
 def run_sheet(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
-    list_rows = _read_csv(paths_.list_csv)
+    source = paths_.list_all_csv if paths_.list_all_csv.exists() else paths_.list_csv
+    list_rows = _read_csv(source)
+    known = {row["심판번호"] for row in list_rows}
+    list_rows += [row for row in _read_csv(paths_.list_csv) if row["심판번호"] not in known]
     prefilter_rows = _read_csv(paths_.prefilter_csv)
     rows = build_sheet_rows(list_rows, prefilter_rows, load_kinds(args.kinds_config))
     _write_csv(paths_.labels_csv, LABEL_COLUMNS, rows)
-    grades = {g: sum(1 for r in rows if r["자동등급"] == g) for g in ("1", "2", "3", "")}
-    print(f"## sheet: {len(rows)}행 → {paths_.labels_csv} "
-          f"(1등급 {grades['1']}, 2등급 {grades['2']}, 3등급 {grades['3']}, 미추출 {grades['']})")
+    trials = {}
+    for r in rows:
+        trials.setdefault(r["심판번호"], r["자동등급"])
+    grades = {g: sum(1 for v in trials.values() if v == g) for g in ("1", "2", "3")}
+    print(f"## sheet: {len(rows)}행/{len(trials)}건 → {paths_.labels_csv} "
+          f"(1등급 {grades['1']}, 2등급 {grades['2']}, 3등급 {grades['3']})")
+    return 0
+
+
+# ====================================================================
+# sample — 층화 표본 (trialDecisionDoc=Y 만, 종류별 분산 규칙)
+# ====================================================================
+
+SAMPLE_COLUMNS = [
+    "심판번호", "kind", "종류", "심결월", "상표명칭", "청구인", "출원번호", "등록번호",
+    "심결문유무",
+]
+
+
+def _round_robin_by_month(rows: list[dict], n: int) -> list[dict]:
+    """월별로 묶어 한 달에 한 건씩 돌아가며 뽑는다(월 분산). 각 월 안에서는 입력 순서."""
+    by_month: dict[str, list[dict]] = {}
+    for row in rows:
+        by_month.setdefault(row["심결월"], []).append(row)
+    picked: list[dict] = []
+    while len(picked) < n and any(by_month.values()):
+        for month in sorted(by_month):
+            if by_month[month] and len(picked) < n:
+                picked.append(by_month[month].pop(0))
+    return picked
+
+
+def select_sample(
+    rows: list[dict], kinds: dict[str, dict], quotas: dict[str, int], exclude: set[str]
+) -> list[dict]:
+    """종류별 표본. scope=최신순, invalidation=월 분산, refusal=청구인당 월 1건 + 월 분산."""
+    usable = [
+        r for r in rows
+        if r.get("심결문유무", "").upper() == "Y" and r["심판번호"] not in exclude
+    ]
+    for row in usable:
+        row["kind"] = kind_for_trial_desc(row.get("종류", ""), kinds)
+    picked: list[dict] = []
+    scope = sorted(
+        (r for r in usable if r["kind"] == "scope"),
+        key=lambda r: (r["심결월"], r["심판번호"]), reverse=True,
+    )
+    picked += scope[: quotas.get("scope", 0)]
+    invalid = sorted(
+        (r for r in usable if r["kind"] == "invalidation"), key=lambda r: r["심판번호"]
+    )
+    picked += _round_robin_by_month(invalid, quotas.get("invalidation", 0))
+    seen_month_plaintiff: set[tuple[str, str]] = set()
+    refusal: list[dict] = []
+    for r in sorted((r for r in usable if r["kind"] == "refusal"), key=lambda r: r["심판번호"]):
+        key = (r["심결월"], " ".join(r.get("청구인", "").split()).casefold())
+        if key in seen_month_plaintiff:
+            continue
+        seen_month_plaintiff.add(key)
+        refusal.append(r)
+    picked += _round_robin_by_month(refusal, quotas.get("refusal", 0))
+    return picked
+
+
+def run_sample(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    source = Path(args.source) if args.source else paths_.list_all_csv
+    rows = _read_csv(source)
+    exclude = {p.stem for p in paths_.pdf_dir.glob("*.pdf")} if paths_.pdf_dir.exists() else set()
+    exclude |= {r["심판번호"] for r in _read_csv(paths_.fetch_log)}
+    for extra in args.exclude or []:
+        exclude |= {r["심판번호"] for r in _read_csv(Path(extra))}
+    quotas = {"scope": args.scope, "invalidation": args.invalidation, "refusal": args.refusal}
+    picked = select_sample(rows, load_kinds(args.kinds_config), quotas, exclude)
+    _write_csv(Path(args.out), SAMPLE_COLUMNS, picked)
+    counts: dict[str, int] = {}
+    years: dict[tuple[str, str], int] = {}
+    for r in picked:
+        counts[r["kind"]] = counts.get(r["kind"], 0) + 1
+        years[(r["kind"], r["심결월"][:4])] = years.get((r["kind"], r["심결월"][:4]), 0) + 1
+    print(f"## sample: {source} {len(rows)}건 중 문서 Y·미수집 대상에서 {len(picked)}건 "
+          f"→ {args.out}")
+    print(f"- 종류별: {counts} (요청 {quotas})")
+    for kind in ("scope", "invalidation", "refusal"):
+        line = ", ".join(f"{y}:{c}" for (k, y), c in sorted(years.items()) if k == kind)
+        print(f"- {kind} 연도 분포: {line or '-'}")
     return 0
 
 
@@ -1106,7 +1304,9 @@ def run_biblio(args: argparse.Namespace, session: Session) -> int:
     exit_code = 0
     try:
         for number in trials:
-            xml_text = session.api_get(BIBLIO_URL, {"trialNumber": number}, BIBLIO_AUTH_PARAM)
+            xml_text = api_get_with_retry(
+                session, BIBLIO_URL, {"trialNumber": number}, BIBLIO_AUTH_PARAM
+            )
             _save_raw(session.paths, f"biblio_{number}.xml", xml_text)
             parsed = parse_biblio_response(xml_text)
             (session.paths.biblio_dir / f"{number}.json").write_text(
@@ -1202,6 +1402,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_list.add_argument("--max-pages", type=int, default=10, help="월당 페이지 하드캡")
     p_list.add_argument("--allow-unverified", action="store_true",
                         help="trialDesc 미검증 상태에서도 실호출 허용(검증용 1개월치 등)")
+    p_list.add_argument("--all-kinds", action="store_true",
+                        help="종류 필터 없이 월 1회 호출, 전 종류를 list_all.csv 에 보관")
 
     p_fetch = sub.add_parser("fetch", help="심결문 경로 조회 + PDF 즉시 다운로드")
     common(p_fetch)
@@ -1217,6 +1419,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_fetch.add_argument("--kind-priority", default="",
                          help="종류 우선순위, 예: refusal,scope,invalidation")
     p_fetch.add_argument("--prefer-doc", action="store_true", help="심결문유무 Y 인 건을 먼저")
+    p_fetch.add_argument("--queue", metavar="CSV", help="sample 이 만든 표본 CSV 순서대로 받는다")
 
     p_extract = sub.add_parser("extract", help="PDF → 텍스트 + prefilter.csv")
     common(p_extract)
@@ -1224,6 +1427,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_sheet = sub.add_parser("sheet", help="labels.csv 초안")
     common(p_sheet)
+    p_sample = sub.add_parser("sample", help="층화 표본 CSV 생성(호출 없음)")
+    p_sample.add_argument("--source", default="", help="목록 CSV(기본 list_all.csv)")
+    p_sample.add_argument("--scope", type=int, default=0)
+    p_sample.add_argument("--invalidation", type=int, default=0)
+    p_sample.add_argument("--refusal", type=int, default=0)
+    p_sample.add_argument("--exclude", action="append", metavar="CSV", help="제외할 심판번호 CSV")
+    p_sample.add_argument("--out", required=True, metavar="CSV")
     p_biblio = sub.add_parser("biblio", help="서지상세 조회(1회/건) — 결과·주문 대조용")
     common(p_biblio)
     p_biblio.add_argument("--trial", action="append", required=True, metavar="심판번호")
@@ -1239,7 +1449,8 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=getattr(args, "dry_run", False),
     )
     runners = {"list": run_list, "fetch": run_fetch, "extract": run_extract,
-               "sheet": run_sheet, "biblio": run_biblio, "status": run_status}
+               "sheet": run_sheet, "sample": run_sample, "biblio": run_biblio,
+               "status": run_status}
     try:
         return runners[args.command](args, session)
     except kc.CallBudgetExceeded as exc:
