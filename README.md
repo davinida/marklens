@@ -58,14 +58,14 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
 | 프론트-1 변경 시안 확정 | 지원 | 미착수 | — | 저장소에 시안 산출물 없음 |
-| 프론트-2 상품↔유사군 변환표 | 지원 | 부분 | `shared/goods_map/`, `shared/types/goods.ts` | 파서·검증기 완료(PR #19), 원 명칭 aliases 보존(PR #23). 변환표 gz 포함(공공누리 제1유형, 출처표시, 2026-09-30 확인) |
+| 프론트-2 상품↔유사군 변환표 | 지원 | 부분 | `shared/goods_map/`, `shared/types/goods.ts` | 파서·검증기 완료(PR #19), 원 명칭 aliases 보존(PR #23). 변환표 gz 포함(공공누리 제1유형, 출처표시, 2026-09-30 확인). aliases 보존·검증기 확장·테스트: 다빈 |
 | 프론트-3 유명 로고 브랜드 목록 | 지원 | 부분 | `shared/famous_brands.txt` | DRAFT 39건(출원인명), 아직 수집 전 |
 | 프론트-4 화면 골격(3층 결과 화면) | 현수 | 완료 | `frontend/app/page.tsx`, `frontend/components/ResultView.tsx` | 이후 추가: 상표명 패널의 발음 유사·관념 유사 두 섹션(병렬 요청, 1회용 Turnstile 토큰을 발음 → 관념 순으로 소비), 결과 화면 분석 범위의 "호칭·관념 조회됨" 표시(PR #22·#26) |
 | 프론트-5 백엔드 1차 연동 | 현수 | 완료 | `frontend/app/api/*`(BFF) | |
-| 프론트-6 지정상품 입력 UI | 지원 | 부분 | `GET /goods/search`·`/goods/classes`, BFF `frontend/app/api/goods/*`, `lib/api.ts` `searchGoods`·`fetchGoodsClasses` | 2026-09-21 API·zod 계약 준비. 화면은 미착수 |
-| 프론트-7 관념 X3 | 지원 | **완료(축 함수 v1.3 + 최소 연결)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`(219건), `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md`, `backend/src/core/semantic_search.py`, `backend/src/api/semantic_search.py`, `frontend/components/SemanticMatchesSection.tsx` | PR #25·#26(2026-09-30). MiniLM-L12-v2 + wordfreq 표제어 게이트(합성어 폴백, 영문 3자 이상, 1음절 명사 목록), 하한 0.55. `POST /semantic-search`(BFF `/api/semantic-search`)로 상표명 확인 패널에 연결, 관념 없는 입력은 안내 문구. 통합 모델 전 |
-| 프론트-8 상품 견련성 X4 | 지원 | **완료(축 함수)** | `ml/src/axes/x4_goods.py`, `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21. 서비스 적용은 DB 유사군 백필(현재 100/1,100건) 후 |
-| 프론트-9 통합 모델·재보정 | 지원 | 설계 초안 | `docs/MarkLens_통합모델_설계.md` | 2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획·결정 대기). 구현·학습은 정답 데이터 라벨링 후 |
+| 프론트-6 지정상품 입력 UI | 다빈 | 부분 | `GET /goods/search`·`/goods/classes`, BFF `frontend/app/api/goods/*`, `lib/api.ts` `searchGoods`·`fetchGoodsClasses` | 2026-09-21 API·zod 계약 준비(PR #24). 화면은 미착수 |
+| 프론트-7 관념 X3 | 다빈 | **완료(축 함수 v1.3 + 최소 연결)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`(219건), `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md`, `backend/src/core/semantic_search.py`, `backend/src/api/semantic_search.py`, `frontend/components/SemanticMatchesSection.tsx` | PR #25·#26(2026-09-30). MiniLM-L12-v2 + wordfreq 표제어 게이트(합성어 폴백, 영문 3자 이상, 1음절 명사 목록), 하한 0.55. `POST /semantic-search`(BFF `/api/semantic-search`)로 상표명 확인 패널에 연결, 관념 없는 입력은 안내 문구. 통합 모델 전 |
+| 프론트-8 상품 견련성 X4 | 다빈 | **완료(축 함수)** | `ml/src/axes/x4_goods.py`, `ml/src/axes/goods_map.py`(로더), `backend/src/api/goods.py`(상품 검색 API), `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21(PR #24). 서비스 적용은 DB 유사군 백필(현재 100/1,100건) 후 |
+| 프론트-9 통합 모델·재보정 | 다빈 | 설계 초안 | `docs/MarkLens_통합모델_설계.md` | 2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획·결정 대기). 구현·학습은 정답 데이터 라벨링 후 |
 | 백엔드-1 PostgreSQL 설계 | 현수 | 완료 | `backend/migrations/001_init.sql` | |
 | 백엔드-2 JSON→DB 마이그레이션 | 현수 | 완료 | `backend/scripts/migrate_json_to_db.py` | |
 | 백엔드-3 이미지 S3 | 현수 | 보류 | `backend/src/core/storage.py` | 로컬 심 계층 + 경로 오버라이드만 |
