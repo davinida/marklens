@@ -6,6 +6,9 @@ import NameCheckPanel from "@/components/NameCheckPanel";
 import PhoneticMatchesSection, {
   type PhoneticPhase,
 } from "@/components/PhoneticMatchesSection";
+import SemanticMatchesSection, {
+  type SemanticPhase,
+} from "@/components/SemanticMatchesSection";
 import TurnstileWidget, {
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
@@ -13,8 +16,13 @@ import {
   ApiError,
   checkTrademarkName,
   searchPhonetic,
+  searchSemantic,
 } from "@/lib/api";
-import type { NameCheckResult, PhoneticSearchResponse } from "@/lib/contracts";
+import type {
+  NameCheckResult,
+  PhoneticSearchResponse,
+  SemanticSearchResponse,
+} from "@/lib/contracts";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
@@ -27,6 +35,7 @@ export interface SearchDraft {
   topK: number;
   nameCheck?: NameCheckResult | null;
   phonetic?: PhoneticSearchResponse | null;
+  semantic?: SemanticSearchResponse | null;
 }
 
 export interface SearchFormValue extends SearchDraft {
@@ -38,6 +47,9 @@ type NamePhase =
   | { name: "loading" }
   | { name: "result"; data: NameCheckResult }
   | { name: "error"; message: string };
+
+// name-check 뒤에 토큰을 하나씩 받아 보내는 축 검색. 순서대로 소비한다(발음 → 관념).
+type AxisKind = "phonetic" | "semantic";
 
 export default function SearchForm({
   onSubmit,
@@ -63,28 +75,45 @@ export default function SearchForm({
       ? { name: "result", data: initialValue.phonetic }
       : { name: "idle" },
   );
+  const [semanticPhase, setSemanticPhase] = useState<SemanticPhase>(() =>
+    initialValue?.semantic
+      ? { name: "result", data: initialValue.semantic }
+      : { name: "idle" },
+  );
   const inputRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const nameAbortRef = useRef<AbortController | null>(null);
   const nameGenerationRef = useRef(0);
   const phoneticAbortRef = useRef<AbortController | null>(null);
   const phoneticGenerationRef = useRef(0);
-  // 이름 확인 직후 위젯을 리셋해 새 토큰이 오면 그 토큰으로 발음 검색을 보낸다.
-  // Turnstile 토큰은 1회용이라 name-check 가 쓴 토큰을 재사용할 수 없다.
-  const pendingPhoneticRef = useRef<{ name: string } | null>(null);
+  const semanticAbortRef = useRef<AbortController | null>(null);
+  const semanticGenerationRef = useRef(0);
+  // 이름 확인 직후 위젯을 리셋해 새 토큰이 올 때마다 대기 중인 축 검색(발음 → 관념)을 하나씩 보낸다.
+  // Turnstile 토큰은 1회용이라 name-check 가 쓴 토큰을 재사용할 수 없고, 두 검색도 토큰을 따로 받는다.
+  const pendingAxisRef = useRef<{ name: string; kinds: AxisKind[] } | null>(null);
   const runPhoneticRef = useRef<(name: string, token: string) => Promise<void>>(
+    async () => {},
+  );
+  const runSemanticRef = useRef<(name: string, token: string) => Promise<void>>(
     async () => {},
   );
   const preview = useObjectUrl(file);
   const pendingPreview = useObjectUrl(pendingFile);
 
   const handleTokenChange = useCallback((token: string | null) => {
-    const pending = pendingPhoneticRef.current;
-    if (token && pending) {
-      // 이 토큰은 발음 검색이 소비한다 — 제출용 토큰은 그 호출이 끝난 뒤 다시 발급받는다.
-      pendingPhoneticRef.current = null;
+    const pending = pendingAxisRef.current;
+    if (token && pending && pending.kinds.length > 0) {
+      // 이 토큰은 대기 중인 축 검색 하나가 소비한다 — 제출용 토큰은 호출들이 끝난 뒤 다시 발급받는다.
+      const [kind, ...rest] = pending.kinds;
+      pendingAxisRef.current = rest.length > 0 ? { name: pending.name, kinds: rest } : null;
       setTurnstileToken(null);
-      void runPhoneticRef.current(pending.name, token);
+      if (kind === "phonetic") {
+        void runPhoneticRef.current(pending.name, token);
+      } else {
+        void runSemanticRef.current(pending.name, token);
+      }
+      // 아직 보낼 축이 남았으면 바로 새 토큰을 받아 두 요청이 겹쳐 돌게 한다.
+      if (rest.length > 0) turnstileRef.current?.reset();
       return;
     }
     setTurnstileToken(token);
@@ -96,7 +125,9 @@ export default function SearchForm({
       nameAbortRef.current?.abort();
       phoneticGenerationRef.current += 1;
       phoneticAbortRef.current?.abort();
-      pendingPhoneticRef.current = null;
+      semanticGenerationRef.current += 1;
+      semanticAbortRef.current?.abort();
+      pendingAxisRef.current = null;
     },
     [],
   );
@@ -145,9 +176,36 @@ export default function SearchForm({
       turnstileRef.current?.reset();
     }
   };
+  const runSemanticSearch = async (name: string, token: string) => {
+    semanticAbortRef.current?.abort();
+    const controller = new AbortController();
+    semanticAbortRef.current = controller;
+    const generation = ++semanticGenerationRef.current;
+    setSemanticPhase({ name: "loading" });
+
+    try {
+      const data = await searchSemantic(name, token, controller.signal);
+      if (generation === semanticGenerationRef.current) {
+        setSemanticPhase({ name: "result", data });
+      }
+    } catch (error) {
+      if (controller.signal.aborted || generation !== semanticGenerationRef.current) return;
+      setSemanticPhase({
+        name: "error",
+        message:
+          error instanceof ApiError
+            ? error.message
+            : "관념 유사도를 계산하지 못했어요. 다시 시도해 주세요.",
+      });
+    } finally {
+      // 관념 검색이 쓴 토큰 대신 제출용 토큰을 다시 받는다.
+      turnstileRef.current?.reset();
+    }
+  };
   // 최신 클로저를 ref 에 보관 — handleTokenChange 는 위젯 재렌더를 피하려고 identity 를 고정한다.
   useEffect(() => {
     runPhoneticRef.current = runPhoneticSearch;
+    runSemanticRef.current = runSemanticSearch;
   });
 
   const runNameCheck = async () => {
@@ -168,10 +226,11 @@ export default function SearchForm({
     const token = turnstileToken;
     setNamePhase({ name: "loading" });
     setTurnstileToken(null);
-    // 발음(호칭) 유사도 검색은 name-check 와 병렬로 보낸다. 토큰이 1회용이라 name-check 를
-    // 띄운 직후 위젯을 리셋해 새 토큰을 받고(handleTokenChange), 그 토큰으로 호출한다.
-    pendingPhoneticRef.current = { name };
+    // 발음(호칭)·관념(의미) 유사도 검색은 name-check 와 병렬로 보낸다. 토큰이 1회용이라 name-check 를
+    // 띄운 직후 위젯을 리셋해 새 토큰을 받고(handleTokenChange), 토큰이 올 때마다 하나씩 호출한다.
+    pendingAxisRef.current = { name, kinds: ["phonetic", "semantic"] };
     setPhoneticPhase({ name: "loading" });
+    setSemanticPhase({ name: "loading" });
 
     const nameCheckPromise = checkTrademarkName(name, token, controller.signal);
     turnstileRef.current?.reset();
@@ -205,6 +264,7 @@ export default function SearchForm({
       topK,
       nameCheck: namePhase.name === "result" ? namePhase.data : null,
       phonetic: phoneticPhase.name === "result" ? phoneticPhase.data : null,
+      semantic: semanticPhase.name === "result" ? semanticPhase.data : null,
       turnstileToken: token,
     });
   };
@@ -323,10 +383,13 @@ export default function SearchForm({
               nameAbortRef.current?.abort();
               phoneticGenerationRef.current += 1;
               phoneticAbortRef.current?.abort();
-              pendingPhoneticRef.current = null;
+              semanticGenerationRef.current += 1;
+              semanticAbortRef.current?.abort();
+              pendingAxisRef.current = null;
               setMarkName(event.target.value);
               setNamePhase({ name: "idle" });
               setPhoneticPhase({ name: "idle" });
+              setSemanticPhase({ name: "idle" });
             }}
             placeholder="예: 몬테로사 MONTEROSA"
             className="min-w-0 flex-1 border-b-2 border-line pb-2 text-[17px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark"
@@ -361,6 +424,11 @@ export default function SearchForm({
         {phoneticPhase.name !== "idle" && (
           <div className="mt-4 border-t border-line pt-4">
             <PhoneticMatchesSection phase={phoneticPhase} live />
+          </div>
+        )}
+        {semanticPhase.name !== "idle" && (
+          <div className="mt-4 border-t border-line pt-4">
+            <SemanticMatchesSection phase={semanticPhase} live />
           </div>
         )}
       </section>

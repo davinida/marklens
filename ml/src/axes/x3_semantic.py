@@ -33,11 +33,14 @@
     조회하고, 그런 관형형 뒤에는 1음절 명사도 허용한다(행복한집 → 행복한 집). 임베딩 텍스트는
     띄어 쓴 형태를 쓰고 세 부분 이상은 나누지 않는다. 스타벅스(스타 5.19·벅스 3.97)는 4.0 미만이라
     조어로 남는다.
+    짧은 조각 배제(v1.3, 2026-09-30 서비스 실측 반영): 영문 토큰은 EN_MIN_LETTERS(3)자 이상일 때만
+    단어로 보고(T·e·LG 제외), 한국어 1음절 토큰은 KO_SINGLE_SYLLABLE_NOUNS 에 있을 때만 단어로 본다
+    (빈도표의 1음절 조각 유·재 배제, 왕·별·달은 인정).
 
 알려진 한계(v1): 상위개념(과일/사과)·연상(별/커피)·다의어(사과 = apple/apology)는 임베딩이 구분하지
 못하거나 과대평가한다. 영어 빈도표에는 자주 쓰이는 브랜드명도 있어(starbucks 3.77, samsung 4.12)
 영문 브랜드는 게이트를 통과할 수 있다. 빈도표에 없는 낱말·신조어·부분이 zipf 4.0 미만인 합성어
-(카카오프렌즈: 프렌즈 3.88)는 결측이 된다.
+(카카오프렌즈: 프렌즈 3.88)·목록에 없는 1음절 명사(잔·탑)·2자 이하 영문(dr·bb)은 결측이 된다.
 모델을 내려받지 못하는 환경에서는 첫 계산에서 RuntimeError 가 난다(입력 오류가 아니라 환경 오류).
 """
 
@@ -74,6 +77,16 @@ ZIPF_MIN_EN: Final = 3.0
 # 허용한다.
 COMPOUND_MIN_ZIPF: Final = 4.0
 COMPOUND_MIN_SYLLABLES: Final = 2
+# 영문 토큰은 이 글자 수 이상일 때만 단어로 본다 — 빈도표에 있는 낱글자·두 글자 조각(t 5.2, e, lg)이
+# 게이트를 통과해 무관한 후보를 만드는 것을 막는다(2026-09-30 서비스 실측: 현대 → T 0.574).
+EN_MIN_LETTERS: Final = 3
+# 한국어 1음절 토큰은 이 목록에 있을 때만 단어로 본다. 빈도표의 1음절 조각(유 4.7·재 4.9 같은 어미·
+# 접사·한자어 조각)을 배제하는 목적이며, 관념이 뚜렷한 우리말 명사만 담는다(2026-09-30 결정, 62개).
+KO_SINGLE_SYLLABLE_NOUNS: Final[frozenset[str]] = frozenset(
+    "왕 별 달 꽃 해 산 강 물 불 눈 비 집 섬 숲 땅 돌 흙 금 은 옥 곰 소 말 개 새 벌 배 "
+    "콩 쌀 밥 빵 떡 술 차 꿀 잎 씨 옷 신 손 발 길 꿈 빛 봄 밤 낮 몸 약 책 글 힘 맛 "
+    "멋 뼈 피 잠 춤 용 학 문 종".split()
+)
 # 관형형 어미(마지막 음절). 검은 → 검, 행복한 → 행복 처럼 어미를 뗀 어간을 조회한다.
 ADNOMINAL_ENDINGS: Final = frozenset("은는한운인된을할")
 # 받침 ㄴ·ㄹ 로 끝나는 관형형(푸른 → 푸르)은 받침을 떼어 본다. 한글 음절 코드의 종성 번호.
@@ -204,7 +217,9 @@ def _is_word(token: str) -> bool:
     if lang is None:
         return False
     if lang == "en":
-        return token_zipf(token) >= ZIPF_MIN_EN
+        return len(token) >= EN_MIN_LETTERS and token_zipf(token) >= ZIPF_MIN_EN
+    if len(token) == 1:  # 1음절은 빈도와 무관하게 명사 목록으로만 판정
+        return token in KO_SINGLE_SYLLABLE_NOUNS
     return token_zipf(token) >= ZIPF_MIN_KO or _compound_split(token) is not None
 
 
@@ -233,6 +248,7 @@ def has_meaning(name: str, *, extra_generic: frozenset[str] = frozenset()) -> bo
 
 class Embedder(Protocol):
     name: str
+    dim: int
 
     def embed_many(self, texts: list[str]) -> np.ndarray:
         """텍스트 목록 → (n, dim) float32 단위 벡터."""
@@ -333,18 +349,46 @@ def _get_embedder() -> Embedder:
     return _embedder
 
 
+# embed_texts() 로 미리 계산한 벡터(서비스 기동용). _embed_cached 가 임베딩 전에 먼저 여기를 본다.
+_precomputed: dict[str, np.ndarray] = {}
+
+
 def _reset_embedder() -> None:
     """테스트용: 캐시된 임베더와 임베딩을 비운다(환경변수를 바꾼 뒤 호출)."""
     global _embedder
     _embedder = None
+    _precomputed.clear()
     _embed_cached.cache_clear()
 
 
 @functools.lru_cache(maxsize=EMBED_CACHE_SIZE)
 def _embed_cached(text: str) -> np.ndarray:
-    vector = _get_embedder().embed_many([text])[0]
-    vector.setflags(write=False)
+    vector = _precomputed.get(text)
+    if vector is None:
+        vector = _get_embedder().embed_many([text])[0]
+        vector.setflags(write=False)
     return vector
+
+
+def embed_text(text: str) -> np.ndarray:
+    """임베딩 텍스트(embedding_text 결과) 1개의 단위 벡터(읽기 전용, lru_cache). 서비스 요청용."""
+    return _embed_cached(text)
+
+
+def embed_texts(texts: list[str]) -> np.ndarray:
+    """텍스트 목록을 한 배치로 임베딩해 (n, dim) 단위 벡터를 돌려주고 프로세스 캐시에 넣는다.
+
+    서비스 기동 시 DB 이름을 미리 계산하는 용도(backend/src/core/semantic_search.py). 이후
+    semantic_similarity·embed_text 는 같은 텍스트를 다시 임베딩하지 않는다.
+    """
+    missing = [text for text in dict.fromkeys(texts) if text not in _precomputed]
+    if missing:
+        for text, vector in zip(missing, _get_embedder().embed_many(missing)):
+            vector.setflags(write=False)
+            _precomputed[text] = vector
+    if not texts:
+        return np.zeros((0, _get_embedder().dim), dtype=np.float32)
+    return np.stack([_precomputed[text] for text in texts])
 
 
 def _baseline() -> float:
@@ -352,6 +396,16 @@ def _baseline() -> float:
     if isinstance(embedder, FakeEmbedder):
         return FAKE_BASELINE
     return BASELINES.get(embedder.name, 0.0)
+
+
+def current_baseline() -> float:
+    """현재 임베더의 기준선 c₀(가짜 임베더는 0.0). 서비스가 행렬 곱 결과를 재보정할 때 쓴다."""
+    return _baseline()
+
+
+def embedder_name() -> str:
+    """현재 프로세스 임베더의 모델 이름(가짜 임베더는 "fake"). 기동 로그·응답 model 필드용."""
+    return _get_embedder().name
 
 
 # =====================================================================================

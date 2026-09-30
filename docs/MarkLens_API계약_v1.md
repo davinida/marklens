@@ -236,6 +236,83 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
   따릅니다(브라우저는 `/api/images/...`로 접근).
 - 발음 후보 캐시는 서버 기동 시 만들고, 인덱스가 재게시되면 다음 요청에서 다시 만듭니다.
 
+## 관념(의미) 유사도 검색 (X3 서비스 연결, 2026-09-30)
+
+입력 상표명과 **로컬 DB(현재 게시 세대)** 상표명의 X3 관념(의미) 유사도를 계산해 상위
+후보(최대 5건)를 돌려줍니다. `/phonetic-search`와 같은 방식(로컬 계산, KIPRIS 무관, 같은
+인증·한도·요청 ID·로깅)이며, 결과는 관념 한 축만 반영한 참고 정보이고 외관·호칭·지정상품·법적
+판단은 포함하지 않습니다.
+
+### 브라우저 API
+
+`POST /api/semantic-search`
+
+```json
+{
+  "name": "왕",
+  "turnstileToken": "browser-token",
+  "top_k": 5
+}
+```
+
+`top_k`는 선택(1..5)입니다. BFF는 Turnstile을 검증한 뒤 토큰을 제거하고 내부
+`POST /semantic-search`로 전달합니다. 프런트는 이름 확인 뒤 위젯을 리셋해 받은 토큰을
+발음 검색 → 관념 검색 순으로 하나씩 소비하므로 두 요청은 겹쳐서(병렬로) 나갑니다.
+
+### 내부 API
+
+`POST /semantic-search`
+
+```json
+{ "name": "왕", "top_k": 5 }
+```
+
+`name`은 공백 제거 후 1..100자(공백만이면 422), `top_k` 미지정 시 5(상한, 6 이상은 422)입니다.
+후보 하한은 `MARKLENS_X3_MIN_SCORE`(기본 0.55, 재보정 점수), 한도는 `MARKLENS_X3_RATELIMIT`
+(기본 30/minute)이며 `/phonetic-search`와 같은 API 키·요청 ID 규칙을 따릅니다.
+`MARKLENS_X3_ENABLED=0`이면 기동 시 임베딩 캐시를 만들지 않고 이 엔드포인트만 503과 이유를
+반환합니다(모델을 못 불러온 경우도 같음). 다른 엔드포인트에는 영향이 없습니다.
+
+응답:
+
+```json
+{
+  "query": { "name": "왕", "has_meaning": true, "text": "왕" },
+  "matches": [
+    {
+      "rank": 1,
+      "score": 0.733,
+      "출원번호": "4020210000001",
+      "상표한글명": "혼술대왕 혼술대왕 Honsul Great King",
+      "이미지URL": "/images/4020210000001.png",
+      "출원인": "테스트 출원인",
+      "류": [43]
+    }
+  ],
+  "searched_count": 515,
+  "excluded_no_meaning": 585,
+  "dataset_info": {},
+  "params": { "top_k": 5, "min_score": 0.55 },
+  "threshold": 0.55,
+  "axis": "X3",
+  "note": "관념(의미) 유사도만 반영한 참고 정보",
+  "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+}
+```
+
+- `query.has_meaning`은 X3 관념 게이트(정규화 토큰 중 실제 단어가 있는지)이고 `query.text`는
+  실제로 임베딩한 텍스트입니다. 입력이 조어·기호뿐이면 `has_meaning=false`, `matches=[]`,
+  `note="관념 없음(조어)"`으로 200을 반환합니다.
+- `score`는 임베딩 코사인을 DB 200쌍 기준선으로 재보정한 0~1 값(X3 `semantic_similarity`와 같음)
+  이며 `matches`는 `score` 내림차순(동점은 출원번호 순), `threshold`(=`params.min_score`) 미만은
+  제외됩니다. `searched_count`는 관념이 있어 비교한 DB 레코드 수, `excluded_no_meaning`은 상표명이
+  없거나 관념이 없어 제외한 수입니다.
+- `이미지URL`은 현재 인덱스에 있는 이미지만 연결하며 `/phonetic-search`와 같은 규칙입니다.
+- 임베딩 캐시는 서버 기동 시 한 배치로 만들고(2026-09-30 실측: 1,100건 세대에서 515건, 6.4초,
+  RSS +0.65GB), 인덱스가 재게시되면 다음 요청에서 다시 만듭니다. 요청은 질의 임베딩 1회 + 행렬
+  곱이라 cold 10~18ms, warm 2ms입니다. 게이트는 영문 3자 이상·한국어 1음절은 명사 목록만 인정합니다
+  (X3 설계 문서 §2).
+
 ## 상품 검색·류 목록 (상품↔유사군 변환표, 프론트-6 지정상품 입력용, 2026-09-21)
 
 지식재산처 고시상품명칭 13판(2026)을 변환한 로컬 변환표(`shared/goods_map/goods_map.json.gz`,
@@ -320,10 +397,10 @@ KIPRIS 키 없이 503을 내는 것과 같은 방식). 다른 엔드포인트에
 | 403 | Turnstile 토큰·action·hostname 검증 실패 |
 | 413 | 업로드 바이트 상한 초과 |
 | 415 | 지원하지 않는 MIME 또는 실제 이미지 형식 |
-| 422 | `top_k` 또는 스키마 검증 실패, `/phonetic-search`의 공백 상표명, `/goods/search`의 공백·범위 밖 파라미터 |
+| 422 | `top_k` 또는 스키마 검증 실패, `/phonetic-search`·`/semantic-search`의 공백 상표명, `/goods/search`의 공백·범위 밖 파라미터 |
 | 429 | gateway/backend 요청 한도 또는 KIPRIS 월 예산 한도 |
 | 502 | KIPRIS/내부 upstream 응답 계약 실패 |
-| 503 | Turnstile·엔진·KIPRIS 설정·인덱스가 준비되지 않음, 상품↔유사군 변환표 파일 없음(`/goods/*`) |
+| 503 | Turnstile·엔진·KIPRIS 설정·인덱스가 준비되지 않음, 상품↔유사군 변환표 파일 없음(`/goods/*`), X3 비활성(`MARKLENS_X3_ENABLED=0`)·모델 미적재(`/semantic-search`) |
 | 504 | Turnstile 또는 내부 upstream 응답 시간 초과 |
 
 서버 오류 응답에는 내부 예외, 요청 URL, KIPRIS 키 또는 검색어를 포함하지 않습니다.

@@ -26,7 +26,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 호칭 유사도 X1 | 최소 연결 | `ml/src/axes/x1_phonetic.py` + `POST /phonetic-search`. 상표명 확인 패널에 "발음이 비슷한 등록상표" 섹션. 통합 점수에는 미반영 |
 | 상품↔유사군 변환표·상품 검색 API | 구현 | 파서·검증기 + 로더(`ml/src/axes/goods_map.py`) + `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`). 변환표 `goods_map.json.gz` 저장소 포함(공공누리 제1유형, 출처표시). 지정상품 입력 화면(프론트-6)은 예정 |
 | 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
-| 관념 X3 | 라이브러리 | `ml/src/axes/x3_semantic.py` 다국어 임베딩(paraphrase-multilingual-MiniLM-L12-v2) + 관념 게이트(wordfreq). 서비스 연결·통합 전 |
+| 관념 X3 | 최소 연결 | `ml/src/axes/x3_semantic.py` 다국어 임베딩(paraphrase-multilingual-MiniLM-L12-v2) + 관념 게이트(wordfreq) + `POST /semantic-search`. 상표명 확인 패널에 "관념 유사 후보" 섹션(발음 섹션과 병렬 요청). 통합 점수에는 미반영 |
 | 통합 모델 | 예정 | UI의 지정상품 입력도 현재 숨김 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
 | 공개 클라우드 배포 | 템플릿만 제공 | 실제 도메인·TLS·계정 배포는 하지 않음 |
@@ -59,7 +59,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 프론트-4 화면 골격(3층 결과 화면) | 현수 | 완료 | `frontend/app/page.tsx`, `frontend/components/ResultView.tsx` | |
 | 프론트-5 백엔드 1차 연동 | 현수 | 완료 | `frontend/app/api/*`(BFF) | |
 | 프론트-6 지정상품 입력 UI | 지원 | 부분 | `GET /goods/search`·`/goods/classes`, BFF `frontend/app/api/goods/*`, `lib/api.ts` `searchGoods`·`fetchGoodsClasses` | 2026-09-21 API·zod 계약 준비. 화면은 미착수 |
-| 프론트-7 관념 X3 | 지원 | **완료(축 함수 v1)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`, `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md` | 2026-09-30. MiniLM-L12-v2 + wordfreq 게이트. 테스트 196건(xfail 0). 서비스 연결·통합 전 |
+| 프론트-7 관념 X3 | 지원 | **완료(축 함수 v1.1 + 최소 연결)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`, `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md`, `backend/src/core/semantic_search.py`, `backend/src/api/semantic_search.py`, `frontend/components/SemanticMatchesSection.tsx` | 2026-09-30. MiniLM-L12-v2 + wordfreq 게이트, 테스트 196건(xfail 0). `POST /semantic-search`(BFF `/api/semantic-search`)로 상표명 확인 패널에 연결. 통합 모델 전 |
 | 프론트-8 상품 견련성 X4 | 지원 | **완료(축 함수)** | `ml/src/axes/x4_goods.py`, `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21. 서비스 적용은 DB 유사군 백필(현재 100/1,100건) 후 |
 | 프론트-9 통합 모델·재보정 | 지원 | 미착수 | — | 로지스틱 회귀 예정 |
 | 백엔드-1 PostgreSQL 설계 | 현수 | 완료 | `backend/migrations/001_init.sql` | |
@@ -77,12 +77,13 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 - 검색 입력은 **아직 이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음).
 - 상표명 확인(`/name-check`)은 검색과 분리된 별도 기능이며 검색 점수에 영향을 주지 않습니다.
 - X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. 검색 점수·등급에는 반영되지 않습니다(통합 모델 예정).
+- X3는 같은 방식으로 `POST /semantic-search`에 연결되어 같은 패널에 관념 유사 후보(최대 5건, 하한 0.55)를 보여 줍니다. 기동 시 DB 상표명 중 관념이 있는 515건을 임베딩해 캐시하며 `MARKLENS_X3_ENABLED=0`이면 이 엔드포인트만 503입니다.
 
 ## 구조
 
 ```text
 Browser
-  -> Next.js same-origin BFF (/api/search, /api/name-check, /api/phonetic-search, /api/goods/search, /api/goods/classes, /api/images, /api/health, /api/turnstile-config)
+  -> Next.js same-origin BFF (/api/search, /api/name-check, /api/phonetic-search, /api/semantic-search, /api/goods/search, /api/goods/classes, /api/images, /api/health, /api/turnstile-config)
   -> private FastAPI
   -> OpenCLIP + FAISS index
   -> PostgreSQL / KIPRIS Plus
@@ -332,6 +333,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `POST /api/search?top_k=5` | Turnstile 검증 후 이미지 검색 프록시 |
 | `POST /api/name-check` | `{ "name": "...", "turnstileToken": "..." }` 명칭 확인 프록시 |
 | `POST /api/phonetic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..20 }` X1 발음 유사 후보 프록시 |
+| `POST /api/semantic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..5 }` X3 관념 유사 후보 프록시 |
 | `GET /api/goods/search?q=&limit=&nice_class=` | 상품↔유사군 변환표 검색 프록시(프론트-6). 읽기 전용이라 Turnstile 불필요 |
 | `GET /api/goods/classes` | NICE 45개 류 명칭·변환표 항목 수 프록시 |
 | `GET /api/health` | 외부용 BFF·FastAPI 준비 상태 |
@@ -341,6 +343,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `POST /search` | 내부 이미지 검색 API (`file`, `top_k`) |
 | `POST /name-check` | 내부 명칭 확인 API |
 | `POST /phonetic-search` | 내부 X1 호칭 유사도 검색 (`name`, `top_k`). 로컬 DB 계산, KIPRIS 무관 |
+| `POST /semantic-search` | 내부 X3 관념 유사도 검색 (`name`, `top_k` ≤ 5). 기동 시 임베딩 캐시, `MARKLENS_X3_ENABLED=0`이면 503 |
 | `GET /goods/search` | 내부 상품 검색 (`q` 1~50자, `limit` 1~50, `nice_class` 1~45). 변환표 파일 없으면 503 |
 | `GET /goods/classes` | 내부 NICE 45개 류 목록 |
 | `GET /images/{key}` | 인덱스에 포함된 결과 이미지만 제공. `MARKLENS_PUBLIC_RESULT_IMAGES=true`(로컬 기본)일 때만 등록 |
@@ -365,7 +368,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 |---|---|---|
 | X1 호칭 | 두 상표명의 발음 유사도. 판례 5규칙(호칭 최우선, 첫음절 강세, 여러 호칭 중 최댓값, 외국어의 국내 발음, 한영 병기 시 한글 우선) | **완료** — 서비스 연결(`/phonetic-search`, 검색 등급에는 미반영) |
 | X2 외관 | OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색 | 완료 — 현재 서비스 |
-| X3 관념 | 상표명 의미를 다국어 문장 임베딩(paraphrase-multilingual-MiniLM-L12-v2)의 코사인으로 비교(DB 200쌍 기준선으로 재보정). 관념 게이트(wordfreq 빈도표)로 조어·기호는 결측 | **완료** — 라이브러리 v1.1(서비스 연결·통합 전) |
+| X3 관념 | 상표명 의미를 다국어 문장 임베딩(paraphrase-multilingual-MiniLM-L12-v2)의 코사인으로 비교(DB 200쌍 기준선으로 재보정). 관념 게이트(wordfreq 빈도표)로 조어·기호는 결측 | **완료** — 서비스 연결(`/semantic-search`, 검색 등급에는 미반영) |
 | X4 상품 견련성 | 유사군 코드 집합 간 자카드 계수 | **완료** — 라이브러리(서비스 적용은 DB 유사군 백필 후) |
 | 통합 | 4축 점수를 로지스틱 회귀로 결합해 0~100% 위험 확률. 특허법원 심결 데이터로 가중치 학습 | 예정 |
 
@@ -409,12 +412,17 @@ semantic_similarity("스타벅스", "커피빈")    # 0.0 — 결측이지 비�
 ```
 
 - 흐름: X1 과 같은 정규화(`normalize_name`) → 관념 게이트(wordfreq 빈도표에 토큰이 통째로 있는가:
-  한국어 zipf ≥ 2.5·영어 ≥ 3.0, 붙여쓴 합성어는 두 표제어(관형형은 어간)로 나뉘면 인정) → 다국어 문장 임베딩(paraphrase-multilingual-MiniLM-L12-v2, 480MB, CPU
+  한국어 zipf ≥ 2.5(1음절은 명사 목록 62개만)·영어 ≥ 3.0(3자 이상), 붙여쓴 합성어는 두 표제어(관형형은
+  어간)로 나뉘면 인정) → 다국어 문장 임베딩(paraphrase-multilingual-MiniLM-L12-v2, 480MB, CPU
   5.9ms/건) 코사인 → DB 200쌍 기준선 c₀ 0.331 로 재보정.
 - 벤치마크(2026-09-30): 유사 12·비유사 8·상위개념 2쌍에서 재보정 분리도 +0.299(e5-base −0.383,
   LaBSE +0.230). 테스트 단언값 0.6/0.35 는 모델 분포에 맞춘 값(서비스 임계값 아님). 붙여쓴 합성어는
   두 부분(관형형은 어간으로 조회, 각 zipf ≥ 4.0)으로 나뉘면 통과(검은고양이·행복한집). xfail 0.
 - 성능: DB 947건 배치 임베딩 0.5초, 1,000쌍 cold 2.2초 → warm 15ms. 최대 RSS 약 1.2GB.
+- 서비스 연결(최소, 2026-09-30): `POST /semantic-search`가 기동 시 DB 상표명 중 관념이 있는 515건을
+  한 배치로 임베딩해 캐시하고(6.4초, 서버 RSS 1.31 → 1.96GB) 입력과 하한 0.55 이상인 상위 5건을
+  돌려줍니다(cold 10~18ms, warm 2ms). 상표명 확인 패널이 발음 섹션 아래 "관념 유사 후보"로 보여 주며
+  두 요청은 병렬입니다. `MARKLENS_X3_ENABLED=0`이면 캐시를 만들지 않고(기동 4.1초) 이 엔드포인트만 503.
 - CI·테스트는 `MARKLENS_FAKE_ML=1`이면 가짜 임베더(모델 다운로드 없음). 실제 모델 검증은
   `ml/venv/bin/python -m pytest ml/tests/test_x3_semantic.py -q`, 점수표는 `ml/scripts/x3_benchmark.py`.
 - 설계·게이트 근거·모델 선정 표·한계: [X3 설계 문서](docs/MarkLens_X3_관념유사도_설계.md).
