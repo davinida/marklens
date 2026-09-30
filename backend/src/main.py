@@ -24,7 +24,16 @@ setup_logging()
 from .api import goods as goods_api  # noqa: E402
 from .api import health, namecheck, search  # noqa: E402
 from .api import phonetic_search as phonetic_search_api  # noqa: E402
-from .core import config, engine, goods, kipris_client, phonetic_search, storage  # noqa: E402
+from .api import semantic_search as semantic_search_api  # noqa: E402
+from .core import (  # noqa: E402
+    config,
+    engine,
+    goods,
+    kipris_client,
+    phonetic_search,
+    semantic_search,
+    storage,
+)
 from .core.auth import require_api_key  # noqa: E402
 from .core.ratelimit import limiter, rate_limit_exceeded_handler  # noqa: E402
 from .core.request_id import RequestIdMiddleware  # noqa: E402
@@ -36,8 +45,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """
     startup: 모델 + 인덱스 + 메타데이터 1회 로딩, 이어서 X1 발음 캐시(상표명 → 발음 후보) 구축.
-    실패 시 명확한 메시지와 함께 서버 기동을 중단합니다. 상품↔유사군 변환표(/goods/*)는
-    없어도 기동하며 해당 엔드포인트만 503 을 냅니다.
+    실패 시 명확한 메시지와 함께 서버 기동을 중단합니다. 상품↔유사군 변환표(/goods/*)와 X3 관념
+    임베딩 캐시(/semantic-search)는 없어도 기동하며 해당 엔드포인트만 503 을 냅니다.
     """
     try:
         try:
@@ -47,6 +56,7 @@ async def lifespan(app: FastAPI):
             logger.exception("[FATAL] startup 리소스 로딩 실패")
             raise
         goods.load_all()  # 예외를 내지 않는다 — 변환표가 없으면 state.error 만 남기고 /goods/* 503
+        semantic_search.load_all()  # 예외 없음 — 모델 실패·X3 비활성이면 /semantic-search 만 503
         yield
     finally:
         # startup 중간 실패에도 이미 열린 DB/HTTP 자원을 정리한다.
@@ -104,12 +114,13 @@ app.add_middleware(
 # === 라우터 등록 ===
 # X-API-Key 인증(require_api_key)은 MARKLENS_API_KEY 설정 시에만 활성(미설정이면 무인증).
 # /health 는 무인증 유지 — 로드밸런서·부하테스트가 키 없이 상태를 폴링해야 함.
-# /search·/name-check·/phonetic-search·/goods/*, 그리고 활성 시 /images(아래 라우트에 Depends
-# 주입)에 인증을 건다.
+# /search·/name-check·/phonetic-search·/semantic-search·/goods/*, 그리고 활성 시 /images(아래
+# 라우트에 Depends 주입)에 인증을 건다.
 app.include_router(health.router)
 app.include_router(search.router, dependencies=[Depends(require_api_key)])
 app.include_router(namecheck.router, dependencies=[Depends(require_api_key)])
 app.include_router(phonetic_search_api.router, dependencies=[Depends(require_api_key)])
+app.include_router(semantic_search_api.router, dependencies=[Depends(require_api_key)])
 app.include_router(goods_api.router, dependencies=[Depends(require_api_key)])
 
 # === 검색 결과 이미지 ===

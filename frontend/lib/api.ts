@@ -4,11 +4,13 @@ import {
   parseNameCheckResponse,
   PhoneticSearchResponseSchema,
   SearchResponseSchema,
+  SemanticSearchResponseSchema,
   type GoodsClassesResponse,
   type GoodsSearchResponse,
   type NameCheckResult,
   type PhoneticSearchResponse,
   type SearchResponse,
+  type SemanticSearchResponse,
 } from "@/lib/contracts";
 
 export type {
@@ -21,6 +23,8 @@ export type {
   PhoneticSearchResponse,
   SearchMatch,
   SearchResponse,
+  SemanticMatch,
+  SemanticSearchResponse,
   StatusCode,
 } from "@/lib/contracts";
 
@@ -176,6 +180,38 @@ export async function searchPhonetic(
     throw new ApiError(
       502,
       "발음 유사도 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
+      response.headers.get("x-request-id"),
+    );
+  }
+  return parsed.data;
+}
+
+/** X3 관념(의미) 유사도 검색 — 로컬 DB 상표명과 비교한 상위 후보(상한 5). phonetic 과 병렬로 부른다. */
+export async function searchSemantic(
+  name: string,
+  turnstileToken: string,
+  signal?: AbortSignal,
+): Promise<SemanticSearchResponse> {
+  let response: Response;
+  try {
+    response = await fetch("/api/semantic-search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, turnstileToken }),
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    networkError(error);
+  }
+
+  const body = await assertOk(response);
+  const parsed = SemanticSearchResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "관념 유사도 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
       response.headers.get("x-request-id"),
     );
   }

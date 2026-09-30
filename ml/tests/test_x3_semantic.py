@@ -118,6 +118,27 @@ def test_has_meaning_with_extra_generic():
     assert has_meaning("카페", extra_generic=frozenset({"카페"})) is True  # 전부 제거 → 폴백
 
 
+@pytest.mark.parametrize(
+    "name", ["유", "재", "T", "e", "LG", "e마티콘", "숏MV", "BB", "K8", "Dr", "잔", "탑"]
+)
+def test_gate_rejects_syllable_fragments_and_short_english(name):
+    # v1.3: 빈도표의 1음절 조각(유·재)과 2자 이하 영문(T·e·LG)은 단어로 보지 않는다
+    assert has_meaning(name) is False
+
+
+@pytest.mark.parametrize("name", ["왕", "별", "달", "꽃", "해", "집", "KING", "SKY", "bbq"])
+def test_gate_accepts_whitelisted_single_syllables_and_three_letter_words(name):
+    assert has_meaning(name) is True
+
+
+def test_single_syllable_noun_whitelist_shape():
+    nouns = x3.KO_SINGLE_SYLLABLE_NOUNS
+    assert len(nouns) >= 60
+    assert all(len(n) == 1 and "가" <= n <= "힣" for n in nouns)
+    assert {"왕", "별", "달"} <= nouns and not {"유", "재", "노래"} & nouns
+    assert x3.EN_MIN_LETTERS == 3
+
+
 def test_one_real_word_among_coined_tokens_is_enough():
     assert has_meaning("엘쏘 사과") is True
     assert has_meaning("XSR king") is True
@@ -279,6 +300,23 @@ def test_fake_embedder_is_deterministic_unit_vectors():
     assert np.array_equal(vectors[0], vectors[2])
     assert not np.array_equal(vectors[0], vectors[1])
     assert fake.embed_many([]).shape == (0, x3.FAKE_DIM)
+
+
+def test_embed_texts_batches_and_feeds_the_cache():
+    # 서비스(backend/src/core/semantic_search.py) 기동용 배치 헬퍼 — 단위 벡터, 같은 텍스트는
+    # 같은 벡터, 이후 embed_text·semantic_similarity 가 같은 캐시를 쓴다.
+    vectors = x3.embed_texts(["왕", "king", "왕"])
+    assert vectors.shape[0] == 3 and vectors.shape[1] == x3._get_embedder().dim
+    assert np.allclose(np.linalg.norm(vectors, axis=1), 1.0)
+    assert np.array_equal(vectors[0], vectors[2])
+    assert np.array_equal(x3.embed_text("왕"), vectors[0])
+    assert x3.embed_texts([]).shape[0] == 0
+    assert 0.0 <= x3.current_baseline() < 1.0
+    assert x3.embedder_name() == ("fake" if FAKE_MODE else x3.configured_model())
+    cosine = float(np.dot(vectors[0], vectors[1]))
+    assert semantic_similarity("왕", "KING") == pytest.approx(
+        x3.recalibrate(cosine, x3.current_baseline()), abs=1e-6
+    )
 
 
 def test_load_embedder_uses_fake_when_env_set(monkeypatch):

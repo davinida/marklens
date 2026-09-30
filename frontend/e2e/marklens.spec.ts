@@ -73,6 +73,34 @@ const PHONETIC_RESULT = {
   note: "호칭(발음) 유사도만 반영한 참고 정보",
 };
 
+const SEMANTIC_RESULT = {
+  query: { name: "BBQ", has_meaning: true, text: "bbq" },
+  matches: [
+    {
+      rank: 1,
+      score: 0.82,
+      출원번호: "4020260012345",
+      상표한글명: "비비큐",
+      이미지URL: null,
+      출원인: "제너시스비비큐",
+      류: [43],
+    },
+  ],
+  searched_count: 1,
+  excluded_no_meaning: 0,
+  dataset_info: {
+    총_상표수: 1,
+    출원일자_범위: "E2E fixture",
+    데이터_기준: "브라우저 테스트",
+    생성일자: "2026-08-14",
+  },
+  params: { top_k: 5, min_score: 0.55 },
+  threshold: 0.55,
+  axis: "X3",
+  note: "관념(의미) 유사도만 반영한 참고 정보",
+  model: "e2e-fixture",
+};
+
 const NAME_CHECK_RESULT = {
   query: "BBQ",
   total_found: 3,
@@ -242,6 +270,13 @@ test("name evidence opens and remains visible in the result dashboard", async ({
       body: JSON.stringify(PHONETIC_RESULT),
     });
   });
+  await page.route("**/api/semantic-search", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(SEMANTIC_RESULT),
+    });
+  });
   await page.route("**/api/search?*", async (route) => {
     await route.fulfill({
       status: 200,
@@ -258,6 +293,9 @@ test("name evidence opens and remains visible in the result dashboard", async ({
     page.getByRole("heading", { name: "발음(호칭)이 비슷한 등록상표" }),
   ).toBeVisible();
   await expect(page.getByText("X1 호칭 유사도 · DB 1건 대상 · 참고 정보")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "관념 유사 후보" })).toBeVisible();
+  await expect(page.getByText("X3 관념 유사도 · DB 1건 대상 · 참고 정보")).toBeVisible();
+  await expect(page.getByText("82%")).toBeVisible();
 
   await page.getByRole("button", { name: /BBQ/ }).click();
   const kiprisLink = page.getByRole("link", { name: /KIPRIS에서 원문 확인/ });
@@ -279,6 +317,7 @@ test("name evidence opens and remains visible in the result dashboard", async ({
     page.locator("[data-name-evidence] + [data-visual-candidates]"),
   ).toBeVisible();
   await expect(page.locator("[data-phonetic-evidence]")).toBeVisible();
-  await expect(page.getByText("호칭만 조회됨")).toBeVisible();
+  await expect(page.locator("[data-semantic-evidence]")).toBeVisible();
+  await expect(page.getByText("호칭·관념 조회됨")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
