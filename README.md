@@ -48,7 +48,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 항목 | 담당 | 상태 | 위치 | 비고 |
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X4) | `ml/src/axes/` | X3 파일은 예정 |
-| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 미착수 | — | 통합 모델 학습 전제 |
+| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분 | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/status), `trials_kinds.json`, `backend/tests/test_trials_collect.py` | 2026-09-30 심판사항 API 수집 파이프라인 1단계 — 설계·구현·dry-run(실호출 0). API 값 검증 뒤 시범 20건 예정 |
 | 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21. 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |

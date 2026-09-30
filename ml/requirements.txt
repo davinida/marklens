@@ -10,3 +10,5 @@ torchvision>=0.28.0,<1.0.0
 pillow>=12.3.0,<13.0.0
 # 수치 연산 라이브러리
 numpy>=1.24.0,<2.0.0
+# 심결문 PDF 텍스트 추출 (다빈-1 심결례 수집, backend/scripts/trials_collect.py extract)
+pymupdf>=1.26.0,<2.0.0

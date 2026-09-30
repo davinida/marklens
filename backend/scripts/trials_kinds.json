@@ -1,0 +1,30 @@
+{
+  "_comment": [
+    "다빈-1 심결례 수집(trials_collect.py list --kind) 의 심판종류(trialDesc) 설정.",
+    "trialDesc 의 정확한 값은 KIPRIS 명세 캡처에서 확인되지 않았다(항목별검색 샘플: 특허 '거절결정불복',",
+    "서지상세 샘플: 상표 무효심판 2013당419 의 cdDesc '무효'). 첫 실호출(1개월치)로 응답의 trialDesc 값 집합을",
+    "확인한 뒤 trialDesc 를 고정하고 verified 를 true 로 바꾼다. 그 전에는 list 실호출에 --allow-unverified 가 필요하다.",
+    "candidates 는 응답 원문 → kind 역매핑에도 쓴다(kind_for_trial_desc)."
+  ],
+  "refusal": {
+    "label": "거절결정불복",
+    "trialDesc": "거절결정불복",
+    "candidates": ["거절결정불복", "거절결정불복심판", "상표거절결정불복"],
+    "verified": false
+  },
+  "invalidation": {
+    "label": "등록무효",
+    "trialDesc": "무효",
+    "candidates": ["무효", "등록무효", "무효심판", "상표등록무효"],
+    "verified": false
+  },
+  "scope": {
+    "label": "권리범위확인",
+    "trialDesc": "권리범위확인",
+    "candidates": [
+      "권리범위확인", "권리범위확인(적극)", "권리범위확인(소극)",
+      "적극적권리범위확인", "소극적권리범위확인", "적극적 권리범위확인", "소극적 권리범위확인"
+    ],
+    "verified": false
+  }
+}

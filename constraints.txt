@@ -6,6 +6,7 @@ torch==2.13.0
 torchvision==0.28.0
 pillow==12.3.0
 numpy==1.26.4
+pymupdf==1.28.2
 
 fastapi==0.139.0
 pydantic-settings==2.15.0
