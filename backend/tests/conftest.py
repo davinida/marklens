@@ -137,6 +137,43 @@ def _build_fake_ml_env(base: Path) -> None:
     (base / "goods_map.json").write_text(
         json.dumps(_GOODS_MAP_FIXTURE, ensure_ascii=False), encoding="utf-8"
     )
+    # 업종 세트 픽스처: cafe 는 name·alias 로 2건 유효 + 없는 명칭 1건(경고·제외),
+    # ghost 는 전부 무효(세트 제외)
+    (base / "business_presets.json").write_text(
+        json.dumps(_GOODS_PRESETS_FIXTURE, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+_GOODS_PRESETS_FIXTURE = [
+    {
+        "id": "cafe",
+        "업종명": "카페",
+        "이모지": "☕",
+        "hint": "테스트 힌트",
+        "별칭": ["카페", "커피숍", "커피집"],
+        "지정상품": [
+            {"name": "커피", "nice_class": 30},
+            {"name": "커피 소매업", "nice_class": 35},
+            {"name": "없는상품", "nice_class": 43},
+        ],
+    },
+    {
+        "id": "cosmetics",
+        "업종명": "화장품 브랜드",
+        "이모지": "🧴",
+        "별칭": ["화장품", "코스메틱"],
+        "지정상품": [
+            {"name": "화장품", "nice_class": 3},
+            {"name": "화장품 소매업", "nice_class": 35},
+        ],
+    },
+    {
+        "id": "ghost",
+        "업종명": "유령",
+        "별칭": ["유령"],
+        "지정상품": [{"name": "없는상품", "nice_class": 1}],
+    },
+]
 
 
 def pytest_configure(config):
@@ -154,6 +191,7 @@ def pytest_configure(config):
     os.environ["MARKLENS_DATA_DIR"] = str(base)
     os.environ["MARKLENS_IMAGES_DIR"] = str(base / "images")
     os.environ["MARKLENS_GOODS_MAP_PATH"] = str(base / "goods_map.json")
+    os.environ["MARKLENS_GOODS_PRESETS_PATH"] = str(base / "business_presets.json")
     os.environ["DATABASE_URL"] = ""  # 가짜 모드는 항상 file 모드로
 
 

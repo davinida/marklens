@@ -19,6 +19,27 @@ class GoodsMatch(BaseModel):
     )
 
 
+class PresetGood(BaseModel):
+    """업종 세트 안의 지정상품 1건(변환표 name 또는 alias, 류, 유사군)."""
+
+    name: str
+    nice_class: int = Field(..., ge=1, le=45)
+    similarity_codes: list[str]
+
+
+class BusinessPreset(BaseModel):
+    """업종 세트 — 일상어 업종명(카페)에 여러 류의 지정상품을 묶은 것.
+
+    원본은 shared/goods_map/business_presets.json(명칭은 변환표 name·alias 와 정확히 일치).
+    """
+
+    id: str
+    업종명: str
+    emoji: str = ""
+    hint: str = Field("", description="세트 카드에 보이는 안내 한 줄(선택)")
+    지정상품: list[PresetGood]
+
+
 class GoodsSearchResponse(BaseModel):
     """GET /goods/search 응답 본문."""
 
@@ -30,6 +51,10 @@ class GoodsSearchResponse(BaseModel):
         ..., description="limit·offset 과 무관한 전체 일치 건수(류 목록이면 그 류의 항목 수)"
     )
     offset: int = Field(0, ge=0, description="matches 가 시작하는 위치(0부터)")
+    presets: list[BusinessPreset] = Field(
+        default_factory=list,
+        description="검색어가 업종명·별칭에 부분 일치하는 업종 세트(최대 3개)",
+    )
     source: str = Field(..., description="변환표 원본 판, 예: '고시상품명칭 13판(2026)'")
 
 
