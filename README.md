@@ -529,6 +529,13 @@ has_goods(set())                                                               #
   → 무효, 신뢰도 high → low 순, 그다음 권리범위 저명·주지 언급 2등급 24건, family 중복 제외)를 함께 만들고,
   `show --next`가 큐에서 유사여부_확정이 비어 있는 첫 건을 보여 줍니다(폴백으로 읽은 결론 문장은 `>>`). 확정 열을
   채우면 `sheet` 재생성 때 보존되고 `status`가 진행률을 보여 줍니다.
+- 라벨 도구(`feat/trials-label`): `show --batch n`이 라벨 없는 다음 n건을 `batch_<k>.md`(주문·판단 절만, 정규식
+  추정은 넣지 않음)로 뽑고, `label <심판번호> <유사|비유사|제외> --source llm|human --evidence "소결 문장"
+  --confidence high|low [--axis 외관,호칭,관념,상품] [--type …] [--reason …] [--b 상대번호] [--pass a|b]`가
+  `labels.csv`에 판정·라벨출처·근거문장·확신도·확인여부를 기록합니다(llm은 사람이 확인한 행을 덮어쓰지 못하고,
+  pass b는 `llm_b_*` 열에만). `confirm`은 LLM 라벨을 그대로 승인, `review`는 재검토 큐(LLM≠추정·확신도 low·
+  메모 애매·pass A≠B), `sample --n 40 --seed 0`은 미확인 LLM 라벨의 종류×판정 층화 검증 표본, `status`는
+  판정 집계와 LLM↔사람·LLM↔추정·LLM A↔B 일치율을 보여 줍니다.
 - 다음 단계: 1등급 후보의 사람 큐레이션, 남은 대기열 621건(11월 예산), 선등록 상표명·이미지
   보강(출원속보 API 등록번호 검색, 건당 1~2회) → 통합 모델 학습.
 - 예산: KIPRIS 월 1,000회 한도를 출원속보 키와 분리해 `KIPRIS_TRIAL_ACCESS_KEY`·
@@ -544,6 +551,9 @@ KIPRIS_TRIAL_DAILY_BUDGET=900 ml/venv/bin/python -m backend.scripts.trials_colle
 ml/venv/bin/python -m backend.scripts.trials_collect extract
 ml/venv/bin/python -m backend.scripts.trials_collect sheet      # 사람 열(유사여부_확정 등)은 보존
 ml/venv/bin/python -m backend.scripts.trials_collect show --next           # 큐레이션 큐의 다음 미확정 건(또는 show 2023100000403)
+ml/venv/bin/python -m backend.scripts.trials_collect show --batch 20       # 라벨 없는 다음 20건 → batch_<k>.md
+ml/venv/bin/python -m backend.scripts.trials_collect label 2023100000403 유사 --axis 호칭 --source llm --evidence "그 호칭이 동일하므로 …" --confidence high
+ml/venv/bin/python -m backend.scripts.trials_collect confirm 2023100000403 # LLM 라벨 승인 · review / sample --n 40 --seed 0
 ml/venv/bin/python -m backend.scripts.trials_collect status
 ```
 
@@ -597,8 +607,8 @@ npm run typecheck && npm run lint && npm test && npm run test:e2e && npm run bui
 npm audit --omit=dev --audit-level=high
 ```
 
-2026-10-01 검증(`feat/trials-collect`, develop `7a4067b` 병합 후): Python `829 passed, 26 skipped`
-(가짜 ML 모드, X1 123건·X3 174건·심결례 파이프라인 61건 포함), X3 실제 모델 검증 `219 passed`,
+2026-10-01 검증(`feat/trials-collect`, develop `7a4067b` 병합 후): Python `835 passed, 26 skipped`
+(가짜 ML 모드, X1 123건·X3 174건·심결례 파이프라인 67건 포함), X3 실제 모델 검증 `219 passed`,
 ruff 통과, frontend Vitest `77 passed`(19 파일), Playwright `15 passed`(스펙 5개 × 뷰포트 3개
 320x568, 667x375, desktop). 2026-09-30 file 모드 실서버 스모크에서 `/health`가 `index_size`·`trademark_count` 1,100과
 generation `20260827T035002Z-25f84a6eeb26`을 반환했고, X3 캐시 515건·`/semantic-search`

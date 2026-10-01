@@ -1557,3 +1557,265 @@ def test_show_marks_fallback_conclusion_sentence(tmp_path, capsys):
     show_y = argparse.Namespace(kinds_config=KINDS, trial=["Y"], next=False)
     assert tc.run_show(show_y, session) == 0
     assert ">> " not in capsys.readouterr().out  # 소결 제목 아래서 읽으면 표시 없음
+
+
+# ---------------- 큐레이션 라벨 도구(feat/trials-label): label·confirm·show --batch·review·
+# sample --n·status 일치율 ----------------
+
+def _curation_fixture(tmp_path):
+    """list·prefilter·텍스트·labels.csv·curation_queue.csv 를 갖춘 데이터 디렉터리.
+    큐 순서: S2·S5·S1·R1·I1·P1·S3."""
+    kinds = tc.load_kinds(KINDS)
+    scope = tc.analyze_text(TEXT_SCOPE)
+    list_rows = [
+        _list_row("S1", "권리범위확인(적극적)", "A", "갑1"),
+        _list_row("S2", "권리범위확인(소극적)", "B", "갑2"),
+        _list_row("S3", "권리범위확인(적극적)", "C", "갑3"), _list_row("R1", "거절결정불복", "D"),
+        _list_row("I1", "무효", "E"), _list_row("P1", "무효", "F", "병"),
+        {**_list_row("S5", "권리범위확인(적극적)", "A", "갑1"), "피청구인": "정"},
+    ]
+    prefilter = [
+        {"심판번호": "S1", **dict(scope, 소결_신뢰도="low")}, {"심판번호": "S2", **scope},
+        {"심판번호": "S3", **dict(scope, 본문_저명주지_실질=1)},
+        {"심판번호": "R1", **tc.analyze_text(TEXT_2024)},
+        {"심판번호": "I1", **tc.analyze_text(TEXT_SIMILAR)},
+        {"심판번호": "P1", **tc.analyze_text(TEXT_PROSE)}, {"심판번호": "S5", **scope},
+    ]
+    paths_ = tc.TrialPaths(tmp_path)
+    paths_.text_dir.mkdir(parents=True)
+    for number, text in (("S2", TEXT_SCOPE), ("S5", TEXT_SCOPE), ("S1", TEXT_SCOPE),
+                         ("R1", TEXT_2024), ("I1", TEXT_SIMILAR)):
+        (paths_.text_dir / f"{number}.txt").write_text(text, encoding="utf-8")
+    tc._write_csv(paths_.list_csv, tc.LIST_COLUMNS, list_rows)
+    tc._write_csv(paths_.prefilter_csv, tc.PREFILTER_COLUMNS, prefilter)
+    assert tc.run_sheet(argparse.Namespace(kinds_config=KINDS), tc.Session(paths=paths_)) == 0
+    return paths_, kinds
+
+
+def _label_cli(tmp_path, *args: str) -> int:
+    return tc.main(["--data-dir", str(tmp_path), *args])
+
+
+def _labels_by_trial(paths_) -> dict[str, dict]:
+    rows = _rows(paths_.labels_csv)
+    return {row["심판번호"]: row for row in rows}
+
+
+def test_label_records_columns_and_validates_inputs(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    before = _labels_by_trial(paths_)["S2"]
+    evidence = '확인대상표장은 "Q-FIRE" 부분만으로, 호칭이 동일하므로 유사하다'  # 따옴표·쉼표 보존
+    assert _label_cli(tmp_path, "label", "S2", "유사", "--axis", "호칭,외관", "--type", "문자",
+                      "--memo", "요부 Q-FIRE", "--source", "human", "--evidence", evidence,
+                      "--confidence", "high") == 0
+    row = _labels_by_trial(paths_)["S2"]
+    assert row["유사여부_확정"] == "유사" and row["판단축_확정"] == "외관|호칭"
+    assert row["상표유형_확정"] == "문자" and row["메모"] == "요부 Q-FIRE" and row["제외사유"] == ""
+    assert row["라벨출처"] == "human" and row["확인여부"] == "Y" and row["확신도"] == "high"
+    assert row["근거문장"] == evidence
+    assert {k: v for k, v in row.items() if k not in tc.PRESERVED_COLUMNS} == {
+        k: v for k, v in before.items() if k not in tc.PRESERVED_COLUMNS
+    }  # 다른 열은 그대로
+    assert "라벨 기록: S2 1행" in capsys.readouterr().out
+    # 재실행으로 수정(메모는 생략하면 유지), 제외는 --reason 필수
+    assert _label_cli(tmp_path, "label", "S2", "제외", "--reason", "인지도", "--source", "human",
+                      "--evidence", "저명상표", "--confidence", "low") == 0
+    row = _labels_by_trial(paths_)["S2"]
+    assert row["유사여부_확정"] == "제외" and row["제외사유"] == "인지도"
+    assert row["메모"] == "요부 Q-FIRE" and row["판단축_확정"] == "" and row["확신도"] == "low"
+    snapshot = paths_.labels_csv.read_bytes()
+    bad = [
+        ["label", "S2", "애매", "--source", "human", "--evidence", "x", "--confidence", "high"],
+        ["label", "S2", "제외", "--source", "human", "--evidence", "x", "--confidence", "high"],
+        ["label", "S2", "유사", "--reason", "기타", "--source", "human", "--evidence", "x",
+         "--confidence", "high"],
+        ["label", "S2", "유사", "--axis", "색깔", "--source", "human", "--evidence", "x",
+         "--confidence", "high"],
+        ["label", "S2", "유사", "--type", "입체", "--source", "human", "--evidence", "x",
+         "--confidence", "high"],
+        ["label", "S2", "유사", "--source", "human", "--confidence", "high"],  # evidence 없음
+        ["label", "S2", "유사", "--source", "human", "--evidence", "x", "--confidence", "중간"],
+        ["label", "S2", "유사", "--source", "기계", "--evidence", "x", "--confidence", "high"],
+        ["label", "S2", "유사", "--pass", "c", "--source", "llm", "--evidence", "x",
+         "--confidence", "high"],
+    ]
+    for argv in bad:
+        assert _label_cli(tmp_path, *argv) == 2, argv
+    assert _label_cli(tmp_path, "label", "ZZ", "유사", "--source", "human", "--evidence", "x",
+                      "--confidence", "high") == 1
+    assert _label_cli(tmp_path, "label", "S2", "유사", "--b", "999", "--source", "human",
+                      "--evidence", "x", "--confidence", "high") == 1
+    assert paths_.labels_csv.read_bytes() == snapshot  # 오류 때는 파일을 건드리지 않는다
+    assert "허용값" in capsys.readouterr().err
+
+
+def test_llm_cannot_overwrite_confirmed_rows_and_undo_clears(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    common = ["--evidence", "표장이 유사하다", "--confidence", "high"]
+    assert _label_cli(tmp_path, "label", "S2", "유사", "--source", "human", *common) == 0
+    snapshot = paths_.labels_csv.read_bytes()
+    assert _label_cli(tmp_path, "label", "S2", "비유사", "--source", "llm", *common) == 3
+    assert "[거부]" in capsys.readouterr().err and paths_.labels_csv.read_bytes() == snapshot
+    # undo 도 거부
+    assert _label_cli(tmp_path, "label", "S2", "유사", "--undo", "--source", "llm") == 3
+    # 미확인 행은 llm 이 쓰고 덮어쓸 수 있다; 사람이 수정하면 원본 LLM 판정을 남긴다
+    assert _label_cli(tmp_path, "label", "S1", "유사", "--source", "llm", *common) == 0
+    assert _label_cli(tmp_path, "label", "S1", "비유사", "--source", "llm", *common) == 0
+    row = _labels_by_trial(paths_)["S1"]
+    assert row["유사여부_확정"] == "비유사" and row["확인여부"] == "" and row["llm_판정_원본"] == ""
+    assert _label_cli(tmp_path, "label", "S1", "유사", "--axis", "호칭", "--source", "human",
+                      *common) == 0
+    row = _labels_by_trial(paths_)["S1"]
+    assert row["라벨출처"] == "human" and row["확인여부"] == "Y"
+    assert row["llm_판정_원본"] == "비유사"
+    # pass b 는 llm_b_* 열에만, 사람 열·확인여부 그대로
+    assert _label_cli(tmp_path, "label", "S1", "비유사", "--pass", "b", "--source", "llm",
+                      "--evidence", "두 번째 판독", "--confidence", "low") == 0
+    row = _labels_by_trial(paths_)["S1"]
+    assert row["llm_b_유사여부"] == "비유사" and row["llm_b_확신도"] == "low"
+    assert row["llm_b_근거"] == "두 번째 판독" and row["유사여부_확정"] == "유사"
+    assert row["확인여부"] == "Y"
+    assert _label_cli(tmp_path, "label", "S1", "--undo", "--pass", "b", "--source", "llm") == 0
+    assert _label_cli(tmp_path, "label", "S1", "--undo", "--source", "human") == 0
+    row = _labels_by_trial(paths_)["S1"]
+    assert all(row[c] == "" for c in tc.PRESERVED_COLUMNS)
+    # labels.csv 가 라벨 열 없이 만들어졌어도(이전 sheet) 열을 덧붙여 기록한다
+    rows = _rows(paths_.labels_csv)
+    old_columns = [c for c in tc.LABEL_COLUMNS if c not in tc.LABEL_META_COLUMNS + tc.LLM_B_COLUMNS]
+    tc._write_csv(paths_.labels_csv, old_columns, rows)
+    assert _label_cli(tmp_path, "label", "S5", "유사", "--source", "llm", *common) == 0
+    assert _labels_by_trial(paths_)["S5"]["라벨출처"] == "llm"
+    assert _rows(paths_.labels_csv)[0].keys() >= set(tc.LABEL_COLUMNS)
+
+
+def test_confirm_approves_llm_label_as_is(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    common = ["--evidence", "표장이 유사하다", "--confidence", "high"]
+    assert _label_cli(tmp_path, "confirm", "S1") == 1  # 라벨 없음
+    assert _label_cli(tmp_path, "label", "S1", "유사", "--axis", "호칭", "--source", "llm",
+                      *common) == 0
+    assert _label_cli(tmp_path, "confirm", "S1") == 0
+    row = _labels_by_trial(paths_)["S1"]
+    assert row["라벨출처"] == "human-confirmed" and row["확인여부"] == "Y"
+    assert row["유사여부_확정"] == "유사" and row["판단축_확정"] == "호칭"
+    assert row["llm_판정_원본"] == "유사" and row["근거문장"] == "표장이 유사하다"
+    assert "승인: S1 1행" in capsys.readouterr().out
+    assert _label_cli(tmp_path, "label", "S1", "비유사", "--source", "llm", *common) == 3
+    assert _label_cli(tmp_path, "confirm", "S1") == 0  # 이미 승인 → 0행, 오류 아님
+    assert "0행" in capsys.readouterr().out
+
+
+def test_batch_markdown_omits_regex_estimates_and_skips_labeled(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    assert _label_cli(tmp_path, "show", "--batch", "2") == 0
+    batch = (tmp_path / "batch_1.md").read_text(encoding="utf-8")
+    assert batch.startswith("# 큐레이션 배치 1 — 2건 · pass a")
+    assert "## 1. S2 · 권리범위확인(소극적) · 상표A: B · 상대 번호: -" in batch
+    assert "## 2. S5 ·" in batch
+    assert "1. 확인대상표장은 상표등록 제1697796호의 권리범위에 속한다." in batch  # 주문
+    assert "4. 확인대상표장이 이 사건 등록상표의 권리범위에 속하는지 여부" in batch  # 판단 절
+    anchors = ("추정", "결정축", "등급사유", "자동등급", "신뢰도", "표장 소결", "주문결과",
+               "등급 1")
+    for anchor in anchors:
+        assert anchor not in batch, anchor  # 자동 판정은 넣지 않는다
+    assert "batch_1.md" in capsys.readouterr().out
+    assert _label_cli(tmp_path, "label", "S2", "유사", "--source", "llm", "--evidence", "x",
+                      "--confidence", "high") == 0
+    assert _label_cli(tmp_path, "show", "--batch", "1") == 0
+    batch2 = (tmp_path / "batch_2.md").read_text(encoding="utf-8")
+    assert "## 1. S5 ·" in batch2 and "S2" not in batch2  # pass a 라벨이 있는 건은 건너뛴다
+    assert _label_cli(tmp_path, "show", "--batch", "1", "--pass", "b") == 0
+    batch3 = (tmp_path / "batch_3.md").read_text(encoding="utf-8")
+    assert "pass b" in batch3 and "## 1. S2 ·" in batch3  # pass b 는 아직 없다
+    assert "--pass b`" in batch3
+
+
+def _label_row(number: str, desc: str, **fields) -> dict:
+    row = {column: "" for column in tc.LABEL_COLUMNS}
+    row.update({"심판번호": number, "종류": desc, "상표B_번호": fields.pop("b", "")})
+    row.update(fields)
+    return row
+
+
+def test_verify_sample_is_stratified_by_kind_and_verdict(tmp_path):
+    kinds = tc.load_kinds(KINDS)
+    descs = {"scope": "권리범위확인(적극적)", "refusal": "거절결정불복", "invalidation": "무효"}
+    rows = []
+    for kind, desc in descs.items():
+        for verdict in tc.VERDICTS:
+            for i in range(4):
+                rows.append(_label_row(f"{kind[0]}{verdict}{i}", desc, 유사여부_확정=verdict,
+                                       라벨출처="llm", 확신도="high", 근거문장="e"))
+    rows.append(_label_row("confirmed", descs["scope"], 유사여부_확정="유사",
+                           라벨출처="human-confirmed", 확인여부="Y"))
+    rows.append(_label_row("human", descs["scope"], 유사여부_확정="유사", 라벨출처="human",
+                           확인여부="Y"))
+    picked = tc.select_verify_sample(rows, kinds, 9, 0)
+    assert len(picked) == 9 and sorted({p["층"] for p in picked}) == sorted(
+        f"{k}/{v}" for k in descs for v in tc.VERDICTS
+    )
+    assert {p["심판번호"] for p in picked}.isdisjoint({"confirmed", "human"})
+    again = tc.select_verify_sample(rows, kinds, 9, 0)
+    assert [p["심판번호"] for p in again] == [p["심판번호"] for p in picked]  # 시드 재현
+    assert [p["심판번호"] for p in tc.select_verify_sample(rows, kinds, 9, 1)] != [
+        p["심판번호"] for p in picked
+    ]
+    twelve = tc.select_verify_sample(rows, kinds, 12, 0)
+    per_stratum = {}
+    for p in twelve:
+        per_stratum[p["층"]] = per_stratum.get(p["층"], 0) + 1
+    assert len(twelve) == 12 and all(1 <= c <= 2 for c in per_stratum.values())
+    assert tc.allocate_strata({"a": 10, "b": 1, "c": 5}, 4) == {"a": 2, "b": 1, "c": 1}
+    assert tc.allocate_strata({"a": 2, "b": 2}, 10) == {"a": 2, "b": 2}
+    paths_ = tc.TrialPaths(tmp_path)
+    tc._write_csv(paths_.labels_csv, tc.LABEL_COLUMNS, rows)
+    assert tc.main(["--data-dir", str(tmp_path), "sample", "--n", "9", "--seed", "0"]) == 0
+    assert [r["심판번호"] for r in _rows(paths_.verify_queue)] == [p["심판번호"] for p in picked]
+    assert set(_rows(paths_.verify_queue)[0]) == set(tc.VERIFY_COLUMNS)
+    assert tc.main(["--data-dir", str(tmp_path), "sample"]) == 2  # 수집 표본은 --out 필수
+
+
+def test_review_queue_reasons_and_status_agreement(tmp_path, capsys):
+    scope, refusal = "권리범위확인(적극적)", "거절결정불복"
+    rows = [
+        _label_row("R1", refusal, 유사여부_확정="비유사", 유사여부_추정="비유사", 라벨출처="human",
+                   확인여부="Y", 확신도="high", llm_판정_원본="유사"),  # 사람이 LLM 유사→비유사로
+        _label_row("R2", refusal, 유사여부_확정="유사", 유사여부_추정="유사", 라벨출처="llm",
+                   확신도="low"),
+        _label_row("R3", scope, 유사여부_확정="유사", 유사여부_추정="유사", 라벨출처="human",
+                   확인여부="Y", 확신도="high", 메모="호칭은 애매함"),
+        _label_row("R4", scope, 유사여부_확정="유사", 유사여부_추정="유사", 라벨출처="llm",
+                   확신도="high", llm_b_유사여부="비유사", llm_b_확신도="high"),
+        _label_row("R5", scope, 유사여부_확정="제외", 제외사유="인지도", 라벨출처="llm",
+                   확신도="high", llm_b_유사여부="제외", llm_b_제외사유="식별력"),
+        _label_row("R6", scope, 유사여부_확정="유사", 유사여부_추정="유사",
+                   라벨출처="human-confirmed", 확인여부="Y", 확신도="high", llm_판정_원본="유사"),
+        _label_row("R7", scope, 유사여부_확정="비유사", 유사여부_추정="유사", 라벨출처="llm",
+                   확신도="high", llm_b_유사여부="비유사"),
+        _label_row("R8", scope),  # 라벨 없음
+    ]
+    queue = tc.build_review_queue(rows)
+    assert {q["심판번호"]: q["사유"] for q in queue} == {
+        "R1": "LLM≠추정", "R2": "확신도 low", "R3": "메모 애매", "R4": "A≠B", "R5": "A≠B",
+        "R7": "LLM≠추정",
+    }
+    assert [q["순번"] for q in queue] == [1, 2, 3, 4, 5, 6]
+    paths_ = tc.TrialPaths(tmp_path)
+    tc._write_csv(paths_.labels_csv, tc.LABEL_COLUMNS, rows)
+    assert tc.main(["--data-dir", str(tmp_path), "review"]) == 0
+    assert "review: 6행" in capsys.readouterr().out
+    assert [r["사유"] for r in _rows(paths_.review_queue)][:2] == ["LLM≠추정", "확신도 low"]
+    curation = [{"순번": i, "심판번호": n, "종류": scope, "상표A_명칭": "", "상대표장_번호": "",
+                 "유사여부_추정": "", "신뢰도": "", "등급사유": ""}
+                for i, n in enumerate(["R1", "R2", "R8"], start=1)]
+    lines = tc.label_summary(rows, curation)
+    assert lines[0].startswith("라벨: 유사 4 · 비유사 2 · 제외 1 (행 7/8)")
+    assert "human 2" in lines[0] and "human-confirmed 1" in lines[0] and "llm 4" in lines[0]
+    assert "확인(Y) 3" in lines[0] and "pass b 3" in lines[0]
+    assert lines[1] == "LLM↔사람 일치율 1/2 (50%) — confirm 1 · 수정 1"  # R6 confirm, R1 수정
+    assert lines[2] == "LLM↔추정 일치율 3/5 (60%)"  # R1 llm 유사≠비유사, R2 ✓, R4 ✓, R6 ✓, R7 ✗
+    assert lines[3] == "LLM A↔B 일치율 1/3 (33%)"  # R4 ✗ · R5 사유 다름 ✗ · R7 ✓
+    assert lines[4] == "남은 큐: pass a 1/3 · pass b 3/3"
+    tc._write_csv(paths_.curation_queue, tc.CURATION_COLUMNS, curation)
+    assert tc.main(["--data-dir", str(tmp_path), "status"]) == 0
+    assert "LLM↔사람 일치율 1/2 (50%)" in capsys.readouterr().out
