@@ -11,10 +11,10 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 | 항목 | 2026-10-01 현재 |
 |---|---|
-| 마지막 갱신 | 2026-10-01 (`main` = `develop` = `1c1512c`) |
+| 마지막 갱신 | 2026-10-01 (`main` = `develop` = `7e56b0a`) |
 | 데이터 | KIPRIS 등록상표 1,100건, generation `20260827T035002Z-25f84a6eeb26` (2026-08-27) |
-| 테스트 | Python `753 passed, 25 skipped`(가짜 ML 모드; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `61 passed`(17 파일) · Playwright 스펙 3개 × 뷰포트 3개 = 9 |
-| CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — PR #25·#26(2026-09-30 develop) |
+| 테스트 | Python `835 passed, 26 skipped`(가짜 ML 모드; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `77 passed`(19 파일) · Playwright 스펙 5개 × 뷰포트 3개 = 15 |
+| CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — PR #28~#31(2026-10-01 develop `7e56b0a`) |
 
 ## 현재 범위
 
@@ -29,7 +29,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
 | 관념 X3 | 최소 연결 | `ml/src/axes/x3_semantic.py` 다국어 임베딩(paraphrase-multilingual-MiniLM-L12-v2) + 관념 게이트(wordfreq) + `POST /semantic-search`. 상표명 확인 패널에 "관념 유사 후보" 섹션(발음 섹션과 병렬 요청). 통합 점수에는 미반영 |
 | 통합 모델 | 설계 초안 | [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)(2026-10-01): 판례가 정한 구조, 로지스틱 회귀 입력, 검증 계획. 구현·학습은 정답 데이터 라벨링 후. UI의 지정상품 입력도 현재 숨김 |
-| 정답 데이터(심결례) 수집 | 수집·자동 선별 | `backend/scripts/trials_collect.py`(2026-10-01 4단계): 심판사항 API 목록 42,474건, PDF·텍스트 843건, 라벨 시트 1024행(자동 1등급 331건), 큐레이션 큐 355건. 사람 라벨링 전 — 아래 "정답 데이터" 소절 |
+| 정답 데이터(심결례) 수집·라벨링 | 수집·LLM 이중 라벨링 | `backend/scripts/trials_collect.py`(2026-10-01 4단계 + 라벨 도구): 심판사항 API 목록 42,474건, PDF·텍스트 843건, 라벨 시트 1024행(자동 1등급 331건), 큐레이션 큐 355건(430행) LLM 이중 라벨링 완료(A↔B 일치 96%). 사람 검증 진행 중 — 아래 "정답 데이터" 소절 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
 | 공개 클라우드 배포 | 템플릿만 제공 | 실제 도메인·TLS·계정 배포는 하지 않음 |
 
@@ -53,7 +53,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 항목 | 담당 | 상태 | 위치 | 비고 |
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X3·X4) | `ml/src/axes/` | |
-| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(수집·자동 선별 완료, 사람 라벨링 전) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(61건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 사람 라벨링 전 — 아래 "정답 데이터" 소절 |
+| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(수집·자동 선별·LLM 이중 라벨링 완료, 사람 검증 중) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/label/confirm/review/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(67건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치, PR #29): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 라벨 도구(PR #30·#31)로 큐 355건(430행) LLM 이중 라벨링 완료(호출 0): 유사 225·비유사 140·제외 65, LLM A↔B 일치율 96%(414/430), LLM↔정규식 추정 80%, 재검토 큐 130행. 사람 검증(표본 40 + 재검토) 진행 중 — 아래 "정답 데이터" 소절 |
 | 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21·#22. v1.5(2026-09-30, `normalize_name` 공개 — X3와 정규화 공유). 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
@@ -504,7 +504,7 @@ has_goods(set())                                                               #
 통합 모델의 학습 데이터입니다. 특허심판원 심결문을 KIPRIS Plus 심판사항 API(항목별 검색 →
 심결문 조회 → PDF)로 받아 텍스트를 뽑고, 정규식으로 주문·결론 조문·선등록 번호를 추출해
 3등급으로 자동 선별한 뒤 사람이 라벨링합니다. 코드(`backend/scripts/trials_collect.py`,
-`backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py` 61건)와 설정
+`backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py` 67건)와 설정
 (`KIPRIS_TRIAL_*`, `pymupdf==1.28.2`)은 저장소에 있고, 데이터(`ml/data/trials/`)는 저장소에 넣지
 않습니다.
 
@@ -525,18 +525,23 @@ has_goods(set())                                                               #
 - 현황(2026-10-01, 호출 9월 924/950 · 10월 900/950): 목록 129개월 42,474건(`list_all.csv`),
   1차 층화 표본 373건 + 시범 20건 + 2차 배치 450건(권리범위확인 280·무효 100·거절결정불복 70)
   → PDF·텍스트 843건, `labels.csv` 1024행/843건 — 자동 1등급 331건(거절 106·무효 30·권리범위 195)·2등급 120·3등급 392,
-  상대 표장 번호 후보 복구 68건. 사람 라벨링 전. `sheet`가 `curation_queue.csv`(355건: 1등급을 권리범위확인 → 거절결정불복
+  상대 표장 번호 후보 복구 68건. `sheet`가 `curation_queue.csv`(355건: 1등급을 권리범위확인 → 거절결정불복
   → 무효, 신뢰도 high → low 순, 그다음 권리범위 저명·주지 언급 2등급 24건, family 중복 제외)를 함께 만들고,
   `show --next`가 큐에서 유사여부_확정이 비어 있는 첫 건을 보여 줍니다(폴백으로 읽은 결론 문장은 `>>`). 확정 열을
   채우면 `sheet` 재생성 때 보존되고 `status`가 진행률을 보여 줍니다.
-- 라벨 도구(`feat/trials-label`): `show --batch n`이 라벨 없는 다음 n건을 `batch_<k>.md`(주문·판단 절만, 정규식
+- 라벨 도구(PR #30, `labels.csv` 프로세스 간 잠금·원자적 쓰기는 PR #31): `show --batch n`이 라벨 없는 다음 n건을 `batch_<k>.md`(주문·판단 절만, 정규식
   추정은 넣지 않음)로 뽑고, `label <심판번호> <유사|비유사|제외> --source llm|human --evidence "소결 문장"
   --confidence high|low [--axis 외관,호칭,관념,상품] [--type …] [--reason …] [--b 상대번호] [--pass a|b]`가
   `labels.csv`에 판정·라벨출처·근거문장·확신도·확인여부를 기록합니다(llm은 사람이 확인한 행을 덮어쓰지 못하고,
   pass b는 `llm_b_*` 열에만). `confirm`은 LLM 라벨을 그대로 승인, `review`는 재검토 큐(LLM≠추정·확신도 low·
   메모 애매·pass A≠B), `sample --n 40 --seed 0`은 미확인 LLM 라벨의 종류×판정 층화 검증 표본, `status`는
   판정 집계와 LLM↔사람·LLM↔추정·LLM A↔B 일치율을 보여 줍니다.
-- 다음 단계: 1등급 후보의 사람 큐레이션, 남은 대기열 621건(11월 예산), 선등록 상표명·이미지
+- LLM 이중 라벨링(2026-10-01, 호출 0): 큐 355건(430행)을 독립 판정자 둘(pass a·b)이 같은 배치 파일만 보고 따로
+  판정해 끝냈습니다 — 유사 225·비유사 140·제외 65(라벨출처 llm), LLM A↔B 일치율 96%(414/430, 불일치 16행은
+  4건), LLM↔정규식 추정 80%(340/424). `review` 재검토 큐 130행(LLM≠추정 84·확신도 low 76·메모 애매 65·A≠B 16,
+  중복 포함). 사람 검증(`sample --n 40 --seed 0` 표본 40건 + 재검토 큐) 진행 중 — `confirm`이나 사람 `label`로
+  확정하면 `status`의 LLM↔사람 일치율이 채워집니다.
+- 다음 단계: 사람 검증 완료 → 남은 대기열 621건(11월 예산), 선등록 상표명·이미지
   보강(출원속보 API 등록번호 검색, 건당 1~2회) → 통합 모델 학습.
 - 예산: KIPRIS 월 1,000회 한도를 출원속보 키와 분리해 `KIPRIS_TRIAL_ACCESS_KEY`·
   `KIPRIS_TRIAL_MONTHLY_BUDGET`(기본 950)·`KIPRIS_TRIAL_DAILY_BUDGET`(기본 300)으로 관리하고, 호출마다
@@ -551,10 +556,12 @@ KIPRIS_TRIAL_DAILY_BUDGET=900 ml/venv/bin/python -m backend.scripts.trials_colle
 ml/venv/bin/python -m backend.scripts.trials_collect extract
 ml/venv/bin/python -m backend.scripts.trials_collect sheet      # 사람 열(유사여부_확정 등)은 보존
 ml/venv/bin/python -m backend.scripts.trials_collect show --next           # 큐레이션 큐의 다음 미확정 건(또는 show 2023100000403)
-ml/venv/bin/python -m backend.scripts.trials_collect show --batch 20       # 라벨 없는 다음 20건 → batch_<k>.md
+ml/venv/bin/python -m backend.scripts.trials_collect show --batch 20       # 라벨 없는 다음 20건 → batch_<k>.md (--pass b 는 pass b 기준)
 ml/venv/bin/python -m backend.scripts.trials_collect label 2023100000403 유사 --axis 호칭 --source llm --evidence "그 호칭이 동일하므로 …" --confidence high
-ml/venv/bin/python -m backend.scripts.trials_collect confirm 2023100000403 # LLM 라벨 승인 · review / sample --n 40 --seed 0
-ml/venv/bin/python -m backend.scripts.trials_collect status
+ml/venv/bin/python -m backend.scripts.trials_collect confirm 2023100000403 # LLM 라벨을 그대로 승인(확인여부=Y)
+ml/venv/bin/python -m backend.scripts.trials_collect review                # 재검토 큐 → review_queue.csv (LLM≠추정·확신도 low·메모 애매·A≠B)
+ml/venv/bin/python -m backend.scripts.trials_collect sample --n 40 --seed 0 # 미확인 LLM 라벨의 종류×판정 층화 검증 표본
+ml/venv/bin/python -m backend.scripts.trials_collect status                # 판정 집계·LLM↔사람·LLM↔추정·A↔B 일치율
 ```
 
 ### 상품↔유사군 변환표 (`shared/goods_map/`)
@@ -701,6 +708,9 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
 - `develop`은 통합 브랜치, `main`은 안정 브랜치입니다. 기능 브랜치(`feat/…`,
   `fix/…`, `chore/…`, `docs/…`) → PR(base `develop`) → CI 통과 후 머지 → `develop`을
   `main`으로 동기화(PR)합니다.
+- 2026-10-01 병합(base `develop`): PR #29 심결례 수집 1~4단계 → #30 라벨 도구(`label`·`confirm`·`show --batch`·
+  `review`·`sample`·`status` 일치율) → #31 `labels.csv` 프로세스 간 잠금·원자적 쓰기(라벨링 에이전트 둘의 동시
+  실행 대비). 병합 후 `main` = `develop` = `7e56b0a`.
 - 커밋 메시지는 `유형(범위): 설명` 형식입니다. 예: `feat(ml): X1 호칭 유사도 축`,
   `fix(backend): …`, `docs(readme): …`.
 - `.env`, `ml/data/`(데이터·인덱스·호출 카운터), 인증키는 커밋하지 않습니다.
