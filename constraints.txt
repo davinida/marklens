@@ -2,7 +2,7 @@
 # Install with: pip install -c constraints.txt -r ml/requirements.txt ...
 open_clip_torch==2.32.0
 faiss-cpu==1.14.3
-torch==2.13.0
+torch==2.14.0
 torchvision==0.28.0
 pillow==12.3.0
 numpy==1.26.4
