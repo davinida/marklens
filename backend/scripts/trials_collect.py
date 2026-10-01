@@ -82,6 +82,7 @@ import re
 import sys
 import time
 import xml.etree.ElementTree as ET
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -2155,6 +2156,44 @@ class LabelError(ValueError):
         self.exit_code = exit_code
 
 
+@contextmanager
+def _labels_lock(paths_: TrialPaths):
+    """labels.csv 갱신의 프로세스 간 배타 잠금 — 라벨링 에이전트 둘(pass a·b)이 동시에 label 을
+    돌려도 읽기→쓰기 사이에 상대 갱신이 유실되지 않게 한다(kipris_client 의 카운터 잠금과 같다)."""
+    lock_path = paths_.labels_csv.with_suffix(paths_.labels_csv.suffix + ".lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(lock_path, "a+b") as handle:
+        if os.name == "nt":
+            import msvcrt
+
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _write_csv_atomic(path: Path, columns: list[str], rows: list[dict]) -> None:
+    """임시 파일에 쓰고 바꿔치기 — 쓰다 죽어도 labels.csv 가 반쯤 쓰인 채 남지 않는다."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=columns, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(rows)
+    os.replace(temporary, path)
+
+
 def _load_labels(paths_: TrialPaths) -> tuple[list[str], list[dict]]:
     """labels.csv 를 열 순서째 읽는다. 라벨 열이 없는(이전 sheet) 파일은 열을 덧붙인다."""
     if not paths_.labels_csv.exists():
@@ -2325,14 +2364,15 @@ def _label_args_summary(args: argparse.Namespace) -> str:
 
 def run_label(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
-    fieldnames, rows = _load_labels(paths_)
-    changed = apply_label(
-        rows, args.trial, args.verdict,
-        axis=args.axis, mark_type=args.mark_type, reason=args.reason, memo=args.memo, b=args.b,
-        source=args.source, evidence=args.evidence, confidence=args.confidence,
-        pass_=args.pass_, undo=args.undo,
-    )
-    _write_csv(paths_.labels_csv, fieldnames, rows)
+    with _labels_lock(paths_):
+        fieldnames, rows = _load_labels(paths_)
+        changed = apply_label(
+            rows, args.trial, args.verdict,
+            axis=args.axis, mark_type=args.mark_type, reason=args.reason, memo=args.memo,
+            b=args.b, source=args.source, evidence=args.evidence, confidence=args.confidence,
+            pass_=args.pass_, undo=args.undo,
+        )
+        _write_csv_atomic(paths_.labels_csv, fieldnames, rows)
     action = "라벨 비움" if args.undo else "라벨 기록"
     print(f"## {action}: {args.trial} {len(changed)}행 ({_label_args_summary(args)}) "
           f"→ {paths_.labels_csv}")
@@ -2341,9 +2381,10 @@ def run_label(args: argparse.Namespace, session: Session) -> int:
 
 def run_confirm(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
-    fieldnames, rows = _load_labels(paths_)
-    confirmed = confirm_labels(rows, args.trial, args.b)
-    _write_csv(paths_.labels_csv, fieldnames, rows)
+    with _labels_lock(paths_):
+        fieldnames, rows = _load_labels(paths_)
+        confirmed = confirm_labels(rows, args.trial, args.b)
+        _write_csv_atomic(paths_.labels_csv, fieldnames, rows)
     print(f"## 승인: {args.trial} {confirmed}행 확인여부=Y(human-confirmed) → {paths_.labels_csv}")
     return 0
 
