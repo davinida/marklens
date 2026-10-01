@@ -29,7 +29,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
 | 관념 X3 | 최소 연결 | `ml/src/axes/x3_semantic.py` 다국어 임베딩(paraphrase-multilingual-MiniLM-L12-v2) + 관념 게이트(wordfreq) + `POST /semantic-search`. 상표명 확인 패널에 "관념 유사 후보" 섹션(발음 섹션과 병렬 요청). 통합 점수에는 미반영 |
 | 통합 모델 | 설계 초안 | [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)(2026-10-01): 판례가 정한 구조, 로지스틱 회귀 입력, 검증 계획. 구현·학습은 정답 데이터 라벨링 후. UI의 지정상품 입력도 현재 숨김 |
-| 정답 데이터(심결례) 수집 | 브랜치(병합 전) | `feat/trials-collect`(커밋 3개, 2026-09-30): 심판사항 API 목록 42,474건, PDF·텍스트 393건, 라벨 시트 초안 438행. 사람 라벨링 전 — 아래 "정답 데이터" 소절 |
+| 정답 데이터(심결례) 수집 | 수집·자동 선별 | `backend/scripts/trials_collect.py`(2026-10-01 4단계): 심판사항 API 목록 42,474건, PDF·텍스트 843건, 라벨 시트 1024행(자동 1등급 331건), 큐레이션 큐 355건. 사람 라벨링 전 — 아래 "정답 데이터" 소절 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
 | 공개 클라우드 배포 | 템플릿만 제공 | 실제 도메인·TLS·계정 배포는 하지 않음 |
 
@@ -53,7 +53,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 항목 | 담당 | 상태 | 위치 | 비고 |
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X3·X4) | `ml/src/axes/` | |
-| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(브랜치 `feat/trials-collect`, develop 병합 전) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(44건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930): 심판사항 API 목록 129개월 42,474건, 층화 표본 373건 + 시범 20건 → PDF·텍스트 393건, `labels.csv` 438행(자동 1등급 84). 호출 924/950. 사람 라벨링 전 — 아래 "정답 데이터" 소절 |
+| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(수집·자동 선별 완료, 사람 라벨링 전) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(61건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 사람 라벨링 전 — 아래 "정답 데이터" 소절 |
 | 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21·#22. v1.5(2026-09-30, `normalize_name` 공개 — X3와 정규화 공유). 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
@@ -94,7 +94,7 @@ Browser
 ```
 
 - `frontend/`: Next.js UI, 수동 크롭, Turnstile 검증, BFF(`app/api/*`)
-- `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인·발음 유사도·관념 유사도·상품 검색 API(`src/api/`), 기동 시 캐시(`src/core/phonetic_search.py`·`semantic_search.py`)와 변환표(`src/core/goods.py`), KIPRIS 수집 스크립트(`scripts/`). 심결례 수집 스크립트 `scripts/trials_collect.py`는 브랜치 `feat/trials-collect`에 있음(develop 병합 전)
+- `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인·발음 유사도·관념 유사도·상품 검색 API(`src/api/`), 기동 시 캐시(`src/core/phonetic_search.py`·`semantic_search.py`)와 변환표(`src/core/goods.py`), KIPRIS 수집 스크립트(`scripts/`), 심결례 수집 스크립트(`scripts/trials_collect.py`)
 - `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구
 - `ml/src/axes/`: 다축 모델의 축 함수 — X1 호칭 유사도(`x1_phonetic.py`, 브랜드·지명 로마자표 `korean_brands.py`), X3 관념 유사도(`x3_semantic.py`), X4 상품 견련성(`x4_goods.py`), 변환표 로더(`goods_map.py`)
 - `ml/evaluation/`: 200-pair 라벨링 팩과 강건성 평가 계약
@@ -252,7 +252,7 @@ dev bypass 한 줄만 있으면 됩니다.
 | `DATABASE_URL` | `.env` | PostgreSQL db 모드. 비우면 JSON file 모드 |
 | `MARKLENS_TURNSTILE_DEV_BYPASS=1` | `frontend/.env.local` | 실제 Turnstile 키 없이 로컬 UI를 쓸 때. production에서는 무시됨 |
 | `MARKLENS_X3_ENABLED` | `.env` | 관념 유사도(`/semantic-search`)를 끌 때 `0`. 기본 `1`(기동 시 임베딩 캐시). 하한은 `MARKLENS_X3_MIN_SCORE`(0.55), 한도 `MARKLENS_X3_RATELIMIT`(30/minute) |
-| `KIPRIS_TRIAL_ACCESS_KEY` 등 `KIPRIS_TRIAL_*` | `.env`(브랜치 `feat/trials-collect`의 `.env.example`) | 심결례 수집. 출원속보 키·예산과 분리(월 950·일 300 기본, 카운터 `ml/data/trials/quota.json`) — 아래 "정답 데이터" 소절 |
+| `KIPRIS_TRIAL_ACCESS_KEY` 등 `KIPRIS_TRIAL_*` | `.env`(`.env.example` 참고) | 심결례 수집. 출원속보 키·예산과 분리(월 950·일 300 기본, 카운터 `ml/data/trials/quota.json`) — 아래 "정답 데이터" 소절 |
 
 전체 목록과 설명은 `.env.example`(백엔드)과 `frontend/.env.example`(프런트)에
 있습니다.
@@ -499,14 +499,14 @@ has_goods(set())                                                               #
   (34조 1항 9·11·12·13호)은 범위 밖입니다.
 - 입력·학습·검증 계획과 결정 대기 항목: [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md).
 
-### 정답 데이터 — 심결례 수집 (브랜치 `feat/trials-collect`, develop 병합 전)
+### 정답 데이터 — 심결례 수집
 
 통합 모델의 학습 데이터입니다. 특허심판원 심결문을 KIPRIS Plus 심판사항 API(항목별 검색 →
 심결문 조회 → PDF)로 받아 텍스트를 뽑고, 정규식으로 주문·결론 조문·선등록 번호를 추출해
 3등급으로 자동 선별한 뒤 사람이 라벨링합니다. 코드(`backend/scripts/trials_collect.py`,
-`backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py` 44건)와 설정
-(`KIPRIS_TRIAL_*`, `pymupdf==1.28.2`)은 2026-10-01 현재 브랜치에만 있고(커밋 3개, PR 전),
-데이터(`ml/data/trials/`)는 저장소에 넣지 않습니다.
+`backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py` 61건)와 설정
+(`KIPRIS_TRIAL_*`, `pymupdf==1.28.2`)은 저장소에 있고, 데이터(`ml/data/trials/`)는 저장소에 넣지
+않습니다.
 
 - 범위: 2016-01~2026-09 상표·특허심판원 심결 중 거절결정불복·무효·권리범위확인(적극·소극).
   취소(불사용취소 등)·보정각하불복·제척·기피는 유사 판단 사례가 아니라 제외합니다.
@@ -514,24 +514,36 @@ has_goods(set())                                                               #
   후보), 7호이지만 인지도 언급이 있거나 결론 조문을 못 뽑았으면 2등급(사람 확인), 각하·선등록상표
   소멸로 인한 취소·결론이 인지도 조항(9·11·12·13호)이나 식별력(33조)뿐인 사례는 3등급(유사 판단 없음).
   같은 청구인 + 같은 선등록 집합(family)은 첫 건만 1등급이고 나머지는 중복으로 표시합니다.
-- 현황(2026-09-30, 호출 924/950): 목록 129개월 42,474건(`list_all.csv`), 층화 표본 373건(권리범위확인
-  100·무효 130·거절결정불복 143) + 시범 20건 → PDF·텍스트 393건(스캔본 0), `labels.csv` 438행 — 자동
-  1등급 84건(1차 373건 중 77건)·2등급 161건·3등급 148건. 사람 라벨링 전. 권리범위확인 심결은 34조
-  결론이 없어 주문(속함/불속) 기준 규칙이 아직 없습니다.
-- 다음 단계: 2차 배치(`fetch_queue.csv` 1,071건 중 10월 예산 안에서 `fetch --queue`), 1등급 후보의
-  사람 큐레이션, 선등록 상표명·이미지 보강(출원속보 API 등록번호 검색, 건당 1~2회) → 통합 모델 학습.
+  권리범위확인은 34조 결론이 없는 것이 정상이라 판단 절의 표장 유사 소결(유사/비유사)로 1등급을 정하고,
+  효력제한(90조)·자유실시·식별력 없음·상품 비유사만·확인대상표장 불특정·상표적 사용 아님은 3등급,
+  유사여부 추정은 주문(속함/불속, 기각은 적극→불속·소극→속함)에서 읽습니다(2026-10-01 4단계). 결론을
+  소결 제목 아래서 읽으면 신뢰도 high, 판단 절 끝에서 폴백으로 읽으면 low 로 표시하고, 상대 표장
+  유형(선등록·선출원·선사용·국제등록·확인대상표장)·결정축·상표유형 추정 열을 함께 냅니다. 선출원 저촉
+  (35조 1항 = 구 8조 1항) 결론은 7호와 같이 다루되 표장 유사 소결이 있어야 1등급이고, 상대 표장 번호를
+  못 뽑은 건은 본문에서 "선등록·인용·선출원·확인대상·대비" 근처(±200자)의 번호를 `상대표장_번호_후보`로
+  냅니다. 권리범위확인의 family 는 청구인·피청구인·이 사건 등록상표로 묶습니다(확인대상표장은 번호가 없음).
+- 현황(2026-10-01, 호출 9월 924/950 · 10월 900/950): 목록 129개월 42,474건(`list_all.csv`),
+  1차 층화 표본 373건 + 시범 20건 + 2차 배치 450건(권리범위확인 280·무효 100·거절결정불복 70)
+  → PDF·텍스트 843건, `labels.csv` 1024행/843건 — 자동 1등급 331건(거절 106·무효 30·권리범위 195)·2등급 120·3등급 392,
+  상대 표장 번호 후보 복구 68건. 사람 라벨링 전. `sheet`가 `curation_queue.csv`(355건: 1등급을 권리범위확인 → 거절결정불복
+  → 무효, 신뢰도 high → low 순, 그다음 권리범위 저명·주지 언급 2등급 24건, family 중복 제외)를 함께 만들고,
+  `show --next`가 큐에서 유사여부_확정이 비어 있는 첫 건을 보여 줍니다(폴백으로 읽은 결론 문장은 `>>`). 확정 열을
+  채우면 `sheet` 재생성 때 보존되고 `status`가 진행률을 보여 줍니다.
+- 다음 단계: 1등급 후보의 사람 큐레이션, 남은 대기열 621건(11월 예산), 선등록 상표명·이미지
+  보강(출원속보 API 등록번호 검색, 건당 1~2회) → 통합 모델 학습.
 - 예산: KIPRIS 월 1,000회 한도를 출원속보 키와 분리해 `KIPRIS_TRIAL_ACCESS_KEY`·
   `KIPRIS_TRIAL_MONTHLY_BUDGET`(기본 950)·`KIPRIS_TRIAL_DAILY_BUDGET`(기본 300)으로 관리하고, 호출마다
   `ml/data/trials/calls.log`, 누계는 `quota.json`에 남깁니다. PDF 다운로드도 1회로 셉니다(가정,
   `KIPRIS_TRIAL_COUNT_DOWNLOADS=1`). `--dry-run`은 호출 0회로 계획만, `--max-calls`는 실행별 상한입니다.
 
 ```bash
-# 브랜치 feat/trials-collect, 프로젝트 루트에서. 실호출은 --max-calls 상한을 두고 사람이 결정한다.
+# 프로젝트 루트에서. 실호출은 --max-calls 상한을 두고 사람이 결정한다(--dry-run 으로 계획표·예산 확인).
 ml/venv/bin/python -m backend.scripts.trials_collect list --all-kinds --from 201601 --to 202609 --dry-run
 ml/venv/bin/python -m backend.scripts.trials_collect sample --scope 100 --invalidation 130 --refusal 145 --out ml/data/trials/sample.csv
-ml/venv/bin/python -m backend.scripts.trials_collect fetch --queue ml/data/trials/fetch_queue.csv --max-calls 300
+KIPRIS_TRIAL_DAILY_BUDGET=900 ml/venv/bin/python -m backend.scripts.trials_collect fetch --queue ml/data/trials/fetch_queue.csv --max-calls 900 --kind-priority scope,invalidation,refusal --kind-cap scope=280,invalidation=100,refusal=70
 ml/venv/bin/python -m backend.scripts.trials_collect extract
-ml/venv/bin/python -m backend.scripts.trials_collect sheet
+ml/venv/bin/python -m backend.scripts.trials_collect sheet      # 사람 열(유사여부_확정 등)은 보존
+ml/venv/bin/python -m backend.scripts.trials_collect show --next           # 큐레이션 큐의 다음 미확정 건(또는 show 2023100000403)
 ml/venv/bin/python -m backend.scripts.trials_collect status
 ```
 
@@ -585,11 +597,10 @@ npm run typecheck && npm run lint && npm test && npm run test:e2e && npm run bui
 npm audit --omit=dev --audit-level=high
 ```
 
-2026-10-01 검증(`main` = `develop` = `1c1512c`): Python `753 passed, 25 skipped`(가짜 ML 모드,
-X1 123건·X3 174건 포함; 심결례 파이프라인 테스트 44건은 브랜치에 있어 미포함), X3 실제 모델 검증
-`219 passed`, ruff 통과, frontend
-Vitest `61 passed`(17 파일), Playwright `9 passed`(스펙 3개 × 뷰포트 3개 320x568, 667x375,
-desktop). 2026-09-30 file 모드 실서버 스모크에서 `/health`가 `index_size`·`trademark_count` 1,100과
+2026-10-01 검증(`feat/trials-collect`, develop `7a4067b` 병합 후): Python `829 passed, 26 skipped`
+(가짜 ML 모드, X1 123건·X3 174건·심결례 파이프라인 61건 포함), X3 실제 모델 검증 `219 passed`,
+ruff 통과, frontend Vitest `77 passed`(19 파일), Playwright `15 passed`(스펙 5개 × 뷰포트 3개
+320x568, 667x375, desktop). 2026-09-30 file 모드 실서버 스모크에서 `/health`가 `index_size`·`trademark_count` 1,100과
 generation `20260827T035002Z-25f84a6eeb26`을 반환했고, X3 캐시 515건·`/semantic-search`
 cold 10~18ms·warm 2ms를 확인했습니다. 이 검증에서 KIPRIS `/name-check`는 호출하지 않았습니다.
 직전 기록(2026-09-22, `b6b9bba`)은 Python `541 passed, 1 skipped`, Vitest `52 passed`였습니다.
@@ -684,8 +695,6 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
   `fix(backend): …`, `docs(readme): …`.
 - `.env`, `ml/data/`(데이터·인덱스·호출 카운터), 인증키는 커밋하지 않습니다.
 - 태그 `v0.1-semester1`(`a4e3f11`, 2026-06-10)이 1학기 종료 기준선입니다.
-- 미병합 브랜치: `feat/trials-collect`(정답 데이터 파이프라인 1~3단계, 커밋 8fb53b0·f84e85d·6e24930,
-  PR 전) — 병합되면 README의 "브랜치, 병합 전" 표시를 지웁니다.
 - Dependabot(주간, pip·npm·docker·actions)이 열어 둔 PR 14건(#3~#16, 2026-10-01 현재)의
   처리 방침은 결정 예정입니다.
 

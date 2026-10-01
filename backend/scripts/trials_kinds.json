@@ -1,0 +1,44 @@
+{
+  "_comment": [
+    "다빈-1 심결례 수집(trials_collect.py list --kind) 의 심판종류(trialDesc) 설정.",
+    "2026-09-30 실호출(2024-01, 상표·특허심판원 전체 203건)에서 확인한 값으로 고정: 취소 97, 거절결정불복 93,",
+    "무효 11, 권리범위확인(적극적) 1, 권리범위확인(소극적) 1. '취소'(불사용취소 등)는 유사 판단 사례가 아니라 제외.",
+    "trialDesc 가 배열이면 list 는 값마다 1회씩 호출한다(월당 호출 = 값 개수). candidates 는 응답 원문 → kind 역매핑용."
+  ],
+  "refusal": {
+    "label": "거절결정불복",
+    "trialDesc": "거절결정불복",
+    "candidates": [
+      "거절결정불복"
+    ],
+    "verified": true,
+    "verified_at": "2026-09-30",
+    "count_202401": 93
+  },
+  "invalidation": {
+    "label": "등록무효",
+    "trialDesc": "무효",
+    "candidates": [
+      "무효",
+      "등록무효"
+    ],
+    "verified": true,
+    "verified_at": "2026-09-30",
+    "count_202401": 11
+  },
+  "scope": {
+    "label": "권리범위확인",
+    "trialDesc": [
+      "권리범위확인(적극적)",
+      "권리범위확인(소극적)"
+    ],
+    "candidates": [
+      "권리범위확인(적극적)",
+      "권리범위확인(소극적)",
+      "권리범위확인"
+    ],
+    "verified": true,
+    "verified_at": "2026-09-30",
+    "count_202401": 2
+  }
+}
