@@ -202,6 +202,9 @@ TEXT_REFUSAL = """심판번호 2021원500
 @pytest.fixture(autouse=True)
 def _fast_limiter(monkeypatch):
     monkeypatch.setattr(kc, "MIN_CALL_INTERVAL_SEC", 0.0)
+    # CI 에는 .env 가 없다 — Session.api_get 의 키 검사가 가짜 transport 테스트를 막지 않게 더미 키.
+    # 실호출 경로는 transport 주입으로 차단돼 있고, dry-run 테스트는 kc._get_client 를 막아 둔다.
+    monkeypatch.setenv("KIPRIS_TRIAL_ACCESS_KEY", "test-trial-key")
 
 
 def _list_args(tmp_path: Path, **overrides) -> argparse.Namespace:
