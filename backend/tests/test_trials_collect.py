@@ -568,7 +568,10 @@ def test_build_sheet_rows_splits_prior_marks_and_marks_missing_text():
     assert "34-11" in rows[0]["조문플래그"] and "저명" in rows[0]["조문플래그"]
     assert rows[2]["등급사유"] == "텍스트 미추출" and rows[2]["상표A_번호"] == "4020200012345"
     assert len(tc.build_sheet_rows(list_rows, prefilter, kinds)) == 2  # 기본은 추출된 건만
-    assert set(tc.LABEL_COLUMNS) >= {"유사여부_확정", "판단축", "제외사유", "메모", "family"}
+    assert set(tc.LABEL_COLUMNS) >= {
+        "유사여부_확정", "판단축_확정", "상표유형_확정", "제외사유", "메모", "family",
+        "상대표장_유형", "신뢰도", "표장유사_소결", "결정축_추정", "상표유형_추정",
+    }
 
 
 def test_family_dedupe_keeps_first_grade_one_only():
@@ -915,3 +918,639 @@ def test_network_error_is_retried_and_each_attempt_counts(tmp_path, monkeypatch)
         tc.run_list(_list_args(tmp_path, kind="", to="202402"), always_down)
     assert always_down.api_calls == tc.NETWORK_RETRIES + 1
 
+
+
+# ---------------- 4단계(2026-10-01): 권리범위확인 규칙 · 구 레이아웃 · 폴백·신뢰도 · 상대 표장 ·
+# 큐레이션 보조(sheet 보존·show·status) · fetch 종류별 상한·연속 오류 중단 ----------------
+
+# 2023당403 구조: 피청구인 답변의 "기각되어야" 가 주문 뒤 쪽 머리말·기초사실에 이어 나온다
+TEXT_SCOPE = """심판번호 2023당403
+사건표시 상표등록 제1697796호 권리범위확인(적극)
+주       문
+1. 확인대상표장은 상표등록 제1697796호의 권리범위에 속한다.
+2. 심판비용은 피청구인이 부담한다.
+(T)121.400-Y(09)
+2/6
+1. 기초사실
+가. 이 사건 등록상표
+(1) 등록번호/출원일/등록일/등록결정일 : 상표등록 제1697796호/2019. 10. 10./202
+1. 2. 26./2020. 12. 29.
+(2) 표  장 :
+(3) 지정상품 : 상품류 구분 제9류의 소방용 펌프
+나. 확인대상표장
+(1) 구 성 :
+(2) 사용업무 : 소방용 펌프
+2. 당사자의 주장 및 답변
+가. 청구인의 주장 요지
+나. 피청구인의 답변 요지
+피청구인은 이 사건 심판청구가 기각되어야 한다고 주장한다.
+3. 이해관계 유무
+4. 확인대상표장이 이 사건 등록상표의 권리범위에 속하는지 여부
+가. 표장의 유사 여부
+확인대상표장이 ‘Q-FIRE’ 부분만으로 분리관찰될 경우 이 사건 등록상표와 그 호칭이 동일하므로
+이 사건 등록상표와 확인대상표장은 전체적으로 유사한 표장에 해당한다.
+나. 상품의 유사 여부
+이 사건 등록상표의 지정상품 중 ‘소방용 펌프’와 확인대상표장의 사용상품인 ‘소방용 펌프’는
+동일한 상품이다.
+다. 소결론
+따라서 확인대상표장은 그 표장과 사용상품이 이 사건 등록상표의 표장 및 지정상품과 동일 또는
+유사하므로 이 사건 등록상표의 권리범위에 속한다 할 것이다.
+5. 결론
+그러므로 이 사건 심판청구는 이유있으므로 이를 인용하고 심판비용은 피청구인의 부담으로 하기로
+하여 주문과 같이 심결한다.
+"""
+SCOPE_SUB = (
+    "따라서 확인대상표장은 그 표장과 사용상품이 이 사건 등록상표의 표장 및 지정상품과 동일 또는\n"
+    "유사하므로 이 사건 등록상표의 권리범위에 속한다 할 것이다.\n"
+)
+SCOPE_ORDER = "1. 확인대상표장은 상표등록 제1697796호의 권리범위에 속한다.\n"
+
+
+def _scope(sub: str = SCOPE_SUB, order: str = SCOPE_ORDER, extra: str = "") -> dict:
+    text = TEXT_SCOPE.replace(SCOPE_SUB, sub).replace(SCOPE_ORDER, order)
+    if extra:
+        text = text.replace("나. 상품의 유사 여부\n", extra + "나. 상품의 유사 여부\n")
+    return tc.analyze_text(text)
+
+
+def test_scope_order_is_read_before_the_answer_and_graded_one():
+    analysis = _scope()
+    assert analysis["주문결과"] == "속함"  # 답변의 "기각되어야" 가 아니라 주문
+    assert analysis["주문"].startswith("1. 확인대상표장은")
+    assert analysis["판단절"] == "표장의 유사 여부|상품의 유사 여부|소결론"
+    assert analysis["결론조문"] == "" and analysis["결론_신뢰도"] == ""  # 34조 결론 없음 = 정상
+    assert analysis["표장유사_소결"] == "유사" and analysis["상품유사_소결"] == "유사"
+    assert analysis["소결_신뢰도"] == "high" and analysis["권리범위_근거"] == ""
+    assert analysis["상대표장_유형"] == "확인대상표장" and analysis["선등록_등록번호"] == ""
+    assert analysis["이사건_등록번호"] == "1697796"  # 날짜 줄바꿈 "1. 2. 26." 은 제목이 아니다
+    assert "호칭" in analysis["결정축_추정"] and "상품" in analysis["결정축_추정"]
+    assert analysis["상표유형_추정"] == "문자"
+    assert tc.classify(analysis, kind="scope") == (
+        "1", "권리범위: 표장 유사 소결, 인지도 언급 없음",
+    )
+    assert tc.estimate_similarity("scope", analysis, "권리범위확인(적극적)") == (
+        "유사", "주문 속함(scope)",
+    )
+
+
+def test_scope_exclusions_and_dismissal_reading():
+    not_belong = "1. 확인대상표장은 상표등록 제1697796호의 권리범위에 속하지 아니한다.\n"
+    applied = _scope(
+        "이상에서 살펴본 바와 같이 확인대상표장은 상표법 제90조 제1항 제2호에 해당하므로 이 사건\n"
+        "등록상표의 상표권 효력이 미치지 아니한다. 따라서 확인대상표장은 이 사건 등록상표와\n"
+        "대비할 필요 없이 이 사건 등록상표의 권리범위에 속하지 아니한다.\n",
+        not_belong,
+    )
+    assert applied["주문결과"] == "불속" and applied["권리범위_근거"] == "효력제한(90조)"
+    assert tc.classify(applied, kind="scope") == ("3", "권리범위: 효력제한(90조)")
+    assert tc.estimate_similarity("scope", applied, "권리범위확인(소극적)") == (
+        "비유사", "주문 불속(scope)",
+    )
+    rejected = _scope(
+        "이상과 같이, 확인대상표장은 이 사건 등록상표와 유사하고, 상표법 제90조 제1항 제3호에\n"
+        "의하여 이 사건 등록상표의 효력이 제한되는 경우에도 해당되지 않으므로, 확인대상표장은 이\n"
+        "사건 등록상표의 권리범위에 속한다 할 것이다.\n"
+    )
+    assert rejected["권리범위_근거"] == "" and tc.classify(rejected, kind="scope")[0] == "1"
+    goods_only = _scope(
+        "이상에서 본 바와 같이 확인대상표장은 그 사용상품이 이 사건 등록상표의 지정상품과 서로\n"
+        "비유사하므로 표장의 유사여부에 대하여 나아가 살펴보지 않더라도 이 사건 등록상표의\n"
+        "권리범위에 속하지 아니한다고 할 것이다.\n",
+        "1. 이 사건 심판청구를 기각한다.\n",
+    )
+    assert goods_only["주문결과"] == "기각"
+    assert goods_only["표장유사_소결"] == "" and goods_only["상품유사_소결"] == "비유사"
+    assert tc.classify(goods_only, kind="scope") == ("3", "권리범위: 상품 비유사만")
+    assert tc.estimate_similarity("scope", goods_only, "권리범위확인(적극적)") == (
+        "비유사", "주문 기각(적극적 권리범위확인 → 불속)",
+    )
+    assert tc.estimate_similarity("scope", goods_only, "권리범위확인(소극적)") == (
+        "유사", "주문 기각(소극적 권리범위확인 → 속함)",
+    )
+    not_use = _scope(
+        "그렇다면 확인대상표장은 상담업의 방법을 나타내는 표시로서 상표적으로 사용되었다고 할 수\n"
+        "없으므로 이 사건 등록상표의 권리범위에 속한다는 청구인의 주장은 이유없다.\n",
+        "1. 이 사건 심판청구를 기각한다.\n",
+    )
+    assert tc.classify(not_use, kind="scope") == ("3", "권리범위: 상표적 사용 아님")
+    plain = _scope("이상과 같이, 확인대상표장은 서비스표로 사용되었다고 할 수 없으므로, 이 사건\n"
+                   "등록서비스표의 권리범위에 속하지 않는다고 할 것이다.\n", not_belong)
+    assert tc.classify(plain, kind="scope") == ("3", "권리범위: 상표적 사용 아님")
+    identical = _scope(
+        "이상을 종합하면, 확인대상표장은 이 사건 등록상표와 표장이 동일하고, 그 사용\n"
+        "상품도 지정상품과 같으므로 이 사건 등록상표의 권리범위에 속한다.\n"
+    )
+    assert identical["표장유사_소결"] == "유사"  # 동일은 유사에 포함
+    assert tc.classify(identical, kind="scope")[0] == "1"
+    dismissed = _scope(order="1. 이 사건 심판청구를 각하한다.\n")
+    assert tc.classify(dismissed, kind="scope") == ("3", "각하(본안 판단 없음)")
+    assert tc.estimate_similarity("scope", dismissed, "권리범위확인(적극적)") == ("", "")
+
+
+def test_scope_fame_mentions_boilerplate_versus_substantive():
+    boiler = _scope(extra="등록상표의 주지저명성 그리고 사용자의 의도와 사용경위 등을 종합한다.\n")
+    assert boiler["본문_저명주지_실질"] == 0 and tc.classify(boiler, kind="scope")[0] == "1"
+    verb = _scope(extra="부가적 부분은 표장의 동일성 여부에 영향을 주지 않는다.\n")
+    assert verb["본문_주지"] == 0 and verb["본문_저명주지_실질"] == 0  # '주지 않는' 의 주지
+    real = _scope(extra="이 사건 등록상표는 국내에서 주지저명한 상표이다.\n")
+    assert real["본문_저명주지_실질"] == 1
+    assert tc.classify(real, kind="scope") == ("2", "권리범위: 표장 유사 소결이나 저명·주지 언급")
+    # 소결에 표장 판단이 없으면 판단 절 끝(앞 소제목의 결론)에서 찾는다 — 신뢰도 low
+    fallback = _scope("따라서 이 사건 심판청구는 이유 없다.\n", "1. 이 사건 심판청구를 기각한다.\n")
+    assert fallback["표장유사_소결"] == "유사" and fallback["소결_신뢰도"] == "low"
+    text = TEXT_SCOPE.replace(SCOPE_SUB, "따라서 이 사건 심판청구는 이유 없다.\n").replace(
+        "이 사건 등록상표와 확인대상표장은 전체적으로 유사한 표장에 해당한다.\n",
+        "양 표장을 대비한다.\n",
+    ).replace("동일한 상품이다", "같은 상품이다")
+    none = tc.analyze_text(text)
+    assert none["표장유사_소결"] == "" and none["소결_신뢰도"] == ""
+    assert tc.classify(none, kind="scope") == ("2", "권리범위: 표장 유사 소결 없음")
+
+
+# 2015당13(2017) 구 레이아웃: 번호 붙은 주문, "3. 판 단", 소결 제목 없이 다중 조문 나열 결론,
+# "- 7 -" 쪽 표시, 선등록(사용)·국제상표·선출원 상대 표장
+TEXT_OLD = """- 1 -
+특   허   심   판   원
+심       결
+심판번호 2015당13
+사건표시 서비스표등록 제307726호 무효
+주       문
+1. 이 사건 심판청구를 기각한다.
+2. 심판비용은 청구인이 부담한다.
+청 구 취 지
+1. 서비스표등록 제41-307726호는 그 등록을 무효로 한다.
+2. 심판비용은 피청구인의 부담으로 한다.
+이       유
+1. 기초사실
+가. 이 사건 등록서비스표
+(1) 등록번호/출원일/등록일 : 서비스표등록 제307726호/2013. 7. 10./2014. 12. 22.
+(3) 지정서비스업 : 서비스업류 구분 제43류의 카페업
+나. 선등록(사용)상표 1
+(1) 등록번호/출원일/등록일 : 상표등록 제904805호/2010. 10. 26./2012. 2. 15.
+다. 선등록(사용)상표 2
+(1) 등록번호/출원일/등록일 : 국제상표 1048069/2010. 6. 28./2011. 12. 29.
+라. 선출원서비스표
+(가) 출원번호/출원일 : 제41-2012-0012345호/2012. 10. 22.
+2. 양 당사자의 주장
+가. 청구인의 주장
+이 사건 등록서비스표는 구 상표법 제7조 제1항 제7호, 제11호 및 제12호에 해당한다고 주장한다.
+3. 판 단
+가. 판단기준
+나. 이 사건 등록서비스표와 선등록(사용)상표들의 대비
+- 7 -
+(1) 표장의 구성 및 외관의 대비
+양 표장은 외관이 서로 다르다.
+(2) 호칭 및 관념의 대비
+양 표장은 호칭 및 관념에 있어서도 서로 차이가 있다.
+4. 이 사건 등록서비스표가 구 상표법 제7조 제1항 제7호, 제11호 및 제12호에 해당하는지 
+여부
+위에서 살펴본 내용을 종합하면, 이 사건 등록서비스표는 선등록(사용)상표들과 유사하지 않다고
+판단된다.
+이 사건 등록서비스표가 선등록(사용)상표들과 동일 또는 유사하지 않은 이상, 이 사건
+등록서비스표는 구 상표법 제7조 제1항 제7호, 제11호 및 제12호에 해당한다고 할 수 없다.
+5. 결론
+그러므로 이 사건 심판청구를 기각하고 심판비용은 청구인의 부담으로 하기로 하여 주문과 같이
+심결한다.
+"""
+
+
+def test_old_layout_numbered_order_spaced_heading_and_article_list():
+    analysis = tc.analyze_text(TEXT_OLD)
+    assert analysis["주문결과"] == "기각" and analysis["주문"].startswith("1. 이 사건 심판청구를")
+    assert analysis["판단절"].startswith("판단기준|이 사건 등록서비스표와 선등록(사용)상표들의")
+    # 구법 7·11·12호 → 34조 7·12·13호, "해당한다고 할 수 없다" 는 부정, "해당하는지 여부" 는 제외
+    assert analysis["결론조문"] == "34-7:부정|34-12:부정|34-13:부정"
+    assert analysis["결론_신뢰도"] == "low"  # 소결 제목 없이 판단 절 끝에서 읽음
+    assert analysis["선등록_등록번호"] == "904805|1048069"
+    assert analysis["상대표장_유형"] == "선등록|선출원|선사용|국제등록"
+    assert analysis["선출원_출원번호"] == "4120120012345"
+    assert analysis["표장유사_소결"] == "비유사" and analysis["소결_신뢰도"] == "low"
+    assert analysis["결정축_추정"] == "외관|호칭|관념"
+    assert tc.classify(analysis) == ("3", "결론에 인지도 조문 34-12,34-13")
+
+
+def test_judgment_heading_variants_including_wrapped_lines():
+    base = TEXT_OLD.replace("3. 판 단\n", "3. 상표법제7조제1항제7호해당여부\n")
+    assert tc.analyze_text(base)["판단절"].startswith("판단기준|")
+    wrapped = TEXT_OLD.replace(
+        "3. 판 단\n", "3. 이 사건 등록서비스표가 구 상표법 제7조 제1항 제7호\n에 해당되는지 여부\n"
+    )
+    assert tc.analyze_text(wrapped)["판단절"].startswith("판단기준|")
+    assert tc.analyze_text(TEXT_OLD.replace("3. 판 단\n", "3. 거절결정의 당부\n"))["판단절"]
+    # "3. 이해관계 여부"·"3. 이 사건 심판청구의 적법 여부" 는 판단 절이 아니다
+    guarded = TEXT_OLD.replace(
+        "3. 판 단\n", "3. 이 사건 심판청구의 적법 여부\n가. 적법하다.\n3. 판 단\n"
+    )
+    assert tc.analyze_text(guarded)["판단절"].startswith("판단기준|")
+
+
+def test_old_layout_prior_application_clause_and_missing_ground():
+    text = TEXT_OLD.replace(
+        "이 사건 등록서비스표가 선등록(사용)상표들과 동일 또는 유사하지 않은 이상, 이 사건\n"
+        "등록서비스표는 구 상표법 제7조 제1항 제7호, 제11호 및 제12호에 해당한다고 할 수 없다.\n",
+        "다. 소결론\n그렇다면 이 사건 등록서비스표는 선등록서비스표들과 그 표장이 비유사하므로,\n"
+        "나아가 지정서비스업의 유사여부에 대하여 살펴보지 않더라도 구 상표법 제7조 제1항 제7호 및\n"
+        "제8조\n"
+        "제1항에 해당하는 무효사유가 존재하지 아니한다.\n",
+    )
+    analysis = tc.analyze_text(text)
+    assert analysis["결론조문"] == "34-7:부정|35-1:부정" and analysis["결론_신뢰도"] == "high"
+    assert tc.classify(analysis) == ("1", "결론 7호, 인지도 언급 없음")
+    assert tc.estimate_similarity("invalidation", analysis) == ("비유사", "결론 7호 부정")
+    # 선출원 저촉(35-1 = 구 8조1항)만 결론이면 7호와 같이: 표장 소결이 있으면 1등급, 추정은 7호 규칙
+    only_35 = tc.analyze_text(text.replace("제7조 제1항 제7호 및\n제8조\n제1항", "제8조\n제1항"))
+    assert only_35["결론조문"] == "35-1:부정"
+    assert tc.classify(only_35) == (
+        "1", "결론 35-1(선출원 저촉), 표장 비유사 소결, 인지도 언급 없음",
+    )
+    assert tc.estimate_similarity("invalidation", only_35) == (
+        "비유사", "결론 35-1(선출원 저촉) 부정",
+    )
+
+
+def test_conclusion_confidence_and_mark_verdict_inference():
+    with_heading = tc.analyze_text(TEXT_2024)
+    assert with_heading["결론_신뢰도"] == "high" and with_heading["표장유사_소결"] == "비유사"
+    no_heading = tc.analyze_text(TEXT_2024.replace("다. 소결론\n", "").replace("(다) 소결\n", ""))
+    assert no_heading["결론조문"] == "34-7:부정" and no_heading["결론_신뢰도"] == "low"
+    # 조문 없이 표장 소결만 있는 거절결정불복(거절이유 7호) → 7호로 추론, 신뢰도 low
+    inferred = tc.analyze_text(TEXT_2024.replace(
+        "다. 소결론\n따라서이사건출원상표는선등록상표와표장이유사하지않으므로, 그지정상품\n"
+        "이유사한지여부에관하여는나아가살펴볼필요없이상표법제34조제1항제7호에\n해당하지않는다.\n",
+        "다. 소결론\n따라서이사건출원상표는선등록상표와표장이비유사하다.\n",
+    ))
+    assert inferred["결론조문"] == "34-7:부정" and inferred["결론추론"] == "표장 소결 → 7호"
+    assert tc.classify(inferred) == ("1", "결론 7호, 인지도 언급 없음 (표장 소결 추론, 신뢰도 low)")
+    assert tc.estimate_similarity("refusal", inferred) == (
+        "비유사", "결론 7호 부정 — 표장 소결 추론",
+    )
+    # 당사자 주장·"해당한다는 이유로 거절한 원결정은 … 타당하지 아니하다" 판독
+    reversed_ground = tc.analyze_text(TEXT_2024.replace(
+        "상표법제34조제1항제7호에\n해당하지않는다.", "상표법제34조제1항제7호에해당한다는이유로\n"
+        "그등록을거절한원결정은더이상타당하지아니하다.",
+    ))
+    assert reversed_ground["결론조문"] == "34-7:부정"
+    claim = tc.analyze_text(TEXT_2024.replace(
+        "다. 소결론\n", "다. 소결론\n청구인은상표법제34조제1항제7호에해당한다고주장한다.\n"
+    ))
+    assert claim["결론조문"] == "34-7:부정"  # 주장 문장은 건너뛴다
+
+
+def test_estimate_marks_goods_only_negative_and_mismatch():
+    goods_negative = tc.estimate_similarity("refusal", {
+        "결론조문": "34-7:부정", "주문결과": "취소", "표장유사_소결": "", "상품유사_소결": "비유사",
+    })
+    assert goods_negative == ("", "결론 7호 부정은 상품 비유사 때문 — 표장 판단 없음")
+    corrected = tc.estimate_similarity("refusal", {
+        "결론조문": "34-7:부정", "주문결과": "취소", "표장유사_소결": "유사",
+        "상품유사_소결": "비유사",
+    })
+    assert corrected == ("유사", "소결 표장 유사(상품 비유사로 결론 7호 부정)")
+    mismatch = tc.estimate_similarity("invalidation", {
+        "결론조문": "34-7:긍정", "주문결과": "무효", "표장유사_소결": "비유사", "상품유사_소결": "",
+    })
+    assert mismatch == ("유사", "결론 7호 긍정 · 소결 표장 비유사와 불일치")
+    assert tc.estimate_similarity("invalidation", _analysis("34-7:모름", 주문결과="일부무효")) == (
+        "유사", "주문 일부무효(invalidation)",
+    )
+
+
+# 추출 순서가 뒤바뀐 심결문: 주문 제목 뒤에 쪽 머리말·기초사실, 주문 문장은 그 뒤, 청구취지는 다음
+TEXT_REORDERED = """주       문
+(T)111.270-V(03)
+2/24
+1. 기초사실
+가. 이 사건 등록상표
+(1) 등록번호/출원일 : 상표등록 제1674764호/2020. 8. 18.
+(3) 지정상품 : 상품류 구분 제3류의 화장품
+나. 선등록상표
+(1) 등록번호 : 상표등록 제1000002호
+1. 이 사건 심판청구를 기각한다.
+2. 심판비용은 청구인이 부담한다.
+청 구 취 지
+1. 상표등록 제1674764호는 그 등록을 무효로 한다.
+2. 심판비용은 피청구인이 부담한다.
+이       유
+2. 당사자의 주장
+3. 판단
+가. 판단기준
+나. 소결론
+이 사건 등록상표는 선등록상표와 표장이 비유사하므로 상표법 제34조 제1항 제7호에 해당하지
+아니한다.
+4. 결론
+그러므로 이 사건 심판청구는 이유 없으므로 이를 기각한다.
+"""
+
+
+def test_reordered_order_block_partial_invalidation_and_cancelled_prior_mark():
+    analysis = tc.analyze_text(TEXT_REORDERED)
+    assert analysis["주문"].startswith("1. 이 사건 심판청구를 기각한다.")
+    assert analysis["주문결과"] == "기각"
+    assert analysis["이사건_등록번호"] == "1674764" and analysis["선등록_등록번호"] == "1000002"
+    assert analysis["결론조문"] == "34-7:부정" and tc.classify(analysis)[0] == "1"
+    partial = tc.analyze_text(TEXT_REORDERED.replace(
+        "1. 이 사건 심판청구를 기각한다.\n",
+        "1. 상표등록 제1674764호의 지정상품 중 ‘화장품’의 등록을 무효로 하고, 나머지 청구는\n"
+        "기각한다.\n",
+    ).replace("이유 없으므로 이를 기각한다", "일부 이유 있다"))
+    assert partial["주문결과"] == "일부무효"
+    gone = tc.analyze_text(TEXT_REORDERED.replace(
+        "이 사건 등록상표는 선등록상표와 표장이 비유사하므로 상표법 제34조 제1항 제7호에 해당하지\n"
+        "아니한다.\n",
+        "선등록상표는 등록무효심결이 확정되어 선원의 지위를 소급적으로 상실하였으므로 이 사건\n"
+        "등록상표는 상표법 제34조 제1항 제7호에 해당하지 아니한다.\n",
+    ))
+    assert gone["선등록소멸취소"] == 1  # 무효심판 기각이라도 선등록상표 소멸이면 유사 판단 없음
+    assert tc.classify(gone) == ("3", "유사 판단 없음(선등록상표 소멸·무효로 취소)")
+
+
+# ---- 큐레이션 보조: sheet 가 사람 열을 보존, show, status ----
+
+def _list_row(number: str, desc: str, title: str = "X", plaintiff: str = "주식회사 갑") -> dict:
+    return {"심판번호": number, "종류": desc, "심판상태": "심결", "심결월": "202401",
+            "상표명칭": title, "출원번호": "", "등록번호": "", "청구인": plaintiff,
+            "피청구인": "을"}
+
+
+def test_sheet_keeps_human_columns_across_regeneration(tmp_path, capsys):
+    kinds = tc.load_kinds(KINDS)
+    list_rows = [_list_row("A", "무효", "루이"), _list_row("S", "권리범위확인(적극적)", "Q-FIRE")]
+    prefilter = [{"심판번호": "A", **tc.analyze_text(TEXT_FAME)},
+                 {"심판번호": "S", **tc.analyze_text(TEXT_SCOPE)}]
+    rows = tc.build_sheet_rows(list_rows, prefilter, kinds)
+    assert [(r["심판번호"], r["상표B_번호"]) for r in rows] == [
+        ("A", "123456"), ("A", "234567"), ("S", ""),
+    ]
+    assert rows[2]["자동등급"] == "1" and rows[2]["신뢰도"] == "high"
+    assert rows[2]["상대표장_유형"] == "확인대상표장" and rows[2]["유사여부_추정"] == "유사"
+    previous = [
+        {"심판번호": "A", "상표B_번호": "123456", "유사여부_확정": "유사", "판단축": "외관"},
+        {"심판번호": "A", "상표B_번호": "234567", "유사여부_확정": "비유사", "판단축": "호칭",
+         "제외사유": "", "메모": "둘째 선등록만 봄"},  # 4단계 전 열 이름(판단축)
+        {"심판번호": "S", "상표B_번호": "9", "유사여부_확정": "유사", "상표유형_확정": "문자",
+         "제외사유": "", "메모": ""},  # 이전 행이 하나뿐이면 상표B 가 달라도 심판번호로 옮긴다
+        {"심판번호": "Z", "상표B_번호": "", "유사여부_확정": "유사"},  # 사라진 건은 버린다
+    ]
+    assert tc.merge_human_columns(rows, previous) == 3
+    assert rows[0]["유사여부_확정"] == "유사" and rows[0]["판단축_확정"] == "외관"
+    assert rows[1]["유사여부_확정"] == "비유사" and rows[1]["판단축_확정"] == "호칭"
+    assert rows[1]["메모"] == "둘째 선등록만 봄"
+    assert rows[2]["유사여부_확정"] == "유사" and rows[2]["상표유형_확정"] == "문자"
+    # 이전 행이 여럿인데 상표B 가 모두 다르면 어느 판단인지 몰라 비워 둔다
+    fresh = tc.build_sheet_rows(list_rows, prefilter, kinds)
+    assert tc.merge_human_columns(fresh, [
+        {"심판번호": "A", "상표B_번호": "1", "유사여부_확정": "유사"},
+        {"심판번호": "A", "상표B_번호": "2", "유사여부_확정": "비유사"},
+    ]) == 0
+
+    # 파일 왕복: labels.csv 를 사람 열이 채워진 상태로 두고 sheet 를 다시 돌린다
+    paths_ = tc.TrialPaths(tmp_path)
+    tc._write_csv(paths_.list_csv, tc.LIST_COLUMNS, list_rows)
+    tc._write_csv(paths_.prefilter_csv, tc.PREFILTER_COLUMNS, prefilter)
+    tc._write_csv(paths_.labels_csv, tc.LABEL_COLUMNS, rows)
+    session = tc.Session(paths=paths_, dry_run=True)
+    assert tc.run_sheet(argparse.Namespace(kinds_config=KINDS), session) == 0
+    again = _rows(paths_.labels_csv)
+    assert [r["유사여부_확정"] for r in again] == ["유사", "비유사", "유사"]
+    assert again[2]["상표유형_확정"] == "문자" and again[1]["판단축_확정"] == "호칭"
+    assert "사람 열 보존 3행" in capsys.readouterr().out
+    assert tc.curation_progress(again).startswith("큐레이션: 1등급 1건 중 유사여부_확정 1건(100%)")
+    assert "전체 확정 2/2건 · 제외사유 0건" in tc.curation_progress(again)
+
+
+def test_show_prints_order_judgment_and_auto_verdict(tmp_path, capsys):
+    paths_ = tc.TrialPaths(tmp_path)
+    paths_.text_dir.mkdir(parents=True)
+    (paths_.text_dir / "2023100000403.txt").write_text(TEXT_SCOPE, encoding="utf-8")
+    tc._write_csv(paths_.list_csv, tc.LIST_COLUMNS,
+                  [_list_row("2023100000403", "권리범위확인(적극적)", "Q-FIRE")])
+    session = tc.Session(paths=paths_, dry_run=True)
+    args = argparse.Namespace(kinds_config=KINDS, trial=["2023100000403", "9999"])
+    assert tc.run_show(args, session) == 1  # 9999 는 텍스트 없음
+    out = capsys.readouterr()
+    assert "## 2023100000403 · 권리범위확인(적극적)" in out.out
+    assert "→ 주문결과 속함" in out.out and "4. 확인대상표장이 이 사건 등록상표의" in out.out
+    assert "- 등급 1 — 권리범위: 표장 유사 소결, 인지도 언급 없음 (신뢰도 high)" in out.out
+    assert "- 유사여부 추정 유사 — 주문 속함(scope)" in out.out
+    assert "상대 표장 확인대상표장" in out.out and "(T)121" not in out.out
+    assert "9999" in out.err
+
+
+# ---- fetch: 종류별 상한 · 계획표 · 연속 오류 중단 ----
+
+def test_parse_kind_caps_and_capped_selection():
+    assert tc.parse_kind_caps("scope=280, invalidation=100,refusal=70") == {
+        "scope": 280, "invalidation": 100, "refusal": 70,
+    }
+    assert tc.parse_kind_caps("") == {}
+    for bad in ("scope", "scope=x", "scope=-1"):
+        with pytest.raises(ValueError):
+            tc.parse_kind_caps(bad)
+    kinds = tc.load_kinds(KINDS)
+    rows = [{"심판번호": str(i), "kind": k, "종류": "", "심결문유무": "Y"}
+            for i, k in enumerate("scope scope invalidation refusal scope invalidation".split())]
+    picked = tc.select_fetch_targets(rows, 0, ["invalidation", "scope"], False, set(), kinds,
+                                     {"scope": 2, "invalidation": 1})
+    # 우선순위 정렬 → 종류별 상한(refusal 은 상한 없음)
+    assert [r["심판번호"] for r in picked] == ["2", "0", "1", "3"]
+    assert len(tc.select_fetch_targets(rows, 3, [], False, set(), kinds, {"scope": 1})) == 3
+
+
+def test_fetch_queue_plan_and_consecutive_error_stop(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(tc, "COUNT_DOWNLOADS", True)
+    monkeypatch.setattr(tc, "NETWORK_BACKOFF_SEC", 0.0)
+    queue = tmp_path / "queue.csv"
+    tc._write_csv(queue, ["심판번호", "kind", "종류"], [
+        {"심판번호": str(i), "kind": "scope" if i < 6 else "refusal", "종류": ""} for i in range(8)
+    ])
+    args = argparse.Namespace(limit=0, skip_no_doc=False, retry_failed=False, queue=str(queue),
+                              kind_priority="scope,refusal", kind_cap="scope=6,refusal=1")
+    session = _session(tmp_path, lambda url, params: XML_DOC, downloader=_fake_pdf_downloader,
+                       dry_run=True, max_calls=12)
+    assert tc.run_fetch(args, session) == 0
+    out = capsys.readouterr().out
+    assert "이번 대상 7건" in out and "refusal 1건(호출 2) · scope 6건(호출 12)" in out
+    assert "예상 호출 14회 / 하드캡 12회" in out and "하드캡에서 중단된다" in out
+
+    def failing(url, params):
+        raise kc.KiprisError("KIPRIS 오류 resultCode=22 한도 초과", result_code="22")
+
+    session = _session(tmp_path, failing, downloader=_fake_pdf_downloader, max_calls=100)
+    assert tc.run_fetch(args, session) == 5  # 연속 5회 오류 → 중단
+    assert session.api_calls == 5 and session.downloads == 0
+    log = _rows(session.paths.fetch_log)
+    assert [r["결과"] for r in log] == ["error"] * 5 and log[0]["파일명"] == "KiprisError/22"
+    assert "오류 응답 연속 5회" in capsys.readouterr().out
+
+    attempts: list[str] = []
+
+    def flaky(url, params):
+        attempts.append(params["trialNumber"])
+        if len(attempts) <= 2:
+            raise kc.KiprisProtocolError("깨진 응답")
+        return XML_DOC
+
+    retry = argparse.Namespace(**{**vars(args), "retry_failed": True})
+    session = _session(tmp_path, flaky, downloader=_fake_pdf_downloader, max_calls=100)
+    assert tc.run_fetch(retry, session) == 0  # 2회 실패 뒤 성공 → 연속 카운터 초기화, 계속 진행
+    assert session.downloads == 5
+    assert len([r for r in _rows(session.paths.fetch_log) if r["결과"] == "ok"]) == 5
+
+    def over_budget(url, params):
+        raise kc.CallBudgetExceeded("예산 초과")
+
+    session = _session(tmp_path, over_budget, downloader=_fake_pdf_downloader, max_calls=100)
+    with pytest.raises(kc.CallBudgetExceeded):  # 예산 초과는 즉시 중단(main 이 exit 4)
+        tc.run_fetch(argparse.Namespace(**{**vars(args), "retry_failed": True}), session)
+
+
+# ---------------- 4단계 보강(2026-10-01): 35-1 을 7호처럼 · 상대 표장 번호 후보 · 큐레이션 큐 ----
+
+def test_prior_application_conflict_is_graded_like_article_seven():
+    text = TEXT_OLD.replace(
+        "라. 선출원서비스표\n(가) 출원번호/출원일 : 제41-2012-0012345호/2012. 10. 22.\n", ""
+    ).replace(
+        "이 사건 등록서비스표가 선등록(사용)상표들과 동일 또는 유사하지 않은 이상, 이 사건\n"
+        "등록서비스표는 구 상표법 제7조 제1항 제7호, 제11호 및 제12호에 해당한다고 할 수 없다.\n",
+        "다. 소결론\n그렇다면 이 사건 등록서비스표는 선등록서비스표와 그 표장이 비유사하므로\n"
+        "구 상표법 제8조 제1항에 해당하는 무효사유가 존재하지 아니한다.\n",
+    )
+    analysis = tc.analyze_text(text)
+    assert analysis["결론조문"] == "35-1:부정" and analysis["표장유사_소결"] == "비유사"
+    assert analysis["상대표장_유형"] == "선등록|선출원|선사용|국제등록"  # 제목이 없어도 선출원 추가
+    assert tc.classify(analysis) == (
+        "1", "결론 35-1(선출원 저촉), 표장 비유사 소결, 인지도 언급 없음",
+    )
+    assert tc.estimate_similarity("invalidation", analysis) == (
+        "비유사", "결론 35-1(선출원 저촉) 부정",
+    )
+    # 표장 소결이 없으면 검토(2등급), 본문에 부정한 목적이 있어도 2등급
+    plain = tc.analyze_text(text.replace(
+        "그렇다면 이 사건 등록서비스표는 선등록서비스표와 그 표장이 비유사하므로\n",
+        "그렇다면 이 사건 등록서비스표는\n",
+    ).replace("양 표장은 외관이 서로 다르다.\n", "").replace(
+        "양 표장은 호칭 및 관념에 있어서도 서로 차이가 있다.\n", ""
+    ).replace("이 사건 등록서비스표는 선등록(사용)상표들과 유사하지 않다고\n판단된다.\n", ""))
+    assert plain["표장유사_소결"] == ""
+    assert tc.classify(plain) == ("2", "결론 35-1(선출원 저촉)이나 표장 소결 없음")
+    fame = tc.analyze_text(
+        text.replace("가. 판단기준\n", "가. 판단기준\n부정한 목적이 인정된다.\n")
+    )
+    assert tc.classify(fame) == ("2", "결론 35-1(선출원 저촉)이나 본문에 부정한 목적")
+
+
+TEXT_PROSE = """주       문
+1. 이 사건 심판청구를 기각한다.
+2. 심판비용은 청구인이 부담한다.
+이       유
+1. 이 사건 등록상표(상표등록 제1000001호, 지정상품 제30류 커피)는 2020. 1. 1. 등록되었다.
+청구인은 이 사건 등록상표가 선등록상표(상표등록 제1234567호)와 유사하다고 주장하고, 선출원상표
+제40-2012-12345호와 국제등록 제987654호도 인용한다.
+2. 판단
+가. 판단기준
+나. 대비
+이 사건 등록상표와 선등록상표는 외관·호칭·관념이 서로 달라 비유사하다.
+""" + "무관한 내용. " * 60 + """
+위 등록 제5555555호는 건외 상표이다.
+다. 소결론
+따라서 이 사건 등록상표는 상표법 제34조 제1항 제7호에 해당하지 아니한다.
+3. 결론
+그러므로 이 사건 심판청구를 기각한다.
+"""
+
+
+def test_candidate_counterpart_numbers_recovered_from_prose():
+    analysis = tc.analyze_text(TEXT_PROSE)
+    assert analysis["선등록_등록번호"] == "" and analysis["상대표장_유형"] == ""  # 제목 없음
+    # 이 사건 번호 제외, 선등록·선출원·인용 근처(±200자)만, 멀리 떨어진 건외 번호는 제외
+    assert analysis["상대표장_번호_후보"] == "1234567;4020120012345;987654"
+    assert tc.candidate_counterpart_numbers("선등록상표 출원 제40-2020-0000001호", set()) == [
+        "4020200000001",
+    ]
+    assert tc.candidate_counterpart_numbers("상표등록 제1000호와 대비", {"1000"}) == []
+    regular = tc.analyze_text(TEXT_FAME)
+    assert regular["선등록_등록번호"] == "123456|234567" and regular["상대표장_번호_후보"] == ""
+    kinds = tc.load_kinds(KINDS)
+    rows = tc.build_sheet_rows([_list_row("P", "무효")], [{"심판번호": "P", **analysis}], kinds)
+    assert rows[0]["상표B_번호"] == "" and rows[0]["상대표장_번호_후보"].startswith("1234567;")
+
+
+def test_curation_queue_order_and_show_next(tmp_path, capsys):
+    kinds = tc.load_kinds(KINDS)
+    scope = tc.analyze_text(TEXT_SCOPE)
+    scope_low = dict(scope, 소결_신뢰도="low")
+    fame = dict(scope, 본문_저명주지_실질=1)
+    refusal = tc.analyze_text(TEXT_2024)
+    invalid = tc.analyze_text(TEXT_SIMILAR)
+    prose = tc.analyze_text(TEXT_PROSE)
+    list_rows = [
+        _list_row("S1", "권리범위확인(적극적)", "A", "갑1"),
+        _list_row("S2", "권리범위확인(소극적)", "B", "갑2"),
+        _list_row("S3", "권리범위확인(적극적)", "C", "갑3"), _list_row("R1", "거절결정불복", "D"),
+        _list_row("I1", "무효", "E"), _list_row("I2", "무효", "E2"),
+        _list_row("P1", "무효", "F", "병"),
+        # 같은 청구인·피청구인·등록상표를 둔 권리범위확인 쌍둥이 사건은 중복, 상대가 다르면 별건
+        _list_row("S4", "권리범위확인(적극적)", "A", "갑1"),
+        {**_list_row("S5", "권리범위확인(적극적)", "A", "갑1"), "피청구인": "정"},
+    ]
+    prefilter = [
+        {"심판번호": "S1", **scope_low}, {"심판번호": "S2", **scope}, {"심판번호": "S3", **fame},
+        {"심판번호": "R1", **refusal}, {"심판번호": "I1", **invalid}, {"심판번호": "I2", **invalid},
+        {"심판번호": "P1", **prose}, {"심판번호": "S4", **scope}, {"심판번호": "S5", **scope},
+    ]
+    rows = tc.build_sheet_rows(list_rows, prefilter, kinds)
+    by = {r["심판번호"]: r for r in rows}
+    assert by["I2"]["등급사유"].startswith("family 중복")  # 같은 청구인·같은 선등록 → 큐에서 제외
+    assert by["S4"]["등급사유"].startswith("family 중복(첫 건 S1)") and by["S5"]["자동등급"] == "1"
+    queue = tc.build_curation_queue(rows, kinds)
+    assert [q["심판번호"] for q in queue] == ["S2", "S5", "S1", "R1", "I1", "P1", "S3"]
+    assert [q["순번"] for q in queue] == [1, 2, 3, 4, 5, 6, 7]
+    assert queue[1]["신뢰도"] == "high" and queue[2]["신뢰도"] == "low"
+    assert queue[4]["상대표장_번호"] == "1000001"
+    assert queue[5]["상대표장_번호"].startswith("1234567;")
+    assert queue[6]["등급사유"] == "권리범위: 표장 유사 소결이나 저명·주지 언급"
+    assert set(queue[0]) == set(tc.CURATION_COLUMNS)
+
+    paths_ = tc.TrialPaths(tmp_path)
+    paths_.text_dir.mkdir(parents=True)
+    for number, text in (("S2", TEXT_SCOPE), ("S5", TEXT_SCOPE), ("R1", TEXT_2024)):
+        (paths_.text_dir / f"{number}.txt").write_text(text, encoding="utf-8")
+    tc._write_csv(paths_.list_csv, tc.LIST_COLUMNS, list_rows)
+    tc._write_csv(paths_.prefilter_csv, tc.PREFILTER_COLUMNS, prefilter)
+    session = tc.Session(paths=paths_, dry_run=True)
+    assert tc.run_sheet(argparse.Namespace(kinds_config=KINDS), session) == 0
+    assert "큐레이션 큐 7건(1등급 6 · 권리범위 저명·주지 언급 1)" in capsys.readouterr().out
+    assert [q["심판번호"] for q in _rows(paths_.curation_queue)][:2] == ["S2", "S5"]
+
+    args = argparse.Namespace(kinds_config=KINDS, trial=[], next=True)
+    assert tc.run_show(args, session) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("큐 1/7 · 권리범위: 표장 유사 소결, 인지도 언급 없음")
+    assert "## S2 ·" in out
+    labels = _rows(paths_.labels_csv)
+    for row in labels:
+        if row["심판번호"] == "S2":
+            row["유사여부_확정"] = "유사"
+    tc._write_csv(paths_.labels_csv, tc.LABEL_COLUMNS, labels)
+    assert tc.run_show(args, session) == 0
+    assert "큐 2/7" in capsys.readouterr().out  # S2 확정 → 다음은 S5
+    assert tc.run_show(argparse.Namespace(kinds_config=KINDS, trial=[], next=False), session) == 2
+
+
+def test_show_marks_fallback_conclusion_sentence(tmp_path, capsys):
+    no_heading = TEXT_2024.replace("다. 소결론\n", "").replace("(다) 소결\n", "")
+    paths_ = tc.TrialPaths(tmp_path)
+    paths_.text_dir.mkdir(parents=True)
+    (paths_.text_dir / "X.txt").write_text(no_heading, encoding="utf-8")
+    session = tc.Session(paths=paths_, dry_run=True)
+    show_x = argparse.Namespace(kinds_config=KINDS, trial=["X"], next=False)
+    assert tc.run_show(show_x, session) == 0
+    out = capsys.readouterr().out
+    assert "### 판단 절 (>> 폴백으로 읽은 결론 문장)" in out
+    assert ">> 이유사한지여부에관하여는나아가살펴볼필요없이상표법제34조제1항제7호에" in out
+    assert ">> 따라서이사건출원상표는선등록상표와표장이유사하지않으므로, 그지정상품" in out
+    assert "(신뢰도 low)" in out
+    (paths_.text_dir / "Y.txt").write_text(TEXT_2024, encoding="utf-8")
+    show_y = argparse.Namespace(kinds_config=KINDS, trial=["Y"], next=False)
+    assert tc.run_show(show_y, session) == 0
+    assert ">> " not in capsys.readouterr().out  # 소결 제목 아래서 읽으면 표시 없음

@@ -4,8 +4,10 @@
     list     월별 항목별검색(getAdvancedSearch)으로 상표 심판 목록 → ml/data/trials/list.csv
     fetch    심판(결)문(getJudDocumentInfoSearch) 경로 조회 → 즉시 PDF 다운로드 → pdf/{심판번호}.pdf
     extract  PyMuPDF 텍스트 추출 + 정규식 선별 → text/{심판번호}.txt, prefilter.csv
-    sheet    사람 라벨링용 시트 초안 → labels.csv
-    status   예산(quota.json)·건수·단계별 진행 요약
+    sheet    사람 라벨링용 시트 초안 → labels.csv (재생성 때 사람 열 보존)
+    show     심판번호의 주문·판단 절·자동 판정 보기 (--next: curation_queue.csv 의 다음 미확정 건)
+    status   예산(quota.json)·건수·단계별 진행·큐레이션 진행률 요약
+    sample   층화 표본 CSV (호출 없음) · biblio 서지상세 (1회/건)
 
 실행 (project root 기준):
     ml/venv/bin/python -m backend.scripts.trials_collect list --kind refusal \\
@@ -189,6 +191,10 @@ class TrialPaths:
     def biblio_dir(self) -> Path:
         return self.base / "biblio"
 
+    @property
+    def curation_queue(self) -> Path:
+        return self.base / "curation_queue.csv"
+
 
 DEFAULT_PATHS = TrialPaths(paths.ML_DATA_DIR / "trials")
 
@@ -197,10 +203,14 @@ LIST_COLUMNS = [
     "청구인", "피청구인", "심결문유무", "원본JSON",
 ]
 FETCH_LOG_COLUMNS = ["심판번호", "결과", "파일명", "kind", "일시"]
+# 사람이 채우는 열(sheet 재생성 때 심판번호·상표B_번호 기준으로 보존). 판단축 은 4단계 전 이름.
+HUMAN_COLUMNS = ("유사여부_확정", "판단축_확정", "상표유형_확정", "제외사유", "메모")
+LEGACY_HUMAN_COLUMNS = {"판단축": "판단축_확정"}
 LABEL_COLUMNS = [
     "심판번호", "종류", "심판상태", "심결월", "상표A_번호", "상표A_명칭", "상표B_번호",
-    "지정상품_원문", "조문플래그", "결론조문", "자동등급", "등급사유", "등급_원규칙", "family",
-    "참고표시", "유사여부_추정", "추정근거", "유사여부_확정", "판단축", "제외사유", "메모",
+    "상대표장_번호_후보", "상대표장_유형", "지정상품_원문", "조문플래그", "결론조문", "신뢰도",
+    "표장유사_소결", "자동등급", "등급사유", "등급_원규칙", "family", "참고표시", "유사여부_추정",
+    "추정근거", "결정축_추정", "상표유형_추정", *HUMAN_COLUMNS,
 ]
 
 
@@ -636,6 +646,30 @@ def pending_fetch_rows(paths_: TrialPaths, *, skip_no_doc: bool, retry_failed: b
     return pending
 
 
+def parse_kind_caps(value: str) -> dict[str, int]:
+    """--kind-cap "scope=280,invalidation=100,refusal=70" → {kind: 상한}. 형식 오류는 ValueError."""
+    caps: dict[str, int] = {}
+    for part in (value or "").split(","):
+        part = part.strip()
+        if not part:
+            continue
+        if "=" not in part:
+            raise ValueError(f"--kind-cap 형식은 kind=건수 입니다: {part!r}")
+        kind, raw = part.split("=", 1)
+        try:
+            caps[kind.strip()] = int(raw)
+        except ValueError:
+            raise ValueError(f"--kind-cap 건수가 정수가 아닙니다: {part!r}") from None
+        if caps[kind.strip()] < 0:
+            raise ValueError(f"--kind-cap 건수는 0 이상이어야 합니다: {part!r}")
+    return caps
+
+
+def row_kind(row: dict, kinds: dict[str, dict]) -> str:
+    """표본·큐 CSV 의 kind 열이 있으면 그 값, 없으면 종류(trialDesc)로 역매핑."""
+    return (row.get("kind") or "").strip() or kind_for_trial_desc(row.get("종류", ""), kinds)
+
+
 def select_fetch_targets(
     pending: list[dict],
     limit: int,
@@ -643,18 +677,29 @@ def select_fetch_targets(
     prefer_doc: bool,
     trials: set[str],
     kinds: dict[str, dict],
+    kind_caps: dict[str, int] | None = None,
 ) -> list[dict]:
-    """대상 선정: --trial 지정 건만 / 종류 우선순위 / 심결문유무 Y 우선 (안정 정렬)."""
+    """대상 선정: --trial 지정 건만 / 종류 우선순위 / 심결문유무 Y 우선 / 종류별 상한 / 건수."""
     if trials:
         pending = [row for row in pending if row["심판번호"] in trials]
 
     def sort_key(row: dict) -> tuple[int, int]:
-        kind = kind_for_trial_desc(row.get("종류", ""), kinds)
+        kind = row_kind(row, kinds)
         rank = kind_priority.index(kind) if kind in kind_priority else len(kind_priority)
         has_doc = 0 if row.get("심결문유무", "").upper() == "Y" else 1
         return (rank if kind_priority else 0, has_doc if prefer_doc else 0)
 
     ordered = sorted(pending, key=sort_key) if (kind_priority or prefer_doc) else list(pending)
+    if kind_caps:
+        taken: dict[str, int] = {}
+        capped: list[dict] = []
+        for row in ordered:
+            kind = row_kind(row, kinds)
+            if kind in kind_caps and taken.get(kind, 0) >= kind_caps[kind]:
+                continue
+            taken[kind] = taken.get(kind, 0) + 1
+            capped.append(row)
+        ordered = capped
     return ordered[:limit] if limit else ordered
 
 
@@ -672,6 +717,11 @@ def queued_fetch_rows(paths_: TrialPaths, queue_path: Path, *, retry_failed: boo
     return pending
 
 
+# 오류 응답(resultCode≠00·네트워크·프로토콜)이 연속으로 이만큼 오면 중단한다 — 한도 초과 등
+# 상태성 오류에서 호출만 낭비하는 것을 막는다. 예산 초과(CallBudgetExceeded)는 즉시 중단(exit 4).
+MAX_CONSECUTIVE_ERRORS = 5
+
+
 def run_fetch(args: argparse.Namespace, session: Session) -> int:
     queue = getattr(args, "queue", None)
     if queue:
@@ -682,40 +732,74 @@ def run_fetch(args: argparse.Namespace, session: Session) -> int:
         )
     raw_priority = getattr(args, "kind_priority", "") or ""
     priority = [k.strip() for k in raw_priority.split(",") if k.strip()]
+    kinds = load_kinds(getattr(args, "kinds_config", KINDS_CONFIG_PATH))
+    caps = parse_kind_caps(getattr(args, "kind_cap", "") or "")
     targets = select_fetch_targets(
         pending, args.limit, priority, bool(getattr(args, "prefer_doc", False)),
-        set(getattr(args, "trial", None) or []),
-        load_kinds(getattr(args, "kinds_config", KINDS_CONFIG_PATH)),
+        set(getattr(args, "trial", None) or []), kinds, caps,
     )
     per_item = 2 if COUNT_DOWNLOADS else 1
     listed = len(_read_csv(Path(queue))) if queue else len(_read_csv(session.paths.list_csv))
     print(f"## fetch ({'queue ' + str(queue) if queue else 'list.csv'} {listed}건, "
           f"PDF 미수신 {len(pending)}건)")
-    print(f"- 이번 대상 {len(targets)}건(--limit {args.limit or '없음'}) → 호출 {len(targets)}회 + "
-          f"다운로드 {len(targets)}회 = 카운트 {len(targets) * per_item}회")
+    by_kind: dict[str, int] = {}
+    for row in targets:
+        kind = row_kind(row, kinds) or "?"
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+    planned = len(targets) * per_item
+    print(f"- 이번 대상 {len(targets)}건(--limit {args.limit or '없음'}"
+          f"{', --kind-cap ' + ','.join(f'{k}={v}' for k, v in caps.items()) if caps else ''}) → "
+          f"호출 {len(targets)}회 + 다운로드 {len(targets)}회 = 카운트 {planned}회")
+    print("- 종류별 계획: " + (" · ".join(
+        f"{kind} {count}건(호출 {count * per_item})" for kind, count in sorted(by_kind.items())
+    ) or "없음") + f" → 예상 호출 {planned}회 / 하드캡 {session.max_calls}회")
+    if planned > session.max_calls:
+        print(f"- 주의: 예상 호출 {planned}회 > --max-calls {session.max_calls}회 — "
+              "하드캡에서 중단된다. --kind-cap·--limit 으로 줄이는 것을 권장")
     print(f"- 요청: GET {DOC_URL} 인증 {DOC_AUTH_PARAM} · 키 {'있음' if access_key() else '없음'}")
     print(f"- 예산: {session.budget_line()}")
     if session.dry_run:
         print("[dry-run] 실호출 0회 — 위 계획만 출력하고 종료합니다.")
         return 0
 
-    done = 0
+    done = errors = consecutive = 0
     log_rows: list[dict] = []
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     exit_code = 0
     try:
         for row in targets:
             number = row["심판번호"]
-            xml_text = api_get_with_retry(session, DOC_URL, {"trialNumber": number}, DOC_AUTH_PARAM)
-            _save_raw(session.paths, f"doc_{number}.xml", xml_text)
-            doc = parse_doc_response(xml_text)
-            if doc["openYN"].upper() != "Y" or not doc["path"]:
-                result = "not_open" if doc["path"] else "no_path"
-                log_rows.append({"심판번호": number, "결과": result, "파일명": doc["fileName"],
-                                 "kind": doc["kind"], "일시": stamp})
+            try:
+                xml_text = api_get_with_retry(
+                    session, DOC_URL, {"trialNumber": number}, DOC_AUTH_PARAM
+                )
+                _save_raw(session.paths, f"doc_{number}.xml", xml_text)
+                doc = parse_doc_response(xml_text)
+                if doc["openYN"].upper() != "Y" or not doc["path"]:
+                    result = "not_open" if doc["path"] else "no_path"
+                    log_rows.append({"심판번호": number, "결과": result, "파일명": doc["fileName"],
+                                     "kind": doc["kind"], "일시": stamp})
+                    consecutive = 0
+                    continue
+                dest = session.paths.pdf_dir / f"{number}.pdf"
+                session.download(doc["path"], dest)  # 일회성 링크 → 응답 직후 바로 받는다
+            except kc.CallBudgetExceeded:
+                raise
+            except kc.KiprisError as exc:  # resultCode 오류(한도 초과 포함)·네트워크·프로토콜
+                errors += 1
+                consecutive += 1
+                code = getattr(exc, "result_code", None)
+                log_rows.append({"심판번호": number, "결과": "error",
+                                 "파일명": f"{type(exc).__name__}{'/' + code if code else ''}",
+                                 "kind": "", "일시": stamp})
+                print(f"  [오류 {consecutive}/{MAX_CONSECUTIVE_ERRORS}] {number}: {exc}")
+                if consecutive >= MAX_CONSECUTIVE_ERRORS:
+                    print(f"[중단] 오류 응답 연속 {MAX_CONSECUTIVE_ERRORS}회 — "
+                          "한도 초과·장애 가능성. 원인 확인 뒤 --retry-failed 로 재개")
+                    exit_code = 5
+                    break
                 continue
-            dest = session.paths.pdf_dir / f"{number}.pdf"
-            session.download(doc["path"], dest)  # 일회성 링크 → 응답 직후 바로 받는다
+            consecutive = 0
             if not _is_pdf(dest):
                 dest.unlink(missing_ok=True)
                 log_rows.append({"심판번호": number, "결과": "bad_pdf", "파일명": doc["fileName"],
@@ -729,8 +813,8 @@ def run_fetch(args: argparse.Namespace, session: Session) -> int:
         exit_code = 3
     finally:
         _append_csv(session.paths.fetch_log, FETCH_LOG_COLUMNS, log_rows)
-    print(f"- 결과: PDF {done}건 저장, 호출 {session.api_calls}회·다운로드 {session.downloads}회 → "
-          f"{session.paths.pdf_dir}")
+    print(f"- 결과: PDF {done}건 저장, 오류 {errors}건, 호출 {session.api_calls}회·"
+          f"다운로드 {session.downloads}회 → {session.paths.pdf_dir}")
     return exit_code
 
 
@@ -761,8 +845,9 @@ _CONCLUSION_RE = re.compile(
 # 선등록상표 소멸·무효 등으로 7호 적용이 없어져 원결정이 취소된 사례 — 유사 판단이 없는 취소
 # (제외 후보 표시용)
 _PRIOR_MARK_GONE_RE = re.compile(
-    r"(?:소멸|말소|무효\s*심결|무효로\s*되|존속기간\s*만료|포기)[\s\S]{0,120}?"
-    r"(?:더\s*이상|않게\s*되|해당하지)"
+    r"(?:소멸|말소|무효\s*심결|무효로\s*(?:되|확정)|존속기간\s*만료|포기|취소한다는\s*심결|등록을\s*취소하는\s*심결"
+    r"|선원의\s*지위를?\s*(?:소급적으로\s*)?상실)[\s\S]{0,160}?"
+    r"(?:더\s*이상|않게\s*되|해당하지|해당되지|해소)"
 )
 # 등록번호 표기: 상표등록 제N호 / 서비스표등록 제N호 / 국제상표(등록) 제N호 / 국제등록 제N호
 _REG_NUMBER_RE = re.compile(
@@ -771,7 +856,9 @@ _REG_NUMBER_RE = re.compile(
 )
 # 각주("1) …")와 쪽 표시("3/9") — 각주 본문이 소결 문단 안에 끼어 들어오는 것을 막는다(2024-01 실측)
 _FOOTNOTE_START_RE = re.compile(r"^\s*\d{1,2}\)\s*\S")
-_PAGE_MARK_RE = re.compile(r"^\s*\d{1,3}/\d{1,3}\s*$")
+# 쪽 표시 "3/9"·구 레이아웃 "- 3 -", 쪽 머리말 분류코드 "(T)111.000-Z(09) 270"
+_PAGE_MARK_RE = re.compile(r"^\s*(?:\d{1,3}/\d{1,3}|-\s*\d{1,3}\s*-)\s*$")
+_HEADER_CODE_RE = re.compile(r"^\s*\(T\)\s*\d{3}[^\n]*$")
 
 
 def _registration_numbers(block: str) -> list[str]:
@@ -793,21 +880,36 @@ def _strip_footnotes(text: str) -> str:
             continue
         if skipping and (_PAGE_MARK_RE.match(line) or re.match(_ANY_HEADING, line)):
             skipping = False
+        if _PAGE_MARK_RE.match(line) or _HEADER_CODE_RE.match(line):
+            continue  # "3/9"·"- 3 -"·"(T)111.000-Z(09) 270" — 문장 가운데 끼면 조문 정규식이 끊긴다
         if not skipping:
             kept.append(line)
     return "\n".join(kept)
 _HEADING_RE = re.compile(r"^\s*([가-힣]\.)\s*(.+?)\s*$", re.MULTILINE)
-_TOP_HEADING = r"(?m)^\s*\d+\.\s*\S"
-_ANY_HEADING = r"(?m)^\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.|\d+\.)\s*\S"
-_PRIOR_MARK = r"(?:선등록|선사용|선출원|비교대상|인용)\s*(?:상표|서비스표|표장)"
+# 번호 제목. "2. 1. 19./2022. 1. 3." 처럼 줄바꿈된 날짜는 제목이 아니다(번호 뒤에 숫자가 오면 제외)
+_TOP_HEADING = r"(?m)^\s*\d+\.\s*(?!\d)\S"
+_ANY_HEADING = r"(?m)^\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.|\d+\.(?!\s*\d))\s*\S"
+_PRIOR_MARK = (
+    r"(?:(?:선등록|선사용|선출원|비교대상|인용)\s*(?:\(\s*사용\s*\)\s*)?(?:상표|서비스표|표장)"
+    r"|확인대상\s*표장)"
+)
 # 요부 판단기준의 판례 문구("…주지ㆍ저명하거나 일반수요자에게 강한 인상을…") — 인지도 사례가
 # 아니어도 거의 모든 7호 심결문에 등장한다. 본문_저명주지_실질 은 이 문구를 뺀 뒤의 언급 여부.
-_FAME_BOILERPLATE_RE = re.compile(r"주지\s*[ㆍ·․,]?\s*저명\s*하거나")
+# 요부 판단기준 "주지ㆍ저명하거나", 상표적 사용 판단기준 "등록상표의 주지저명성 그리고 사용자의
+# 의도", 동일성 판단기준 "표장의 주지 정도 및 당해 상품과의 관계"(권리범위확인) — 전부 판례 문구
+_FAME_BOILERPLATE_RE = re.compile(
+    r"주지\s*[ㆍ·․,]?\s*저\s*명\s*하\s*거나|주지\s*저\s*명\s*성\s*(?:그\s*리\s*고|및|과|,)"
+    r"|표장의\s*주지\s*정도\s*및|주지\s*[ㆍ·․,]\s*저\s*명의\s*상\s*표로"
+)
+# "영향을 주지 않는" 의 '주지'는 周知가 아니다
+_FAME_WORD_RE = re.compile(r"저명|주지(?!\s*(?:않|아니|말|못))")
 _SECTION_TITLES = ("소결론", "소결", "결론", "판단")
 KEYWORDS = {"저명": "저명", "주지": "주지", "부정한목적": "부정한 목적", "식별력": "식별력"}
 
 
 def _norm_article(law: str, number: int) -> str | None:
+    if law in ("8", "35"):  # 선출원 저촉: 구법 8조1항 = 현행 35조1항
+        return "35-1"
     if law == "34":
         return f"34-{number}" if number in (7, 9, 11, 12, 13) else f"34-{number}"
     mapped = OLD_LAW_MAP.get(number)
@@ -827,14 +929,16 @@ def _find_block(text: str, start_pattern: str, end_patterns: tuple[str, ...]) ->
     return rest[:end]
 
 
-def _conclusion_blocks(text: str) -> list[str]:
+def _conclusion_blocks(text: str, *, final: bool = True) -> list[str]:
     """'소결'·'소결론'·'결론' 제목의 절 본문 — 실제 적용 조문은 여기서 읽는다.
 
     제목 표시는 (1)·(가)·가.·1. 네 가지를 모두 받는다(2024년 심결문은 "(다) 소결", "다. 소결론").
+    final=False 면 '소결'·'소결론' 제목만(유사 판단·권리범위 근거는 여기서 읽는다).
     """
     blocks: list[str] = []
+    titles = r"소\s*결\s*론|소\s*결" + (r"|결\s*론" if final else "")
     for match in re.finditer(
-        r"(?m)^\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.|\d+\.)\s*(?:소\s*결\s*론|소\s*결|결\s*론)\b[^\n]*$",
+        r"(?m)^\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.|\d+\.(?!\s*\d))\s*(?:" + titles + r")\b[^\n]*$",
         text,
     ):
         rest = text[match.end():]
@@ -861,30 +965,541 @@ def _refusal_ground_block(text: str) -> str:
 
 
 def _decision_result(order: str) -> str:
-    if re.search(r"무효로\s*한다", order):
-        return "무효"
+    """주문 문장 → 무효/일부무효/각하/불속/속함/기각/취소/미판독. 속함·불속은 기각보다 먼저 본다."""
+    if re.search(r"무효로\s*(?:한다|하고)", order):
+        return "일부무효" if re.search(r"나머지[^.]{0,30}?기각", order) else "무효"
     if re.search(r"각하", order):
         return "각하"
-    if re.search(r"기각", order):
-        return "기각"
-    if re.search(r"(원결정|결정)을?\s*취소", order):
-        return "취소"
-    if re.search(r"속하지\s*(아니|않)", order):
+    if re.search(r"속하지\s*(?:아니|않)", order):
         return "불속"
     if re.search(r"권리범위에\s*속한다", order):
         return "속함"
+    if re.search(r"기각", order):
+        return "기각"
+    if re.search(r"(?:원\s*결정|결정)을?\s*(?:취소|파기)", order):
+        return "취소"
     return "미판독"
+
+
+# 주문 블록의 끝: 청구취지·이유 제목, 기초사실 제목, 쪽 머리말 분류코드 "(T)111.000-Z(09)", 쪽 번호,
+# 서명란. PyMuPDF 가 쪽 요소 순서를 바꾸면 주문 제목 뒤에 기초사실이 따라오므로 거기서 끊는다
+# (2023당403: 피청구인 답변의 "기각"을 주문으로 읽던 문제).
+_ORDER_END_PATTERNS = (
+    r"(?m)^\s*청\s*구\s*(?:의\s*)?취\s*지\s*$",
+    r"(?m)^\s*이\s*유\s*$",
+    r"(?m)^\s*\d+\.\s*기\s*초\s*사\s*실",
+    r"(?m)^\s*[가-힣]\.\s*이\s*사건",
+    r"(?m)^\s*심\s*판\s*장\s*$",
+)
+_PAGE_NOISE_RE = re.compile(r"\(T\)\s*\d{3}|^\s*(?:-\s*\d{1,3}\s*-|\d{1,3}/\d{1,3})\s*$", re.M)
+# 주문 문장 자체(번호 유무 무관) — 제목 뒤 블록이 비면 본문 순서에서 찾는다(청구취지보다 앞에 온다)
+_ORDER_SENTENCE_RE = re.compile(
+    r"(?m)^[^\n]*?(?:심판\s*청구를\s*(?:모두\s*)?(?:기각|각하)|청구(?:를|는)\s*(?:모두\s*)?(?:기각|각하)한다"
+    r"|권리범위에\s*속(?:한다|하지)|등록을\s*무효로\s*(?:한다|하고)|(?:원\s*)?결정을\s*(?:취소|파기))[^\n]*$"
+)
+
+
+def _final_section_hint(text: str) -> str:
+    """'N. 결론' 절의 "이유 있으므로"(인용) / "이유 없으므로"(기각) — 주문 폴백의 대조용."""
+    match = re.search(r"(?m)^\s*\d+\.\s*결\s*론\s*$", text)
+    if not match:
+        return ""
+    final = " ".join(text[match.end(): match.end() + 400].split())
+    if re.search(r"이유\s*(?:가\s*)?없", final):
+        return "기각"
+    if re.search(r"이유\s*(?:가\s*)?있", final):
+        return "인용"
+    return ""
+
+
+def _order_block(text: str) -> str:
+    """주문 제목 아래 블록. 쪽 머리말·쪽 번호가 주문 문장보다 먼저 오면(추출 순서가 뒤바뀐 문서)
+    본문에서 주문 문장을 찾는다. 긴 지정상품 목록이 쪽을 넘기는 일부무효 주문은 그대로 둔다."""
+    block = _find_block(text, r"(?m)^\s*주\s*문\s*$", _ORDER_END_PATTERNS)
+    sentence = _ORDER_SENTENCE_RE.search(block)
+    noise = _PAGE_NOISE_RE.search(block)
+    if sentence and (noise is None or sentence.start() < noise.start()):
+        return block
+    heading = re.search(r"(?m)^\s*주\s*문\s*$", text)
+    region = text[heading.end():] if heading else text
+    candidates = list(_ORDER_SENTENCE_RE.finditer(region))[:4]
+    if not candidates:
+        return block
+    hint = _final_section_hint(text)  # 주문과 청구취지가 뒤섞인 문서: 결론 절과 맞는 문장을 고른다
+    found = candidates[0]
+    for candidate in candidates:
+        verdict = _decision_result(candidate.group(0))
+        if (hint == "기각" and verdict in ("기각", "각하")) or (
+            hint == "인용" and verdict not in ("기각", "각하", "미판독")
+        ):
+            found = candidate
+            break
+    picked = [region[found.start():found.end()]]
+    for line in region[found.end():].splitlines()[1:4]:  # 이어지는 줄·"2. 심판비용은 …" 까지만
+        if re.match(r"^\s*\d+\.\s*(?!\d)\S", line) or "심판비용" in line:
+            picked.append(line)
+        elif not picked[-1].rstrip().endswith(".") and not re.search(r"취\s*지|^\s*이\s*유", line):
+            picked.append(line)  # 문장이 줄을 넘겼다
+        else:
+            break
+    return "\n".join(picked)
+
+
+# 판단 절: "3. 판단"·"3. 판 단"(2016)·"3. …해당하는지 여부"(2024)·"3. …유사여부"(2017)·
+# "4. 확인대상표장이 … 권리범위에 속하는지 여부"(권리범위확인) → "N. 결론"·서명란·별지 앞까지
+_JUDGMENT_KEYWORD_RE = re.compile(
+    r"판\s*단|해당\s*(?:하는지|되는지|하는\s*것인지|되는\s*것인지)?\s*여부|유사\s*(?:한지\s*)?여부"
+    r"|권리범위에\s*속하|당부|존부|가능\s*여부|무효\s*여부"
+)
+_JUDGMENT_END_PATTERNS = (
+    r"(?m)^\s*\d+\.\s*결\s*론\s*$",
+    r"(?m)^\s*심\s*판\s*장\s*$",
+    r"(?m)^\s*\[?\s*별\s*지\s*(?:\]|\d|$)",
+)
+
+
+def _judgment_heading(text: str) -> re.Match | None:
+    """판단 절의 최상위 제목 줄. 줄을 넘긴 제목("…제7호" / "에 해당하는지 여부")은 다음 줄도
+    본다."""
+    for match in re.finditer(_TOP_HEADING + r"[^\n]*", text):
+        line = match.group(0)
+        if re.search(r"결\s*론\s*$|기\s*초\s*사\s*실|주장|답변|이해관계|적법", line):
+            continue
+        after = text[match.end(): match.end() + 60]
+        following = after.split("\n", 2)[1] if "\n" in after else ""
+        if _JUDGMENT_KEYWORD_RE.search(line) or (
+            not re.match(r"\s*(?:\(\d+\)|\([가-힣]\)|[가-힣]\.)", following)
+            and _JUDGMENT_KEYWORD_RE.search(line + " " + following)
+        ):
+            return match
+    return None
+
+
+def _judgment_block(text: str) -> str:
+    heading = _judgment_heading(text)
+    if not heading:
+        return ""
+    rest = text[heading.end():]
+    end = len(rest)
+    for pattern in _JUDGMENT_END_PATTERNS:
+        found = re.search(pattern, rest)
+        if found and found.start() < end:
+            end = found.start()
+    return rest[:end]
+
+
+def judgment_text(text: str, marks: list[tuple[int, int]] | None = None) -> str:
+    """show 용: 각주·쪽 표시를 뺀 판단 절(제목 포함). 없으면 ''. marks 는 판단 절 본문 기준 구간
+    목록으로, 그 구간이 걸린 줄은 ">> " 로 표시한다(폴백으로 읽은 결론 문장)."""
+    cleaned = _strip_footnotes(text)
+    heading = _judgment_heading(cleaned)
+    if not heading:
+        return ""
+    body = _judgment_block(cleaned)
+    full = heading.group(0).strip() + body
+    offset = len(heading.group(0).strip())
+    lines: list[str] = []
+    position = 0
+    for line in full.splitlines():
+        start, end = position - offset, position + len(line) - offset
+        position += len(line) + 1
+        flagged = any(s < end and e > start for s, e in (marks or []))
+        lines.append((">> " + line) if flagged else line)
+    return "\n".join(lines).strip()
+
+
+def fallback_marks(text: str, analysis: dict) -> list[tuple[int, int]]:
+    """판단 절 폴백으로 읽은 결론(조문·표장 판단)의 본문 위치. 소결 제목 아래서 읽었으면 빈 목록."""
+    cleaned = _strip_footnotes(text)
+    judgment = _judgment_block(cleaned)
+    marks: list[tuple[int, int]] = []
+    if not judgment:
+        return marks
+    if analysis.get("결론_신뢰도") == "low" and not analysis.get("결론추론"):
+        spans: dict[str, tuple[int, int]] = {}
+        _conclusions_in(judgment, {}, last_wins=True, spans=spans)
+        marks += list(spans.values())
+    if analysis.get("소결_신뢰도") == "low" and analysis.get("표장유사_소결"):
+        tail = judgment[-1500:]
+        base = len(judgment) - len(tail)
+        spans = {}
+        _similarity_verdicts(tail, spans)
+        if "표장" in spans:
+            marks.append((base + spans["표장"][0], base + spans["표장"][1]))
+    return marks
+
+
+def next_in_queue(queue: list[dict], label_rows: list[dict]) -> dict | None:
+    """큐에서 유사여부_확정이 비어 있는 첫 건(심판번호의 어느 행이든 채워졌으면 확정으로 본다)."""
+    confirmed = {row["심판번호"] for row in label_rows if (row.get("유사여부_확정") or "").strip()}
+    for item in queue:
+        if item["심판번호"] not in confirmed:
+            return item
+    return None
+
+
+# 결론 조문: "제34조 제1항 제7호(, 제11호 및 제12호 | 및 제8조 제1항)에(는) (각) 해당…" — 조문
+# 나열 전부와 선출원 저촉(제8조 제1항·제35조 제1항)을 받고, 긍정·부정은 뒤따르는 문구로 판독한다.
+_ART_LIST_TAIL = (
+    r"((?:\s*(?:및|,|와|과|또는|·|ㆍ|내지)\s*(?:같은\s*법\s*|구\s*상표법\s*|상표법\s*)?(?:제\s*)?"
+    r"(?:\d{1,2}\s*조\s*(?:제\s*)?\d\s*항(?:\s*제\s*\d{1,2}\s*호)?|\d{1,2}\s*호))*)"
+)
+_CONCLUSION_RE = re.compile(
+    r"(?:제\s*(34|7)\s*조\s*제\s*1\s*항\s*제\s*(\d{1,2})\s*호"
+    r"|제\s*(8|35)\s*조\s*제\s*1\s*항|제\s*(33|6)\s*조\s*제\s*1\s*항\s*제\s*\d{1,2}\s*호)"
+    + _ART_LIST_TAIL
+    + r"(?:\s*의\s*규정)?\s*(?:에(?:는|도)?\s*)?(?:각각?\s*)?(?:더\s*이상\s*)?(?:의하여\s*)?"
+    r"(해당|위반되|등록(?:될|받을)\s*수\s*없)"
+)
+# 조문 뒤가 쟁점·주장이면 결론이 아니다: "해당하는지 여부", "해당한다고 주장", "해당한다는 취지"
+_NOT_CONCLUSION_AFTER_RE = re.compile(
+    r"^\s*(?:하는지|되는지|하는\s*것인지|여부|하는\s*경우)"
+)
+_CLAIM_AFTER_RE = re.compile(r"주장|다투|취지")  # 조문 뒤 35자 안이면 당사자 주장 인용
+# "…에 해당한다는 이유로 (등록을 거절한) 원결정은 타당하다 / 더 이상 타당하지 아니하다"
+# — 원결정 평가가 결론
+_GROUND_RE = re.compile(r"이유\s*로")
+_GROUND_UPHELD_RE = re.compile(
+    r"타당하다|정당하다|적법하다|타당하고|정당하고|무효로\s*되어야|등록받을\s*수\s*없|거절되어야"
+)
+_GROUND_REVERSED_RE = re.compile(
+    r"타당하지\s*(?:아니|않)|부당하|위법하|타당하다고\s*(?:할\s*수\s*없|볼\s*수\s*없)|타당성을\s*잃"
+    r"|아니\s*될|아니\s*된다|해소되"
+)
+# 조문 뒤 40자 안의 부정 표현: "하지 아니한다 / 않게 되었다 / 한다고 할 수 없다 /
+# 하는 무효사유가 존재하지 아니한다"
+_NEGATIVE_AFTER_RE = re.compile(
+    r"^\s*(?:(?:하지|되지)\s*(?:아니|않)"
+    r"|한다고\s*(?:할\s*수\s*없|보기\s*어렵|볼\s*수\s*없|단정|인정하기\s*어렵)"
+    r"|된다고\s*(?:볼\s*수\s*없|보기\s*어렵)"
+    r"|하는\s*(?:무효\s*사유|거절\s*이유|사유)가?\s*(?:존재하지|없)"
+    r"|않게\s*되|되는\s*것으로\s*볼\s*수\s*없|한다\s*(?:할|볼)\s*수\s*없)"
+)
+
+
+def _conclusions_in(
+    block: str,
+    found: dict[str, str],
+    *,
+    last_wins: bool = False,
+    spans: dict[str, tuple[int, int]] | None = None,
+) -> bool:
+    """block 의 결론 조문을 found 에 모은다. 소결 블록은 첫 언급, 판단 절 폴백(last_wins)은
+    마지막 언급. 34조·7조·8조·35조 결론을 하나라도 읽었으면 True(33조만 있으면 False).
+    spans 를 주면 조문별로 읽은 문장 위치(block 기준)를 기록한다(show 의 ">>" 표시용)."""
+    seen = False
+    for match in _CONCLUSION_RE.finditer(block):
+        law, number, law_art, law_33, extra, _verb = match.groups()
+        window = block[match.end(): match.end() + 40]
+        clause = re.match(r"[^,.]{0,35}", window).group(0)
+        if _NOT_CONCLUSION_AFTER_RE.match(window) or _CLAIM_AFTER_RE.search(clause):
+            continue
+        if _GROUND_RE.search(clause):
+            sentence = block[match.end(): match.end() + 120]
+            if _GROUND_REVERSED_RE.search(sentence):
+                polarity = "부정"
+            elif _GROUND_UPHELD_RE.search(sentence):
+                polarity = "긍정"
+            else:
+                continue
+        else:
+            polarity = "부정" if _NEGATIVE_AFTER_RE.match(window) else "긍정"
+        keys: list[str] = []
+        if law:
+            keys.append(_norm_article(law, int(number)) or "")
+        elif law_33:
+            keys.append("33")
+        else:
+            keys.append(_norm_article(law_art, 1) or "")
+        rest = extra or ""
+        for article, clause, ho in re.findall(
+            r"(\d{1,2})\s*조\s*(?:제\s*)?(\d)\s*항(?:\s*제\s*(\d{1,2})\s*호)?", rest
+        ):
+            if article in ("8", "35") and clause == "1":
+                keys.append("35-1")
+            elif article in ("33", "6"):
+                keys.append("33")
+            elif article in ("34", "7") and ho:
+                keys.append(_norm_article(article, int(ho)) or "")
+        rest = re.sub(r"\d{1,2}\s*조\s*(?:제\s*)?\d\s*항(?:\s*제\s*\d{1,2}\s*호)?", " ", rest)
+        for extra_ho in re.findall(r"(\d{1,2})\s*호", rest):
+            keys.append("33" if law_33 else (_norm_article(law or "34", int(extra_ho)) or ""))
+        for key in keys:
+            if key and (last_wins or key not in found):
+                found[key] = polarity
+                seen = seen or key != "33"
+                if spans is not None:
+                    spans[key] = (match.start(), match.end() + len(window))
+    if re.search(r"(?:상표법\s*)?제\s*(?:33|6)\s*조", block) and "33" not in found:
+        lacks = re.search(r"식별력\s*(?:이\s*)?(?:없|부족)", block)
+        found["33"] = "부정" if lacks else "긍정"
+    return seen
+
+
+# 소결 문장의 유사 판단: "표장이 비유사하므로", "표장 및 사용상품이 동일 또는 유사하여",
+# "유사하다고 볼 수 없다". '유사 여부'·'유사한지'·가정문·당사자 주장은 판단이 아니다.
+_MARK_WORDS_RE = re.compile(r"표장|상표|서비스표|확인대상")
+_GOODS_WORDS_RE = re.compile(r"상품|서비스업|역무|업무")
+_SIM_SKIP_AFTER_RE = re.compile(
+    r"^\s*(?:여부|한지|한\s*것인지|할\s*것인지|점|성|판단|할\s*때|하다\s*(?:하더라도|할지라도)"
+    r"|하다[고는]\s*(?:가정|주장|취지)|한\s*(?:상품|서비스)[^.]{0,20}?하더라도)"
+)
+_SIM_HYPOTHETICAL_RE = re.compile(r"살펴보지|살펴볼\s*필요|살피지|따질\s*필요")
+_SIM_NEG_AFTER_RE = re.compile(
+    r"^\s*(?:하지도?\s*(?:아니|않)|하다고\s*(?:보기\s*어렵|볼\s*수\s*없|할\s*수\s*없|단정|인정하기\s*어렵)"
+    r"|한\s*것으로\s*볼\s*수\s*없|하다\s*할\s*수\s*없)"
+)
+# "표장 및 사용상품이 … 유사" 처럼 표장·상품이 병렬로 묶인 경우만 양쪽 판단으로 본다
+_BOTH_SUBJECTS_RE = re.compile(
+    r"(?:표장|상표|서비스표)\s*(?:및|과|와|,|·|ㆍ)\s*(?:그\s*)?(?:사용|지정)?\s*(?:\(지정\))?\s*(?:상품|서비스업)"
+    r"|(?:상품|서비스업)\s*(?:및|과|와|,|·|ㆍ)\s*(?:그\s*)?(?:표장|상표)"
+)
+
+
+def _compact_hangul(text: str) -> str:
+    """공백 정리 + 한글 사이 공백 제거 — PDF 줄바꿈이 낱말 가운데 남긴 공백("유 사하므로")."""
+    return _compact_hangul_map(text)[0]
+
+
+def _compact_hangul_map(text: str) -> tuple[str, list[int]]:
+    """_compact_hangul 과 같되, 압축 문자열의 각 글자가 원문의 어느 위치에서 왔는지도 돌려준다."""
+    chars: list[str] = []
+    origin: list[int] = []
+    previous_hangul = False
+    pending_space = False
+    for index, char in enumerate(text):
+        if char.isspace():
+            pending_space = chars != []  # 앞뒤 공백은 버리고 가운데 공백은 하나로
+            continue
+        if pending_space:
+            is_hangul = "가" <= char <= "힣"
+            if not (previous_hangul and is_hangul):
+                chars.append(" ")
+                origin.append(index)
+            pending_space = False
+        chars.append(char)
+        origin.append(index)
+        previous_hangul = "가" <= char <= "힣"
+    return "".join(chars), origin
+
+
+def _similarity_verdicts(
+    block: str, spans: dict[str, tuple[int, int]] | None = None
+) -> dict[str, str]:
+    """표장·상품의 유사/비유사 판단(마지막 언급 우선). 없으면 ''. spans 를 주면 판단 문장의
+    원문 위치(block 기준)를 기록한다."""
+    verdicts = {"표장": "", "상품": ""}
+    compact, origin = _compact_hangul_map(block)
+
+    def mark(key: str, start: int, end: int) -> None:
+        if spans is not None and origin:
+            spans[key] = (origin[max(0, start - 20)], origin[min(len(origin), end + 20) - 1] + 1)
+
+    for match in re.finditer(r"(비\s*)?유사|비유(?=하)", compact):
+        after = compact[match.end(): match.end() + 24]
+        if _SIM_SKIP_AFTER_RE.match(after) or _SIM_HYPOTHETICAL_RE.search(after[:14]):
+            continue
+        negative = bool(match.group(1)) or compact.startswith("비유", match.start()) or bool(
+            _SIM_NEG_AFTER_RE.match(after)
+        )
+        verdict = "비유사" if negative else "유사"
+        before = compact[max(0, match.start() - 45): match.start()]
+        mark_hits = [m.end() for m in _MARK_WORDS_RE.finditer(before)]
+        goods_hits = [m.end() for m in _GOODS_WORDS_RE.finditer(before)]
+        near = before[-30:]
+        if _BOTH_SUBJECTS_RE.search(near):
+            verdicts["표장"] = verdicts["상품"] = verdict
+            mark("표장", match.start(), match.end())
+            mark("상품", match.start(), match.end())
+        elif goods_hits and (not mark_hits or goods_hits[-1] > mark_hits[-1]):
+            verdicts["상품"] = verdict
+            mark("상품", match.start(), match.end())
+        else:
+            verdicts["표장"] = verdict
+            mark("표장", match.start(), match.end())
+    differs = re.search(
+        r"(?:표장|상표|서비스표)[^.]{0,40}?(?:서로\s*)?(?:다르|상이|구별|달라)", compact
+    )
+    if not verdicts["표장"] and differs:
+        verdicts["표장"] = "비유사"
+        mark("표장", differs.start(), differs.end())
+    identical = re.search(
+        r"(?:표장|상표|서비스표)(?:이|은|가|와|과|을)?\s*(?:서로\s*|실질적으로\s*)?"
+        r"동일(?:하다|하고|하므로|하여|함|한\s*것)",
+        compact,
+    )
+    if not verdicts["표장"] and identical:
+        verdicts["표장"] = "유사"  # 동일은 유사에 포함된다
+        mark("표장", identical.start(), identical.end())
+    return verdicts
+
+
+# 권리범위확인에서 유사 판단 외의 결론 근거(3등급): 효력제한(90조)·자유실시·식별력 없음·확인대상표장
+# 불특정·상표적 사용 아님·상품 비유사만
+_NOT_APPLY_90_RE = re.compile(
+    r"해당(?:하지|되지)(?:아니|않)|해당(?:되지|하지)도않|경우에도해당|해당(?:된다|한다)고(?:볼수없|보기어렵)"
+    r"|해당하는지"
+)
+_APPLY_90_RE = re.compile(
+    r"해당하(?:여|므로|고|는|기)(?!않)|해당한다|미치지(?:아니|않)|효력이제한(?:된다|되므로|되어)|규정에따라"
+)
+
+
+def _scope_basis(block: str, verdicts: dict[str, str]) -> list[str]:
+    compact = _compact_hangul(block)
+    basis: list[str] = []
+    for match in re.finditer(r"제\s*(?:90|51)\s*조", compact):
+        window = compact[match.end(): match.end() + 90]
+        rejected = _NOT_APPLY_90_RE.search(window)
+        applied = _APPLY_90_RE.search(window)
+        if applied and (rejected is None or applied.start() < rejected.start()):
+            basis.append("효력제한(90조)")
+            break
+    if re.search(r"자유\s*실시", compact):
+        basis.append("자유실시")
+    elif re.search(
+        r"제\s*33\s*조|식별력이?\s*(?:없|부족|미약)|기술적\s*표장|보통명칭|관용표장", compact
+    ):
+        basis.append("식별력 없음(33조)")
+    if re.search(r"특정되(?:지|었다고\s*볼\s*수\s*없)|불특정", compact):
+        basis.append("확인대상표장 불특정")
+    if re.search(
+        r"(?:상표|서비스표)(?:로서|로|적|으로서)(?:의|으로)?\s*(?:사용|이용)(?:이|으로|에|을|된)?[^.]{0,25}?"
+        r"(?:아니(?!라)|볼\s*수\s*없|할\s*수\s*없|해당하지|않)"
+        r"|출처(?:표시|를\s*표시)[^.]{0,15}?사용[^.]{0,20}?(?:볼\s*수\s*없|할\s*수\s*없)"
+        r"|순수한?\s*디자인|디자인적\s*요소|장식적",
+        compact,
+    ):
+        basis.append("상표적 사용 아님")
+    if verdicts.get("상품") == "비유사" and verdicts.get("표장") != "비유사":
+        basis.append("상품 비유사만")
+    return basis
+
+
+# 결정축·상표유형 추정 — 판단 절 끝부분(구체적 판단 + 소결)의 판단 문장에서 축 단어를 모은다
+_AXIS_PATTERNS = (("외관", r"외관"), ("호칭", r"호칭|칭호|발음"), ("관념", r"관념"),
+                  ("상품", r"지정상품|사용상품|상품|서비스업"))
+_VERDICT_WORD_RE = re.compile(r"유사|다르|상이|차이|동일|구별|달라")
+_AXIS_SKIP_SENTENCE_RE = re.compile(r"기준|판결|참조|대법원|하더라도|주장")
+# 판단하지 않은 축: "나아가 지정상품의 유사 여부에 대하여 살펴보지 않더라도", "…살펴볼 필요 없이"
+_AXIS_SKIP_CLAUSE_RE = re.compile(
+    r"(?:나아가\s*)?[^,.]*?(?:살펴보지\s*않|살펴볼\s*필요|살펴보지\s*아니|여부에\s*(?:대하여|관하여|관하여는)[^,.]*)"
+)
+
+
+def _decision_axes(tail: str) -> str:
+    axes: list[str] = []
+    for sentence in re.split(r"(?<=다)\.\s*|\.\s+", " ".join(tail.split())):
+        if _AXIS_SKIP_SENTENCE_RE.search(sentence):
+            continue
+        clause = _AXIS_SKIP_CLAUSE_RE.sub("", sentence)
+        if not _VERDICT_WORD_RE.search(clause):
+            continue
+        for name, pattern in _AXIS_PATTERNS:
+            if name not in axes and re.search(pattern, clause):
+                axes.append(name)
+    return "|".join(name for name, _ in _AXIS_PATTERNS if name in axes)
+
+
+def _mark_type(subject: str, tail: str, title: str = "") -> str:
+    clauses = [c for c in re.split(r"[.]\s*", " ".join((subject + " " + tail).split()))
+               if not re.search(r"판결|참조|기준|대법원", c)]
+    text = " ".join(clauses)
+    combined = (
+        r"(?:문자|한글|영문)[^.]{0,20}도형|도형[^.]{0,20}(?:문자|한글|영문)|결합\s*(?:상표|표장)"
+    )
+    if re.search(combined, text):
+        return "결합"
+    if re.search(r"도형\s*(?:상표|표장|만으로|으로만)", text):
+        return "도형"
+    has_figure = bool(re.search(r"도형", text))
+    has_letters = bool(re.search(r"문자|한글|영문|알파벳|국문|한자|음절|호칭", text))
+    if has_figure and not has_letters:
+        return "도형"
+    if has_figure:
+        return "결합"
+    if has_letters or title:
+        return "문자"
+    return "미상"
+
+
+# 상대 표장 유형: 기초사실의 제목 줄에서 선등록/선출원/선사용/국제등록/확인대상표장을 읽는다
+_COUNTERPART_HEAD_RE = re.compile(
+    r"(선등록|선사용|선출원|확인대상|인용|비교대상)\s*(?:\(\s*(사용|등록)\s*\)\s*)?(?:상표|서비스표|표장)"
+)
+_COUNTERPART_ORDER = ("선등록", "선출원", "선사용", "국제등록", "확인대상표장", "인용")
+
+
+def _counterparts(facts: str) -> tuple[list[str], list[str]]:
+    """(유형 목록, 선출원 출원번호 목록)."""
+    headings = [m for m in re.finditer(_ANY_HEADING + r"[^\n]*", facts)
+                if _COUNTERPART_HEAD_RE.search(m.group(0))]
+    types: list[str] = []
+    applications: list[str] = []
+
+    def add(name: str) -> None:
+        if name and name not in types:
+            types.append(name)
+
+    for index, match in enumerate(headings):
+        line = match.group(0)
+        end = headings[index + 1].start() if index + 1 < len(headings) else len(facts)
+        block = facts[match.start():end]
+        for head, paren in _COUNTERPART_HEAD_RE.findall(line):
+            add({"확인대상": "확인대상표장", "비교대상": "인용"}.get(head, head))
+            if paren == "사용":
+                add("선사용")
+            if head == "선출원":
+                number = _application_number(block)
+                if number and number not in applications:
+                    applications.append(number)
+        if re.search(r"국제\s*(?:등록|상표)", block):
+            add("국제등록")
+    ordered = [name for name in _COUNTERPART_ORDER if name in types]
+    return ordered, applications
+
+
+# 상대 표장 번호 복구: 기초사실 제목이 없거나 상대 표장이 산문에만 있는 문서 — 본문 전체에서 번호를
+# "선등록·인용·선출원·확인대상·대비" 단어의 ±200자 안에서 찾는다. 이 사건 번호와 "이 사건 …" 바로 뒤
+# 번호는 제외. 복수면 ; 로 잇는다(사람이 확정).
+_COUNTERPART_WORD_RE = re.compile(r"선등록|인용|선출원|확인대상|대비")
+_CANDIDATE_NUMBER_RE = re.compile(
+    r"(?:상표|서비스표|국제)?\s*등록(?:번호)?\s*[:：]?\s*제\s*([\d\-]{5,})\s*호"
+    r"|출원(?:번호)?\s*[:：]?\s*제\s*([\d\-]{5,})\s*호"
+    r"|제\s*(4[015]\s*-\s*\d{4}\s*-\s*\d{1,7})\s*호"
+    r"|국제\s*상표\s*(\d{6,8})"
+)
+CANDIDATE_WINDOW = 200
+
+
+def _normalize_candidate(raw: str) -> str:
+    parts = re.split(r"\s*-\s*", raw.strip())
+    if len(parts) == 3 and re.fullmatch(r"4[015]", parts[0]) and re.fullmatch(r"\d{4}", parts[1]):
+        return f"{parts[0]}{parts[1]}{int(parts[2]):07d}"  # 40-2012-12345 → 4020120012345
+    return _digits(raw)
+
+
+def candidate_counterpart_numbers(text: str, exclude: set[str]) -> list[str]:
+    found: list[str] = []
+    for match in _CANDIDATE_NUMBER_RE.finditer(text):
+        window = text[max(0, match.start() - CANDIDATE_WINDOW): match.end() + CANDIDATE_WINDOW]
+        if not _COUNTERPART_WORD_RE.search(window):
+            continue
+        before = text[max(0, match.start() - 30): match.start()]
+        own = list(re.finditer(r"이\s*사건", before))
+        if own and not _COUNTERPART_WORD_RE.search(before[own[-1].end():]):
+            continue  # "이 사건 등록상표(상표등록 제N호)" — 이 사건 번호
+        number = _normalize_candidate(next(group for group in match.groups() if group))
+        if number and number not in exclude and number not in found:
+            found.append(number)
+    return found
 
 
 def analyze_text(text: str) -> dict:
     """심결문 텍스트 → 정규식 추출 결과(prefilter.csv 한 행). 2013당419 구조를 기준으로 삼는다."""
     result: dict = {"텍스트길이": len(text), "추출실패": 1 if len(text.strip()) < 200 else 0}
     text = _strip_footnotes(text)
-    order = _find_block(
-        text,
-        r"(?m)^\s*주\s*문\s*$",
-        (r"(?m)^\s*청\s*구\s*(?:의\s*)?취\s*지\s*$", r"(?m)^\s*이\s*유\s*$"),
-    )
+    order = _order_block(text)
     result["주문"] = " ".join(order.split())[:200]
     result["주문결과"] = _decision_result(order)
 
@@ -908,7 +1523,7 @@ def analyze_text(text: str) -> dict:
     result["이사건_지정상품"] = " ".join(goods.group(1).split())[:300] if goods else ""
 
     # 선등록상표 영역: 제목에 '선등록상표'가 든 첫 줄("나. 선등록상표 1", "나. 원결정이유및선등록
-    # 상표", "(2) 선등록상표")부터 다음 최상위 번호 제목("2. 당사자의 주장" 등)까지.
+    # 상표", "(2) 선등록상표", "나. 확인대상표장")부터 다음 최상위 번호 제목("2. 당사자의 주장")까지
     prior_region = _find_block(
         text,
         r"(?m)^\s*(?:\(\d+\)|[가-힣]\.|\d+\.)\s*[^\n]*?" + _PRIOR_MARK,
@@ -918,13 +1533,20 @@ def analyze_text(text: str) -> dict:
         n for n in _registration_numbers(prior_region) if n != result["이사건_등록번호"]
     ]
     result["선등록_등록번호"] = "|".join(prior_numbers)
-
-    # 판단 절: "3. 판단"(2013) 또는 "3. 이사건출원상표가…해당하는지여부"(2024) → "N. 결론" 전까지
-    judgment = _find_block(
-        text,
-        r"(?m)^\s*\d+\.\s*[^\n]*?(?:판\s*단|해당하는지\s*여부)[^\n]*$",
-        (r"(?m)^\s*\d+\.\s*결\s*론\s*$",),
+    facts = _find_block(text, r"(?m)^\s*\d+\.\s*기\s*초\s*사\s*실", (_TOP_HEADING,))
+    types, applications = _counterparts(facts or (subject + "\n" + prior_region))
+    result["상대표장_유형"] = "|".join(types)
+    result["선출원_출원번호"] = "|".join(
+        n for n in applications if n != result["이사건_출원번호"]
     )
+    result["상대표장_번호_후보"] = ""
+    if not prior_numbers and not result["선출원_출원번호"]:
+        exclude = {
+            result["이사건_등록번호"], result["이사건_출원번호"], result["이사건_국제등록번호"],
+        } - {""}
+        result["상대표장_번호_후보"] = ";".join(candidate_counterpart_numbers(text, exclude))
+
+    judgment = _judgment_block(text)
     result["판단절"] = "|".join(
         " ".join(m.group(2).split())[:80] for m in _HEADING_RE.finditer(judgment)
     )
@@ -939,35 +1561,10 @@ def analyze_text(text: str) -> dict:
     for key in ("34-7", "34-9", "34-11", "34-12", "34-13", "33"):
         result[f"본문_{key.replace('-', '_')}"] = 1 if key in body_articles else 0
     for key, word in KEYWORDS.items():
-        result[f"본문_{key}"] = 1 if re.search(word.replace(" ", r"\s*"), text) else 0
+        pattern = _FAME_WORD_RE if key == "주지" else re.compile(word.replace(" ", r"\s*"))
+        result[f"본문_{key}"] = 1 if pattern.search(text) else 0
     without_boilerplate = _FAME_BOILERPLATE_RE.sub("", text)
-    result["본문_저명주지_실질"] = 1 if re.search(r"저명|주지", without_boilerplate) else 0
-
-    conclusions: dict[str, str] = {}
-    blocks = _conclusion_blocks(text)
-    # 폴백: '소결' 제목 없이 판단 절 본문에 결론이 오는 심결문(2024-01 실측 20건 중 6건)
-    # → 판단 절 전체에서 찾는다
-    if judgment and not any(_CONCLUSION_RE.search(block) for block in blocks):
-        blocks = blocks + [judgment]
-    for block in blocks:
-        for match in _CONCLUSION_RE.finditer(block):
-            law, number, extra, verb = match.groups()
-            polarity = "부정" if re.search(r"(아니|않)", verb) else "긍정"
-            if re.search(r"않게\s*되", block[match.end():match.end() + 12]):
-                polarity = "부정"
-            for raw in (number, extra):
-                if raw:
-                    key = _norm_article(law, int(raw))
-                    if key and key not in conclusions:
-                        conclusions[key] = polarity
-        if re.search(r"(?:상표법\s*)?제\s*(?:33|6)\s*조", block) and "33" not in conclusions:
-            lacks = re.search(r"식별력\s*(?:이\s*)?(?:없|부족)", block)
-            conclusions["33"] = "부정" if lacks else "긍정"
-    result["결론절추출"] = 1 if blocks else 0
-    result["결론조문"] = "|".join(f"{k}:{v}" for k, v in conclusions.items())
-    result["선등록소멸취소"] = 1 if (
-        result["주문결과"] == "취소" and _PRIOR_MARK_GONE_RE.search(text)
-    ) else 0
+    result["본문_저명주지_실질"] = 1 if _FAME_WORD_RE.search(without_boilerplate) else 0
 
     ground = _refusal_ground_block(text)
     ground_articles = []
@@ -978,15 +1575,73 @@ def analyze_text(text: str) -> dict:
     if _ARTICLE_33_RE.search(ground) and "33" not in ground_articles:
         ground_articles.append("33")
     result["거절이유조문"] = "|".join(ground_articles)
+
+    # 결론 조문: 소결·소결론·결론 제목 블록(신뢰도 high) → 없으면 판단 절 전체(low)
+    conclusions: dict[str, str] = {}
+    blocks = _conclusion_blocks(text)
+    article_found = False
+    for block in blocks:
+        article_found = _conclusions_in(block, conclusions) or article_found
+    confidence = "high" if conclusions else ""
+    if judgment and not article_found:  # 소결에 34조·35조 결론이 없으면(33조만 있어도) 판단 절 전체
+        if _conclusions_in(judgment, conclusions, last_wins=True) or not conclusions:
+            confidence = "low" if conclusions else ""
+
+    # 표장·상품 유사 소결: 소결 제목 블록(마지막) → 없으면 판단 절 끝 1,500자
+    sub_conclusions = _conclusion_blocks(text, final=False)
+    tail = judgment[-1500:] if judgment else ""
+    verdict_block = sub_conclusions[-1] if sub_conclusions else tail
+    verdicts = _similarity_verdicts(verdict_block) if verdict_block else {"표장": "", "상품": ""}
+    verdict_confidence = "high" if sub_conclusions else "low"
+    reserved = re.search(  # 소결이 표장 판단을 유보한 경우("표장의 유사여부는 살펴보지 않더라도")
+        r"표장[^.]{0,30}?(?:살펴보지|살펴볼필요|살피지|따질필요)", _compact_hangul(verdict_block)
+    )
+    # 소결이 표장을 말하지 않으면(유보가 아니면) 판단 절 끝에서 찾는다 — 신뢰도 low
+    if sub_conclusions and not verdicts["표장"] and tail and not reserved:
+        fallback = _similarity_verdicts(tail)
+        if fallback["표장"]:
+            verdicts = {"표장": fallback["표장"], "상품": verdicts["상품"] or fallback["상품"]}
+            verdict_confidence = "low"
+    result["표장유사_소결"] = verdicts["표장"]
+    result["상품유사_소결"] = verdicts["상품"]
+    result["소결_신뢰도"] = verdict_confidence if (verdicts["표장"] or verdicts["상품"]) else ""
+    result["권리범위_근거"] = (
+        "|".join(_scope_basis(verdict_block, verdicts)) if verdict_block else ""
+    )
+
+    # 조문 없이 표장 소결만 있는 거절·무효 사례: 거절이유가 7호이거나 본문이 7호만 다루면 7호로
+    # 추론한다(신뢰도 low)
+    result["결론추론"] = ""
+    if not conclusions and verdicts["표장"] and verdicts["상품"] != "비유사":
+        fame_in_body = any(result[f"본문_{k}"] for k in ("34_9", "34_11", "34_12", "34_13"))
+        if result["거절이유조문"] == "34-7" or (result["본문_34_7"] == 1 and not fame_in_body):
+            conclusions["34-7"] = "긍정" if verdicts["표장"] == "유사" else "부정"
+            confidence = "low"
+            result["결론추론"] = "표장 소결 → 7호"
+    result["결론절추출"] = 1 if blocks else 0
+    result["결론조문"] = "|".join(f"{k}:{v}" for k, v in conclusions.items())
+    result["결론_신뢰도"] = confidence
+    if "35-1" in conclusions and "선출원" not in types:  # 선출원 저촉 결론 → 상대 표장은 선출원
+        types = types + ["선출원"]
+        result["상대표장_유형"] = "|".join(t for t in _COUNTERPART_ORDER if t in types)
+    # 선등록상표가 소멸·무효·취소돼 유사 판단 없이 끝난 사건: 거절결정 취소 또는 무효심판 기각
+    result["선등록소멸취소"] = 1 if (
+        result["주문결과"] in ("취소", "기각") and _PRIOR_MARK_GONE_RE.search(judgment or text)
+    ) else 0
+    result["결정축_추정"] = _decision_axes(judgment) if judgment else ""
+    result["상표유형_추정"] = _mark_type(subject, judgment) if (subject or judgment) else "미상"
     return result
 
 
 PREFILTER_COLUMNS = [
     "심판번호", "텍스트길이", "추출실패", "주문", "주문결과", "이사건_구분", "이사건_등록번호",
-    "이사건_출원번호", "이사건_지정상품", "선등록_등록번호", "판단절",
+    "이사건_출원번호", "이사건_지정상품", "선등록_등록번호", "선출원_출원번호",
+    "상대표장_번호_후보", "상대표장_유형", "판단절",
     "본문_34_7", "본문_34_9", "본문_34_11", "본문_34_12", "본문_34_13", "본문_33",
     "이사건_국제등록번호", "본문_저명", "본문_주지", "본문_부정한목적", "본문_식별력",
-    "본문_저명주지_실질", "결론절추출", "결론조문", "거절이유조문", "선등록소멸취소",
+    "본문_저명주지_실질", "결론절추출", "결론조문", "결론_신뢰도", "결론추론", "거절이유조문",
+    "선등록소멸취소", "표장유사_소결", "상품유사_소결", "소결_신뢰도", "권리범위_근거",
+    "결정축_추정", "상표유형_추정",
 ]
 
 
@@ -1032,24 +1687,56 @@ def parse_conclusions(value: str) -> dict[str, str]:
     return conclusions
 
 
-def classify(analysis: dict, *, ignore_boilerplate: bool = True) -> tuple[str, str]:
+def _flag(analysis: dict, key: str) -> bool:
+    return str(analysis.get(key, "0")) == "1"
+
+
+def classify_scope(analysis: dict) -> tuple[str, str]:
+    """권리범위확인(4단계 규칙). 34조 결론이 없는 것이 정상이라 '추출 실패'로 보지 않는다.
+
+    1 = 판단 절에 표장 유사 소결(유사/비유사) & 34조 9·11·12·13호 결론 없음 & 저명·주지 실질
+    언급 없음. 3 = 각하, 효력제한(90조)·자유실시·식별력 없음·상품 비유사만·확인대상표장 불특정·
+    상표적 사용 아님. 나머지 2.
+    """
+    if analysis.get("주문결과") == "각하":
+        return "3", "각하(본안 판단 없음)"
+    basis = analysis.get("권리범위_근거") or ""
+    if basis:
+        return "3", "권리범위: " + basis.replace("|", "·")
+    verdict = analysis.get("표장유사_소결") or ""
+    if not verdict:
+        return "2", "권리범위: 표장 유사 소결 없음"
+    conclusions = parse_conclusions(analysis.get("결론조문", ""))
+    fame = [k for k in FAME_ARTICLES if k in conclusions]
+    if fame:
+        return "2", "권리범위: 표장 소결 있으나 인지도 조문 " + ",".join(fame)
+    if _flag(analysis, "본문_저명주지_실질"):
+        return "2", f"권리범위: 표장 {verdict} 소결이나 저명·주지 언급"
+    return "1", f"권리범위: 표장 {verdict} 소결, 인지도 언급 없음"
+
+
+def classify(analysis: dict, *, kind: str = "", ignore_boilerplate: bool = True) -> tuple[str, str]:
     """(자동등급, 사유). 1=순수 유사 사례 후보, 2=검토 필요, 3=제외 후보.
 
     2026-09-30 3단계 규칙: 각하와 선등록상표 소멸·무효 취소는 3등급(유사 판단 없음), 저명·주지
     언급은 요부 판단기준 판례 문구("주지ㆍ저명하거나…")를 뺀 뒤(본문_저명주지_실질)로 판단한다.
+    2026-10-01 4단계: kind="scope" 는 classify_scope. 선출원 저촉(35-1 = 구 8조1항)은 7호와 같이
+    다루되 표장 유사 소결이 있어야 1등급.
     ignore_boilerplate=False 는 이전 규칙(참고 열 등급_원규칙)용.
     """
+    if kind == "scope":
+        return classify_scope(analysis)
     if analysis.get("주문결과") == "각하":
         return "3", "각하(본안 판단 없음)"
-    if str(analysis.get("선등록소멸취소", "0")) == "1":
+    if _flag(analysis, "선등록소멸취소"):
         return "3", "유사 판단 없음(선등록상표 소멸·무효로 취소)"
     conclusions = parse_conclusions(analysis.get("결론조문", ""))
     fame_in_conclusion = [k for k in FAME_ARTICLES if k in conclusions]
     fame_keys = (("본문_저명", "저명"), ("본문_주지", "주지"), ("본문_부정한목적", "부정한 목적"))
-    fame_in_body = [name for key, name in fame_keys if str(analysis.get(key, "0")) == "1"]
+    fame_in_body = [name for key, name in fame_keys if _flag(analysis, key)]
     if ignore_boilerplate:
         fame_in_body = [n for n in fame_in_body if n == "부정한 목적"]
-        if str(analysis.get("본문_저명주지_실질", "0")) == "1":
+        if _flag(analysis, "본문_저명주지_실질"):
             fame_in_body.append("저명·주지(문구 제외 후)")
     if fame_in_conclusion:
         return "3", "결론에 인지도 조문 " + ",".join(fame_in_conclusion)
@@ -1057,30 +1744,64 @@ def classify(analysis: dict, *, ignore_boilerplate: bool = True) -> tuple[str, s
         return "3", "식별력 사례(33조만)"
     if not conclusions:
         return "2", "결론 조문 추출 실패"
+    inferred = " (표장 소결 추론, 신뢰도 low)" if analysis.get("결론추론") else ""
     if "34-7" in conclusions and not fame_in_body:
-        return "1", "결론 7호, 인지도 언급 없음"
+        return "1", "결론 7호, 인지도 언급 없음" + inferred
     if "34-7" in conclusions:
         return "2", "결론 7호이나 본문에 " + "·".join(fame_in_body)
+    if "35-1" in conclusions:
+        verdict = analysis.get("표장유사_소결") or ""
+        if fame_in_body:
+            return "2", "결론 35-1(선출원 저촉)이나 본문에 " + "·".join(fame_in_body)
+        if not verdict:
+            return "2", "결론 35-1(선출원 저촉)이나 표장 소결 없음"
+        return "1", f"결론 35-1(선출원 저촉), 표장 {verdict} 소결, 인지도 언급 없음"
     return "2", "결론 조문이 7호 아님(" + ",".join(conclusions) + ")"
 
 
-def estimate_similarity(kind: str, analysis: dict) -> tuple[str, str]:
-    """결론 7호일 때 유사여부 추정과 근거. 사람이 '유사여부_확정'에서 확정한다."""
+def estimate_similarity(kind: str, analysis: dict, trial_desc: str = "") -> tuple[str, str]:
+    """유사여부 추정과 근거. 사람이 '유사여부_확정'에서 확정한다.
+
+    권리범위확인: 주문 속함 → 유사, 불속 → 비유사, 기각은 적극(→ 불속)·소극(→ 속함)으로 읽는다.
+    그 외: 결론 7호(없으면 35-1) 긍정/부정. 소결의 표장 판단이 있으면 대조해 불일치를 근거에 적고,
+    상품 비유사로 7호가 부정된 경우는 표장 판단(유사)을 따른다.
+    """
+    result = analysis.get("주문결과", "")
+    mark_verdict = analysis.get("표장유사_소결") or ""
+    if kind == "scope":
+        if result == "속함":
+            return "유사", "주문 속함(scope)"
+        if result == "불속":
+            return "비유사", "주문 불속(scope)"
+        if result == "기각" and "소극" in (trial_desc or ""):
+            return "유사", "주문 기각(소극적 권리범위확인 → 속함)"
+        if result == "기각" and "적극" in (trial_desc or ""):
+            return "비유사", "주문 기각(적극적 권리범위확인 → 불속)"
+        return "", ""
     conclusions = parse_conclusions(analysis.get("결론조문", ""))
-    polarity = conclusions.get("34-7")
-    if polarity == "긍정":
-        return "유사", "결론 7호 긍정"
-    if polarity == "부정":
-        return "비유사", "결론 7호 부정"
+    for article, label in (("34-7", "결론 7호"), ("35-1", "결론 35-1(선출원 저촉)")):
+        polarity = conclusions.get(article)
+        if polarity not in ("긍정", "부정"):
+            continue
+        guess = "유사" if polarity == "긍정" else "비유사"
+        basis = f"{label} {polarity}"
+        if analysis.get("결론추론"):
+            basis += " — 표장 소결 추론"
+        elif guess == "비유사" and not mark_verdict and analysis.get("상품유사_소결") == "비유사":
+            return "", f"{label} 부정은 상품 비유사 때문 — 표장 판단 없음"
+        elif mark_verdict and mark_verdict != guess:
+            if guess == "비유사" and analysis.get("상품유사_소결") == "비유사":
+                return "유사", f"소결 표장 유사(상품 비유사로 {label} 부정)"
+            basis += f" · 소결 표장 {mark_verdict}와 불일치"
+        return guess, basis
+    if mark_verdict:
+        return mark_verdict, f"소결 표장 {mark_verdict}(조문 없음)"
     if "34-7" not in conclusions:
         return "", ""
-    result = analysis.get("주문결과", "")
     if kind == "refusal":
         mapping = {"기각": "유사", "취소": "비유사"}
-    else:  # invalidation / scope: 인용 = 유사, 기각 = 비유사 (권리범위확인은 주문 문구 우선)
-        mapping = {
-            "무효": "유사", "취소": "유사", "속함": "유사", "기각": "비유사", "불속": "비유사",
-        }
+    else:  # invalidation: 인용(무효·일부무효) = 유사, 기각 = 비유사
+        mapping = {"무효": "유사", "일부무효": "유사", "취소": "유사", "기각": "비유사"}
     guess = mapping.get(result, "")
     return guess, f"주문 {result}({kind})" if guess else ""
 
@@ -1090,6 +1811,10 @@ def family_key(plaintiff: str, prior_numbers: list[str]) -> str:
     name = "".join((plaintiff or "").split()).casefold()  # 공백 차이("주식회사 X"/"주식회사X") 무시
     payload = name + "|" + "|".join(sorted(set(prior_numbers)))
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:8]
+
+
+def _empty_human() -> dict[str, str]:
+    return {column: "" for column in HUMAN_COLUMNS}
 
 
 def build_sheet_rows(
@@ -1113,24 +1838,35 @@ def build_sheet_rows(
             "심판상태": row.get("심판상태", ""),
             "심결월": row.get("심결월", ""),
             "상표A_명칭": row.get("상표명칭", ""),
-            "유사여부_확정": "", "판단축": "", "제외사유": "", "메모": "",
+            **_empty_human(),
         }
         if analysis is None:
             if include_missing:
                 sheet.append({
                     **base,
                     "상표A_번호": row.get("등록번호") or row.get("출원번호", ""),
-                    "상표B_번호": "", "지정상품_원문": "", "조문플래그": "", "결론조문": "",
+                    "상표B_번호": "", "상대표장_번호_후보": "", "상대표장_유형": "",
+                    "지정상품_원문": "", "조문플래그": "",
+                    "결론조문": "", "신뢰도": "", "표장유사_소결": "",
                     "자동등급": "", "등급사유": "텍스트 미추출", "등급_원규칙": "", "family": "",
-                    "참고표시": "", "유사여부_추정": "", "추정근거": "",
+                    "참고표시": "", "유사여부_추정": "", "추정근거": "", "결정축_추정": "",
+                    "상표유형_추정": "",
                 })
             continue
-        grade, reason = classify(analysis)
-        old_grade, _ = classify(analysis, ignore_boilerplate=False)
-        guess, basis = estimate_similarity(kind, analysis)
+        grade, reason = classify(analysis, kind=kind)
+        old_grade, _ = classify(analysis, kind=kind, ignore_boilerplate=False)
+        guess, basis = estimate_similarity(kind, analysis, row.get("종류", ""))
         notes = []
         prior_list = [p for p in (analysis.get("선등록_등록번호") or "").split("|") if p]
-        family = family_key(row.get("청구인", ""), prior_list)
+        prior_list += [p for p in (analysis.get("선출원_출원번호") or "").split("|")
+                       if p and p not in prior_list]
+        if kind == "scope":  # 확인대상표장은 번호가 없다 → 청구인·피청구인·이 사건 등록번호
+            family = family_key(
+                f"{row.get('청구인', '')}|{row.get('피청구인', '')}",
+                [analysis.get("이사건_등록번호") or row.get("등록번호", "")],
+            )
+        else:
+            family = family_key(row.get("청구인", ""), prior_list)
         if family in first_of_family:
             notes.append(f"중복(family 첫 건 {first_of_family[family]})")
             if grade == "1":
@@ -1139,23 +1875,32 @@ def build_sheet_rows(
             first_of_family[family] = number
         if analysis.get("주문결과") == "각하":
             notes.append("각하(본안 판단 없음)")
-        if str(analysis.get("선등록소멸취소", "0")) == "1":
+        if _flag(analysis, "선등록소멸취소"):
             notes.append("선등록상표 소멸로 취소(유사 판단 없음)")
         if analysis.get("이사건_국제등록번호"):
             notes.append("국제등록출원")
+        counterpart = analysis.get("상대표장_유형", "")
+        if kind != "scope" and not prior_list and counterpart not in ("", "선사용"):
+            notes.append("상대 표장 번호 없음")
         flags = [key.replace("본문_", "").replace("_", "-") for key in analysis
                  if key.startswith("본문_") and str(analysis[key]) == "1"]
         subject_number = (analysis.get("이사건_등록번호") or row.get("등록번호")
                           or analysis.get("이사건_출원번호") or row.get("출원번호", ""))
+        confidence = (analysis.get("소결_신뢰도") if kind == "scope"
+                      else analysis.get("결론_신뢰도")) or ""
         prior = prior_list or [""]
         for prior_number in prior:  # 선등록상표가 여러 건이면 행을 나눈다
             sheet.append({
                 **base,
                 "상표A_번호": subject_number,
                 "상표B_번호": prior_number,
+                "상대표장_번호_후보": analysis.get("상대표장_번호_후보", ""),
+                "상대표장_유형": analysis.get("상대표장_유형", ""),
                 "지정상품_원문": analysis.get("이사건_지정상품", ""),
                 "조문플래그": ",".join(flags),
                 "결론조문": analysis.get("결론조문", ""),
+                "신뢰도": confidence,
+                "표장유사_소결": analysis.get("표장유사_소결", ""),
                 "자동등급": grade,
                 "등급사유": reason,
                 "등급_원규칙": old_grade,
@@ -1163,8 +1908,105 @@ def build_sheet_rows(
                 "참고표시": "; ".join(notes),
                 "유사여부_추정": guess,
                 "추정근거": basis,
+                "결정축_추정": analysis.get("결정축_추정", ""),
+                "상표유형_추정": analysis.get("상표유형_추정", ""),
             })
     return sheet
+
+
+def merge_human_columns(rows: list[dict], previous: list[dict]) -> int:
+    """이전 labels.csv 의 사람 열을 새 행에 옮긴다 — (심판번호, 상표B_번호) 일치 우선. 그 심판번호의
+    이전 행이 하나뿐이면 상표B 가 달라도 옮긴다(여러 행이면 어느 것인지 몰라 비워 둔다).
+    4단계 전 열 이름(판단축)도 받는다. 옮긴 행 수를 돌려준다."""
+    by_pair: dict[tuple[str, str], dict[str, str]] = {}
+    by_trial: dict[str, dict[str, str]] = {}
+    rows_per_trial: dict[str, int] = {}
+    for old in previous:
+        rows_per_trial[old.get("심판번호", "")] = rows_per_trial.get(old.get("심판번호", ""), 0) + 1
+        values = {}
+        for column in HUMAN_COLUMNS:
+            value = (old.get(column) or "").strip()
+            if not value:
+                for legacy, renamed in LEGACY_HUMAN_COLUMNS.items():
+                    if renamed == column:
+                        value = (old.get(legacy) or "").strip()
+            values[column] = value
+        if not any(values.values()):
+            continue
+        by_pair.setdefault((old.get("심판번호", ""), old.get("상표B_번호", "")), values)
+        by_trial.setdefault(old.get("심판번호", ""), values)
+    moved = 0
+    for row in rows:
+        pair = (row["심판번호"], row.get("상표B_번호", ""))
+        values = by_pair.get(pair)
+        if not values and rows_per_trial.get(row["심판번호"], 0) == 1:
+            values = by_trial.get(row["심판번호"])
+        if not values:
+            continue
+        for column, value in values.items():
+            if value:
+                row[column] = value
+        moved += 1
+    return moved
+
+
+def _grade_summary(rows: list[dict]) -> tuple[dict[str, int], int]:
+    trials: dict[str, str] = {}
+    for r in rows:
+        trials.setdefault(r["심판번호"], r["자동등급"])
+    return {g: sum(1 for v in trials.values() if v == g) for g in ("1", "2", "3")}, len(trials)
+
+
+CURATION_COLUMNS = [
+    "순번", "심판번호", "종류", "상표A_명칭", "상대표장_번호", "유사여부_추정", "신뢰도",
+    "등급사유",
+]
+_CURATION_KIND_ORDER = {"scope": 0, "refusal": 1, "invalidation": 2}
+_CURATION_CONFIDENCE_ORDER = {"high": 0, "low": 1, "": 2}
+_CURATION_SECOND_RE = re.compile(r"^권리범위: 표장 (?:유사|비유사) 소결이나 저명·주지 언급")
+
+
+def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]:
+    """큐레이션 순서: 1등급(권리범위확인 → 거절결정불복 → 무효, 각 안에서 신뢰도 high → low) 다음에
+    2등급 중 "권리범위 … 저명·주지 언급". family 중복은 제외. 심판번호당 한 줄(상대 표장 번호는 ; 로
+    잇고, 없으면 복구 후보)."""
+    first: dict[str, dict] = {}
+    numbers: dict[str, list[str]] = {}
+    for row in rows:
+        first.setdefault(row["심판번호"], row)
+        known = numbers.setdefault(row["심판번호"], [])
+        if row.get("상표B_번호") and row["상표B_번호"] not in known:
+            known.append(row["상표B_번호"])
+    picked: list[tuple[tuple[int, int, int, str], dict]] = []
+    for number, row in first.items():
+        reason = row.get("등급사유", "")
+        if "중복" in row.get("참고표시", "") or reason.startswith("family 중복"):
+            continue
+        if row.get("자동등급") == "1":
+            bucket = 0
+        elif row.get("자동등급") == "2" and _CURATION_SECOND_RE.match(reason):
+            bucket = 1
+        else:
+            continue
+        kind = kind_for_trial_desc(row.get("종류", ""), kinds)
+        key = (bucket, _CURATION_KIND_ORDER.get(kind, 3),
+               _CURATION_CONFIDENCE_ORDER.get(row.get("신뢰도", ""), 2), number)
+        picked.append((key, row))
+    picked.sort(key=lambda item: item[0])
+    return [
+        {
+            "순번": index,
+            "심판번호": row["심판번호"],
+            "종류": row.get("종류", ""),
+            "상표A_명칭": row.get("상표A_명칭", ""),
+            "상대표장_번호": ";".join(numbers.get(row["심판번호"], []))
+            or row.get("상대표장_번호_후보", ""),
+            "유사여부_추정": row.get("유사여부_추정", ""),
+            "신뢰도": row.get("신뢰도", ""),
+            "등급사유": row.get("등급사유", ""),
+        }
+        for index, (_, row) in enumerate(picked, start=1)
+    ]
 
 
 def run_sheet(args: argparse.Namespace, session: Session) -> int:
@@ -1174,15 +2016,100 @@ def run_sheet(args: argparse.Namespace, session: Session) -> int:
     known = {row["심판번호"] for row in list_rows}
     list_rows += [row for row in _read_csv(paths_.list_csv) if row["심판번호"] not in known]
     prefilter_rows = _read_csv(paths_.prefilter_csv)
-    rows = build_sheet_rows(list_rows, prefilter_rows, load_kinds(args.kinds_config))
+    previous = _read_csv(paths_.labels_csv)
+    kinds = load_kinds(args.kinds_config)
+    rows = build_sheet_rows(list_rows, prefilter_rows, kinds)
+    moved = merge_human_columns(rows, previous)
     _write_csv(paths_.labels_csv, LABEL_COLUMNS, rows)
-    trials = {}
-    for r in rows:
-        trials.setdefault(r["심판번호"], r["자동등급"])
-    grades = {g: sum(1 for v in trials.values() if v == g) for g in ("1", "2", "3")}
-    print(f"## sheet: {len(rows)}행/{len(trials)}건 → {paths_.labels_csv} "
-          f"(1등급 {grades['1']}, 2등급 {grades['2']}, 3등급 {grades['3']})")
+    grades, trials = _grade_summary(rows)
+    print(f"## sheet: {len(rows)}행/{trials}건 → {paths_.labels_csv} "
+          f"(1등급 {grades['1']}, 2등급 {grades['2']}, 3등급 {grades['3']}) · "
+          f"사람 열 보존 {moved}행(이전 {len(previous)}행)")
+    queue = build_curation_queue(rows, kinds)
+    _write_csv(paths_.curation_queue, CURATION_COLUMNS, queue)
+    second = sum(1 for item in queue if _CURATION_SECOND_RE.match(item["등급사유"]))
+    recovered = sum(1 for r in {row["심판번호"]: row for row in rows}.values()
+                    if not r.get("상표B_번호") and r.get("상대표장_번호_후보"))
+    print(f"- 큐레이션 큐 {len(queue)}건(1등급 {len(queue) - second} · "
+          f"권리범위 저명·주지 언급 {second}) → {paths_.curation_queue} · "
+          f"상대 표장 번호 후보 복구 {recovered}건")
     return 0
+
+
+# ====================================================================
+# show — 주문 + 판단 절 + 자동 판정 (호출 없음, 큐레이션 보조)
+# ====================================================================
+
+def run_show(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    kinds = load_kinds(args.kinds_config)
+    listed = {row["심판번호"]: row for row in _read_csv(paths_.list_csv)}
+    if paths_.list_all_csv.exists():
+        for row in _read_csv(paths_.list_all_csv):
+            listed.setdefault(row["심판번호"], row)
+    label_rows = _read_csv(paths_.labels_csv)
+    labels: dict[str, dict] = {}
+    for row in label_rows:
+        labels.setdefault(row["심판번호"], row)
+    trials = list(getattr(args, "trial", None) or [])
+    if getattr(args, "next", False):
+        queue = _read_csv(paths_.curation_queue)
+        if not queue:
+            print(f"[없음] {paths_.curation_queue} — sheet 먼저", file=sys.stderr)
+            return 1
+        item = next_in_queue(queue, label_rows)
+        if item is None:
+            print(f"큐 {len(queue)}건 모두 유사여부_확정 완료")
+            return 0
+        print(f"큐 {item['순번']}/{len(queue)} · {item['등급사유']} · "
+              f"추정 {item['유사여부_추정'] or '-'} · 신뢰도 {item['신뢰도'] or '-'}")
+        trials.append(item["심판번호"])
+    if not trials:
+        print("[오류] 심판번호를 주거나 --next 를 쓰세요.", file=sys.stderr)
+        return 2
+    exit_code = 0
+    for number in trials:
+        text_path = paths_.text_dir / f"{number}.txt"
+        if not text_path.exists():
+            print(f"[없음] {text_path} — fetch·extract 먼저", file=sys.stderr)
+            exit_code = 1
+            continue
+        text = text_path.read_text(encoding="utf-8")
+        analysis = analyze_text(text)
+        row = listed.get(number, {"심판번호": number, "종류": "", "심결월": "", "상표명칭": ""})
+        sheet = build_sheet_rows([row], [{"심판번호": number, **analysis}], kinds)
+        auto = sheet[0] if sheet else {}
+        print(f"## {number} · {row.get('종류', '')} · {row.get('심결월', '')} · "
+              f"{row.get('상표명칭', '')} · 청구인 {row.get('청구인', '')}")
+        print("### 주문")
+        print(analysis["주문"] or "(주문을 찾지 못함)")
+        print(f"→ 주문결과 {analysis['주문결과']}")
+        marks = fallback_marks(text, analysis)
+        print("### 판단 절" + (" (>> 폴백으로 읽은 결론 문장)" if marks else ""))
+        print(judgment_text(text, marks) or "(판단 절 제목을 찾지 못함)")
+        print("### 자동 판정")
+        dash = lambda value: value or "-"  # noqa: E731 — 빈 값 표시
+        print(f"- 등급 {auto.get('자동등급', '')} — {auto.get('등급사유', '')} "
+              f"(신뢰도 {dash(auto.get('신뢰도', ''))})")
+        print(f"- 유사여부 추정 {dash(auto.get('유사여부_추정', ''))} — "
+              f"{dash(auto.get('추정근거', ''))}")
+        print(f"- 결론조문 {dash(analysis['결론조문'])} · "
+              f"표장 소결 {dash(analysis['표장유사_소결'])} · "
+              f"상품 소결 {dash(analysis['상품유사_소결'])} · "
+              f"권리범위 근거 {dash(analysis['권리범위_근거'])}")
+        print(f"- 결정축 추정 {dash(analysis['결정축_추정'])} · "
+              f"상표유형 추정 {analysis['상표유형_추정']}")
+        prior = [r.get("상표B_번호", "") for r in sheet if r.get("상표B_번호")]
+        candidates = analysis.get("상대표장_번호_후보", "")
+        print(f"- 상대 표장 {dash(analysis['상대표장_유형'])} 번호 {dash(', '.join(prior))}"
+              f"{' (후보 ' + candidates + ')' if candidates else ''} · "
+              f"이 사건 {dash(auto.get('상표A_번호', ''))} · "
+              f"조문플래그 {dash(auto.get('조문플래그', ''))}")
+        human = labels.get(number)
+        if human:
+            filled = {c: human.get(c, "") for c in HUMAN_COLUMNS if human.get(c)}
+            print(f"- 사람 열(labels.csv): {filled if filled else '아직 없음'}")
+    return exit_code
 
 
 # ====================================================================
@@ -1349,6 +2276,26 @@ def summarize_calls(log_path: Path) -> dict[str, int]:
     return counts
 
 
+def curation_progress(label_rows: list[dict]) -> str:
+    """큐레이션 진행률: 1등급 중 유사여부_확정이 채워진 건수, 제외사유 표시 건수(심판번호 단위)."""
+    first: dict[str, dict] = {}
+    for row in label_rows:
+        first.setdefault(row["심판번호"], row)
+    confirmed_by_trial: dict[str, bool] = {}
+    excluded: set[str] = set()
+    for row in label_rows:
+        if (row.get("유사여부_확정") or "").strip():
+            confirmed_by_trial[row["심판번호"]] = True
+        if (row.get("제외사유") or "").strip():
+            excluded.add(row["심판번호"])
+    grade_one = [n for n, r in first.items() if r.get("자동등급") == "1"]
+    confirmed_one = sum(1 for n in grade_one if confirmed_by_trial.get(n))
+    confirmed_all = sum(1 for n in first if confirmed_by_trial.get(n))
+    percent = (confirmed_one * 100 // len(grade_one)) if grade_one else 0
+    return (f"큐레이션: 1등급 {len(grade_one)}건 중 유사여부_확정 {confirmed_one}건({percent}%) · "
+            f"전체 확정 {confirmed_all}/{len(first)}건 · 제외사유 {len(excluded)}건")
+
+
 def run_status(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
     calls = summarize_calls(paths_.calls_log)
@@ -1360,9 +2307,11 @@ def run_status(args: argparse.Namespace, session: Session) -> int:
     print(f"## status ({paths_.base})")
     print(f"- 예산: {session.budget_line()}")
     prefilter_count = len(_read_csv(paths_.prefilter_csv))
-    labels_count = len(_read_csv(paths_.labels_csv))
+    label_rows = _read_csv(paths_.labels_csv)
     print(f"- list.csv {len(list_rows)}건 · PDF {pdfs}건 · 텍스트 {texts}건 · "
-          f"prefilter {prefilter_count}행 · labels {labels_count}행")
+          f"prefilter {prefilter_count}행 · labels {len(label_rows)}행")
+    if label_rows:
+        print("- " + curation_progress(label_rows))
     progress = load_progress(paths_.list_progress)
     for kind, months in progress.items():
         done = sum(1 for m in months.values() if m.get("done"))
@@ -1420,13 +2369,19 @@ def build_parser() -> argparse.ArgumentParser:
                          help="종류 우선순위, 예: refusal,scope,invalidation")
     p_fetch.add_argument("--prefer-doc", action="store_true", help="심결문유무 Y 인 건을 먼저")
     p_fetch.add_argument("--queue", metavar="CSV", help="sample 이 만든 표본 CSV 순서대로 받는다")
+    p_fetch.add_argument("--kind-cap", default="", metavar="kind=N,...",
+                         help="종류별 상한(우선순위 정렬 뒤 적용), 예: scope=280,invalidation=100")
 
     p_extract = sub.add_parser("extract", help="PDF → 텍스트 + prefilter.csv")
     common(p_extract)
     p_extract.add_argument("--force", action="store_true", help="이미 있는 텍스트도 다시 추출")
 
-    p_sheet = sub.add_parser("sheet", help="labels.csv 초안")
+    p_sheet = sub.add_parser("sheet", help="labels.csv 초안(재생성 때 사람 열 보존)")
     common(p_sheet)
+    p_show = sub.add_parser("show", help="심판번호의 주문·판단 절·자동 판정 보기(호출 없음)")
+    p_show.add_argument("trial", nargs="*", metavar="심판번호")
+    p_show.add_argument("--next", action="store_true",
+                        help="curation_queue.csv 에서 유사여부_확정이 비어 있는 첫 건을 보여 준다")
     p_sample = sub.add_parser("sample", help="층화 표본 CSV 생성(호출 없음)")
     p_sample.add_argument("--source", default="", help="목록 CSV(기본 list_all.csv)")
     p_sample.add_argument("--scope", type=int, default=0)
@@ -1449,8 +2404,8 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=getattr(args, "dry_run", False),
     )
     runners = {"list": run_list, "fetch": run_fetch, "extract": run_extract,
-               "sheet": run_sheet, "sample": run_sample, "biblio": run_biblio,
-               "status": run_status}
+               "sheet": run_sheet, "show": run_show, "sample": run_sample,
+               "biblio": run_biblio, "status": run_status}
     try:
         return runners[args.command](args, session)
     except kc.CallBudgetExceeded as exc:
