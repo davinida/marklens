@@ -526,12 +526,32 @@ export const GoodsMatchSchema = z
   })
   .passthrough();
 
+// 업종 세트(shared/goods_map/business_presets.json): 검색어가 업종명·별칭에 부분 일치하면 함께 온다.
+export const PresetGoodSchema = z
+  .object({
+    name: z.string().min(1),
+    nice_class: z.number().int().min(1).max(45),
+    similarity_codes: z.array(z.string()),
+  })
+  .passthrough();
+
+export const BusinessPresetSchema = z
+  .object({
+    id: z.string().min(1),
+    업종명: z.string().min(1),
+    emoji: z.string().optional().default(""),
+    hint: z.string().optional().default(""),
+    지정상품: z.array(PresetGoodSchema),
+  })
+  .passthrough();
+
 export const GoodsSearchResponseSchema = z
   .object({
     query: z.string(),
     matches: z.array(GoodsMatchSchema),
     total: z.number().int().nonnegative(),
     offset: z.number().int().nonnegative().optional().default(0),
+    presets: z.array(BusinessPresetSchema).optional().default([]),
     source: z.string().optional(),
   })
   .passthrough();
@@ -553,6 +573,8 @@ export const GoodsClassesResponseSchema = z
   .passthrough();
 
 export type GoodsMatch = z.infer<typeof GoodsMatchSchema>;
+export type PresetGood = z.infer<typeof PresetGoodSchema>;
+export type BusinessPreset = z.infer<typeof BusinessPresetSchema>;
 export type GoodsSearchResponse = z.infer<typeof GoodsSearchResponseSchema>;
 export type GoodsClass = z.infer<typeof GoodsClassSchema>;
 export type GoodsClassesResponse = z.infer<typeof GoodsClassesResponseSchema>;

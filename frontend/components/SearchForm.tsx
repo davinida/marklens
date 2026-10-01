@@ -376,7 +376,7 @@ export default function SearchForm({
 
       <section aria-labelledby="name-title" className="rise rise-2 rounded-lg bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label id="name-title" htmlFor="mark-name" className="text-[13px] font-semibold text-sub">
+          <label id="name-title" htmlFor="mark-text" className="text-[13px] font-semibold text-sub">
             상표 이름
           </label>
           <span className="rounded-full bg-blue-bg px-2.5 py-0.5 text-[11px] font-bold text-blue-dark">
@@ -384,9 +384,11 @@ export default function SearchForm({
           </span>
         </div>
         <div className="mt-2 flex items-end gap-2">
+          {/* Safari 연락처 자동완성 아이콘 방지: autoComplete=off, id 에 'name' 을 쓰지 않는다 */}
           <input
-            id="mark-name"
+            id="mark-text"
             type="text"
+            autoComplete="off"
             value={markName}
             maxLength={100}
             aria-describedby="name-help"
@@ -445,7 +447,12 @@ export default function SearchForm({
         )}
       </section>
 
-      <section aria-labelledby="goods-title" className="rise rise-3 rounded-lg bg-card p-5">
+      {/* .rise 의 transform 이 카드마다 stacking context 를 만들어 드롭다운(z-20)이 뒤 카드에 가려진다.
+          이 카드만 z-index 를 올려 드롭다운이 다음 카드 위에 그려지게 한다(헤더 z-10 보다는 아래). */}
+      <section
+        aria-labelledby="goods-title"
+        className="rise rise-3 relative z-[1] rounded-lg bg-card p-5"
+      >
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 id="goods-title" className="text-[13px] font-semibold text-sub">
             지정상품

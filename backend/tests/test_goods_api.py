@@ -11,6 +11,7 @@ from backend.src.core import goods
 from backend.src.core.ratelimit import limiter
 
 COSMETICS_35 = "화장품 판매업(도소매·중개·대행)"
+COFFEE_35 = "커피 판매업(도소매·중개·대행)"
 
 
 @pytest.fixture(scope="module")
@@ -97,7 +98,12 @@ def test_search_strips_query_and_handles_no_match(client):
 
     body = client.get("/goods/search", params={"q": "없는상품"}).json()
     assert body == {
-        "query": "없는상품", "matches": [], "total": 0, "offset": 0, "source": goods.SOURCE,
+        "query": "없는상품",
+        "matches": [],
+        "total": 0,
+        "offset": 0,
+        "presets": [],
+        "source": goods.SOURCE,
     }
 
 
@@ -155,6 +161,42 @@ def test_offset_pages_listing_and_search(client):
     assert [m["name"] for m in first["matches"]] == ["화장품", "화장품용 스펀지"]
     assert [m["name"] for m in second["matches"]] == [COSMETICS_35, "기능성 화장품"]
     assert first["total"] == second["total"] == 4 and second["offset"] == 2
+
+
+def test_search_returns_matching_business_presets(client):
+    """검색어가 세트의 업종명·별칭에 부분 일치하면 presets 에 세트(유사군 해석 완료)를 함께 준다."""
+    body = client.get("/goods/search", params={"q": "카페"}).json()
+    assert [p["id"] for p in body["presets"]] == ["cafe"]
+    cafe = body["presets"][0]
+    assert cafe["업종명"] == "카페" and cafe["emoji"] == "☕" and cafe["hint"] == "테스트 힌트"
+    assert [(g["name"], g["nice_class"], g["similarity_codes"]) for g in cafe["지정상품"]] == [
+        ("커피", 30, ["G0502"]),
+        ("커피 소매업", 35, ["S2039"]),  # alias 로 적은 명칭도 병합 항목의 유사군으로 해석
+    ]
+    # 별칭(커피숍)에 부분 일치해도 잡히고, 개별 검색 결과·total·offset 은 그대로다
+    body = client.get("/goods/search", params={"q": "커피"}).json()
+    assert [p["id"] for p in body["presets"]] == ["cafe"]
+    assert body["total"] == 2 and body["offset"] == 0
+    assert [m["name"] for m in body["matches"]] == ["커피", COFFEE_35]
+
+
+def test_search_without_preset_match_has_empty_presets(client):
+    assert client.get("/goods/search", params={"q": "장갑"}).json()["presets"] == []
+    # 류 목록 보기(검색어 없음)에는 세트를 붙이지 않는다
+    assert client.get("/goods/search", params={"nice_class": 25}).json()["presets"] == []
+    assert client.get("/goods/search", params={"q": "화장품"}).json()["presets"][0]["id"] == (
+        "cosmetics"
+    )
+
+
+def test_invalid_preset_names_are_excluded_with_warning(client):
+    """변환표에 없는 명칭은 경고 + 제외, 유효한 지정상품이 없는 세트는 통째로 제외(기동은 정상)."""
+    presets = goods.state.presets
+    assert presets is not None and len(presets) == 2
+    assert presets.get("ghost") is None
+    assert any("cafe" in w and "없는상품" in w for w in goods.state.preset_warnings)
+    assert any("ghost" in w for w in goods.state.preset_warnings)
+    assert client.get("/health").status_code == 200
 
 
 def test_classes_returns_all_45_with_titles_and_counts(client):

@@ -13,7 +13,14 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from ..core import config, goods
 from ..core.ratelimit import limiter
-from ..schemas.goods import GoodsClass, GoodsClassesResponse, GoodsMatch, GoodsSearchResponse
+from ..schemas.goods import (
+    BusinessPreset,
+    GoodsClass,
+    GoodsClassesResponse,
+    GoodsMatch,
+    GoodsSearchResponse,
+    PresetGood,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -99,6 +106,23 @@ def goods_search(
         ],
         total=total,
         offset=offset,
+        presets=[
+            BusinessPreset(
+                id=preset.id,
+                업종명=preset.label,
+                emoji=preset.emoji,
+                hint=preset.hint,
+                지정상품=[
+                    PresetGood(
+                        name=good.name,
+                        nice_class=good.nice_class,
+                        similarity_codes=list(good.similarity_codes),
+                    )
+                    for good in preset.goods
+                ],
+            )
+            for preset in (goods.presets_for(query) if query else [])
+        ],
         source=goods.SOURCE,
     )
 

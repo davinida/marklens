@@ -117,6 +117,28 @@ const GOODS_SEARCH_RESULT = {
   source: "E2E fixture",
 };
 
+const CAFE_PRESET_RESULT = {
+  query: "카페",
+  matches: [
+    { name: "카페서비스업", nice_class: 43, similarity_codes: ["S120602"], matched_alias: null },
+  ],
+  total: 1,
+  offset: 0,
+  presets: [
+    {
+      id: "cafe",
+      업종명: "카페",
+      emoji: "☕",
+      지정상품: [
+        { name: "커피전문점업", nice_class: 43, similarity_codes: ["G0301", "G0502", "S120602"] },
+        { name: "커피", nice_class: 30, similarity_codes: ["G0502"] },
+        { name: "커피 소매업", nice_class: 35, similarity_codes: ["S2005"] },
+      ],
+    },
+  ],
+  source: "E2E fixture",
+};
+
 const GOODS_CLASSES_RESULT = {
   classes: [
     { nice_class: 30, title: "커피·과자", count: 1 },
@@ -356,7 +378,9 @@ test("selected goods survive the search and appear in the result summary", async
       body: JSON.stringify(
         url.searchParams.get("q") === "커피"
           ? GOODS_SEARCH_RESULT
-          : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
+          : url.searchParams.get("q") === "카페"
+            ? CAFE_PRESET_RESULT
+            : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
       ),
     });
   });
@@ -399,5 +423,69 @@ test("selected goods survive the search and appear in the result summary", async
     "선택한 지정상품: 커피, 커피전문점업 (유사군 2개)",
   );
   await expect(page.getByText("지정상품 2개 선택(유사군 2개) · 검색 반영 전")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+});
+
+test("a business preset adds three goods that show up in the result summary", async ({ page }) => {
+  await page.route("**/api/goods/search?*", async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        url.searchParams.get("q") === "카페"
+          ? CAFE_PRESET_RESULT
+          : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
+      ),
+    });
+  });
+  await page.route("**/api/search?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(SEARCH_RESULT),
+    });
+  });
+
+  await page.getByRole("combobox", { name: "지정상품 검색" }).fill("카페");
+  const card = page.getByRole("region", { name: "카페 업종 세트" });
+  await expect(card).toBeVisible();
+  // 카드 등장 애니메이션(.rise transform)이 켜진 상태에서도 드롭다운이 다음 카드 위에 그려진다
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const section = document.querySelector('section[aria-labelledby="goods-title"]')!;
+        const dropdown = document.querySelector('section[aria-label="카페 업종 세트"]')!
+          .parentElement!;
+        dropdown.scrollIntoView({ block: "start" });
+        window.scrollBy(0, -64); // 고정 헤더(h-14) 아래로
+        const box = dropdown.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + 56);
+        return {
+          animated: getComputedStyle(section).transform !== "none",
+          dropdownOnTop: !!hit && hit.closest("[data-goods-picker]") !== null,
+        };
+      }),
+    )
+    .toEqual({ animated: true, dropdownOnTop: true });
+  await card.getByRole("button", { name: "3개 모두 추가" }).click();
+  for (const name of ["커피전문점업", "커피", "커피 소매업"]) {
+    await expect(page.getByRole("button", { name: `${name} 제거` })).toBeVisible();
+  }
+  await expect(page.getByText("선택 3개")).toBeVisible();
+  await expect(page.getByText("유사군 4개")).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+
+  await chooseLogo(page);
+  await page
+    .getByRole("dialog", { name: "분석할 로고 영역 선택" })
+    .getByRole("button", { name: "전체 이미지 사용" })
+    .click();
+  await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
+
+  await expect(page.locator("[data-goods-summary]")).toContainText(
+    "선택한 지정상품: 커피전문점업, 커피, 커피 소매업 (유사군 4개)",
+  );
   await expectNoHorizontalOverflow(page);
 });

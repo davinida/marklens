@@ -22,8 +22,11 @@ if str(paths.ML_ROOT) not in sys.path:
 from src.axes.goods_map import (  # noqa: E402
     NICE_CLASS_TITLES,
     SOURCE_LABEL,
+    BusinessPreset,
+    BusinessPresets,
     GoodsMap,
     Match,
+    load_business_presets,
     load_goods_map,
 )
 
@@ -41,6 +44,8 @@ class GoodsState:
     entry_count: int = 0
     alias_count: int = 0
     load_ms: float = 0.0
+    presets: BusinessPresets | None = None  # 업종 세트(없어도 검색은 동작)
+    preset_warnings: tuple[str, ...] = ()
 
 
 # 모듈 전역 상태. main.py lifespan 이 load_all() 로 채운다.
@@ -56,6 +61,8 @@ def reset() -> None:
     state.entry_count = 0
     state.alias_count = 0
     state.load_ms = 0.0
+    state.presets = None
+    state.preset_warnings = ()
 
 
 def load_all(path: str | None = None) -> GoodsState:
@@ -92,7 +99,38 @@ def load_all(path: str | None = None) -> GoodsState:
         state.path,
         state.load_ms,
     )
+    _load_presets(goods_map)
     return state
+
+
+def _load_presets(goods_map: GoodsMap) -> None:
+    """업종 세트 적재 — 없거나 깨져도 기동을 막지 않는다(경고만). 불일치 명칭은 로더가 뺀다."""
+    try:
+        presets = load_business_presets(goods_map, config.GOODS_PRESETS_PATH or None)
+    except Exception:
+        logger.exception("업종 세트 적재 실패 — 세트 없이 동작")
+        state.presets = BusinessPresets(
+            (), ("업종 세트 JSON 을 읽지 못했습니다(로그 참조).",)
+        )
+        state.preset_warnings = state.presets.warnings
+        return
+    state.presets = presets
+    state.preset_warnings = presets.warnings
+    for warning in presets.warnings:
+        logger.warning("업종 세트: %s", warning)
+    logger.info(
+        "업종 세트 준비: %d개 (경고 %d건, %s)",
+        len(presets),
+        len(presets.warnings),
+        presets.path or "파일 없음",
+    )
+
+
+def presets_for(query: str) -> list[BusinessPreset]:
+    """검색어가 업종명·별칭에 부분 일치하는 세트(파일 순서, 최대 3개). 세트가 없으면 빈 목록."""
+    if state.presets is None:
+        return []
+    return state.presets.match(query)
 
 
 def _require() -> GoodsMap:

@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
-import { LayoutGrid, Search, X } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { ChevronDown, HelpCircle, LayoutGrid, Search, X } from "lucide-react";
 import { ApiError, fetchGoodsClasses, searchGoods } from "@/lib/api";
-import type { GoodsClass, GoodsMatch } from "@/lib/contracts";
+import type { BusinessPreset, GoodsClass, GoodsMatch } from "@/lib/contracts";
 import {
+  addPresetGoods,
   addSelectedGood,
+  FREQUENT_PRESETS,
   goodsCodeUnion,
   MAX_SELECTED_GOODS,
   removeSelectedGood,
@@ -14,15 +16,19 @@ import {
 } from "@/lib/goods";
 
 // TODO(프론트-6 후속): 동의어 검색(카페 → 커피전문점업)은 범위 밖. 변환표 aliases 는 제35류 병합 명칭뿐이라
-// 지금은 고시상품명칭 부분 일치만 된다.
+// 지금은 고시상품명칭 부분 일치 + 업종 세트(business_presets.json)의 별칭 일치만 된다.
 
 export const DEBOUNCE_MS = 250;
 export const MIN_QUERY_LENGTH = 2;
 const PAGE_SIZE = 20;
+const PRODUCT_CLASS_MAX = 34; // 1~34류 상품, 35~45류 서비스
+const DESKTOP_QUERY = "(min-width: 640px)";
+export const SIMILARITY_GROUP_HELP =
+  "유사군: 특허청이 서로 비슷한 상품끼리 묶어 둔 심사 기준 그룹이에요. 같은 그룹이면 상품이 비슷하다고 봐요.";
 
 type SearchState =
   | { name: "loading" }
-  | { name: "result"; matches: GoodsMatch[]; total: number }
+  | { name: "result"; matches: GoodsMatch[]; total: number; presets: BusinessPreset[] }
   | { name: "error"; message: string };
 
 type Listing = { niceClass: number; items: GoodsMatch[]; total: number };
@@ -35,6 +41,23 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+/** 데스크톱(sm 이상)이면 true. matchMedia 가 없는 환경(테스트)은 모바일로 본다. */
+function useIsDesktop(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      if (typeof window === "undefined" || !window.matchMedia) return () => {};
+      const media = window.matchMedia(DESKTOP_QUERY);
+      media.addEventListener("change", onChange);
+      return () => media.removeEventListener("change", onChange);
+    },
+    () =>
+      typeof window !== "undefined" && !!window.matchMedia
+        ? window.matchMedia(DESKTOP_QUERY).matches
+        : false,
+    () => false,
+  );
+}
+
 function ClassBadge({ niceClass }: { niceClass: number }) {
   return (
     <span className="shrink-0 rounded-sm bg-low-bg px-1.5 py-0.5 text-[10px] font-bold text-sub tnum">
@@ -43,9 +66,69 @@ function ClassBadge({ niceClass }: { niceClass: number }) {
   );
 }
 
+function ClassGroup({
+  title,
+  classes,
+  open,
+  onToggle,
+  selectedClass,
+  onSelect,
+}: {
+  title: string;
+  classes: GoodsClass[];
+  open: boolean;
+  onToggle: () => void;
+  selectedClass: number | null;
+  onSelect: (niceClass: number) => void;
+}) {
+  const id = useId();
+  return (
+    <div className="mt-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-2 py-1 text-left text-[11.5px] font-bold text-ink"
+      >
+        {title}
+        <ChevronDown
+          aria-hidden
+          size={14}
+          className={`shrink-0 text-sub transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <div id={id} role="group" aria-label={title} className="mt-1 flex flex-wrap gap-1.5">
+          {classes.map((item) => {
+            const pressed = selectedClass === item.nice_class;
+            return (
+              <button
+                key={item.nice_class}
+                type="button"
+                aria-pressed={pressed}
+                onClick={() => onSelect(item.nice_class)}
+                className={`press rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  pressed ? "bg-blue-dark text-white" : "bg-card text-ink"
+                }`}
+              >
+                제{item.nice_class}류 {item.title}{" "}
+                <span className={`ml-1 tnum ${pressed ? "text-white/80" : "text-sub"}`}>
+                  {item.count.toLocaleString()}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
- * 지정상품 입력(프론트-6): 상품명 검색(디바운스·2글자 이상) 또는 류 탐색으로 변환표 항목을 여러 개 고른다.
- * 선택 상태는 부모(SearchForm)가 들고 있어 이름 확인·이미지 검색을 해도 유지된다.
+ * 지정상품 입력(프론트-6): 상품명 검색(디바운스·2글자 이상), 업종 세트 카드(v1.1), 자주 찾는 업종 칩,
+ * 류 탐색(상품/서비스 두 묶음)으로 변환표 항목을 여러 개 고른다. 선택 상태는 부모(SearchForm)가 들고
+ * 있어 이름 확인·이미지 검색을 해도 유지된다.
  */
 export default function GoodsPicker({
   value,
@@ -60,15 +143,21 @@ export default function GoodsPicker({
 }) {
   const baseId = useId();
   const listboxId = `${baseId}-listbox`;
+  const helpId = `${baseId}-help`;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isDesktop = useIsDesktop();
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState<SearchState | null>(null);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const [notice, setNotice] = useState<string | null>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [browsing, setBrowsing] = useState(false);
   const [classes, setClasses] = useState<GoodsClass[] | null>(null);
   const [classesError, setClassesError] = useState<string | null>(null);
   const [selectedClass, setSelectedClass] = useState<number | null>(null);
+  const [productsOpen, setProductsOpen] = useState<boolean | null>(null);
+  const [servicesOpen, setServicesOpen] = useState<boolean | null>(null);
   const [listing, setListing] = useState<Listing | null>(null);
   const [listingError, setListingError] = useState<string | null>(null);
   const [appending, setAppending] = useState(false);
@@ -78,6 +167,9 @@ export default function GoodsPicker({
   const showShortHint = trimmed.length > 0 && !searching;
   const codes = useMemo(() => goodsCodeUnion(value), [value]);
   const selectedKeys = useMemo(() => new Set(value.map(selectedGoodKey)), [value]);
+  // 모바일 기본: 상품 묶음 접힘·서비스 묶음 펼침. 데스크톱은 둘 다 펼침. 사용자가 누르면 그 값을 따른다.
+  const productsExpanded = productsOpen ?? isDesktop;
+  const servicesExpanded = servicesOpen ?? true;
 
   // 상품명 검색 — 250ms 디바운스, 2글자 이상에서만 호출. 류를 골라 두면 그 류 안에서 찾는다.
   useEffect(() => {
@@ -93,7 +185,12 @@ export default function GoodsPicker({
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
-        setSearch({ name: "result", matches: data.matches, total: data.total });
+        setSearch({
+          name: "result",
+          matches: data.matches,
+          total: data.total,
+          presets: data.presets,
+        });
         setActiveIndex(data.matches.length > 0 ? 0 : -1);
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -173,7 +270,7 @@ export default function GoodsPicker({
   };
 
   const select = useCallback(
-    (match: GoodsMatch) => {
+    (match: SelectedGood) => {
       const result = addSelectedGood(value, match, max);
       if (!result.added) {
         setNotice(
@@ -189,7 +286,23 @@ export default function GoodsPicker({
     [value, onChange, max],
   );
 
+  const addPreset = useCallback(
+    (preset: BusinessPreset) => {
+      const result = addPresetGoods(value, preset.지정상품, max);
+      if (result.added > 0) onChange(result.next);
+      if (result.overLimit > 0) {
+        setNotice(`지정상품은 최대 ${max}개까지라 ${result.overLimit}개는 추가하지 못했어요.`);
+      } else if (result.added === 0) {
+        setNotice("이미 모두 고른 상품이에요.");
+      } else {
+        setNotice(null);
+      }
+    },
+    [value, onChange, max],
+  );
+
   const options = searching && search?.name === "result" ? search.matches : [];
+  const presets = searching && search?.name === "result" ? search.presets : [];
   const dropdownOpen = open && searching && search !== null;
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -207,11 +320,15 @@ export default function GoodsPicker({
       return;
     }
     if (event.key === "Escape") {
+      event.preventDefault(); // type=search 의 기본 동작(입력값 지우기)을 막고 드롭다운만 닫는다
       setOpen(false);
     }
   };
 
   const activeId = dropdownOpen && activeIndex >= 0 ? `${listboxId}-${activeIndex}` : undefined;
+  const keepFocus = (event: React.MouseEvent) => event.preventDefault(); // 드롭다운 클릭 시 blur 방지
+  const productClasses = classes?.filter((item) => item.nice_class <= PRODUCT_CLASS_MAX) ?? [];
+  const serviceClasses = classes?.filter((item) => item.nice_class > PRODUCT_CLASS_MAX) ?? [];
 
   return (
     <div data-goods-picker>
@@ -223,8 +340,12 @@ export default function GoodsPicker({
               size={16}
               className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-sub"
             />
+            {/* type=search + autoComplete=off: Safari 연락처 자동완성 아이콘 방지.
+                검색창 기본 모양과 WebKit/Chrome 의 지우기(x) 버튼은 끈다. */}
             <input
-              type="text"
+              ref={inputRef}
+              type="search"
+              autoComplete="off"
               role="combobox"
               aria-label="지정상품 검색"
               aria-expanded={dropdownOpen}
@@ -234,7 +355,7 @@ export default function GoodsPicker({
               aria-describedby={describedBy}
               value={query}
               maxLength={50}
-              placeholder="예: 커피, 화장품, 의류"
+              placeholder="예: 커피, 화장품, 의류 — 또는 업종(카페, 치킨집)"
               onChange={(event) => {
                 setQuery(event.target.value);
                 setNotice(null);
@@ -244,7 +365,7 @@ export default function GoodsPicker({
                 if (search !== null) setOpen(true);
               }}
               onBlur={() => setOpen(false)}
-              className="w-full border-b-2 border-line pb-2 pl-6 text-[15px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark"
+              className="w-full appearance-none border-b-2 border-line pb-2 pl-6 text-[15px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark [&::-webkit-search-cancel-button]:appearance-none"
             />
           </div>
           <button
@@ -264,8 +385,31 @@ export default function GoodsPicker({
           <p className="mt-1.5 text-[11px] text-sub">2글자 이상 입력하면 검색해요.</p>
         )}
 
+        {trimmed.length === 0 && (
+          <div className="mt-2">
+            <p className="text-[11px] font-semibold text-sub">자주 찾는 업종</p>
+            <div role="group" aria-label="자주 찾는 업종" className="mt-1 flex flex-wrap gap-1.5">
+              {FREQUENT_PRESETS.map((chip) => (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => {
+                    setQuery(chip.query);
+                    setNotice(null);
+                    inputRef.current?.focus();
+                  }}
+                  className="press rounded-full bg-low-bg px-2.5 py-1 text-[11.5px] font-semibold text-ink hover:bg-blue-bg"
+                >
+                  <span aria-hidden>{chip.emoji} </span>
+                  {chip.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {dropdownOpen && search && (
-          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-72 overflow-auto rounded-md border border-line bg-card shadow-lg">
+          <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-96 overflow-auto rounded-md border border-line bg-card shadow-lg">
             {search.name === "loading" && (
               <p role="status" aria-live="polite" className="px-3 py-2 text-[12px] text-sub">
                 상품을 찾는 중이에요.
@@ -276,6 +420,70 @@ export default function GoodsPicker({
                 {search.message}
               </p>
             )}
+            {presets.map((preset) => {
+              const allChosen = preset.지정상품.every((good) =>
+                selectedKeys.has(selectedGoodKey(good)),
+              );
+              return (
+                <section
+                  key={preset.id}
+                  aria-label={`${preset.업종명} 업종 세트`}
+                  className="border-b border-line bg-blue-bg/40 px-3 py-2.5"
+                >
+                  {/* 글은 남은 폭을 채우고(14rem 미만이면 버튼이 다음 줄로), 버튼은 줄바꿈·축소 없이 */}
+                  <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+                    <p className="min-w-0 grow basis-56 text-[12.5px] leading-snug text-ink">
+                      <span className="font-extrabold">
+                        <span aria-hidden>{preset.emoji ? `${preset.emoji} ` : ""}</span>
+                        {preset.업종명} 업종
+                      </span>
+                      <span className="text-sub">
+                        {" — "}
+                        {preset.지정상품
+                          .map((good) => `${good.name}(${good.nice_class}류)`)
+                          .join(" · ")}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      disabled={allChosen}
+                      onMouseDown={keepFocus}
+                      onClick={() => addPreset(preset)}
+                      className="press shrink-0 whitespace-nowrap rounded-md bg-blue-dark px-2.5 py-1.5 text-[11.5px] font-bold text-white disabled:bg-disabled disabled:text-disabled-text"
+                    >
+                      {allChosen ? "모두 선택됨" : `${preset.지정상품.length}개 모두 추가`}
+                    </button>
+                  </div>
+                  {preset.hint && (
+                    <p className="mt-1 text-[11px] leading-relaxed text-sub">{preset.hint}</p>
+                  )}
+                  <ul aria-label={`${preset.업종명} 업종 세트 항목`} className="mt-1.5 flex flex-wrap gap-1.5">
+                    {preset.지정상품.map((good) => {
+                      const chosen = selectedKeys.has(selectedGoodKey(good));
+                      return (
+                        <li key={selectedGoodKey(good)}>
+                          <button
+                            type="button"
+                            disabled={chosen}
+                            aria-label={chosen ? `${good.name} 선택됨` : `${good.name} 추가`}
+                            onMouseDown={keepFocus}
+                            onClick={() => select(good)}
+                            className="press inline-flex items-center gap-1 rounded-full border border-line bg-card px-2 py-0.5 text-[11.5px] font-semibold text-ink disabled:text-disabled-text"
+                          >
+                            {good.name} <ClassBadge niceClass={good.nice_class} />
+                            {chosen ? (
+                              <span className="text-[10px] text-sub">선택됨</span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-blue-dark">추가</span>
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              );
+            })}
             {search.name === "result" && search.matches.length === 0 && (
               <p className="px-3 py-2 text-[12px] text-sub">
                 일치하는 상품명이 없어요. 다른 표현이나 분류로 찾아보세요.
@@ -299,7 +507,7 @@ export default function GoodsPicker({
                         id={`${listboxId}-${index}`}
                         role="option"
                         aria-selected={index === activeIndex}
-                        onMouseDown={(event) => event.preventDefault()}
+                        onMouseDown={keepFocus}
                         onMouseEnter={() => setActiveIndex(index)}
                         onClick={() => select(match)}
                         className={`flex cursor-pointer flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-[13px] ${
@@ -310,7 +518,7 @@ export default function GoodsPicker({
                         <span className="break-words font-bold text-ink">{match.name}</span>{" "}
                         <ClassBadge niceClass={match.nice_class} />{" "}
                         {match.matched_alias && (
-                          <span className="text-[11px] text-sub">원 명칭: {match.matched_alias}</span>
+                          <span className="text-[11px] text-sub">고시 명칭: {match.matched_alias}</span>
                         )}{" "}
                         {chosen && (
                           <span className="text-[11px] font-semibold text-blue-dark">선택됨</span>
@@ -328,7 +536,8 @@ export default function GoodsPicker({
       {browsing && (
         <div className="mt-3 rounded-md border border-line bg-bg p-3">
           <p className="text-[11px] font-semibold text-sub">
-            분류(류)를 고르면 그 류 안에서 검색하거나 목록에서 바로 고를 수 있어요.
+            분류(류)를 고르면 그 류 안에서 검색하거나 목록에서 바로 고를 수 있어요. 1~34류는 상품,
+            35~45류는 서비스예요.
           </p>
           {classesError && (
             <p role="alert" className="mt-2 text-[12px] font-semibold text-caution-deep">
@@ -341,31 +550,28 @@ export default function GoodsPicker({
             </p>
           )}
           {classes && (
-            <div role="group" aria-label="상품 분류" className="mt-2 flex flex-wrap gap-1.5">
-              {classes.map((item) => {
-                const pressed = selectedClass === item.nice_class;
-                return (
-                  <button
-                    key={item.nice_class}
-                    type="button"
-                    aria-pressed={pressed}
-                    onClick={() =>
-                      setSelectedClass((current) =>
-                        current === item.nice_class ? null : item.nice_class,
-                      )
-                    }
-                    className={`press rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                      pressed ? "bg-blue-dark text-white" : "bg-card text-ink"
-                    }`}
-                  >
-                    제{item.nice_class}류 {item.title}{" "}
-                    <span className={`ml-1 tnum ${pressed ? "text-white/80" : "text-sub"}`}>
-                      {item.count.toLocaleString()}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+            <>
+              <ClassGroup
+                title="상품(1~34류)"
+                classes={productClasses}
+                open={productsExpanded}
+                onToggle={() => setProductsOpen(!productsExpanded)}
+                selectedClass={selectedClass}
+                onSelect={(niceClass) =>
+                  setSelectedClass((current) => (current === niceClass ? null : niceClass))
+                }
+              />
+              <ClassGroup
+                title="서비스(35~45류)"
+                classes={serviceClasses}
+                open={servicesExpanded}
+                onToggle={() => setServicesOpen(!servicesExpanded)}
+                selectedClass={selectedClass}
+                onSelect={(niceClass) =>
+                  setSelectedClass((current) => (current === niceClass ? null : niceClass))
+                }
+              />
+            </>
           )}
           {selectedClass !== null && searching && (
             <p className="mt-2 text-[11px] text-sub">제{selectedClass}류 안에서 검색해요.</p>
@@ -454,10 +660,27 @@ export default function GoodsPicker({
               </li>
             ))}
           </ul>
-          <details className="mt-2 text-[11px] text-sub">
-            <summary className="cursor-pointer font-semibold text-ink">유사군 {codes.length}개</summary>
-            <p className="mt-1 break-words tnum">{codes.join(", ")}</p>
-          </details>
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] text-sub">
+            <details className="min-w-0">
+              <summary className="cursor-pointer font-semibold text-ink">유사군 {codes.length}개</summary>
+              <p className="mt-1 break-words tnum">{codes.join(", ")}</p>
+            </details>
+            <button
+              type="button"
+              aria-label="유사군 설명"
+              aria-expanded={helpOpen}
+              aria-controls={helpId}
+              onClick={() => setHelpOpen((open) => !open)}
+              className="press rounded-full p-0.5 text-sub hover:text-blue-dark"
+            >
+              <HelpCircle aria-hidden size={14} />
+            </button>
+          </div>
+          {helpOpen && (
+            <p id={helpId} className="mt-1 rounded-md bg-bg px-3 py-2 text-[11px] leading-relaxed text-sub">
+              {SIMILARITY_GROUP_HELP}
+            </p>
+          )}
         </div>
       )}
 

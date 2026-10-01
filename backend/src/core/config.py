@@ -128,6 +128,7 @@ _FIELD_TO_ENV: dict[str, str] = {
     "x3_min_score": "MARKLENS_X3_MIN_SCORE",
     "goods_rate_limit": "MARKLENS_GOODS_RATELIMIT",
     "goods_map_path": "MARKLENS_GOODS_MAP_PATH",
+    "goods_presets_path": "MARKLENS_GOODS_PRESETS_PATH",
     "api_key": "MARKLENS_API_KEY",
     "database_url": "DATABASE_URL",
     "environment": "MARKLENS_ENVIRONMENT",
@@ -214,6 +215,9 @@ class Settings(BaseSettings):
     # 변환표 파일 경로. 비우면 로더 기본(shared/goods_map/goods_map.json.gz → .json).
     # 파일이 없어도 서버는 기동하고 /goods/* 만 503 을 낸다(core/goods.py).
     goods_map_path: str = Field(default="", validation_alias="MARKLENS_GOODS_MAP_PATH")
+    # 업종 세트 JSON 경로. 비우면 shared/goods_map/business_presets.json. 없거나 명칭이 변환표와
+    # 어긋나도 기동은 되고(경고 로그 + 해당 항목 제외) 검색 응답의 presets 만 빈다.
+    goods_presets_path: str = Field(default="", validation_alias="MARKLENS_GOODS_PRESETS_PATH")
 
     # 정적 X-API-Key. 설정 시에만 /search·/name-check 에서 헤더 일치를 검증(불일치 401).
     # 미설정("")이면 완전 비활성 — 로컬 개발은 무인증 개방. (core/auth.py 참조)
@@ -386,6 +390,7 @@ X3_MIN_SCORE: float = settings.x3_min_score
 # 상품↔유사군 변환표 /goods/* (env: MARKLENS_GOODS_RATELIMIT / MARKLENS_GOODS_MAP_PATH)
 GOODS_RATE_LIMIT: str = settings.goods_rate_limit
 GOODS_MAP_PATH: str = settings.goods_map_path.strip()
+GOODS_PRESETS_PATH: str = settings.goods_presets_path.strip()
 
 # 정적 X-API-Key (env: MARKLENS_API_KEY, 미설정 시 인증 비활성)
 API_KEY: str = settings.api_key

@@ -360,10 +360,20 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
   ],
   "total": 61,
   "offset": 0,
+  "presets": [],
   "source": "지식재산처 고시상품명칭 13판(2026), 공공누리 제1유형"
 }
 ```
 
+- `presets`(2026-10-01): 검색어가 업종 세트(`shared/goods_map/business_presets.json`)의 업종명·별칭에
+  부분 일치하면 최대 3개를 파일 순서로 함께 돌려줍니다. 개별 검색 결과·`total`·`offset`은 그대로이고,
+  류 목록 보기(`q` 없음)에서는 항상 빈 목록입니다. 예: `q=카페` →
+  `"presets": [{ "id": "cafe", "업종명": "카페", "emoji": "☕", "지정상품": [{ "name": "커피전문점업",
+  "nice_class": 43, "similarity_codes": ["G0301", "G0502", "S120602"] }, { "name": "커피", "nice_class": 30,
+  "similarity_codes": ["G0502"] }, { "name": "커피 소매업", "nice_class": 35, "similarity_codes": ["S2005"] }] }]`.
+  세트의 명칭은 변환표의 `name`·`aliases`와 정확히 일치하는 것만 실리며(로더가 적재 때 검증, 어긋나면
+  경고 + 제외) 유사군은 변환표에서 찾아 붙입니다. 세트에 안내 문구가 있으면 `hint`(문자열, 없으면 빈 값)로
+  옵니다.
 - 순위: 정확 일치 > 접두 > 부분. 같은 순위에서는 `name` 일치가 alias 일치보다 앞이고 `name`이
   짧은 순 → 가나다순. NFKC·대소문자·연속 공백을 정규화해 비교합니다.
 - `matched_alias`는 `name`이 아니라 제35류 병합 항목의 원 명칭(alias)으로 잡혔을 때만 값이

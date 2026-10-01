@@ -62,6 +62,61 @@ export function removeSelectedGood(
   return goods.filter((good) => selectedGoodKey(good) !== key);
 }
 
+export type AddPresetResult = {
+  next: SelectedGood[];
+  added: number;
+  duplicates: number;
+  overLimit: number;
+};
+
+/** 업종 세트의 지정상품을 한꺼번에 추가한다(중복·상한 처리는 addSelectedGood 재사용). */
+export function addPresetGoods(
+  goods: readonly SelectedGood[],
+  presetGoods: readonly SelectedGood[],
+  max: number = MAX_SELECTED_GOODS,
+): AddPresetResult {
+  let next: SelectedGood[] = [...goods];
+  let added = 0;
+  let duplicates = 0;
+  let overLimit = 0;
+  for (const good of presetGoods) {
+    const result = addSelectedGood(next, good, max);
+    if (result.added) {
+      next = result.next;
+      added += 1;
+    } else if (result.reason === "duplicate") {
+      duplicates += 1;
+    } else {
+      overLimit += 1;
+    }
+  }
+  return { next, added, duplicates, overLimit };
+}
+
+/**
+ * "자주 찾는 업종" 칩 12개(순서 고정). id 는 business_presets.json 의 세트 id 이고 query 는 칩을 눌렀을 때
+ * 검색창에 넣는 말 — 세트의 별칭에 부분 일치해 세트 카드가 열리고 개별 검색 결과도 함께 나온다.
+ */
+export const FREQUENT_PRESETS: readonly {
+  id: string;
+  label: string;
+  emoji: string;
+  query: string;
+}[] = [
+  { id: "cafe", label: "카페", emoji: "☕", query: "카페" },
+  { id: "chicken", label: "치킨집", emoji: "🍗", query: "치킨" },
+  { id: "korean_restaurant", label: "식당(한식)", emoji: "🍚", query: "한식" },
+  { id: "bunsik", label: "분식집", emoji: "🍢", query: "분식" },
+  { id: "bakery", label: "빵집", emoji: "🥐", query: "빵집" },
+  { id: "pub", label: "술집", emoji: "🍺", query: "술집" },
+  { id: "hair_salon", label: "미용실", emoji: "💇", query: "미용실" },
+  { id: "nail", label: "네일샵", emoji: "💅", query: "네일" },
+  { id: "fitness", label: "헬스장·필라테스", emoji: "🏋️", query: "헬스" },
+  { id: "academy", label: "학원", emoji: "📚", query: "학원" },
+  { id: "clothing", label: "옷가게·쇼핑몰", emoji: "👕", query: "의류" },
+  { id: "cosmetics", label: "화장품", emoji: "🧴", query: "화장품" },
+];
+
 /** 결과 화면 요약: "커피, 커피전문점업 (유사군 3개)". 비어 있으면 빈 문자열. */
 export function goodsSummaryText(goods: readonly SelectedGood[]): string {
   if (goods.length === 0) return "";
