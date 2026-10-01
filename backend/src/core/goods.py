@@ -22,8 +22,11 @@ if str(paths.ML_ROOT) not in sys.path:
 from src.axes.goods_map import (  # noqa: E402
     NICE_CLASS_TITLES,
     SOURCE_LABEL,
+    BusinessPreset,
+    BusinessPresets,
     GoodsMap,
     Match,
+    load_business_presets,
     load_goods_map,
 )
 
@@ -41,6 +44,8 @@ class GoodsState:
     entry_count: int = 0
     alias_count: int = 0
     load_ms: float = 0.0
+    presets: BusinessPresets | None = None  # 업종 세트(없어도 검색은 동작)
+    preset_warnings: tuple[str, ...] = ()
 
 
 # 모듈 전역 상태. main.py lifespan 이 load_all() 로 채운다.
@@ -56,6 +61,8 @@ def reset() -> None:
     state.entry_count = 0
     state.alias_count = 0
     state.load_ms = 0.0
+    state.presets = None
+    state.preset_warnings = ()
 
 
 def load_all(path: str | None = None) -> GoodsState:
@@ -92,7 +99,38 @@ def load_all(path: str | None = None) -> GoodsState:
         state.path,
         state.load_ms,
     )
+    _load_presets(goods_map)
     return state
+
+
+def _load_presets(goods_map: GoodsMap) -> None:
+    """업종 세트 적재 — 없거나 깨져도 기동을 막지 않는다(경고만). 불일치 명칭은 로더가 뺀다."""
+    try:
+        presets = load_business_presets(goods_map, config.GOODS_PRESETS_PATH or None)
+    except Exception:
+        logger.exception("업종 세트 적재 실패 — 세트 없이 동작")
+        state.presets = BusinessPresets(
+            (), ("업종 세트 JSON 을 읽지 못했습니다(로그 참조).",)
+        )
+        state.preset_warnings = state.presets.warnings
+        return
+    state.presets = presets
+    state.preset_warnings = presets.warnings
+    for warning in presets.warnings:
+        logger.warning("업종 세트: %s", warning)
+    logger.info(
+        "업종 세트 준비: %d개 (경고 %d건, %s)",
+        len(presets),
+        len(presets.warnings),
+        presets.path or "파일 없음",
+    )
+
+
+def presets_for(query: str) -> list[BusinessPreset]:
+    """검색어가 업종명·별칭에 부분 일치하는 세트(파일 순서, 최대 3개). 세트가 없으면 빈 목록."""
+    if state.presets is None:
+        return []
+    return state.presets.match(query)
 
 
 def _require() -> GoodsMap:
@@ -101,11 +139,21 @@ def _require() -> GoodsMap:
     return state.goods_map
 
 
-def search(query: str, limit: int, nice_class: int | None) -> tuple[list[Match], int, float]:
-    """(상위 limit 개, 전체 일치 건수, 소요 ms). 정규화·순위는 로더에 맡긴다."""
+def search(
+    query: str, limit: int, nice_class: int | None, offset: int = 0
+) -> tuple[list[Match], int, float]:
+    """(offset 부터 limit 개, 전체 일치 건수, 소요 ms). 정규화·순위는 로더에 맡긴다."""
     goods_map = _require()
     started = time.perf_counter()
-    matches, total = goods_map.search_with_total(query, limit, nice_class)
+    matches, total = goods_map.search_with_total(query, limit, nice_class, offset)
+    return matches, total, (time.perf_counter() - started) * 1000
+
+
+def list_class(nice_class: int, offset: int, limit: int) -> tuple[list[Match], int, float]:
+    """한 류의 항목을 이름순으로 offset 부터 limit 개 (검색어 없이 류 탐색). (목록, 전체 수, ms)."""
+    goods_map = _require()
+    started = time.perf_counter()
+    matches, total = goods_map.list_class(nice_class, offset, limit)
     return matches, total, (time.perf_counter() - started) * 1000
 
 

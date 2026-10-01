@@ -208,3 +208,40 @@ describe("PhoneticSearchResponseSchema", () => {
     expect(parsed.searched_count).toBe(947);
   });
 });
+
+describe("SemanticSearchResponseSchema", () => {
+  it("parses the X3 semantic-search contract and fills optional defaults", async () => {
+    const { SemanticSearchResponseSchema } = await import("@/lib/contracts");
+    const parsed = SemanticSearchResponseSchema.parse({
+      query: { name: "왕", has_meaning: true },
+      matches: [{ rank: 1, score: 0.807, 출원번호: "4020210000001", 상표한글명: "KING" }],
+      searched_count: 595,
+      excluded_no_meaning: 352,
+      params: { top_k: 5, min_score: 0.5 },
+      threshold: 0.5,
+      axis: "X3",
+      note: "관념(의미) 유사도만 반영한 참고 정보",
+      model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+      extra_field: "ignored but kept",
+    });
+
+    expect(parsed.query.text).toBe("");
+    expect(parsed.matches[0].류).toEqual([]);
+    expect(parsed.matches[0].이미지URL).toBeUndefined();
+    expect(parsed.threshold).toBe(0.5);
+    expect(parsed.searched_count).toBe(595);
+  });
+
+  it("rejects a match without a score", async () => {
+    const { SemanticSearchResponseSchema } = await import("@/lib/contracts");
+    expect(
+      SemanticSearchResponseSchema.safeParse({
+        query: { name: "왕", has_meaning: true },
+        matches: [{ rank: 1, 출원번호: "4020210000001", 상표한글명: "KING" }],
+        searched_count: 1,
+        excluded_no_meaning: 0,
+        params: { top_k: 5, min_score: 0.5 },
+      }).success,
+    ).toBe(false);
+  });
+});

@@ -36,6 +36,10 @@ DEFAULT_CANDIDATES: tuple[Path, ...] = (
     DEFAULT_DIR / "goods_map.json",
 )
 ENV_PATH = "MARKLENS_GOODS_MAP_PATH"
+# 업종 세트(일상어 업종명 → 여러 류의 지정상품 묶음, 프론트-6 v1.1). 명칭은 반드시 변환표의 name
+# 또는 alias 와 정확히 일치해야 하며 로더가 적재 시 검증한다(불일치는 경고 + 해당 항목 제외).
+DEFAULT_PRESETS_PATH = DEFAULT_DIR / "business_presets.json"
+ENV_PRESETS_PATH = "MARKLENS_GOODS_PRESETS_PATH"
 
 # 변환표 원본·이용허락 표기(응답 source 필드). 공공누리 제1유형의 출처 표시를 여기서 이행한다.
 # 파일 안에 판 정보가 없어 상수로 둔다 — 14판으로 바꾸면 여기와 shared/goods_map/README.md §5 를
@@ -94,6 +98,7 @@ NICE_CLASS_TITLES: dict[int, str] = {
 _SEP = "\x00"
 
 TIER_EXACT, TIER_PREFIX, TIER_PARTIAL = 0, 1, 2
+TIER_LIST = 3  # 검색이 아니라 류 목록(list_class)으로 나온 항목
 
 
 def normalize(text: str) -> str:
@@ -200,6 +205,14 @@ class GoodsMap:
         for entry in self.entries:
             counts[entry.nice_class] = counts.get(entry.nice_class, 0) + 1
         self._class_counts = counts
+        # 류 탐색 UI의 목록 보기용: 류별 항목 번호를 name 가나다순으로 미리 정렬해 둔다.
+        by_class: dict[int, list[int]] = {}
+        for index, entry in enumerate(self.entries):
+            by_class.setdefault(entry.nice_class, []).append(index)
+        self._by_class: dict[int, tuple[int, ...]] = {
+            nice_class: tuple(sorted(indexes, key=lambda i: self.entries[i].name))
+            for nice_class, indexes in by_class.items()
+        }
         # 같은 순위 안의 정렬 기준(name 짧은 순 → 가나다 순)을 항목별 순위 번호로 미리 계산해
         # 검색 때 sort key 를 싸게 만든다(부분 일치 5만 건짜리 질의에서 체감됨).
         by_name = sorted(
@@ -257,9 +270,12 @@ class GoodsMap:
         )
 
     def search_with_total(
-        self, query: str, limit: int = 20, nice_class: int | None = None
+        self, query: str, limit: int = 20, nice_class: int | None = None, offset: int = 0
     ) -> tuple[list[Match], int]:
-        """search() 와 같되 전체 일치 건수(total)도 돌려준다 — API 응답의 total 용."""
+        """search() 와 같되 전체 일치 건수(total)도 돌려준다 — API 응답의 total 용.
+
+        offset 은 순위 목록에서 건너뛸 개수(페이지 넘김). total 은 offset 과 무관한 전체 일치 수.
+        """
         needle = normalize(query)
         if not needle:
             return [], 0
@@ -272,7 +288,7 @@ class GoodsMap:
                 matched_alias=alias,
                 tier=tier,
             )
-            for index, tier, _via, alias in ranked[: max(limit, 0)]
+            for index, tier, _via, alias in ranked[max(offset, 0) : max(offset, 0) + max(limit, 0)]
         ]
         return matches, len(ranked)
 
@@ -280,12 +296,49 @@ class GoodsMap:
         """name·aliases 부분 일치 상위 limit 개 (정확 > 접두 > 부분)."""
         return self.search_with_total(query, limit, nice_class)[0]
 
+    def list_class(
+        self, nice_class: int, offset: int = 0, limit: int = 20
+    ) -> tuple[list[Match], int]:
+        """한 류의 항목을 name 가나다순으로 offset 부터 limit 개 (류 탐색 UI의 목록 보기용).
+
+        Returns:
+            (해당 구간의 Match 목록 — matched_alias 는 None, tier 는 TIER_LIST — 와
+            그 류의 전체 항목 수).
+            없는 류·범위 밖 offset 은 빈 목록.
+        """
+        indexes = self._by_class.get(nice_class, ())
+        start = max(offset, 0)
+        page = indexes[start : start + max(limit, 0)]
+        return [
+            Match(
+                name=self.entries[index].name,
+                nice_class=self.entries[index].nice_class,
+                similarity_codes=self.entries[index].similarity_codes,
+                matched_alias=None,
+                tier=TIER_LIST,
+            )
+            for index in page
+        ], len(indexes)
+
     def classes(self) -> list[dict[str, int]]:
         """45개 류 전부의 항목 수 (없는 류는 0)."""
         return [
             {"nice_class": nice_class, "count": self._class_counts.get(nice_class, 0)}
             for nice_class in sorted(NICE_CLASS_TITLES)
         ]
+
+    def find(self, name: str, nice_class: int) -> GoodsEntry | None:
+        """name 또는 alias 와 정확히 일치하고 류가 같은 항목. 없으면 None(업종 세트 검증용)."""
+        query = normalize(name)
+        if not query:
+            return None
+        indexes = [self._names.entry_of[i] for i in self._names.exact(query)]
+        indexes += [self._aliases.entry_of[i] for i in self._aliases.exact(query)]
+        for index in indexes:
+            entry = self.entries[index]
+            if entry.nice_class == nice_class:
+                return entry
+        return None
 
 
 def _to_entry(record: dict) -> GoodsEntry:
@@ -325,6 +378,137 @@ def resolve_path(path: str | os.PathLike[str] | None = None) -> Path:
         "shared/goods_map/README.md 절차로 goods_map.json(.gz) 을 만들거나 "
         f"{ENV_PATH} 로 경로를 지정하세요."
     )
+
+
+@dataclass(frozen=True, slots=True)
+class PresetGood:
+    """업종 세트의 지정상품 1건 — JSON 에 적힌 명칭(name 또는 alias)과 변환표에서 찾은 유사군."""
+
+    name: str
+    nice_class: int
+    similarity_codes: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BusinessPreset:
+    """업종 세트 1건. aliases 는 검색어 부분 일치 대상(업종명 자체도 대조한다)."""
+
+    id: str
+    label: str
+    aliases: tuple[str, ...]
+    emoji: str
+    hint: str  # 세트 카드에 보이는 안내 한 줄(선택). 예: 앱은 9류 명칭이 용도별이라 검색 안내
+    goods: tuple[PresetGood, ...]
+
+
+class BusinessPresets:
+    """적재·검증된 업종 세트 목록. match(query) 로 검색어에 맞는 세트를 파일 순서대로 돌려준다."""
+
+    def __init__(
+        self,
+        presets: Iterable[BusinessPreset],
+        warnings: Iterable[str] = (),
+        path: Path | None = None,
+    ) -> None:
+        self.presets: tuple[BusinessPreset, ...] = tuple(presets)
+        self.warnings: tuple[str, ...] = tuple(warnings)
+        self.path = path
+        self._terms = [
+            tuple(normalize(term) for term in (preset.label, *preset.aliases))
+            for preset in self.presets
+        ]
+
+    def __len__(self) -> int:
+        return len(self.presets)
+
+    def get(self, preset_id: str) -> BusinessPreset | None:
+        return next((preset for preset in self.presets if preset.id == preset_id), None)
+
+    def match(self, query: str, limit: int = 3) -> list[BusinessPreset]:
+        """검색어(정규화)가 업종명·별칭 어느 하나에 부분 일치하는 세트(파일 순서, 최대 limit 개)."""
+        needle = normalize(query)
+        if not needle:
+            return []
+        found = [
+            preset
+            for preset, terms in zip(self.presets, self._terms)
+            if any(needle in term for term in terms)
+        ]
+        return found[:limit]
+
+
+def resolve_presets_path(path: str | os.PathLike[str] | None = None) -> Path | None:
+    """인자 > MARKLENS_GOODS_PRESETS_PATH > 기본 경로. 파일이 없으면 None(세트 없이 동작)."""
+    if path:
+        candidate = Path(path)
+    else:
+        env_value = os.environ.get(ENV_PRESETS_PATH, "").strip()
+        candidate = Path(env_value) if env_value else DEFAULT_PRESETS_PATH
+    return candidate if candidate.is_file() else None
+
+
+def load_business_presets(
+    goods_map: GoodsMap, path: str | os.PathLike[str] | None = None
+) -> BusinessPresets:
+    """업종 세트 JSON 을 읽어 변환표와 대조한다.
+
+    명칭이 변환표의 name·alias(같은 류)와 정확히 일치하지 않으면 그 지정상품을 제외하고 경고를
+    남긴다. 지정상품이 하나도 남지 않는 세트는 통째로 제외한다. 파일이 없으면 빈 목록. 기동을
+    막는 예외는 JSON 자체를 읽지 못할 때만 낸다.
+    """
+    resolved = resolve_presets_path(path)
+    if resolved is None:
+        return BusinessPresets((), (f"업종 세트 파일 없음: {path or ENV_PRESETS_PATH}/기본 경로",))
+    data = json.loads(resolved.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ValueError(f"업종 세트 최상위는 배열이어야 합니다: {resolved}")
+    presets: list[BusinessPreset] = []
+    warnings: list[str] = []
+    seen_ids: set[str] = set()
+    for record in data:
+        preset_id = str(record.get("id") or "").strip()
+        label = str(record.get("업종명") or "").strip()
+        if not preset_id or not label or preset_id in seen_ids:
+            warnings.append(f"업종 세트 건너뜀(id/업종명 누락 또는 중복): {record.get('id')!r}")
+            continue
+        seen_ids.add(preset_id)
+        goods: list[PresetGood] = []
+        for item in record.get("지정상품") or []:
+            name = str(item.get("name") or "").strip()
+            try:
+                nice_class = int(item.get("nice_class"))
+            except (TypeError, ValueError):
+                nice_class = 0
+            entry = goods_map.find(name, nice_class) if name and 1 <= nice_class <= 45 else None
+            if entry is None:
+                warnings.append(
+                    f"업종 세트 {preset_id}: 변환표에 없는 지정상품 제외 — {name!r}({nice_class}류)"
+                )
+                continue
+            goods.append(
+                PresetGood(
+                    name=name, nice_class=nice_class, similarity_codes=entry.similarity_codes
+                )
+            )
+        if not goods:
+            warnings.append(f"업종 세트 {preset_id}: 유효한 지정상품이 없어 제외")
+            continue
+        aliases = tuple(
+            dict.fromkeys(
+                str(alias).strip() for alias in (record.get("별칭") or []) if str(alias).strip()
+            )
+        )
+        presets.append(
+            BusinessPreset(
+                id=preset_id,
+                label=label,
+                aliases=aliases,
+                emoji=str(record.get("이모지") or ""),
+                hint=str(record.get("hint") or "").strip(),
+                goods=tuple(goods),
+            )
+        )
+    return BusinessPresets(presets, warnings, path=resolved)
 
 
 @lru_cache(maxsize=4)

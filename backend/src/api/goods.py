@@ -13,15 +13,23 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from ..core import config, goods
 from ..core.ratelimit import limiter
-from ..schemas.goods import GoodsClass, GoodsClassesResponse, GoodsMatch, GoodsSearchResponse
+from ..schemas.goods import (
+    BusinessPreset,
+    GoodsClass,
+    GoodsClassesResponse,
+    GoodsMatch,
+    GoodsSearchResponse,
+    PresetGood,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# 검색어 길이 상한(고시상품명칭 최장 항목이 40자 안팎)과 반환 건수 범위.
+# 검색어 길이 상한(고시상품명칭 최장 항목이 40자 안팎)과 반환 건수·시작 위치 범위.
 QUERY_MAX_LENGTH = 50
 LIMIT_DEFAULT = 20
 LIMIT_MAX = 50
+OFFSET_MAX = 100_000  # 변환표 전체(91,591건)보다 큰 값이면 빈 목록
 
 
 def _require_ready() -> None:
@@ -36,23 +44,34 @@ def _require_ready() -> None:
 @limiter.limit(config.GOODS_RATE_LIMIT)  # IP 기준 한도(기본 60/min) — 자동완성 호출 폭주 보호
 def goods_search(
     request: Request,  # slowapi 데코레이터가 IP 추출에 사용
-    q: str = Query(
-        ...,
-        min_length=1,
+    q: Optional[str] = Query(
+        None,
         max_length=QUERY_MAX_LENGTH,
-        pattern=r"^\s*\S",  # 공백만인 검색어는 422
-        description="상품명 검색어(1~50자). 고시상품명칭 name 과 원 명칭(aliases)에 부분 일치",
+        description="상품명 검색어(1~50자). 고시상품명칭 name 과 원 명칭(aliases)에 부분 일치. "
+        "nice_class 가 있으면 생략 가능(그 류의 항목을 이름순으로 나열)",
     ),
     limit: int = Query(LIMIT_DEFAULT, ge=1, le=LIMIT_MAX, description="반환 건수"),
+    offset: int = Query(0, ge=0, le=OFFSET_MAX, description="시작 위치(0부터) — 더 보기용"),
     nice_class: Optional[int] = Query(None, ge=1, le=45, description="류 번호로 좁히기"),
 ) -> GoodsSearchResponse:
-    """상품명 부분 일치 검색.
+    """상품명 부분 일치 검색, 또는 검색어 없이 한 류의 항목 나열.
 
-    정확 일치 > 접두 > 부분 순이며, 원 명칭(alias)으로 잡히면 matched_alias 에 표기한다.
+    검색: 정확 일치 > 접두 > 부분 순이며, 원 명칭(alias)으로 잡히면 matched_alias 에 표기한다.
+    나열(q 생략·공백 + nice_class): 그 류의 항목을 이름순으로 offset 부터 limit 개.
+    q 도 nice_class 도 없으면 422.
     """
     _require_ready()
+    query = (q or "").strip()
+    if not query and nice_class is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="상품명 검색어(q, 1~50자) 또는 류 번호(nice_class, 1~45) 중 하나는 필요합니다.",
+        )
     try:
-        matches, total, elapsed_ms = goods.search(q, limit, nice_class)
+        if query:
+            matches, total, elapsed_ms = goods.search(query, limit, nice_class, offset)
+        else:
+            matches, total, elapsed_ms = goods.list_class(nice_class, offset, limit)  # type: ignore[arg-type]
     except RuntimeError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)
@@ -65,15 +84,17 @@ def goods_search(
         ) from None
 
     logger.info(
-        "goods-search: matched=%d/%d limit=%d class=%s %.1fms",
+        "goods-search: mode=%s matched=%d/%d limit=%d offset=%d class=%s %.1fms",
+        "search" if query else "list",
         len(matches),
         total,
         limit,
+        offset,
         nice_class,
         elapsed_ms,
     )
     return GoodsSearchResponse(
-        query=q.strip(),
+        query=query,
         matches=[
             GoodsMatch(
                 name=match.name,
@@ -84,6 +105,24 @@ def goods_search(
             for match in matches
         ],
         total=total,
+        offset=offset,
+        presets=[
+            BusinessPreset(
+                id=preset.id,
+                업종명=preset.label,
+                emoji=preset.emoji,
+                hint=preset.hint,
+                지정상품=[
+                    PresetGood(
+                        name=good.name,
+                        nice_class=good.nice_class,
+                        similarity_codes=list(good.similarity_codes),
+                    )
+                    for good in preset.goods
+                ],
+            )
+            for preset in (goods.presets_for(query) if query else [])
+        ],
         source=goods.SOURCE,
     )
 

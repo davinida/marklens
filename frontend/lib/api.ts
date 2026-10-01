@@ -4,11 +4,13 @@ import {
   parseNameCheckResponse,
   PhoneticSearchResponseSchema,
   SearchResponseSchema,
+  SemanticSearchResponseSchema,
   type GoodsClassesResponse,
   type GoodsSearchResponse,
   type NameCheckResult,
   type PhoneticSearchResponse,
   type SearchResponse,
+  type SemanticSearchResponse,
 } from "@/lib/contracts";
 
 export type {
@@ -21,6 +23,8 @@ export type {
   PhoneticSearchResponse,
   SearchMatch,
   SearchResponse,
+  SemanticMatch,
+  SemanticSearchResponse,
   StatusCode,
 } from "@/lib/contracts";
 
@@ -182,20 +186,63 @@ export async function searchPhonetic(
   return parsed.data;
 }
 
+/** X3 관념(의미) 유사도 검색 — 로컬 DB 상표명과 비교한 상위 후보(상한 5). phonetic 과 병렬로 부른다. */
+export async function searchSemantic(
+  name: string,
+  turnstileToken: string,
+  signal?: AbortSignal,
+): Promise<SemanticSearchResponse> {
+  let response: Response;
+  try {
+    response = await fetch("/api/semantic-search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, turnstileToken }),
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    networkError(error);
+  }
+
+  const body = await assertOk(response);
+  const parsed = SemanticSearchResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "관념 유사도 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
+      response.headers.get("x-request-id"),
+    );
+  }
+  return parsed.data;
+}
+
 /**
  * 상품↔유사군 변환표 검색 (프론트-6 지정상품 입력). 정확 > 접두 > 부분 순이며 원 명칭(alias)으로
  * 잡히면 matched_alias 에 그 명칭이 온다. Turnstile 토큰이 필요 없다(app/api/goods/search 주석).
- * 자동완성에 쓸 때는 디바운스(300ms 안팎)와 2글자 이상 조건을 두는 것이 좋다 — 백엔드 한도가
- * 기본 60/minute 이고 1글자 광범위 질의는 결과가 수만 건이다(서버 실측 약 50ms).
+ * 자동완성에 쓸 때는 디바운스(GoodsPicker 는 250ms)와 2글자 이상 조건을 두는 것이 좋다 — 백엔드
+ * 한도가 기본 60/minute 이고 1글자 광범위 질의는 결과가 수만 건이다(서버 실측 약 50ms).
+ * query 가 비어 있고 niceClass 가 있으면 그 류의 항목을 이름순으로 나열한다(offset 으로 더 보기).
  */
 export async function searchGoods(
-  query: string,
-  options: { limit?: number; niceClass?: number; signal?: AbortSignal } = {},
+  query: string | null | undefined,
+  options: {
+    limit?: number;
+    niceClass?: number;
+    offset?: number;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<GoodsSearchResponse> {
-  const params = new URLSearchParams({ q: query });
+  const params = new URLSearchParams();
+  const trimmed = query?.trim() ?? "";
+  if (trimmed) params.set("q", trimmed);
   if (options.limit !== undefined) params.set("limit", String(options.limit));
   if (options.niceClass !== undefined) {
     params.set("nice_class", String(options.niceClass));
+  }
+  if (options.offset !== undefined && options.offset > 0) {
+    params.set("offset", String(options.offset));
   }
 
   let response: Response;

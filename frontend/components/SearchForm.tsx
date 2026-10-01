@@ -1,11 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import GoodsPicker from "@/components/GoodsPicker";
 import ImageCropDialog from "@/components/ImageCropDialog";
 import NameCheckPanel from "@/components/NameCheckPanel";
 import PhoneticMatchesSection, {
   type PhoneticPhase,
 } from "@/components/PhoneticMatchesSection";
+import SemanticMatchesSection, {
+  type SemanticPhase,
+} from "@/components/SemanticMatchesSection";
 import TurnstileWidget, {
   type TurnstileHandle,
 } from "@/components/TurnstileWidget";
@@ -13,8 +17,14 @@ import {
   ApiError,
   checkTrademarkName,
   searchPhonetic,
+  searchSemantic,
 } from "@/lib/api";
-import type { NameCheckResult, PhoneticSearchResponse } from "@/lib/contracts";
+import type {
+  NameCheckResult,
+  PhoneticSearchResponse,
+  SemanticSearchResponse,
+} from "@/lib/contracts";
+import { goodsCodeUnion, type SelectedGood } from "@/lib/goods";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
@@ -27,10 +37,15 @@ export interface SearchDraft {
   topK: number;
   nameCheck?: NameCheckResult | null;
   phonetic?: PhoneticSearchResponse | null;
+  semantic?: SemanticSearchResponse | null;
+  /** 지정상품 선택(프론트-6). 이름 확인·검색을 거쳐도 유지되고 폼 초기화(다른 로고 비교하기)에서만 비운다. */
+  goods?: SelectedGood[] | null;
 }
 
 export interface SearchFormValue extends SearchDraft {
   turnstileToken: string;
+  /** 선택한 지정상품의 유사군 코드 합집합 — /search 연동(범위 ③, 유사군 백필 후) 입력용 파생값. */
+  goodsCodes: string[];
 }
 
 type NamePhase =
@@ -38,6 +53,9 @@ type NamePhase =
   | { name: "loading" }
   | { name: "result"; data: NameCheckResult }
   | { name: "error"; message: string };
+
+// name-check 뒤에 토큰을 하나씩 받아 보내는 축 검색. 순서대로 소비한다(발음 → 관념).
+type AxisKind = "phonetic" | "semantic";
 
 export default function SearchForm({
   onSubmit,
@@ -63,28 +81,49 @@ export default function SearchForm({
       ? { name: "result", data: initialValue.phonetic }
       : { name: "idle" },
   );
+  const [semanticPhase, setSemanticPhase] = useState<SemanticPhase>(() =>
+    initialValue?.semantic
+      ? { name: "result", data: initialValue.semantic }
+      : { name: "idle" },
+  );
+  const [selectedGoods, setSelectedGoods] = useState<SelectedGood[]>(
+    () => initialValue?.goods ?? [],
+  );
+  const goodsCodes = useMemo(() => goodsCodeUnion(selectedGoods), [selectedGoods]);
   const inputRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const nameAbortRef = useRef<AbortController | null>(null);
   const nameGenerationRef = useRef(0);
   const phoneticAbortRef = useRef<AbortController | null>(null);
   const phoneticGenerationRef = useRef(0);
-  // 이름 확인 직후 위젯을 리셋해 새 토큰이 오면 그 토큰으로 발음 검색을 보낸다.
-  // Turnstile 토큰은 1회용이라 name-check 가 쓴 토큰을 재사용할 수 없다.
-  const pendingPhoneticRef = useRef<{ name: string } | null>(null);
+  const semanticAbortRef = useRef<AbortController | null>(null);
+  const semanticGenerationRef = useRef(0);
+  // 이름 확인 직후 위젯을 리셋해 새 토큰이 올 때마다 대기 중인 축 검색(발음 → 관념)을 하나씩 보낸다.
+  // Turnstile 토큰은 1회용이라 name-check 가 쓴 토큰을 재사용할 수 없고, 두 검색도 토큰을 따로 받는다.
+  const pendingAxisRef = useRef<{ name: string; kinds: AxisKind[] } | null>(null);
   const runPhoneticRef = useRef<(name: string, token: string) => Promise<void>>(
+    async () => {},
+  );
+  const runSemanticRef = useRef<(name: string, token: string) => Promise<void>>(
     async () => {},
   );
   const preview = useObjectUrl(file);
   const pendingPreview = useObjectUrl(pendingFile);
 
   const handleTokenChange = useCallback((token: string | null) => {
-    const pending = pendingPhoneticRef.current;
-    if (token && pending) {
-      // 이 토큰은 발음 검색이 소비한다 — 제출용 토큰은 그 호출이 끝난 뒤 다시 발급받는다.
-      pendingPhoneticRef.current = null;
+    const pending = pendingAxisRef.current;
+    if (token && pending && pending.kinds.length > 0) {
+      // 이 토큰은 대기 중인 축 검색 하나가 소비한다 — 제출용 토큰은 호출들이 끝난 뒤 다시 발급받는다.
+      const [kind, ...rest] = pending.kinds;
+      pendingAxisRef.current = rest.length > 0 ? { name: pending.name, kinds: rest } : null;
       setTurnstileToken(null);
-      void runPhoneticRef.current(pending.name, token);
+      if (kind === "phonetic") {
+        void runPhoneticRef.current(pending.name, token);
+      } else {
+        void runSemanticRef.current(pending.name, token);
+      }
+      // 아직 보낼 축이 남았으면 바로 새 토큰을 받아 두 요청이 겹쳐 돌게 한다.
+      if (rest.length > 0) turnstileRef.current?.reset();
       return;
     }
     setTurnstileToken(token);
@@ -96,7 +135,9 @@ export default function SearchForm({
       nameAbortRef.current?.abort();
       phoneticGenerationRef.current += 1;
       phoneticAbortRef.current?.abort();
-      pendingPhoneticRef.current = null;
+      semanticGenerationRef.current += 1;
+      semanticAbortRef.current?.abort();
+      pendingAxisRef.current = null;
     },
     [],
   );
@@ -145,9 +186,36 @@ export default function SearchForm({
       turnstileRef.current?.reset();
     }
   };
+  const runSemanticSearch = async (name: string, token: string) => {
+    semanticAbortRef.current?.abort();
+    const controller = new AbortController();
+    semanticAbortRef.current = controller;
+    const generation = ++semanticGenerationRef.current;
+    setSemanticPhase({ name: "loading" });
+
+    try {
+      const data = await searchSemantic(name, token, controller.signal);
+      if (generation === semanticGenerationRef.current) {
+        setSemanticPhase({ name: "result", data });
+      }
+    } catch (error) {
+      if (controller.signal.aborted || generation !== semanticGenerationRef.current) return;
+      setSemanticPhase({
+        name: "error",
+        message:
+          error instanceof ApiError
+            ? error.message
+            : "관념 유사도를 계산하지 못했어요. 다시 시도해 주세요.",
+      });
+    } finally {
+      // 관념 검색이 쓴 토큰 대신 제출용 토큰을 다시 받는다.
+      turnstileRef.current?.reset();
+    }
+  };
   // 최신 클로저를 ref 에 보관 — handleTokenChange 는 위젯 재렌더를 피하려고 identity 를 고정한다.
   useEffect(() => {
     runPhoneticRef.current = runPhoneticSearch;
+    runSemanticRef.current = runSemanticSearch;
   });
 
   const runNameCheck = async () => {
@@ -168,10 +236,11 @@ export default function SearchForm({
     const token = turnstileToken;
     setNamePhase({ name: "loading" });
     setTurnstileToken(null);
-    // 발음(호칭) 유사도 검색은 name-check 와 병렬로 보낸다. 토큰이 1회용이라 name-check 를
-    // 띄운 직후 위젯을 리셋해 새 토큰을 받고(handleTokenChange), 그 토큰으로 호출한다.
-    pendingPhoneticRef.current = { name };
+    // 발음(호칭)·관념(의미) 유사도 검색은 name-check 와 병렬로 보낸다. 토큰이 1회용이라 name-check 를
+    // 띄운 직후 위젯을 리셋해 새 토큰을 받고(handleTokenChange), 토큰이 올 때마다 하나씩 호출한다.
+    pendingAxisRef.current = { name, kinds: ["phonetic", "semantic"] };
     setPhoneticPhase({ name: "loading" });
+    setSemanticPhase({ name: "loading" });
 
     const nameCheckPromise = checkTrademarkName(name, token, controller.signal);
     turnstileRef.current?.reset();
@@ -205,6 +274,9 @@ export default function SearchForm({
       topK,
       nameCheck: namePhase.name === "result" ? namePhase.data : null,
       phonetic: phoneticPhase.name === "result" ? phoneticPhase.data : null,
+      semantic: semanticPhase.name === "result" ? semanticPhase.data : null,
+      goods: selectedGoods,
+      goodsCodes,
       turnstileToken: token,
     });
   };
@@ -304,7 +376,7 @@ export default function SearchForm({
 
       <section aria-labelledby="name-title" className="rise rise-2 rounded-lg bg-card p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <label id="name-title" htmlFor="mark-name" className="text-[13px] font-semibold text-sub">
+          <label id="name-title" htmlFor="mark-text" className="text-[13px] font-semibold text-sub">
             상표 이름
           </label>
           <span className="rounded-full bg-blue-bg px-2.5 py-0.5 text-[11px] font-bold text-blue-dark">
@@ -312,9 +384,11 @@ export default function SearchForm({
           </span>
         </div>
         <div className="mt-2 flex items-end gap-2">
+          {/* Safari 연락처 자동완성 아이콘 방지: autoComplete=off, id 에 'name' 을 쓰지 않는다 */}
           <input
-            id="mark-name"
+            id="mark-text"
             type="text"
+            autoComplete="off"
             value={markName}
             maxLength={100}
             aria-describedby="name-help"
@@ -323,10 +397,13 @@ export default function SearchForm({
               nameAbortRef.current?.abort();
               phoneticGenerationRef.current += 1;
               phoneticAbortRef.current?.abort();
-              pendingPhoneticRef.current = null;
+              semanticGenerationRef.current += 1;
+              semanticAbortRef.current?.abort();
+              pendingAxisRef.current = null;
               setMarkName(event.target.value);
               setNamePhase({ name: "idle" });
               setPhoneticPhase({ name: "idle" });
+              setSemanticPhase({ name: "idle" });
             }}
             placeholder="예: 몬테로사 MONTEROSA"
             className="min-w-0 flex-1 border-b-2 border-line pb-2 text-[17px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark"
@@ -363,6 +440,31 @@ export default function SearchForm({
             <PhoneticMatchesSection phase={phoneticPhase} live />
           </div>
         )}
+        {semanticPhase.name !== "idle" && (
+          <div className="mt-4 border-t border-line pt-4">
+            <SemanticMatchesSection phase={semanticPhase} live />
+          </div>
+        )}
+      </section>
+
+      {/* .rise 의 transform 이 카드마다 stacking context 를 만들어 드롭다운(z-20)이 뒤 카드에 가려진다.
+          이 카드만 z-index 를 올려 드롭다운이 다음 카드 위에 그려지게 한다(헤더 z-10 보다는 아래). */}
+      <section
+        aria-labelledby="goods-title"
+        className="rise rise-3 relative z-[1] rounded-lg bg-card p-5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id="goods-title" className="text-[13px] font-semibold text-sub">
+            지정상품
+          </h2>
+          <span className="rounded-full bg-blue-bg px-2.5 py-0.5 text-[11px] font-bold text-blue-dark tnum">
+            선택 {selectedGoods.length}개
+          </span>
+        </div>
+        <p id="goods-help" className="mt-1 text-[11px] leading-relaxed text-sub">
+          상표를 쓸 상품·서비스를 고르세요. 여러 개 가능
+        </p>
+        <GoodsPicker value={selectedGoods} onChange={setSelectedGoods} describedBy="goods-help" />
       </section>
 
       <section aria-labelledby="count-title" className="rise rise-3 rounded-lg bg-card p-5">

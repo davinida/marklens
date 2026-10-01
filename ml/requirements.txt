@@ -10,5 +10,9 @@ torchvision>=0.28.0,<1.0.0
 pillow>=12.3.0,<13.0.0
 # 수치 연산 라이브러리
 numpy>=1.24.0,<2.0.0
+# X3 관념 축 — 다국어 문장 임베딩 (transformers·scikit-learn·scipy 를 함께 설치한다)
+sentence-transformers>=6.1.0,<7.0.0
+# X3 관념 게이트 — 단어 빈도표 (MIT). 한국어는 표제어를 직접 조회하므로 MeCab(cjk extra) 불필요
+wordfreq>=3.1.1,<4.0.0
 # 심결문 PDF 텍스트 추출 (다빈-1 심결례 수집, backend/scripts/trials_collect.py extract)
 pymupdf>=1.26.0,<2.0.0

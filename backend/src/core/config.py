@@ -123,8 +123,12 @@ _FIELD_TO_ENV: dict[str, str] = {
     "phonetic_rate_limit": "MARKLENS_PHONETIC_RATELIMIT",
     "phonetic_top_k_default": "MARKLENS_PHONETIC_TOP_K_DEFAULT",
     "phonetic_min_similarity": "MARKLENS_PHONETIC_MIN_SIMILARITY",
+    "x3_enabled": "MARKLENS_X3_ENABLED",
+    "x3_rate_limit": "MARKLENS_X3_RATELIMIT",
+    "x3_min_score": "MARKLENS_X3_MIN_SCORE",
     "goods_rate_limit": "MARKLENS_GOODS_RATELIMIT",
     "goods_map_path": "MARKLENS_GOODS_MAP_PATH",
+    "goods_presets_path": "MARKLENS_GOODS_PRESETS_PATH",
     "api_key": "MARKLENS_API_KEY",
     "database_url": "DATABASE_URL",
     "environment": "MARKLENS_ENVIRONMENT",
@@ -190,6 +194,18 @@ class Settings(BaseSettings):
         default=0.5, validation_alias="MARKLENS_PHONETIC_MIN_SIMILARITY"
     )
 
+    # /semantic-search (X3 관념 유사도, /phonetic-search 와 같은 방식): 기동 시 DB 상표명 중 관념이
+    # 있는 것만 임베딩해 캐시한다(MiniLM, RSS 약 1.2GB). 0 이면 적재를 생략하고 엔드포인트만 503.
+    x3_enabled: bool = Field(default=True, validation_alias="MARKLENS_X3_ENABLED")
+    x3_rate_limit: str = Field(
+        default="30/minute", validation_alias="MARKLENS_X3_RATELIMIT"
+    )
+    # 후보 점수 하한(0.0~1.0, 재보정 점수). 0.55 는 벤치마크(MiniLM) 유사 쌍 최솟값 0.617
+    # (사과/APPLE) 아래·비유사 최댓값 0.318(왕/사과) 위에 두되 서비스 실측의 무관 후보(왕 → 재
+    # 0.696 급)를 걸러
+    # 내려고 0.5 에서 올린 값(2026-09-30). 정답 데이터(다빈-1)로 재조정 예정. 반환 상한은 5건 고정.
+    x3_min_score: float = Field(default=0.55, validation_alias="MARKLENS_X3_MIN_SCORE")
+
     # /goods/search·/goods/classes (상품↔유사군 변환표, 프론트-6): KIPRIS·CPU 모델과 무관한
     # 로컬 메모리 조회(수 ms)지만 자동완성이 키 입력마다 부르므로 무제한은 피한다 —
     # 사람 타자 속도 + 디바운스를 가정한 60/minute 기본.
@@ -199,6 +215,9 @@ class Settings(BaseSettings):
     # 변환표 파일 경로. 비우면 로더 기본(shared/goods_map/goods_map.json.gz → .json).
     # 파일이 없어도 서버는 기동하고 /goods/* 만 503 을 낸다(core/goods.py).
     goods_map_path: str = Field(default="", validation_alias="MARKLENS_GOODS_MAP_PATH")
+    # 업종 세트 JSON 경로. 비우면 shared/goods_map/business_presets.json. 없거나 명칭이 변환표와
+    # 어긋나도 기동은 되고(경고 로그 + 해당 항목 제외) 검색 응답의 presets 만 빈다.
+    goods_presets_path: str = Field(default="", validation_alias="MARKLENS_GOODS_PRESETS_PATH")
 
     # 정적 X-API-Key. 설정 시에만 /search·/name-check 에서 헤더 일치를 검증(불일치 401).
     # 미설정("")이면 완전 비활성 — 로컬 개발은 무인증 개방. (core/auth.py 참조)
@@ -248,6 +267,7 @@ class Settings(BaseSettings):
         "namecheck_rate_limit",
         "images_rate_limit",
         "phonetic_rate_limit",
+        "x3_rate_limit",
         "goods_rate_limit",
     )
     @classmethod
@@ -266,10 +286,10 @@ class Settings(BaseSettings):
             raise ValueError(f"{MIN_TOP_K}~{MAX_TOP_K} 범위여야 합니다 (받은 값: {n}).")
         return n
 
-    @field_validator("phonetic_min_similarity", mode="before")
+    @field_validator("phonetic_min_similarity", "x3_min_score", mode="before")
     @classmethod
-    def _check_phonetic_min_similarity(cls, v: object) -> float:
-        """0.0 ~ 1.0 실수(X1 점수 범위)."""
+    def _check_unit_interval(cls, v: object) -> float:
+        """0.0 ~ 1.0 실수(X1·X3 점수 범위)."""
         try:
             x = float(str(v).strip())
         except (TypeError, ValueError):
@@ -361,9 +381,16 @@ PHONETIC_RATE_LIMIT: str = settings.phonetic_rate_limit
 PHONETIC_TOP_K_DEFAULT: int = settings.phonetic_top_k_default
 PHONETIC_MIN_SIMILARITY: float = settings.phonetic_min_similarity
 
+# X3 관념 유사도 /semantic-search (env: MARKLENS_X3_ENABLED / MARKLENS_X3_RATELIMIT
+#   / MARKLENS_X3_MIN_SCORE)
+X3_ENABLED: bool = settings.x3_enabled
+X3_RATE_LIMIT: str = settings.x3_rate_limit
+X3_MIN_SCORE: float = settings.x3_min_score
+
 # 상품↔유사군 변환표 /goods/* (env: MARKLENS_GOODS_RATELIMIT / MARKLENS_GOODS_MAP_PATH)
 GOODS_RATE_LIMIT: str = settings.goods_rate_limit
 GOODS_MAP_PATH: str = settings.goods_map_path.strip()
+GOODS_PRESETS_PATH: str = settings.goods_presets_path.strip()
 
 # 정적 X-API-Key (env: MARKLENS_API_KEY, 미설정 시 인증 비활성)
 API_KEY: str = settings.api_key

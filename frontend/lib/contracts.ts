@@ -472,6 +472,49 @@ export const PhoneticSearchResponseSchema = z
 export type PhoneticMatch = z.infer<typeof PhoneticMatchSchema>;
 export type PhoneticSearchResponse = z.infer<typeof PhoneticSearchResponseSchema>;
 
+// ---- X3 관념(의미) 유사도 검색 (/api/semantic-search) — phonetic-search 와 같은 구조 ----
+// 백엔드 /semantic-search 응답. 점수 필드는 score(재보정 코사인)이고 나머지 키는 phonetic 과 같다.
+export const SemanticMatchSchema = z
+  .object({
+    rank: z.number().int().positive(),
+    score: z.number().finite(),
+    출원번호: z.string(),
+    상표한글명: z.string(),
+    이미지URL: NullableText,
+    출원인: NullableText,
+    류: z.array(z.number()).optional().default([]),
+  })
+  .passthrough();
+
+export const SemanticSearchResponseSchema = z
+  .object({
+    query: z
+      .object({
+        name: z.string(),
+        has_meaning: z.boolean(),
+        text: z.string().optional().default(""),
+      })
+      .passthrough(),
+    matches: z.array(SemanticMatchSchema),
+    searched_count: z.number().int().nonnegative(),
+    excluded_no_meaning: z.number().int().nonnegative(),
+    dataset_info: DatasetInfoSchema.optional(),
+    params: z
+      .object({
+        top_k: z.number().int().positive(),
+        min_score: z.number().min(0).max(1),
+      })
+      .passthrough(),
+    threshold: z.number().min(0).max(1).optional(),
+    axis: z.string().optional(),
+    note: z.string().optional(),
+    model: z.string().optional(),
+  })
+  .passthrough();
+
+export type SemanticMatch = z.infer<typeof SemanticMatchSchema>;
+export type SemanticSearchResponse = z.infer<typeof SemanticSearchResponseSchema>;
+
 // ---- 상품↔유사군 변환표 검색 (/api/goods/search, /api/goods/classes) — 프론트-6 지정상품 입력 UI용 ----
 // 백엔드 /goods/* 응답. 필드는 shared/types/goods.ts 의 GoodsMapEntry + matched_alias(원 명칭으로 잡힌 경우).
 export const GoodsMatchSchema = z
@@ -483,11 +526,32 @@ export const GoodsMatchSchema = z
   })
   .passthrough();
 
+// 업종 세트(shared/goods_map/business_presets.json): 검색어가 업종명·별칭에 부분 일치하면 함께 온다.
+export const PresetGoodSchema = z
+  .object({
+    name: z.string().min(1),
+    nice_class: z.number().int().min(1).max(45),
+    similarity_codes: z.array(z.string()),
+  })
+  .passthrough();
+
+export const BusinessPresetSchema = z
+  .object({
+    id: z.string().min(1),
+    업종명: z.string().min(1),
+    emoji: z.string().optional().default(""),
+    hint: z.string().optional().default(""),
+    지정상품: z.array(PresetGoodSchema),
+  })
+  .passthrough();
+
 export const GoodsSearchResponseSchema = z
   .object({
     query: z.string(),
     matches: z.array(GoodsMatchSchema),
     total: z.number().int().nonnegative(),
+    offset: z.number().int().nonnegative().optional().default(0),
+    presets: z.array(BusinessPresetSchema).optional().default([]),
     source: z.string().optional(),
   })
   .passthrough();
@@ -509,6 +573,8 @@ export const GoodsClassesResponseSchema = z
   .passthrough();
 
 export type GoodsMatch = z.infer<typeof GoodsMatchSchema>;
+export type PresetGood = z.infer<typeof PresetGoodSchema>;
+export type BusinessPreset = z.infer<typeof BusinessPresetSchema>;
 export type GoodsSearchResponse = z.infer<typeof GoodsSearchResponseSchema>;
 export type GoodsClass = z.infer<typeof GoodsClassSchema>;
 export type GoodsClassesResponse = z.infer<typeof GoodsClassesResponseSchema>;

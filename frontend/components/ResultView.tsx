@@ -16,14 +16,20 @@ import {
 } from "lucide-react";
 import NameCheckPanel from "@/components/NameCheckPanel";
 import PhoneticMatchesSection from "@/components/PhoneticMatchesSection";
+import SemanticMatchesSection from "@/components/SemanticMatchesSection";
 import { imageUrl } from "@/lib/api";
+import { goodsCodeUnion, goodsSummaryText, type SelectedGood } from "@/lib/goods";
 import type {
   GradeCode,
   SearchMatch,
   SearchResponse,
   StatusCode,
 } from "@/lib/api";
-import type { NameCheckResult, PhoneticSearchResponse } from "@/lib/contracts";
+import type {
+  NameCheckResult,
+  PhoneticSearchResponse,
+  SemanticSearchResponse,
+} from "@/lib/contracts";
 
 const GRADE_VIEW: Record<
   StatusCode,
@@ -466,9 +472,13 @@ function MatchDistribution({
 function AnalysisScope({
   nameCheck,
   phonetic,
+  semantic,
+  goods,
 }: {
   nameCheck?: NameCheckResult | null;
   phonetic?: PhoneticSearchResponse | null;
+  semantic?: SemanticSearchResponse | null;
+  goods?: SelectedGood[] | null;
 }) {
   const items = [
     {
@@ -494,14 +504,31 @@ function AnalysisScope({
     },
     {
       label: "호칭·관념",
-      state: phonetic ? "호칭만 조회됨" : "미분석",
-      detail: phonetic ? "X1 발음 유사도 · 의미 비교 제외" : "발음·의미 비교 제외",
-      kind: phonetic ? ("partial" as const) : ("missing" as const),
+      state:
+        phonetic && semantic
+          ? "호칭·관념 조회됨"
+          : phonetic
+            ? "호칭만 조회됨"
+            : semantic
+              ? "관념만 조회됨"
+              : "미분석",
+      detail:
+        phonetic && semantic
+          ? "X1 발음 · X3 의미 유사도 (등급 미반영)"
+          : phonetic
+            ? "X1 발음 유사도 · 의미 비교 제외"
+            : semantic
+              ? "X3 의미 유사도 · 발음 비교 제외"
+              : "발음·의미 비교 제외",
+      kind: phonetic || semantic ? ("partial" as const) : ("missing" as const),
     },
     {
       label: "상품 견련성",
       state: "미분석",
-      detail: "지정상품 충돌 비교 제외",
+      detail:
+        goods && goods.length > 0
+          ? `지정상품 ${goods.length}개 선택(유사군 ${goodsCodeUnion(goods).length}개) · 검색 반영 전`
+          : "지정상품 충돌 비교 제외",
       kind: "missing" as const,
     },
   ];
@@ -623,12 +650,16 @@ export default function ResultView({
   queryPreview,
   nameCheck,
   phonetic,
+  semantic,
+  goods,
   onReset,
 }: {
   result: SearchResponse;
   queryPreview: string | null;
   nameCheck?: NameCheckResult | null;
   phonetic?: PhoneticSearchResponse | null;
+  semantic?: SemanticSearchResponse | null;
+  goods?: SelectedGood[] | null;
   onReset: () => void;
 }) {
   const grade = result.grade;
@@ -704,6 +735,16 @@ export default function ResultView({
           </div>
         </div>
 
+        {goods && goods.length > 0 && (
+          <p
+            data-goods-summary
+            className="mt-3 border-t border-current/10 pt-3 text-[12px] leading-relaxed text-sub"
+          >
+            <span className="font-bold text-ink">선택한 지정상품:</span> {goodsSummaryText(goods)}
+            <span className="ml-1">· 검색 점수에는 아직 반영되지 않아요(유사군 백필 후)</span>
+          </p>
+        )}
+
         {(grade.warnings.length > 0 || grade.uncertain) && (
           <div className="mt-4 grid gap-2 border-t border-current/10 pt-3 sm:grid-cols-2">
             {grade.warnings.map((warning) => (
@@ -774,7 +815,12 @@ export default function ResultView({
             </div>
 
             <MatchDistribution matches={result.matches} thresholds={thresholds} />
-            <AnalysisScope nameCheck={nameCheck} phonetic={phonetic} />
+            <AnalysisScope
+              nameCheck={nameCheck}
+              phonetic={phonetic}
+              semantic={semantic}
+              goods={goods}
+            />
           </section>
         </div>
 
@@ -833,6 +879,17 @@ export default function ResultView({
             >
               <h2 id="phonetic-evidence-title" className="sr-only">호칭 유사도 분석</h2>
               <PhoneticMatchesSection phase={{ name: "result", data: phonetic }} />
+            </section>
+          )}
+
+          {semantic && (
+            <section
+              data-semantic-evidence
+              aria-labelledby="semantic-evidence-title"
+              className="border-y border-line bg-card px-5 py-5"
+            >
+              <h2 id="semantic-evidence-title" className="sr-only">관념 유사도 분석</h2>
+              <SemanticMatchesSection phase={{ name: "result", data: semantic }} />
             </section>
           )}
         </div>

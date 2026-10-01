@@ -99,6 +99,21 @@ def test_search_limit_and_class_filter(gm):
     assert gm.search("화장품", nice_class=44) == []
 
 
+def test_list_class_is_name_sorted_with_offset(gm):
+    matches, total = gm.list_class(25)
+    assert [m.name for m in matches] == ["신발", "의류", "장갑"] and total == 3
+    assert all(m.matched_alias is None and m.tier == goods_map.TIER_LIST for m in matches)
+    page, total = gm.list_class(25, offset=1, limit=1)
+    assert [m.name for m in page] == ["의류"] and total == 3
+    assert gm.list_class(25, offset=3) == ([], 3)
+    assert gm.list_class(44) == ([], 0)
+    # 검색의 offset 은 순위 목록의 페이지 넘김
+    assert [m.name for m in gm.search_with_total("화장품", limit=2, offset=2)[0]] == [
+        COSMETICS_35,
+        "기능성 화장품",
+    ]
+
+
 def test_search_blank_or_unknown_query_is_empty(gm):
     assert gm.search("") == []
     assert gm.search("   ") == []
