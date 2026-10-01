@@ -320,6 +320,7 @@ export default function GoodsPicker({
       return;
     }
     if (event.key === "Escape") {
+      event.preventDefault(); // type=search 의 기본 동작(입력값 지우기)을 막고 드롭다운만 닫는다
       setOpen(false);
     }
   };
@@ -339,9 +340,12 @@ export default function GoodsPicker({
               size={16}
               className="pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 text-sub"
             />
+            {/* type=search + autoComplete=off: Safari 연락처 자동완성 아이콘 방지.
+                검색창 기본 모양과 WebKit/Chrome 의 지우기(x) 버튼은 끈다. */}
             <input
               ref={inputRef}
-              type="text"
+              type="search"
+              autoComplete="off"
               role="combobox"
               aria-label="지정상품 검색"
               aria-expanded={dropdownOpen}
@@ -361,7 +365,7 @@ export default function GoodsPicker({
                 if (search !== null) setOpen(true);
               }}
               onBlur={() => setOpen(false)}
-              className="w-full border-b-2 border-line pb-2 pl-6 text-[15px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark"
+              className="w-full appearance-none border-b-2 border-line pb-2 pl-6 text-[15px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark [&::-webkit-search-cancel-button]:appearance-none"
             />
           </div>
           <button
@@ -426,8 +430,9 @@ export default function GoodsPicker({
                   aria-label={`${preset.업종명} 업종 세트`}
                   className="border-b border-line bg-blue-bg/40 px-3 py-2.5"
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <p className="min-w-0 text-[12.5px] leading-snug text-ink">
+                  {/* 글은 남은 폭을 채우고(14rem 미만이면 버튼이 다음 줄로), 버튼은 줄바꿈·축소 없이 */}
+                  <div className="flex flex-wrap items-start justify-between gap-x-2 gap-y-1.5">
+                    <p className="min-w-0 grow basis-56 text-[12.5px] leading-snug text-ink">
                       <span className="font-extrabold">
                         <span aria-hidden>{preset.emoji ? `${preset.emoji} ` : ""}</span>
                         {preset.업종명} 업종
@@ -444,7 +449,7 @@ export default function GoodsPicker({
                       disabled={allChosen}
                       onMouseDown={keepFocus}
                       onClick={() => addPreset(preset)}
-                      className="press shrink-0 rounded-md bg-blue-dark px-2.5 py-1.5 text-[11.5px] font-bold text-white disabled:bg-disabled disabled:text-disabled-text"
+                      className="press shrink-0 whitespace-nowrap rounded-md bg-blue-dark px-2.5 py-1.5 text-[11.5px] font-bold text-white disabled:bg-disabled disabled:text-disabled-text"
                     >
                       {allChosen ? "모두 선택됨" : `${preset.지정상품.length}개 모두 추가`}
                     </button>

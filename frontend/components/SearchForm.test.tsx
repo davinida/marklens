@@ -135,10 +135,11 @@ describe("SearchForm name check", () => {
     const user = userEvent.setup();
     render(<SearchForm onSubmit={vi.fn()} />);
 
-    await user.type(
-      screen.getByRole("textbox", { name: "상표 이름" }),
-      "MarkLens",
-    );
+    const nameInput = screen.getByRole("textbox", { name: "상표 이름" });
+    // Safari 연락처 자동완성 아이콘 방지: autocomplete=off, id 에 'name' 없음
+    expect(nameInput).toHaveAttribute("autocomplete", "off");
+    expect(nameInput.id).not.toMatch(/name/i);
+    await user.type(nameInput, "MarkLens");
     const checkButton = screen.getByRole("button", { name: "이름 확인" });
     await waitFor(() => expect(checkButton).toBeEnabled());
     await user.click(checkButton);

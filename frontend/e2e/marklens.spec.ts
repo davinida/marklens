@@ -450,6 +450,25 @@ test("a business preset adds three goods that show up in the result summary", as
   await page.getByRole("combobox", { name: "지정상품 검색" }).fill("카페");
   const card = page.getByRole("region", { name: "카페 업종 세트" });
   await expect(card).toBeVisible();
+  // 카드 등장 애니메이션(.rise transform)이 켜진 상태에서도 드롭다운이 다음 카드 위에 그려진다
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const section = document.querySelector('section[aria-labelledby="goods-title"]')!;
+        const dropdown = document.querySelector('section[aria-label="카페 업종 세트"]')!
+          .parentElement!;
+        dropdown.scrollIntoView({ block: "start" });
+        window.scrollBy(0, -64); // 고정 헤더(h-14) 아래로
+        const box = dropdown.getBoundingClientRect();
+        const hit = document.elementFromPoint(box.x + box.width / 2, box.y + 56);
+        return {
+          animated: getComputedStyle(section).transform !== "none",
+          dropdownOnTop: !!hit && hit.closest("[data-goods-picker]") !== null,
+        };
+      }),
+    )
+    .toEqual({ animated: true, dropdownOnTop: true });
   await card.getByRole("button", { name: "3개 모두 추가" }).click();
   for (const name of ["커피전문점업", "커피", "커피 소매업"]) {
     await expect(page.getByRole("button", { name: `${name} 제거` })).toBeVisible();

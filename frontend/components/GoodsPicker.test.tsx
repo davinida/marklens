@@ -125,6 +125,9 @@ describe("GoodsPicker", () => {
   it("waits for two characters and debounces typing into one request", async () => {
     const user = userEvent.setup();
     render(<Harness />);
+    // Safari 연락처 자동완성 아이콘 방지: 검색창은 type=search + autocomplete=off
+    expect(input()).toHaveAttribute("type", "search");
+    expect(input()).toHaveAttribute("autocomplete", "off");
 
     await user.type(input(), "커");
     expect(screen.getByText("2글자 이상 입력하면 검색해요.")).toBeVisible();
