@@ -5,7 +5,13 @@
     fetch    심판(결)문(getJudDocumentInfoSearch) 경로 조회 → 즉시 PDF 다운로드 → pdf/{심판번호}.pdf
     extract  PyMuPDF 텍스트 추출 + 정규식 선별 → text/{심판번호}.txt, prefilter.csv
     sheet    사람 라벨링용 시트 초안 → labels.csv (재생성 때 사람 열 보존)
-    show     심판번호의 주문·판단 절·자동 판정 보기 (--next: curation_queue.csv 의 다음 미확정 건)
+    show     심판번호의 주문·판단 절·자동 판정 보기 (--next: curation_queue.csv 의 다음 미확정 건,
+             --batch n: 라벨 없는 다음 n건을 batch_<k>.md 로 — 정규식 추정은 넣지 않는다)
+    label    큐레이션 라벨 기록 (유사|비유사|제외, --source llm|human, --evidence, --confidence,
+             --pass a|b). llm 은 사람이 확인한 행(확인여부=Y)을 덮어쓰지 못한다
+    confirm  LLM 라벨을 그대로 승인 (확인여부=Y, 라벨출처=human-confirmed)
+    review   재검토 큐 review_queue.csv (LLM≠추정 · 확신도 low · 메모 애매 · pass A≠B)
+    sample   --n 40 --seed 0: 미확인 LLM 라벨에서 종류×판정 층화 표본 → verify_queue.csv
     status   예산(quota.json)·건수·단계별 진행·큐레이션 진행률 요약
     sample   층화 표본 CSV (호출 없음) · biblio 서지상세 (1회/건)
 
@@ -71,6 +77,7 @@ import hashlib
 import json
 import math
 import os
+import random
 import re
 import sys
 import time
@@ -195,6 +202,14 @@ class TrialPaths:
     def curation_queue(self) -> Path:
         return self.base / "curation_queue.csv"
 
+    @property
+    def review_queue(self) -> Path:
+        return self.base / "review_queue.csv"
+
+    @property
+    def verify_queue(self) -> Path:
+        return self.base / "verify_queue.csv"
+
 
 DEFAULT_PATHS = TrialPaths(paths.ML_DATA_DIR / "trials")
 
@@ -206,11 +221,16 @@ FETCH_LOG_COLUMNS = ["심판번호", "결과", "파일명", "kind", "일시"]
 # 사람이 채우는 열(sheet 재생성 때 심판번호·상표B_번호 기준으로 보존). 판단축 은 4단계 전 이름.
 HUMAN_COLUMNS = ("유사여부_확정", "판단축_확정", "상표유형_확정", "제외사유", "메모")
 LEGACY_HUMAN_COLUMNS = {"판단축": "판단축_확정"}
+# label 명령의 메타 열: 출처(llm/human/human-confirmed), 소결 문장 원문, 확신도(high/low),
+# 사람 확인(Y), 사람이 수정하기 전 LLM 판정(LLM↔사람 일치율용). pass b(이중 라벨링)는 llm_b_* 열.
+LABEL_META_COLUMNS = ("라벨출처", "근거문장", "확신도", "확인여부", "llm_판정_원본")
+LLM_B_COLUMNS = ("llm_b_유사여부", "llm_b_판단축", "llm_b_제외사유", "llm_b_확신도", "llm_b_근거")
+PRESERVED_COLUMNS = HUMAN_COLUMNS + LABEL_META_COLUMNS + LLM_B_COLUMNS
 LABEL_COLUMNS = [
     "심판번호", "종류", "심판상태", "심결월", "상표A_번호", "상표A_명칭", "상표B_번호",
     "상대표장_번호_후보", "상대표장_유형", "지정상품_원문", "조문플래그", "결론조문", "신뢰도",
     "표장유사_소결", "자동등급", "등급사유", "등급_원규칙", "family", "참고표시", "유사여부_추정",
-    "추정근거", "결정축_추정", "상표유형_추정", *HUMAN_COLUMNS,
+    "추정근거", "결정축_추정", "상표유형_추정", *PRESERVED_COLUMNS,
 ]
 
 
@@ -1814,7 +1834,7 @@ def family_key(plaintiff: str, prior_numbers: list[str]) -> str:
 
 
 def _empty_human() -> dict[str, str]:
-    return {column: "" for column in HUMAN_COLUMNS}
+    return {column: "" for column in PRESERVED_COLUMNS}
 
 
 def build_sheet_rows(
@@ -1915,16 +1935,16 @@ def build_sheet_rows(
 
 
 def merge_human_columns(rows: list[dict], previous: list[dict]) -> int:
-    """이전 labels.csv 의 사람 열을 새 행에 옮긴다 — (심판번호, 상표B_번호) 일치 우선. 그 심판번호의
-    이전 행이 하나뿐이면 상표B 가 달라도 옮긴다(여러 행이면 어느 것인지 몰라 비워 둔다).
-    4단계 전 열 이름(판단축)도 받는다. 옮긴 행 수를 돌려준다."""
+    """이전 labels.csv 의 사람 열·라벨 메타·llm_b 열을 새 행에 옮긴다 — (심판번호, 상표B_번호) 일치
+    우선. 그 심판번호의 이전 행이 하나뿐이면 상표B 가 달라도 옮긴다(여러 행이면 어느 것인지 몰라
+    비워 둔다). 4단계 전 열 이름(판단축)도 받는다. 옮긴 행 수를 돌려준다."""
     by_pair: dict[tuple[str, str], dict[str, str]] = {}
     by_trial: dict[str, dict[str, str]] = {}
     rows_per_trial: dict[str, int] = {}
     for old in previous:
         rows_per_trial[old.get("심판번호", "")] = rows_per_trial.get(old.get("심판번호", ""), 0) + 1
         values = {}
-        for column in HUMAN_COLUMNS:
+        for column in PRESERVED_COLUMNS:
             value = (old.get(column) or "").strip()
             if not value:
                 for legacy, renamed in LEGACY_HUMAN_COLUMNS.items():
@@ -2051,6 +2071,8 @@ def run_show(args: argparse.Namespace, session: Session) -> int:
     labels: dict[str, dict] = {}
     for row in label_rows:
         labels.setdefault(row["심판번호"], row)
+    if getattr(args, "batch", 0):
+        return run_batch(args, session)
     trials = list(getattr(args, "trial", None) or [])
     if getattr(args, "next", False):
         queue = _read_csv(paths_.curation_queue)
@@ -2107,9 +2129,514 @@ def run_show(args: argparse.Namespace, session: Session) -> int:
               f"조문플래그 {dash(auto.get('조문플래그', ''))}")
         human = labels.get(number)
         if human:
-            filled = {c: human.get(c, "") for c in HUMAN_COLUMNS if human.get(c)}
-            print(f"- 사람 열(labels.csv): {filled if filled else '아직 없음'}")
+            filled = {c: human.get(c, "") for c in PRESERVED_COLUMNS if human.get(c)}
+            print(f"- 라벨(labels.csv): {filled if filled else '아직 없음'}")
     return exit_code
+
+
+# ====================================================================
+# label·confirm·review·sample --n·show --batch — 큐레이션 라벨 (호출 없음)
+# ====================================================================
+
+VERDICTS = ("유사", "비유사", "제외")
+AXES = ("외관", "호칭", "관념", "상품")
+MARK_TYPES = ("문자", "도형", "결합-문자요부", "결합-도형요부")
+EXCLUDE_REASONS = ("인지도", "식별력", "소멸", "각하", "불특정", "비사용", "중복", "기타")
+LABEL_SOURCES = ("llm", "human")
+CONFIDENCES = ("high", "low")
+LABEL_PASSES = ("a", "b")
+
+
+class LabelError(ValueError):
+    """label/confirm/review/sample 의 입력·상태 오류. exit 2 입력 · 3 덮어쓰기 거부 · 1 데이터."""
+
+    def __init__(self, message: str, exit_code: int = 2):
+        super().__init__(message)
+        self.exit_code = exit_code
+
+
+def _load_labels(paths_: TrialPaths) -> tuple[list[str], list[dict]]:
+    """labels.csv 를 열 순서째 읽는다. 라벨 열이 없는(이전 sheet) 파일은 열을 덧붙인다."""
+    if not paths_.labels_csv.exists():
+        raise LabelError(f"{paths_.labels_csv} 가 없습니다 — sheet 먼저", 1)
+    with paths_.labels_csv.open(encoding="utf-8", newline="") as handle:
+        reader = csv.DictReader(handle)
+        fieldnames = list(reader.fieldnames or [])
+        rows = list(reader)
+    for column in LABEL_COLUMNS:
+        if column not in fieldnames:
+            fieldnames.append(column)
+    for row in rows:
+        for column in fieldnames:
+            if row.get(column) is None:
+                row[column] = ""
+    return fieldnames, rows
+
+
+def _target_rows(rows: list[dict], number: str, b: str | None) -> list[dict]:
+    targets = [row for row in rows if row.get("심판번호") == number]
+    if not targets:
+        raise LabelError(f"labels.csv 에 심판번호 {number} 가 없습니다", 1)
+    if b is not None:
+        matched = [row for row in targets if (row.get("상표B_번호") or "") == b]
+        if not matched:
+            have = ", ".join(row.get("상표B_번호") or "(없음)" for row in targets)
+            raise LabelError(
+                f"심판번호 {number} 에 상표B_번호 {b!r} 행이 없습니다(있는 값: {have})", 1
+            )
+        targets = matched
+    return targets
+
+
+def canonical_axes(value: str) -> str:
+    """'호칭,외관' → '외관|호칭'(고정 순서). 허용값 밖이면 LabelError."""
+    parts = [part.strip() for part in (value or "").replace("|", ",").split(",") if part.strip()]
+    bad = [part for part in parts if part not in AXES]
+    if bad:
+        raise LabelError(f"--axis 허용값은 {','.join(AXES)} 입니다: {','.join(bad)}")
+    return "|".join(axis for axis in AXES if axis in parts)
+
+
+def _refuse_if_confirmed(targets: list[dict]) -> None:
+    confirmed = [row for row in targets if (row.get("확인여부") or "").strip().upper() == "Y"]
+    if confirmed:
+        where = ", ".join(
+            f"{row['심판번호']}(상표B {row.get('상표B_번호') or '-'})" for row in confirmed
+        )
+        raise LabelError(
+            f"[거부] 사람이 확인한 라벨(확인여부=Y)은 llm 이 덮어쓸 수 없습니다: {where} — "
+            "--source human 으로 수정하거나 --b 로 다른 행을 고르세요",
+            3,
+        )
+
+
+def apply_label(
+    rows: list[dict],
+    number: str,
+    verdict: str,
+    *,
+    axis: str = "",
+    mark_type: str = "",
+    reason: str = "",
+    memo: str | None = None,
+    b: str | None = None,
+    source: str = "",
+    evidence: str = "",
+    confidence: str = "",
+    pass_: str = "a",
+    undo: bool = False,
+) -> list[dict]:
+    """labels.csv 행(들)에 라벨을 기록하고 바뀐 행을 돌려준다. 다른 열은 건드리지 않는다.
+
+    pass a: 유사여부_확정·판단축_확정·상표유형_확정·제외사유·메모 + 라벨출처·근거문장·확신도·
+    확인여부.
+    human 은 확인여부=Y. llm 은 확인여부=Y 인 행을 덮어쓰지 못한다(LabelError exit 3).
+    사람이 LLM 라벨을 수정하면 이전 LLM 판정을 llm_판정_원본 에 남긴다(일치율용).
+    pass b: llm_b_* 열에만 기록(사람 열 그대로). --undo 는 해당 pass 의 열을 비운다.
+    """
+    if pass_ not in LABEL_PASSES:
+        raise LabelError("--pass 는 a 또는 b 입니다")
+    if source not in LABEL_SOURCES:
+        raise LabelError("--source 는 llm 또는 human 이어야 합니다")
+    targets = _target_rows(rows, number, b)
+    if pass_ == "a" and source == "llm":
+        _refuse_if_confirmed(targets)
+    if undo:
+        columns = LLM_B_COLUMNS if pass_ == "b" else HUMAN_COLUMNS + LABEL_META_COLUMNS
+        for row in targets:
+            for column in columns:
+                row[column] = ""
+        return targets
+    if verdict not in VERDICTS:
+        raise LabelError(f"판정은 {'|'.join(VERDICTS)} 중 하나여야 합니다: {verdict!r}")
+    if mark_type and mark_type not in MARK_TYPES:
+        raise LabelError(f"--type 허용값은 {'|'.join(MARK_TYPES)} 입니다: {mark_type!r}")
+    if reason and reason not in EXCLUDE_REASONS:
+        raise LabelError(f"--reason 허용값은 {'|'.join(EXCLUDE_REASONS)} 입니다: {reason!r}")
+    if verdict == "제외" and not reason:
+        raise LabelError("제외에는 --reason 이 필요합니다")
+    if verdict != "제외" and reason:
+        raise LabelError("--reason 은 판정이 제외일 때만 씁니다")
+    if confidence not in CONFIDENCES:
+        raise LabelError("--confidence 는 high 또는 low 여야 합니다")
+    evidence = (evidence or "").strip()
+    if not evidence:
+        raise LabelError("--evidence(소결 문장 원문)가 필요합니다")
+    axes = canonical_axes(axis)
+    for row in targets:
+        if pass_ == "b":
+            row["llm_b_유사여부"] = verdict
+            row["llm_b_판단축"] = axes
+            row["llm_b_제외사유"] = reason
+            row["llm_b_확신도"] = confidence
+            row["llm_b_근거"] = evidence
+            continue
+        previous_source = (row.get("라벨출처") or "").strip()
+        previous_verdict = (row.get("유사여부_확정") or "").strip()
+        if source == "human" and previous_source == "llm" and previous_verdict:
+            row["llm_판정_원본"] = previous_verdict  # 사람이 LLM 라벨을 수정 — 원본을 남긴다
+        row["유사여부_확정"] = verdict
+        row["판단축_확정"] = axes
+        row["상표유형_확정"] = mark_type
+        row["제외사유"] = reason
+        if memo is not None:
+            row["메모"] = memo
+        row["라벨출처"] = source
+        row["근거문장"] = evidence
+        row["확신도"] = confidence
+        row["확인여부"] = "Y" if source == "human" else ""
+    return targets
+
+
+def confirm_labels(rows: list[dict], number: str, b: str | None = None) -> int:
+    """기존 LLM 라벨을 그대로 승인: 확인여부=Y, 라벨출처=human-confirmed, llm_판정_원본=판정.
+    새로 승인한 행 수를 돌려준다(이미 사람 라벨·승인된 행은 그대로)."""
+    targets = _target_rows(rows, number, b)
+    unlabeled = [row for row in targets if not (row.get("유사여부_확정") or "").strip()]
+    if unlabeled:
+        raise LabelError(f"심판번호 {number} 에 승인할 라벨이 없습니다(유사여부_확정 비어 있음)", 1)
+    foreign = [row for row in targets
+               if (row.get("라벨출처") or "").strip() not in ("llm", "human", "human-confirmed")]
+    if foreign:
+        raise LabelError(
+            f"심판번호 {number} 의 라벨출처가 llm 이 아닙니다(label 로 기록한 라벨만 승인)", 1
+        )
+    confirmed = 0
+    for row in targets:
+        if (row.get("라벨출처") or "").strip() != "llm":
+            continue
+        row["llm_판정_원본"] = row["유사여부_확정"]
+        row["라벨출처"] = "human-confirmed"
+        row["확인여부"] = "Y"
+        confirmed += 1
+    return confirmed
+
+
+def _label_args_summary(args: argparse.Namespace) -> str:
+    parts = [f"판정 {args.verdict or '-'}", f"출처 {args.source}", f"pass {args.pass_}"]
+    if args.axis:
+        parts.append(f"축 {canonical_axes(args.axis)}")
+    if args.mark_type:
+        parts.append(f"유형 {args.mark_type}")
+    if args.reason:
+        parts.append(f"사유 {args.reason}")
+    return " · ".join(parts)
+
+
+def run_label(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    fieldnames, rows = _load_labels(paths_)
+    changed = apply_label(
+        rows, args.trial, args.verdict,
+        axis=args.axis, mark_type=args.mark_type, reason=args.reason, memo=args.memo, b=args.b,
+        source=args.source, evidence=args.evidence, confidence=args.confidence,
+        pass_=args.pass_, undo=args.undo,
+    )
+    _write_csv(paths_.labels_csv, fieldnames, rows)
+    action = "라벨 비움" if args.undo else "라벨 기록"
+    print(f"## {action}: {args.trial} {len(changed)}행 ({_label_args_summary(args)}) "
+          f"→ {paths_.labels_csv}")
+    return 0
+
+
+def run_confirm(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    fieldnames, rows = _load_labels(paths_)
+    confirmed = confirm_labels(rows, args.trial, args.b)
+    _write_csv(paths_.labels_csv, fieldnames, rows)
+    print(f"## 승인: {args.trial} {confirmed}행 확인여부=Y(human-confirmed) → {paths_.labels_csv}")
+    return 0
+
+
+# ---- show --batch: 라벨 없는 다음 n건을 markdown 으로(정규식 추정·결정축·등급사유는 뺀다) ----
+
+def unlabeled_queue(queue: list[dict], label_rows: list[dict], pass_: str = "a") -> list[dict]:
+    column = "llm_b_유사여부" if pass_ == "b" else "유사여부_확정"
+    labeled = {row["심판번호"] for row in label_rows if (row.get(column) or "").strip()}
+    return [item for item in queue if item["심판번호"] not in labeled]
+
+
+def next_batch_index(base: Path) -> int:
+    numbers = []
+    for path in base.glob("batch_*.md"):
+        match = re.fullmatch(r"batch_(\d+)\.md", path.name)
+        if match:
+            numbers.append(int(match.group(1)))
+    return max(numbers, default=0) + 1
+
+
+BATCH_GUIDE = (
+    "라벨 명령: `label <심판번호> <유사|비유사|제외> [--axis 외관,호칭,관념,상품] "
+    "[--type 문자|도형|결합-문자요부|결합-도형요부] "
+    "[--reason 인지도|식별력|소멸|각하|불특정|비사용|중복|기타] [--b 상대번호] "
+    "--source llm --evidence '<소결 문장 원문>' --confidence high|low --pass {pass_}`"
+)
+
+
+def render_batch(
+    items: list[dict], paths_: TrialPaths, label_rows: list[dict], *, index: int, pass_: str
+) -> str:
+    """배치 markdown: 심판번호·종류·상표A 명칭·상대 번호(후보 포함)·주문·판단 절. 자동 판정은 뺀다.
+    """
+    numbers: dict[str, list[str]] = {}
+    candidates: dict[str, str] = {}
+    for row in label_rows:
+        if row.get("상표B_번호"):
+            numbers.setdefault(row["심판번호"], []).append(row["상표B_번호"])
+        candidates.setdefault(row["심판번호"], row.get("상대표장_번호_후보") or "")
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    lines = [
+        f"# 큐레이션 배치 {index} — {len(items)}건 · pass {pass_} · {stamp}",
+        "",
+        BATCH_GUIDE.format(pass_=pass_),
+        "",
+    ]
+    for order, item in enumerate(items, start=1):
+        number = item["심판번호"]
+        text_path = paths_.text_dir / f"{number}.txt"
+        text = text_path.read_text(encoding="utf-8") if text_path.exists() else ""
+        order_text = analyze_text(text)["주문"] if text else ""
+        counterpart = "; ".join(dict.fromkeys(numbers.get(number, []))) or "-"
+        candidate = candidates.get(number, "")
+        lines += [
+            f"## {order}. {number} · {item.get('종류', '')} · "
+            f"상표A: {item.get('상표A_명칭') or '-'} · 상대 번호: {counterpart}"
+            + (f" (후보 {candidate})" if candidate else ""),
+            "",
+            "### 주문",
+            order_text or "(주문을 찾지 못함)",
+            "",
+            "### 판단 절",
+            "```text",
+            (judgment_text(text) if text else "") or "(판단 절을 찾지 못함 — 텍스트 없음)",
+            "```",
+            "",
+        ]
+    return "\n".join(lines)
+
+
+def run_batch(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    pass_ = getattr(args, "pass_", "a") or "a"
+    if pass_ not in LABEL_PASSES:
+        raise LabelError("--pass 는 a 또는 b 입니다")
+    queue = _read_csv(paths_.curation_queue)
+    if not queue:
+        raise LabelError(f"{paths_.curation_queue} 가 없습니다 — sheet 먼저", 1)
+    label_rows = _read_csv(paths_.labels_csv)
+    pending = unlabeled_queue(queue, label_rows, pass_)
+    items = pending[: args.batch]
+    if not items:
+        print(f"큐 {len(queue)}건 모두 pass {pass_} 라벨이 있습니다")
+        return 0
+    index = next_batch_index(paths_.base)
+    out = paths_.base / f"batch_{index}.md"
+    out.write_text(
+        render_batch(items, paths_, label_rows, index=index, pass_=pass_), encoding="utf-8"
+    )
+    print(f"## batch {index}: pass {pass_} 라벨 없는 {len(items)}건"
+          f"(남은 {len(pending)}/{len(queue)}) → {out}")
+    print("- " + ", ".join(item["심판번호"] for item in items))
+    return 0
+
+
+# ---- review: 재검토 큐 ----
+
+REVIEW_COLUMNS = [
+    "순번", "심판번호", "상표B_번호", "종류", "유사여부_확정", "유사여부_추정", "llm_b_유사여부",
+    "확신도", "라벨출처", "사유",
+]
+
+
+def _llm_verdict(row: dict) -> str:
+    """pass a 의 LLM 판정: 사람이 수정했으면 llm_판정_원본, 아니면 llm/human-confirmed 행의 판정."""
+    original = (row.get("llm_판정_원본") or "").strip()
+    if original:
+        return original
+    if (row.get("라벨출처") or "").strip() in ("llm", "human-confirmed"):
+        return (row.get("유사여부_확정") or "").strip()
+    return ""
+
+
+def _passes_disagree(row: dict) -> bool:
+    a = (row.get("유사여부_확정") or "").strip()
+    b = (row.get("llm_b_유사여부") or "").strip()
+    if not a or not b:
+        return False
+    if a != b:
+        return True
+    return a == "제외" and (row.get("제외사유") or "") != (row.get("llm_b_제외사유") or "")
+
+
+def build_review_queue(label_rows: list[dict]) -> list[dict]:
+    """(a) LLM 판정 ≠ 정규식 추정 (b) 확신도 low (c) 메모에 '애매' (d) pass a ≠ pass b."""
+    queue: list[dict] = []
+    for row in label_rows:
+        verdict = (row.get("유사여부_확정") or "").strip()
+        b_verdict = (row.get("llm_b_유사여부") or "").strip()
+        if not verdict and not b_verdict:
+            continue
+        reasons: list[str] = []
+        llm = _llm_verdict(row)
+        estimate = (row.get("유사여부_추정") or "").strip()
+        if llm and estimate and llm != estimate:
+            reasons.append("LLM≠추정")
+        if (row.get("확신도") or "").strip() == "low":
+            reasons.append("확신도 low")
+        if "애매" in (row.get("메모") or ""):
+            reasons.append("메모 애매")
+        if _passes_disagree(row):
+            reasons.append("A≠B")
+        if not reasons:
+            continue
+        queue.append({
+            "순번": len(queue) + 1,
+            "심판번호": row["심판번호"],
+            "상표B_번호": row.get("상표B_번호", ""),
+            "종류": row.get("종류", ""),
+            "유사여부_확정": verdict,
+            "유사여부_추정": estimate,
+            "llm_b_유사여부": b_verdict,
+            "확신도": row.get("확신도", ""),
+            "라벨출처": row.get("라벨출처", ""),
+            "사유": ";".join(reasons),
+        })
+    return queue
+
+
+def run_review(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    _fieldnames, rows = _load_labels(paths_)
+    queue = build_review_queue(rows)
+    _write_csv(paths_.review_queue, REVIEW_COLUMNS, queue)
+    counts = {key: sum(1 for item in queue if key in item["사유"].split(";"))
+              for key in ("LLM≠추정", "확신도 low", "메모 애매", "A≠B")}
+    print(f"## review: {len(queue)}행 → {paths_.review_queue} · " + " · ".join(
+        f"{key} {value}" for key, value in counts.items()
+    ))
+    return 0
+
+
+# ---- sample --n: 미확인 LLM 라벨의 종류×판정 층화 무작위 표본(검증용) ----
+
+VERIFY_COLUMNS = [
+    "순번", "층", "심판번호", "상표B_번호", "종류", "유사여부_확정", "판단축_확정", "제외사유",
+    "확신도", "근거문장",
+]
+
+
+def allocate_strata(sizes: dict[str, int], n: int) -> dict[str, int]:
+    """비례 배분(비어 있지 않은 층은 최소 1), 큰 나머지 순으로 n 에 맞춘다."""
+    total = sum(sizes.values())
+    if total == 0 or n <= 0:
+        return {key: 0 for key in sizes}
+    if n >= total:
+        return dict(sizes)
+    keys = sorted(sizes)
+    quota = {key: min(sizes[key], max(1, int(n * sizes[key] / total))) for key in keys}
+    remainder = {key: n * sizes[key] / total - int(n * sizes[key] / total) for key in keys}
+    while sum(quota.values()) > n:  # 최소 1 때문에 넘치면 큰 층부터 하나씩 뺀다
+        key = max((k for k in keys if quota[k] > 1), key=lambda k: quota[k], default=None)
+        if key is None:
+            break
+        quota[key] -= 1
+    while sum(quota.values()) < n:
+        open_keys = [k for k in keys if quota[k] < sizes[k]]
+        key = max(open_keys, key=lambda k: remainder[k], default=None)
+        if key is None:
+            break
+        quota[key] += 1
+        remainder[key] = -1.0
+    return quota
+
+
+def select_verify_sample(
+    label_rows: list[dict], kinds: dict[str, dict], n: int, seed: int
+) -> list[dict]:
+    pool = [
+        row for row in label_rows
+        if (row.get("라벨출처") or "").strip() == "llm"
+        and not (row.get("확인여부") or "").strip()
+        and (row.get("유사여부_확정") or "").strip()
+    ]
+    strata: dict[str, list[dict]] = {}
+    for row in pool:
+        key = f"{kind_for_trial_desc(row.get('종류', ''), kinds) or '?'}/{row['유사여부_확정']}"
+        strata.setdefault(key, []).append(row)
+    quota = allocate_strata({key: len(rows) for key, rows in strata.items()}, n)
+    rng = random.Random(seed)
+    picked: list[dict] = []
+    for key in sorted(strata):
+        for row in rng.sample(strata[key], min(quota[key], len(strata[key]))):
+            picked.append({
+                "순번": len(picked) + 1, "층": key, "심판번호": row["심판번호"],
+                "상표B_번호": row.get("상표B_번호", ""), "종류": row.get("종류", ""),
+                "유사여부_확정": row["유사여부_확정"], "판단축_확정": row.get("판단축_확정", ""),
+                "제외사유": row.get("제외사유", ""), "확신도": row.get("확신도", ""),
+                "근거문장": row.get("근거문장", ""),
+            })
+    return picked
+
+
+def run_verify_sample(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    _fieldnames, rows = _load_labels(paths_)
+    picked = select_verify_sample(rows, load_kinds(args.kinds_config), args.n, args.seed)
+    out = Path(args.out) if args.out else paths_.verify_queue
+    _write_csv(out, VERIFY_COLUMNS, picked)
+    strata: dict[str, int] = {}
+    for item in picked:
+        strata[item["층"]] = strata.get(item["층"], 0) + 1
+    print(f"## sample: 미확인 LLM 라벨에서 {len(picked)}건(요청 {args.n}, seed {args.seed}) "
+          f"→ {out}")
+    by_stratum = " · ".join(f"{key} {count}" for key, count in sorted(strata.items()))
+    print("- 층별: " + (by_stratum or "없음"))
+    return 0
+
+
+# ---- status: 판정 집계·일치율 ----
+
+def _rate(hits: int, total: int) -> str:
+    return f"{hits}/{total} ({hits * 100 // total}%)" if total else "0/0 (-)"
+
+
+def label_summary(label_rows: list[dict], queue: list[dict]) -> list[str]:
+    labeled = [row for row in label_rows if (row.get("유사여부_확정") or "").strip()]
+    verdicts = {key: sum(1 for row in labeled if row["유사여부_확정"] == key) for key in VERDICTS}
+    sources: dict[str, int] = {}
+    for row in labeled:
+        source = (row.get("라벨출처") or "").strip() or "(출처 없음)"
+        sources[source] = sources.get(source, 0) + 1
+    confirmed = sum(1 for row in labeled if (row.get("확인여부") or "").strip().upper() == "Y")
+    # LLM↔사람: confirm 은 일치, 사람이 LLM 라벨을 수정(llm_판정_원본 있음·라벨출처 human)은 불일치
+    agree = sum(1 for row in labeled if (row.get("라벨출처") or "") == "human-confirmed")
+    modified = sum(1 for row in labeled
+                   if (row.get("라벨출처") or "") == "human" and (row.get("llm_판정_원본") or ""))
+    estimate_pairs = [
+        (_llm_verdict(row), (row.get("유사여부_추정") or "").strip()) for row in labeled
+    ]
+    estimate_pairs = [(llm, est) for llm, est in estimate_pairs if llm and est]
+    estimate_agree = sum(1 for llm, est in estimate_pairs if llm == est)
+    both = [row for row in label_rows
+            if _llm_verdict(row) and (row.get("llm_b_유사여부") or "").strip()]
+    ab_agree = sum(1 for row in both if not _passes_disagree(row))
+    b_only = sum(1 for row in label_rows if (row.get("llm_b_유사여부") or "").strip())
+    lines = [
+        f"라벨: 유사 {verdicts['유사']} · 비유사 {verdicts['비유사']} · 제외 {verdicts['제외']} "
+        f"(행 {len(labeled)}/{len(label_rows)}) · 출처 "
+        + (", ".join(f"{key} {value}" for key, value in sorted(sources.items())) or "-")
+        + f" · 확인(Y) {confirmed} · pass b {b_only}",
+        f"LLM↔사람 일치율 {_rate(agree, agree + modified)} — confirm {agree} · 수정 {modified}",
+        f"LLM↔추정 일치율 {_rate(estimate_agree, len(estimate_pairs))}",
+        f"LLM A↔B 일치율 {_rate(ab_agree, len(both))}",
+    ]
+    if queue:
+        remaining_a = len(unlabeled_queue(queue, label_rows, "a"))
+        remaining_b = len(unlabeled_queue(queue, label_rows, "b"))
+        lines.append(
+            f"남은 큐: pass a {remaining_a}/{len(queue)} · pass b {remaining_b}/{len(queue)}"
+        )
+    return lines
 
 
 # ====================================================================
@@ -2168,6 +2695,10 @@ def select_sample(
 
 
 def run_sample(args: argparse.Namespace, session: Session) -> int:
+    if getattr(args, "n", 0):
+        return run_verify_sample(args, session)
+    if not args.out:
+        raise LabelError("수집 표본에는 --out 이 필요합니다(검증 표본은 --n)")
     paths_ = session.paths
     source = Path(args.source) if args.source else paths_.list_all_csv
     rows = _read_csv(source)
@@ -2312,6 +2843,8 @@ def run_status(args: argparse.Namespace, session: Session) -> int:
           f"prefilter {prefilter_count}행 · labels {len(label_rows)}행")
     if label_rows:
         print("- " + curation_progress(label_rows))
+        for line in label_summary(label_rows, _read_csv(paths_.curation_queue)):
+            print("- " + line)
     progress = load_progress(paths_.list_progress)
     for kind, months in progress.items():
         done = sum(1 for m in months.values() if m.get("done"))
@@ -2382,13 +2915,41 @@ def build_parser() -> argparse.ArgumentParser:
     p_show.add_argument("trial", nargs="*", metavar="심판번호")
     p_show.add_argument("--next", action="store_true",
                         help="curation_queue.csv 에서 유사여부_확정이 비어 있는 첫 건을 보여 준다")
+    p_show.add_argument("--batch", type=int, default=0, metavar="N",
+                        help="큐에서 라벨 없는 다음 N건을 batch_<k>.md 로(자동 판정은 넣지 않음)")
+    p_show.add_argument("--pass", dest="pass_", default="a", help="--batch 기준 pass: a(기본)|b")
+    p_label = sub.add_parser("label", help="큐레이션 라벨 기록(호출 없음)")
+    p_label.add_argument("trial", metavar="심판번호")
+    p_label.add_argument("verdict", nargs="?", default="", metavar="유사|비유사|제외")
+    p_label.add_argument("--axis", default="", help="판단축: 외관,호칭,관념,상품 중 복수(쉼표)")
+    p_label.add_argument("--type", dest="mark_type", default="",
+                         help="상표유형: 문자|도형|결합-문자요부|결합-도형요부")
+    p_label.add_argument("--reason", default="",
+                         help="제외사유(제외일 때 필수): " + "|".join(EXCLUDE_REASONS))
+    p_label.add_argument("--memo", default=None, help="메모(생략하면 기존 메모 유지)")
+    p_label.add_argument("--b", default=None, metavar="상대번호",
+                         help="그 상표B_번호 행만(없으면 심판번호의 전 행)")
+    p_label.add_argument("--source", default="", help="llm|human (human 은 확인여부=Y)")
+    p_label.add_argument("--evidence", default="", help="소결 문장 원문")
+    p_label.add_argument("--confidence", default="", help="high|low")
+    p_label.add_argument("--pass", dest="pass_", default="a",
+                         help="a(기본, 판정 열)|b(llm_b_* 열, 이중 라벨링)")
+    p_label.add_argument("--undo", action="store_true", help="해당 pass 의 라벨 열을 비운다")
+    p_confirm = sub.add_parser("confirm", help="LLM 라벨을 그대로 승인(확인여부=Y)")
+    p_confirm.add_argument("trial", metavar="심판번호")
+    p_confirm.add_argument("--b", default=None, metavar="상대번호")
+    sub.add_parser("review", help="재검토 큐 review_queue.csv(LLM≠추정·확신도 low·메모 애매·A≠B)")
     p_sample = sub.add_parser("sample", help="층화 표본 CSV 생성(호출 없음)")
     p_sample.add_argument("--source", default="", help="목록 CSV(기본 list_all.csv)")
     p_sample.add_argument("--scope", type=int, default=0)
     p_sample.add_argument("--invalidation", type=int, default=0)
     p_sample.add_argument("--refusal", type=int, default=0)
     p_sample.add_argument("--exclude", action="append", metavar="CSV", help="제외할 심판번호 CSV")
-    p_sample.add_argument("--out", required=True, metavar="CSV")
+    p_sample.add_argument("--out", default="", metavar="CSV",
+                          help="수집 표본 출력(필수) · 검증 표본은 기본 verify_queue.csv")
+    p_sample.add_argument("--n", type=int, default=0,
+                          help="검증 표본: 미확인 LLM 라벨에서 종류×판정 층화 무작위 N건")
+    p_sample.add_argument("--seed", type=int, default=0, help="검증 표본 난수 시드")
     p_biblio = sub.add_parser("biblio", help="서지상세 조회(1회/건) — 결과·주문 대조용")
     common(p_biblio)
     p_biblio.add_argument("--trial", action="append", required=True, metavar="심판번호")
@@ -2404,10 +2965,14 @@ def main(argv: list[str] | None = None) -> int:
         dry_run=getattr(args, "dry_run", False),
     )
     runners = {"list": run_list, "fetch": run_fetch, "extract": run_extract,
-               "sheet": run_sheet, "show": run_show, "sample": run_sample,
-               "biblio": run_biblio, "status": run_status}
+               "sheet": run_sheet, "show": run_show, "label": run_label, "confirm": run_confirm,
+               "review": run_review, "sample": run_sample, "biblio": run_biblio,
+               "status": run_status}
     try:
         return runners[args.command](args, session)
+    except LabelError as exc:
+        print(f"[오류] {exc}" if exc.exit_code != 3 else str(exc), file=sys.stderr)
+        return exc.exit_code
     except kc.CallBudgetExceeded as exc:
         print(f"[중단] 예산 초과: {exc}", file=sys.stderr)
         return 4
