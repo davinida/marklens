@@ -852,6 +852,50 @@ def normalize_advanced_item(item: dict) -> dict:
     }
 
 
+# 번호 검색(다빈-1 정답 데이터 보강, backend/scripts/trials_enrich.py): 등록번호·출원번호·국제등록
+# 번호로 1건을 찾는다. 공식 파라미터명(KIPRIS Plus 상표 항목별검색) registerNumber /
+# applicationNumber / internationalRegisterNumber — env 로 바꿀 수 있게 둔다. 2026-10-08 실측:
+# registerNumber 는 kipris_metadata.json 과 같은 13자리(하이픈 없음), internationalRegisterNumber 는
+# 숫자만으로 각각 첫 1건에 결과가 왔다(applicationNumber 는 대상이 없어 미실측). trials_enrich
+# lookup 이 종류별 첫 1건으로 파라미터명·형식을 검증(실패 시 하이픈 형식 재시도)한 뒤 진행한다.
+REGISTER_NUMBER_PARAM: str = os.getenv("KIPRIS_REGISTER_NUMBER_PARAM", "registerNumber")
+APPLICATION_NUMBER_PARAM: str = os.getenv("KIPRIS_APPLICATION_NUMBER_PARAM", "applicationNumber")
+INTL_REGISTER_NUMBER_PARAM: str = os.getenv(
+    "KIPRIS_INTL_REGISTER_NUMBER_PARAM", "internationalRegisterNumber"
+)
+NUMBER_PARAMS: dict[str, str] = {
+    "registration": REGISTER_NUMBER_PARAM,
+    "application": APPLICATION_NUMBER_PARAM,
+    "international": INTL_REGISTER_NUMBER_PARAM,
+}
+# 번호 검색은 소멸·취소된 선등록상표도 찾아야 하므로 30개 플래그를 전부 true 로 보낸다.
+ALL_ADVANCED_TRUE_FLAGS: frozenset[str] = frozenset(ADVANCED_ALL_FLAGS)
+
+
+def advanced_search_by_number_raw(
+    number: str,
+    kind: str = "registration",
+    true_flags: "frozenset[str] | set[str]" = ALL_ADVANCED_TRUE_FLAGS,
+    num_of_rows: int = 20,
+    request_timeout: float | None = None,
+) -> str:
+    """항목별검색(getAdvancedSearch)을 번호 하나로 호출해 응답 원본 XML 을 돌려준다(다빈-1 보강).
+
+    kind: registration(등록번호) | application(출원번호) | international(국제등록번호).
+    호출 1회가 리미터(월·일 예산)를 1회 소비한다 — 호출자가 하드캡을 따로 둔다.
+    """
+    if kind not in NUMBER_PARAMS:
+        raise ValueError(f"unknown number kind: {kind}")
+    _require_config(ADVANCED_SEARCH_URL, "KIPRIS_APPLICANT_SEARCH_URL")
+    params = {
+        NUMBER_PARAMS[kind]: number,
+        **build_advanced_flags(true_flags),
+        "pageNo": "1",
+        "numOfRows": str(max(1, min(num_of_rows, ADVANCED_MAX_ROWS))),
+    }
+    return _get(ADVANCED_SEARCH_URL, params, auth_param="ServiceKey", timeout=request_timeout)
+
+
 def advanced_search(
     applicant: str,
     true_flags: "frozenset[str] | set[str]" = DEFAULT_ADVANCED_TRUE_FLAGS,
