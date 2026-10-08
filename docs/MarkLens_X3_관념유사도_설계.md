@@ -1,6 +1,6 @@
 # MarkLens X3 관념 유사도 설계
 
-- 기준일: 2026-09-30 (v1.1) · 구현: `ml/src/axes/x3_semantic.py` · 정규화 공유: `ml/src/axes/x1_phonetic.py` `normalize_name`(X1 v1.5) · 테스트: `ml/tests/test_x3_semantic.py`(A 불변식·B 게이트·C 벤치마크(실제 모델)·D 정규화/재보정) · 벤치마크·성능: `ml/scripts/x3_benchmark.py`
+- 기준일: 2026-09-30 (v1.1; 심결례 벤치마크 §7-1 2026-10-08) · 구현: `ml/src/axes/x3_semantic.py` · 정규화 공유: `ml/src/axes/x1_phonetic.py` `normalize_name`(X1 v1.5) · 테스트: `ml/tests/test_x3_semantic.py`(A 불변식·B 게이트·C 벤치마크(실제 모델)·D 정규화/재보정) · 벤치마크·성능: `ml/scripts/x3_benchmark.py`
 - 규약(공통-2): `semantic_similarity(a, b, *, extra_generic=frozenset()) -> float` 0.0~1.0(높을수록 관념 유사), 순수 함수·대칭·결정적, 어떤 문자열에도 예외 없음. `has_meaning(name) -> bool` 은 X1 `has_pronunciation` 과 같은 결측 판정이다.
 - 의존성: `sentence-transformers` 6.1.0(transformers·scikit-learn·scipy 동반), `wordfreq` 3.1.1(MIT, 한국어는 표제어 직접 조회라 MeCab 불필요). 모델은 `MARKLENS_X3_MODEL` 로 교체, CI 는 `MARKLENS_FAKE_ML=1` 가짜 임베더.
 
@@ -100,6 +100,15 @@ semantic_similarity("카페 봄", "봄", extra_generic=frozenset({"카페"}))  #
   | 바다 | 바다 VADA 0.916 · Air Seoul 0.601 · 금호 0.591 · EV9 Water 0.515 | EV9 Water 하한 제외 | 바다 VADA 0.916(2건) · Air Seoul 0.601 · 금호 0.591 |
 
 - 남은 한계: 게이트를 통과한 짧은 이름끼리는 MiniLM 코사인이 여전히 높아 왕 → 너구리 0.656·마비노기 0.654 같은 무관 후보가 남고, 바다 → Air Seoul 0.601 처럼 연상 수준의 후보가 하한을 넘는다. 하한·모델 교체는 정답 데이터로 결정한다.
+
+### 7-1. 심결례 벤치마크 (2026-10-08, `ml/scripts/axes_benchmark.py`, 통합 모델 설계 §4-1)
+
+LLM 라벨이 일치한 심결례 350쌍(이름 B = kipris 137·본문 128·OCR 55)에서 `semantic_similarity`(실제 MiniLM)가 **표장 라벨**을 가르는 정도. 코드·게이트 변경 없음.
+
+- 게이트: 양쪽 `has_meaning` 인 쌍은 313쌍 중 **78**(25%)뿐 — 상표명 대부분이 조어·고유명사다. 게이트가 꺼진 235쌍은 0.0 이 된다.
+- ROC AUC(95% CI): (a) 전체(0.0 포함) 0.50 (0.45~0.55, n 290) · (b) 판단축에 관념 포함 0.53 (0.46~0.59, n 176) · (c) 게이트 켜짐 0.51 (0.38~0.65, n 75: 유사 51·비유사 24). 종류별 무효 0.62 (n 27), 나머지 0.46~0.50. 출처별 kipris 0.53·본문 0.46·OCR 0.52. 정밀도 0.9 임계값 없음(지지 10 이상 최대 정밀도 0.79 @ ≥ 0.752, n 29, 재현율 0.12).
+- **게이트 효과**: 게이트를 끈 `x3_raw`(정규화 텍스트 임베딩 코사인의 c₀ 재보정)는 게이트 꺼진 211쌍에서 AUC 0.59 (0.51~0.67, 유사 중앙값 0.61·비유사 0.48)로 켜진 75쌍의 0.51 보다 높다. 조어 쌍에서 MiniLM 코사인이 철자 겹침(서브워드)을 따라가는 것으로 보이며, 이는 관념이 아니라 X2 철자와 겹치는 신호다(x3↔x2_text ρ 0.33). 게이트를 완화할지는 결정 대기(통합 모델 설계 §6) — 관념 축의 정의(§1)상 조어에 관념 점수를 주는 것은 법리와 어긋나므로, 현재 권고는 게이트 유지 + 조어 쌍은 X2 철자가 맡는 것이다.
+- 결론: 관념 축이 실제로 작동하는 쌍이 75개라 학습에서 X3 는 결측 지시변수와 함께 넣고, 계수 해석은 표본 확대 후로 미룬다.
 
 ## 8. 변경 이력
 

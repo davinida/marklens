@@ -1,6 +1,6 @@
 # MarkLens X1 호칭(발음) 유사도 설계
 
-- 기준일: 2026-09-17 (v1 초판 → v1.1 검토 반영 → v1.2 마무리) · 구현: `ml/src/axes/x1_phonetic.py`, `ml/src/axes/korean_brands.py` · 테스트: `ml/tests/test_axes.py` · 보고: `ml/scripts/x1_report.py` · 로마자 후보 캐기: `ml/scripts/x1_mine_romanization.py`
+- 기준일: 2026-09-17 (v1 초판 → v1.1 검토 반영 → v1.2 마무리; 심결례 벤치마크 §8-1 2026-10-08) · 구현: `ml/src/axes/x1_phonetic.py`, `ml/src/axes/korean_brands.py` · 테스트: `ml/tests/test_axes.py` · 보고: `ml/scripts/x1_report.py` · 로마자 후보 캐기: `ml/scripts/x1_mine_romanization.py`
 - 규약(공통-2): `phonetic_similarity(name_a, name_b, *, extra_generic=frozenset()) -> float` 0.0~1.0(높을수록 유사), 순수 함수, 표준 라이브러리만 사용. 외부 G2P 라이브러리는 검증 후 **채택하지 않았다**(§7).
 
 ## 1. 판례 ↔ 구현 매핑
@@ -124,6 +124,15 @@
 - 성능: 데이터 상표명 1,000쌍 0.21초(cold, v1 0.51초 — 낱자 읽기 감소로 후보가 줄어 빨라짐). 내부 lru_cache 로 반복 호출은 더 빠르다.
 - 서비스 연결(2026-09-17, 최소 통합): `backend/src/core/phonetic_search.py` 가 기동 시 DB 상표명 중 `has_pronunciation` 인 것만 `pronunciation_candidates` 로 캐시하고, `POST /phonetic-search` 가 입력과 각 레코드의 `phonetic_similarity` 상위 후보를 돌려준다(하한 `MARKLENS_PHONETIC_MIN_SIMILARITY` 기본 0.5). 프런트는 상표명 확인 패널에 "발음(호칭)이 비슷한 등록상표" 섹션으로 표시한다. 공개 함수 세 개만 사용하며 검색 등급에는 미반영.
 - 통합 시 주의: 점수는 교정 전 원점수다. 로지스틱 회귀 학습 전 §2 상수와 §5 보류 항목은 정답 데이터(다빈-1)로 재검토한다.
+
+### 8-1. 심결례 벤치마크 (2026-10-08, `ml/scripts/axes_benchmark.py`, 통합 모델 설계 §4-1)
+
+LLM 라벨이 일치한 심결례 350쌍(이름 A = 이 사건 표장, 이름 B = 상대 표장: kipris 137·본문 128·OCR 55, 없음 30)에서 `phonetic_similarity` 가 **표장 라벨**(유사 218·비유사 109)을 가르는 정도. 코드·상수 변경 없음.
+
+- ROC AUC(95% CI): (a) 전체 0.54 (0.47~0.61, n 290) · (b) 판단축에 호칭 포함 0.54 (0.47~0.61, n 264) · (c) 양쪽 `has_pronunciation` 0.55 (n 286). 종류별: 무효 0.78 (n 27), 권리범위확인 소극 0.61 (n 66)·적극 0.52 (n 108), 거절결정불복 **0.38** (n 89). 이름 B 출처별: OCR 0.70 (n 54) > 본문 0.54 (n 121) > kipris 0.48 (n 115).
+- 정밀도 0.9 가 되는 임계값은 없다. x1 = 1.0 인 104쌍 중 비유사가 25 — GATE/GATE, DREAM/Hello Dream!, 28지킴이/지킴이, Purple Vie/Vie, GEN-S SERIES/S Series 처럼 **공통 부분이 식별력이 없어 요부가 못 된 사건**을 분리관찰(§1 추가 법리)이 1.0 으로 올린다. 이 오류는 `extra_generic`(식별력 필터, 다빈-3)으로만 걸러진다. 반대로 유사인데 0.3 이하인 32쌍은 권리범위확인(27)·본문 출처(22)에 몰리며 상당수가 상대 명칭 오추출('㈜영명', '왕의, 왕립의, 성대한')이고, 부산에어/에어부산 0.20 은 어순 뒤바뀜(§4 한계). 의심 명칭을 빼도 (a) 0.55 라 주원인은 식별력과 경계 사례 편중이다.
+- X2 문자 외관(철자, `x2_ortho.py`)과 스피어만 0.63 — 같은 정규화 토큰에서 출발하므로 통합 모델에서 공선성을 다룬다. 게이트 꺼짐은 4쌍(모두 유사, 0.0 고정).
+- 결론: 심판 사건은 호칭만으로 갈리지 않는 경계 사례라 단독 AUC 가 낮은 것 자체는 예상 범위지만, 식별력 처리 전에는 X1 의 1.0 을 "유사 확정" 신호로 쓸 수 없다. §5-1 보류 자모 4개는 이 데이터로 검증할 만큼 신호가 깨끗하지 않아 그대로 둔다.
 
 ## 9. 변경 이력
 

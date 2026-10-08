@@ -1,8 +1,8 @@
 # MarkLens X2 외관 — 현재 구현 요약과 심결 이미지 쌍 벤치마크 v0
 
 기준일 2026-10-08 · 상태: **v0 기준선 + v1 ① 표장 라벨 보정·요부 분리(§7) + v1 ② 전체 이미지 변형·OCR
-진단·게이팅(§8) 완료. 서비스 반영은 다음 PR** · 브랜치 `feat/x2-benchmark`(v0, PR #33 병합) →
-`feat/x2-v1`(v1 ①·②)
+진단·게이팅(§8) 완료 + 문자 외관(철자) 축 함수 `x2_ortho.py`(§9). 서비스 반영은 다음 PR** · 브랜치
+`feat/x2-benchmark`(v0, PR #33 병합) → `feat/x2-v1`(v1 ①·②, PR #34 병합) → `feat/axes-benchmark`(§9)
 
 X2(외관)는 1학기에 OpenCLIP 임베딩 + FAISS 코사인 검색으로 구현돼 현재 서비스(`POST /search`)에
 쓰이고 있지만, 그 점수가 심판원의 외관 판단과 얼마나 맞는지는 잰 적이 없었다. 이 문서는 (1) 현재
@@ -298,7 +298,17 @@ this 쪽을 OCR 대신 labels 의 상표A_명칭(참값)으로 바꾸고 상대 
 3. **게이팅 `x2_gate` 는 잠정 후보**((b) 0.70, CI 겹침). 사람 검증 라벨과 11월 표본(특히 도형)으로 재확인한
    뒤 서비스 반영 여부를 정한다 — 이번 PR 에서는 반영하지 않는다.
 
-## 9. 다음 단계(제안, 결정 대기)
+## 9. 문자 외관(철자) 축 함수 `ml/src/axes/x2_ortho.py` (2026-10-08, `feat/axes-benchmark`)
+
+§7 의 `x2_text_ortho`(OCR 글자 기준 실험 특징)를 공통 규약(문자열 2개 → 0~1, 순수 함수·대칭·결정적·예외 없음, 표준 라이브러리만)의 축 함수로 올렸다. 서비스 연결은 없고 통합 모델 입력(`pairs_features.csv` 의 `x2_text`)이다.
+
+- **판례 근거**: 표장 유사는 외관·호칭·관념의 전체적·객관적·이격적 관찰(대법원 97후3050 등). 문자상표의 외관은 글자의 구성·배열이 시각적으로 비슷한지의 문제이므로 발음(G2P)을 쓰지 않고 정규화한 철자를 비교한다. X1 과 재는 것이 다르다 — XSR/XSL 은 철자 0.667·호칭은 별개, 나이키/NIKE 는 호칭 0.91·철자 0.0, 스타벅스/STARBUCKS 0.0(한영 병기는 X1 이 잇는다).
+- **방법**: X1 `normalize_name`(NFKC·casefold·회사 형태·부가어·영문 기능어·`extra_generic` 제거, 한자·기호 버림) → 후보 = 토큰을 붙인 전체 문자열 + 토큰이 3개 이하면 2자 이상인 각 토큰(분리관찰, X1 `MAX_TOKENS_FOR_SPLIT` 과 같은 상한) → 한글은 X1 유틸로 초·중·종성 자모 분해 → 후보 쌍의 문자 단위 정규화 편집거리 유사도 1 − d/max 의 최댓값. 공개 API `orthographic_similarity(a, b, *, extra_generic=frozenset())`, `has_spelling(name)`(글자 토큰 없음 → 결측), `spelling_candidates(name)`(디버깅).
+- **회귀**: 토큰 후보가 전체 문자열을 넘지 못하는 입력(스타벅스/스타박스 0.889, XSR/XSL 0.667, 커피빈/커피 빈 1.0, UNDEFEATED/UNDFTD …)에서 §7 `x2_split.ortho_similarity` 와 같은 값. 토큰 후보는 점수를 올리기만 한다(닥치고 떡볶이/떡볶이 명가 → 1.0). 테스트 `ml/tests/test_x2_ortho.py` 함수 16개(매개변수 전개 109건): 자기 1.0·대칭·범위·예외 없음, 스타벅스/스타박스 ≥ 0.8, 나이키/NIKE·스타벅스/STARBUCKS ≤ 0.3, BLUE COFFEE/RED COFFEE 는 `extra_generic` {커피} 로 1.0 → ≤ 0.3, 기호·한자만은 결측.
+- **심결례 벤치마크(상표명 기준, 통합 모델 설계 §4-1)**: 표장 라벨 AUC (a) 전체 0.50 (0.44~0.57, n 290) · (b) 판단축에 외관 포함 **0.65** (0.52~0.77, n 119 — 유사 26·비유사 93) · (c) 0.51. 같은 쌍의 전체 이미지 CLIP(`x2_whole`)은 (b) 0.63 (0.53~0.73, n 131), 도형 크롭(`x2_fig`)은 (b) 0.49 (n 45). OCR 글자 기준 §7.4 의 0.72(n 130)보다 낮은 것은 상표명에 도형 안 글자가 빠지거나 회사명·병기가 붙는 쌍이 섞이기 때문이고, (b)의 라벨 쏠림(외관을 적은 쌍은 대부분 비유사)은 §7.1 과 같다. X1 과 스피어만 0.63(공선성), 전체 이미지와 0.25.
+- **한계**: 서체·색·배열은 보지 못한다. 공통 토큰이 있으면 분리관찰로 1.0 이 되므로(x2_text = 1.0 인 78쌍 중 비유사 20: GATE/GATE 등) 보통명칭·식별력 없는 부분은 `extra_generic` 으로 걸러야 한다(X1 과 같은 의존). 4토큰 이상 슬로건형은 전체 문자열만 비교한다.
+
+## 10. 다음 단계(제안, 결정 대기)
 
 1. 문자 외관은 철자 유사(`x2_text_ortho`)로, 도형 외관은 요부 크롭 CLIP(`x2_fig`)으로 가는 방향을
    유지하되, 도형 쪽은 **표본 확대 후** 판단한다(11월 대기열 621건, 특히 도형·결합-도형요부).
@@ -309,7 +319,7 @@ this 쪽을 OCR 대신 labels 의 상표A_명칭(참값)으로 바꾸고 상대 
 4. 서비스 반영 판단 — (b)·(c)에서 기준선을 유의하게 넘는 특징이 나오고 사람 검증 라벨로 재확인되기
    전에는 X2 전처리·점수를 바꾸지 않는다.
 
-## 10. 파일·명령
+## 11. 파일·명령
 
 ```bash
 # 프로젝트 루트에서. KIPRIS 호출 0. 데이터는 ml/data/trials/(비공개)
@@ -322,6 +332,9 @@ ml/venv/bin/python ml/scripts/x2_benchmark.py --features --pairs ml/data/trials/
 ml/venv/bin/python ml/scripts/x2_variants.py                         # v1 ②: 변형 5종·OCR 진단·게이팅 → x2_variants_v1.json (DINOv2 첫 실행 다운로드)
 ml/venv/bin/python ml/scripts/x2_variants.py --skip-dino             # CLIP 변형만
 MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_trials_extract_images.py ml/tests/test_x2_benchmark.py ml/tests/test_x2_split.py ml/tests/test_x2_variants.py   # 52건
+ml/venv/bin/python ml/scripts/pairs_features.py                      # §9·통합 모델 §4-1: 350쌍 4축 특징(실제 X3 모델) → pairs_features.csv
+ml/venv/bin/python ml/scripts/axes_benchmark.py                      # 축별 AUC·상관·임계값·게이트 효과 → axes_benchmark_v1.json, axes_hist_v1_<축>.png
+MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_ortho.py ml/tests/test_pairs_features.py ml/tests/test_axes_benchmark.py   # 119건
 ```
 
 - `ml/scripts/trials_extract_images.py` — 추출·연결·쌍·QA 시트·coverage(함수 `extract_document`,
@@ -340,11 +353,14 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_trials_extract_
   반복 로고 + 소형 아이콘 + 문자 구성 + 벡터 구성 + 영역 밖 이미지, 묶음 제목, 각주 제목, 조각난 라벨)로
   추출·연결·제외·렌더·쌍·QA 를 검사. `ml/tests/test_x2_benchmark.py`(9건) — 합성 점수 지표, 가짜 임베더
   파이프라인, 캐시 재사용·계약 불일치, 표장 라벨 평가, 순위 AUC. 네트워크·실데이터 없이 CI 에서 돈다.
+- `ml/src/axes/x2_ortho.py` — §9 문자 외관(철자) 축 함수(`orthographic_similarity`·`has_spelling`·
+  `spelling_candidates`), X1 정규화·자모 유틸 재사용. `ml/scripts/pairs_features.py` — 심결례 350쌍 4축 특징,
+  `ml/scripts/axes_benchmark.py` — 축별 벤치마크(x2_benchmark 의 AUC·CI·히스토그램 재사용).
 - 의존성: `easyocr==1.7.2`(+ `opencv-python-headless==4.11.0.86`, scikit-image), `timm==1.0.27`(DINOv2,
   open_clip 이 이미 끌어오던 패키지를 직접 의존성으로 고정), `ml/requirements.txt`·`constraints.txt`.
   실험 스크립트 전용이며 서비스 기동 경로에서는 import 하지 않는다.
 
-## 11. 변경 이력
+## 12. 변경 이력
 
 - 2026-10-08 v0 — 추출 스크립트·벤치마크·테스트·이 문서 신설. 커버리지 286/350, AUC 전체 0.51·외관축 0.62.
 - 2026-10-08 v1 ① — 소형 기준 32px(306쌍), 표장 라벨(유사 189·비유사 95·제외 22), 부트스트랩 CI,
@@ -353,3 +369,6 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_trials_extract_
 - 2026-10-08 v1 ② — `x2_variants.py`: 전체 이미지 변형 5종(흑백·윤곽선·다중 해상도·DINOv2·앙상블)
   모두 채택 없음(최대 (b) +0.026, CI 겹침). OCR 노이즈 진단: half 참값으로 바꿔도 (b) ±0.01 → 철자 신호의
   상한은 신호 자체. 유형 게이팅 `x2_gate` (b) 0.70(CI 겹침, 잠정 후보). 서비스 반영은 다음 PR(§8).
+- 2026-10-08 §9 — 문자 외관(철자) 축 함수 `ml/src/axes/x2_ortho.py` 신설(x2_split 구현과 회귀 일치, 토큰 후보
+  추가), 심결례 350쌍 4축 특징·축별 벤치마크(상표명 기준 철자 외관축 0.65, 전체 이미지 0.63). §9 삽입으로
+  다음 단계·파일·변경 이력이 §10~§12 로 밀렸다.
