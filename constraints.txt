@@ -11,6 +11,7 @@ wordfreq==3.1.1
 pymupdf==1.28.2
 easyocr==1.7.2
 opencv-python-headless==4.11.0.86
+timm==1.0.27
 
 fastapi==0.139.0
 pydantic-settings==2.15.0

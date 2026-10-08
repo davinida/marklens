@@ -13,7 +13,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 |---|---|
 | 마지막 갱신 | 2026-10-01 (`main` = `develop` = `7e56b0a`) |
 | 데이터 | KIPRIS 등록상표 1,100건, generation `20260827T035002Z-25f84a6eeb26` (2026-08-27) |
-| 테스트 | Python `878 passed, 26 skipped`(가짜 ML 모드, 2026-10-08 X2 벤치마크·요부 분리 44건 포함; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `77 passed`(19 파일) · Playwright 스펙 5개 × 뷰포트 3개 = 15 |
+| 테스트 | Python `886 passed, 26 skipped`(가짜 ML 모드, 2026-10-08 X2 벤치마크·요부 분리·변형 52건 포함; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `77 passed`(19 파일) · Playwright 스펙 5개 × 뷰포트 3개 = 15 |
 | CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — PR #28~#31(2026-10-01 develop `7e56b0a`) |
 
 ## 현재 범위
@@ -66,7 +66,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 프론트-7 관념 X3 | 다빈 | **완료(축 함수 v1.3 + 최소 연결)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`(219건), `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md`, `backend/src/core/semantic_search.py`, `backend/src/api/semantic_search.py`, `frontend/components/SemanticMatchesSection.tsx` | PR #25·#26(2026-09-30). MiniLM-L12-v2 + wordfreq 표제어 게이트(합성어 폴백, 영문 3자 이상, 1음절 명사 목록), 하한 0.55. `POST /semantic-search`(BFF `/api/semantic-search`)로 상표명 확인 패널에 연결, 관념 없는 입력은 안내 문구. 통합 모델 전 |
 | 프론트-8 상품 견련성 X4 | 다빈 | **완료(축 함수)** | `ml/src/axes/x4_goods.py`, `ml/src/axes/goods_map.py`(로더), `backend/src/api/goods.py`(상품 검색 API), `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21(PR #24). 서비스 적용은 DB 유사군 백필(현재 100/1,100건) 후 |
 | 프론트-9 통합 모델·재보정 | 다빈 | 설계 초안 | `docs/MarkLens_통합모델_설계.md` | 2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획·결정 대기). 구현·학습은 정답 데이터 라벨링 후 |
-| X2 외관 벤치마크(심결 이미지 쌍) | 다빈 | 부분(v0 기준선 + v1 ① 요부 분리) | `ml/scripts/trials_extract_images.py`, `ml/scripts/x2_benchmark.py`, `ml/scripts/x2_split.py`, `ml/tests/test_trials_extract_images.py`·`test_x2_benchmark.py`·`test_x2_split.py`(44건), `docs/MarkLens_X2_외관_설계.md` | 2026-10-08 v0: 심결문 PDF에서 양쪽 표장 이미지를 뽑아 제목에 연결(QA 시트 30쌍 눈 확인) → LLM 라벨이 붙은 이미지 쌍 286/350행(82%). 현재 CLIP 코사인의 ROC AUC 전체 0.51 · 판단축 외관 0.62 — 섞은 라벨 0.50. v1 ①(같은 날): 소형 기준 32px → 306쌍, 결론 대신 **표장 라벨**(유사 189·비유사 95·제외 22), 부트스트랩 95% CI, easyocr로 문자·도형 영역 분리(유형 일치 76%, OCR 완전 일치 51%). 철자 유사(`x2_text_ortho`) 외관축 AUC 0.72(0.57~0.86), 전체 이미지 0.63, 도형 크롭은 쌍 80·도형 29로 판단 보류, 사진 표장에서는 역전. 데이터는 `ml/data/trials/`(비공개) |
+| X2 외관 벤치마크(심결 이미지 쌍) | 다빈 | 부분(v0 기준선 + v1 ① 요부 분리) | `ml/scripts/trials_extract_images.py`, `ml/scripts/x2_benchmark.py`, `ml/scripts/x2_split.py`, `ml/scripts/x2_variants.py`, `ml/tests/test_trials_extract_images.py`·`test_x2_benchmark.py`·`test_x2_split.py`·`test_x2_variants.py`(52건), `docs/MarkLens_X2_외관_설계.md` | 2026-10-08 v0: 심결문 PDF에서 양쪽 표장 이미지를 뽑아 제목에 연결(QA 시트 30쌍 눈 확인) → LLM 라벨이 붙은 이미지 쌍 286/350행(82%). 현재 CLIP 코사인의 ROC AUC 전체 0.51 · 판단축 외관 0.62 — 섞은 라벨 0.50. v1 ①(같은 날): 소형 기준 32px → 306쌍, 결론 대신 **표장 라벨**(유사 189·비유사 95·제외 22), 부트스트랩 95% CI, easyocr로 문자·도형 영역 분리(유형 일치 76%, OCR 완전 일치 51%). 철자 유사(`x2_text_ortho`) 외관축 AUC 0.72(0.57~0.86), 전체 이미지 0.63, 도형 크롭은 쌍 80·도형 29로 판단 보류, 사진 표장에서는 역전. v1 ②(`x2_variants.py`): 전체 이미지 변형 5종(흑백·윤곽선·다중 해상도·DINOv2·앙상블) 모두 채택 없음(최대 외관축 +0.026, CI 겹침), OCR 노이즈 진단은 ±0.01(철자 신호 상한은 신호 자체), 유형 게이팅 `x2_gate` 외관축 0.70(잠정 후보). 서비스 반영은 다음 PR. 데이터는 `ml/data/trials/`(비공개) |
 | 백엔드-1 PostgreSQL 설계 | 현수 | 완료 | `backend/migrations/001_init.sql` | |
 | 백엔드-2 JSON→DB 마이그레이션 | 현수 | 완료 | `backend/scripts/migrate_json_to_db.py` | |
 | 백엔드-3 이미지 S3 | 현수 | 보류 | `backend/src/core/storage.py` | 로컬 심 계층 + 경로 오버라이드만 |
@@ -392,7 +392,7 @@ production compose의 gateway는 여기에 사용자별 검색 5회/분·명칭 
 | 축 | 내용 | 상태 |
 |---|---|---|
 | X1 호칭 | 두 상표명의 발음 유사도. 판례 5규칙(호칭 최우선, 첫음절 강세, 여러 호칭 중 최댓값, 외국어의 국내 발음, 한영 병기 시 한글 우선) | **완료** — 서비스 연결(`/phonetic-search`, 검색 등급에는 미반영) |
-| X2 외관 | OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색 | 완료 — 현재 서비스. 심결 이미지 쌍 벤치마크(2026-10-08): v0 286쌍 AUC 0.51·외관축 0.62, v1 ① 표장 라벨·요부 분리 — 철자 유사 외관축 0.72, 도형 크롭은 표본 부족 — [X2 외관 설계](docs/MarkLens_X2_외관_설계.md) |
+| X2 외관 | OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색 | 완료 — 현재 서비스. 심결 이미지 쌍 벤치마크(2026-10-08): v0 286쌍 AUC 0.51·외관축 0.62, v1 ① 표장 라벨·요부 분리 — 철자 유사 외관축 0.72, v1 ② 전체 이미지 변형 5종 채택 없음·유형 게이팅 0.70(잠정) — [X2 외관 설계](docs/MarkLens_X2_외관_설계.md) |
 | X3 관념 | 상표명 의미를 다국어 문장 임베딩(paraphrase-multilingual-MiniLM-L12-v2)의 코사인으로 비교(DB 200쌍 기준선으로 재보정). 관념 게이트(wordfreq 빈도표)로 조어·기호는 결측 | **완료** — 서비스 연결(`/semantic-search`, 검색 등급에는 미반영) |
 | X4 상품 견련성 | 유사군 코드 집합 간 자카드 계수 | **완료** — 라이브러리(서비스 적용은 DB 유사군 백필 후) |
 | 통합 | 4축 점수를 로지스틱 회귀로 결합해 출처 혼동 위험도(0~1)와 등급. 심결례 정답 데이터로 가중치 학습 | 설계 초안 — [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)(2026-10-01). 구현·학습은 라벨링 후 |
