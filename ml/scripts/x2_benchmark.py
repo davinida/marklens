@@ -55,8 +55,27 @@ SUBSETS = (
     ("c_도형", "상표유형 도형·결합-도형요부"),
     ("d_문자", "상표유형 문자"),
     ("e_신뢰high", "연결 신뢰도 high"),
+    ("f_사진", "확인대상표장이 사진으로 추정"),
 )
 FAILURES_KEY = "__failures__"
+BOOTSTRAP_ROUNDS = 1000
+MARK_AXES = ("외관", "호칭", "관념")
+# v1 쌍 특징(ml/scripts/x2_split.py 가 image_pairs_v1.csv 에 붙인다)
+FEATURES = ("x2_whole", "x2_fig", "x2_text_ortho", "x2_rule_auto", "x2_rule_llm")
+
+
+def mark_label(row: dict) -> str:
+    """표장 라벨(v1). 유사 = 라벨 유사 또는 메모에 '표장 유사'(상품 비유사로 끝난 건).
+    비유사 = 라벨 비유사이고 판단축에 외관·호칭·관념 중 하나 이상.
+    그 외(판단축 '상품'만·미상)는 "" — 벤치마크에서 뺀다."""
+    label = row.get("라벨", "")
+    memo = row.get("메모", "") or ""
+    axes = row.get("판단축", "") or ""
+    if label == "유사" or "표장 유사" in memo:
+        return "유사"
+    if label == "비유사" and any(axis in axes for axis in MARK_AXES):
+        return "비유사"
+    return ""
 
 
 def load_pairs(path: Path) -> list[dict]:
@@ -64,7 +83,18 @@ def load_pairs(path: Path) -> list[dict]:
         rows = list(csv.DictReader(handle))
     for row in rows:
         row["_label"] = 1 if row["라벨"] == "유사" else 0
+        mark = mark_label(row)
+        row["_mark"] = None if not mark else (1 if mark == "유사" else 0)
     return rows
+
+
+def feature_scores(pairs: list[dict], column: str) -> np.ndarray:
+    """쌍 파일의 특징 열(빈 값은 NaN)."""
+    values = []
+    for pair in pairs:
+        raw = pair.get(column)
+        values.append(float(raw) if raw not in (None, "") else np.nan)
+    return np.asarray(values, dtype=np.float32)
 
 
 def file_sha256(path: Path) -> str:
@@ -144,15 +174,36 @@ def pair_scores(pairs: list[dict], embeddings: dict, base: Path) -> np.ndarray:
 
 
 def roc_auc(scores: np.ndarray, labels: np.ndarray) -> float | None:
-    """Mann-Whitney 순위 AUC(동점은 0.5). 한쪽 클래스가 비면 None."""
+    """Mann-Whitney 순위 AUC(동점은 평균 순위 = 0.5). 한쪽 클래스가 비면 None."""
+    from scipy.stats import rankdata
+
     scores = np.asarray(scores, dtype=np.float64)
     labels = np.asarray(labels, dtype=np.int64)
-    positive, negative = scores[labels == 1], scores[labels == 0]
-    if positive.size == 0 or negative.size == 0:
+    n_pos, n_neg = int((labels == 1).sum()), int((labels == 0).sum())
+    if n_pos == 0 or n_neg == 0:
         return None
-    greater = (positive[:, None] > negative[None, :]).sum()
-    equal = (positive[:, None] == negative[None, :]).sum()
-    return float((greater + 0.5 * equal) / (positive.size * negative.size))
+    ranks = rankdata(scores, method="average")
+    rank_sum = float(ranks[labels == 1].sum())
+    return float((rank_sum - n_pos * (n_pos + 1) / 2) / (n_pos * n_neg))
+
+
+def bootstrap_auc(scores: np.ndarray, labels: np.ndarray, *, rounds: int = BOOTSTRAP_ROUNDS,
+                  seed: int = 0) -> tuple[float | None, float | None]:
+    """쌍을 복원추출해 AUC 의 2.5·97.5 백분위(95% CI). 한쪽 클래스가 비면 (None, None)."""
+    scores = np.asarray(scores, dtype=np.float64)
+    labels = np.asarray(labels, dtype=np.int64)
+    if rounds <= 0 or roc_auc(scores, labels) is None:
+        return None, None
+    rng = np.random.default_rng(seed)
+    values = []
+    for _ in range(rounds):
+        index = rng.integers(0, scores.size, scores.size)
+        auc = roc_auc(scores[index], labels[index])
+        if auc is not None:
+            values.append(auc)
+    if not values:
+        return None, None
+    return _round(np.percentile(values, 2.5)), _round(np.percentile(values, 97.5))
 
 
 def best_threshold(scores: np.ndarray, labels: np.ndarray) -> tuple[float | None, float | None]:
@@ -223,27 +274,59 @@ def subset_mask(pairs: list[dict], key: str) -> np.ndarray:
         return np.array([(p.get("상표유형") or "") == "문자" for p in pairs], dtype=bool)
     if key == "e_신뢰high":
         return np.array([p.get("연결신뢰도") == "high" for p in pairs], dtype=bool)
+    if key == "f_사진":
+        return np.array([
+            (p.get("상대role") or "").startswith("target")
+            and str(p.get("상대_사진추정") or "") == "1"
+            for p in pairs
+        ], dtype=bool)
     raise ValueError(key)
 
 
-def evaluate(pairs: list[dict], scores: np.ndarray, *, seed: int = 0,
-             shuffles: int = 200) -> dict:
-    labels = np.array([p["_label"] for p in pairs], dtype=np.int64)
-    valid = ~np.isnan(scores)
+def evaluate(pairs: list[dict], scores: np.ndarray, *, labels: np.ndarray | None = None,
+             seed: int = 0, shuffles: int = 200, bootstrap: int = BOOTSTRAP_ROUNDS) -> dict:
+    """부분집합마다 AUC(95% 부트스트랩 CI)·섞은 라벨 기준선·분포·임계값·분리도.
+    labels 는 1/0, 제외 행은 -1."""
+    if labels is None:
+        labels = np.array([p["_label"] for p in pairs], dtype=np.int64)
+    labels = np.asarray(labels, dtype=np.int64)
+    valid = ~np.isnan(scores) & (labels >= 0)
     result: dict = {}
     for key, title in SUBSETS:
         mask = subset_mask(pairs, key) & valid
         sub_scores, sub_labels = scores[mask], labels[mask]
         similar, dissimilar = sub_scores[sub_labels == 1], sub_scores[sub_labels == 0]
         threshold, accuracy = best_threshold(sub_scores, sub_labels)
+        low, high = bootstrap_auc(sub_scores, sub_labels, rounds=bootstrap, seed=seed)
         result[key] = {
             "설명": title, "n": int(mask.sum()), "n_유사": int(similar.size),
             "n_비유사": int(dissimilar.size), "auc": _round(roc_auc(sub_scores, sub_labels)),
+            "auc_ci95": [low, high],
             "auc_섞은라벨": shuffled_auc(sub_scores, sub_labels, seed=seed, rounds=shuffles),
             "임계값": _round(threshold), "정확도": _round(accuracy),
             "유사_분포": distribution(similar), "비유사_분포": distribution(dissimilar),
             "분리도_Q1유사-Q3비유사": separation(similar, dissimilar),
         }
+    return result
+
+
+def evaluate_features(pairs: list[dict], columns: list[str], *, seed: int = 0,
+                      shuffles: int = 200, bootstrap: int = BOOTSTRAP_ROUNDS) -> dict:
+    """특징 열마다 표장 라벨(v1, 제외 행 빼고)과 v0 라벨로 평가한다."""
+    mark = np.array([-1 if p.get("_mark") is None else p["_mark"] for p in pairs], dtype=np.int64)
+    v0 = np.array([p["_label"] for p in pairs], dtype=np.int64)
+    result = {
+        "표장라벨_제외": int((mark < 0).sum()), "표장라벨_유사": int((mark == 1).sum()),
+        "표장라벨_비유사": int((mark == 0).sum()), "표장라벨": {}, "v0라벨": {},
+    }
+    for column in columns:
+        scores = feature_scores(pairs, column)
+        result["표장라벨"][column] = evaluate(
+            pairs, scores, labels=mark, seed=seed, shuffles=shuffles, bootstrap=bootstrap
+        )
+        result["v0라벨"][column] = evaluate(
+            pairs, scores, labels=v0, seed=seed, shuffles=shuffles, bootstrap=bootstrap
+        )
     return result
 
 
@@ -253,7 +336,7 @@ def _round(value: float | None) -> float | None:
 
 def markdown_table(results: dict) -> str:
     lines = [
-        "| 부분집합 | n (유사/비유사) | AUC | 섞은 AUC | 임계값 | 정확도 | 유사 중앙값 "
+        "| 부분집합 | n (유사/비유사) | AUC (95% CI) | 섞은 AUC | 임계값 | 정확도 | 유사 중앙값 "
         "| 비유사 중앙값 | 분리도 |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
@@ -261,13 +344,45 @@ def markdown_table(results: dict) -> str:
         shuffled = item["auc_섞은라벨"].get("mean")
         counts = f"{item['n']} ({item['n_유사']}/{item['n_비유사']})"
         lines.append(
-            f"| {item['설명']} | {counts} | {_fmt(item['auc'])} | {_fmt(shuffled)} | "
+            f"| {item['설명']} | {counts} | {_auc_ci(item)} | {_fmt(shuffled)} | "
             f"{_fmt(item['임계값'])} | {_fmt(item['정확도'])} | "
             f"{_fmt(item['유사_분포'].get('median'))} | "
             f"{_fmt(item['비유사_분포'].get('median'))} | "
             f"{_fmt(item['분리도_Q1유사-Q3비유사'])} |"
         )
     return "\n".join(lines)
+
+
+def feature_table(result: dict) -> str:
+    """evaluate_features 결과 → 라벨 기준마다 부분집합 × 특징 AUC(95% CI) 표."""
+    blocks = []
+    for scheme in ("표장라벨", "v0라벨"):
+        columns = list(result[scheme])
+        if not columns:
+            continue
+        head = "| 부분집합 (n 유사/비유사) | " + " | ".join(columns) + " |"
+        lines = [f"### {scheme}", head, "|---|" + "---|" * len(columns)]
+        first = result[scheme][columns[0]]
+        for key, _title in SUBSETS:
+            if key not in first:
+                continue
+            cells = []
+            for column in columns:
+                item = result[scheme][column][key]
+                cells.append(f"{_auc_ci(item)} n{item['n']}")
+            counts = f"{first[key]['설명']} ({first[key]['n_유사']}/{first[key]['n_비유사']})"
+            lines.append(f"| {counts} | " + " | ".join(cells) + " |")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
+
+
+def _auc_ci(item: dict) -> str:
+    low, high = item.get("auc_ci95", [None, None])
+    if item.get("auc") is None:
+        return "-"
+    if low is None or high is None:
+        return _fmt(item["auc"])
+    return f"{item['auc']:.3f} ({low:.2f}~{high:.2f})"
 
 
 def _fmt(value) -> str:
@@ -335,14 +450,15 @@ def histogram_png(similar: np.ndarray, dissimilar: np.ndarray, path: Path, *, bi
 
 
 def run(pairs_path: Path, *, cache_path: Path, out_path: Path, hist_path: Path | None,
-        seed: int = 0, shuffles: int = 200, encode=encode_image) -> dict:
+        seed: int = 0, shuffles: int = 200, bootstrap: int = BOOTSTRAP_ROUNDS,
+        encode=encode_image) -> dict:
     pairs = load_pairs(pairs_path)
     base = Path(pairs_path).parent
     paths = sorted({base / p[key] for p in pairs for key in ("이미지A", "이미지B")})
     embeddings = embed_paths(paths, cache_path, encode=encode)
     failures = embeddings.pop(FAILURES_KEY)
     scores = pair_scores(pairs, embeddings, base)
-    results = evaluate(pairs, scores, seed=seed, shuffles=shuffles)
+    results = evaluate(pairs, scores, seed=seed, shuffles=shuffles, bootstrap=bootstrap)
     labels = np.array([p["_label"] for p in pairs])
     valid = ~np.isnan(scores)
     report = {
@@ -372,10 +488,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-hist", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--shuffles", type=int, default=200)
+    parser.add_argument("--bootstrap", type=int, default=BOOTSTRAP_ROUNDS,
+                        help="AUC 95%% CI 부트스트랩 횟수(0이면 생략)")
+    parser.add_argument("--features", action="store_true",
+                        help="--pairs(image_pairs_v1.csv)의 특징 열만 평가(표장·v0 라벨)")
     args = parser.parse_args(argv)
+    if args.features:
+        pairs = load_pairs(args.pairs)
+        columns = [column for column in FEATURES if column in (pairs[0] if pairs else {})]
+        report = evaluate_features(pairs, columns, seed=args.seed, shuffles=args.shuffles,
+                                   bootstrap=args.bootstrap)
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(feature_table(report))
+        print(f"JSON: {args.out}")
+        return 0
     hist = None if args.no_hist else args.hist
     report = run(args.pairs, cache_path=args.cache, out_path=args.out, hist_path=hist,
-                 seed=args.seed, shuffles=args.shuffles)
+                 seed=args.seed, shuffles=args.shuffles, bootstrap=args.bootstrap)
     failed = len(report["임베딩_실패"])
     print(f"쌍 {report['쌍']} · 점수 {report['점수_있는_쌍']} · 임베딩 실패 {failed}")
     print(markdown_table(report["부분집합"]))

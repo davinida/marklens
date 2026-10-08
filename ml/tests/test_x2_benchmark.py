@@ -154,3 +154,32 @@ def test_embed_paths_records_failures(tmp_path):
     bad.write_bytes(b"not an image")
     result = x2b.embed_paths([bad], tmp_path / "cache.npz")
     assert str(bad) in result[x2b.FAILURES_KEY] and str(bad) not in result
+
+
+def test_evaluate_features_uses_mark_label_and_reports_exclusions(pairs_csv):
+    pairs = x2b.load_pairs(pairs_csv)
+    for pair, whole, fig in zip(pairs, (0.9, 0.8, 0.3, 0.2), ("0.95", "", "0.4", "0.1")):
+        pair["x2_whole"] = f"{whole:.4f}"
+        pair["x2_fig"] = fig
+    pairs[3]["판단축"] = "상품"  # 비유사인데 상품 축뿐 → 표장 라벨 제외
+    pairs[3]["_mark"] = None
+    result = x2b.evaluate_features(pairs, ["x2_whole", "x2_fig"], shuffles=5, bootstrap=20)
+    assert result["표장라벨_제외"] == 1 and result["표장라벨_유사"] == 2
+    assert result["표장라벨_비유사"] == 1
+    whole = result["표장라벨"]["x2_whole"]["a_전체"]
+    assert whole["n"] == 3 and whole["auc"] == 1.0 and whole["auc_ci95"] == [1.0, 1.0]
+    assert result["v0라벨"]["x2_whole"]["a_전체"]["n"] == 4
+    assert result["표장라벨"]["x2_fig"]["a_전체"]["n"] == 2  # 결측 1 + 제외 1
+    table = x2b.feature_table(result)
+    assert "### 표장라벨" in table and "x2_fig" in table and "### v0라벨" in table
+
+
+def test_rank_auc_matches_pairwise_definition():
+    rng = np.random.default_rng(1)
+    scores = np.round(rng.random(40), 1)  # 동점이 생기도록
+    labels = rng.integers(0, 2, 40)
+    positive, negative = scores[labels == 1], scores[labels == 0]
+    greater = (positive[:, None] > negative[None, :]).sum()
+    equal = (positive[:, None] == negative[None, :]).sum()
+    pairwise = (greater + 0.5 * equal) / (positive.size * negative.size)
+    assert x2b.roc_auc(scores, labels) == pytest.approx(float(pairwise))

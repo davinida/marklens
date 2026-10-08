@@ -16,3 +16,9 @@ sentence-transformers>=6.1.0,<7.0.0
 wordfreq>=3.1.1,<4.0.0
 # 심결문 PDF 텍스트 추출 (다빈-1 심결례 수집, backend/scripts/trials_collect.py extract)
 pymupdf>=1.26.0,<2.0.0
+# X2 v1 요부 분리 — 표장 이미지의 문자 영역 검출(CRAFT)·인식(ko·en), CPU. 모델은 첫 실행 때 내려받는다
+# (ml/scripts/x2_split.py 실험 전용, 서비스 미사용). opencv-python-headless·scikit-image 를 함께 설치한다
+easyocr>=1.7.2,<2.0.0
+# X2 v1 ② 변형 실험 — DINOv2 ViT-S/14(vit_small_patch14_dinov2.lvd142m, 첫 실행 때 HF 허브에서 내려받음).
+# open_clip_torch 가 이미 끌어오는 패키지를 직접 의존성으로 고정(ml/scripts/x2_variants.py 전용, 서비스 미사용)
+timm>=1.0.27,<2.0.0

@@ -3,7 +3,7 @@
 실행 (프로젝트 루트에서):
     ml/venv/bin/python ml/scripts/trials_extract_images.py            # 추출 → 색인 → 쌍 → QA 시트
     ml/venv/bin/python ml/scripts/trials_extract_images.py --numbers 2014100002294 --no-qa
-    ml/venv/bin/python ml/scripts/trials_extract_images.py --min-size 20   # 소형 기준 완화 실험
+    ml/venv/bin/python ml/scripts/trials_extract_images.py --min-size 40   # v0 기준(40px)
 
 대상: labels.csv 에서 pass a(유사여부_확정)와 pass b(llm_b_유사여부)가 일치하고 둘 다 유사·비유사인
 행의 심판번호(제외·불일치 행은 뺀다).
@@ -18,7 +18,8 @@
      "나. 원결정 이유 및 선등록상표(들)" 은 묶음 제목이라 잠정 블록으로 두고 하위 "(2) 선등록상표 1"
      이 나오면 그것으로 바꾼다. 각 이미지는 읽기 순서상 직전 표장 제목에 연결한다.
   4. 제외: 같은 xref 가 전체 쪽의 절반 넘게 반복(머리말 로고·도장. 표장 이미지도 판단 절에서 2~4쪽
-     재사용되므로 '여러 쪽'을 절반 초과로 잡는다), 폭 또는 높이가 --min-size(기본 40)px 미만(소형).
+     재사용되므로 '여러 쪽'을 절반 초과로 잡는다), 폭 또는 높이가 --min-size(기본 32, v0 는 40)px
+     미만(소형).
      한 표장에 이미지가 여럿이면 픽셀 면적이 가장 큰 것.
   5. 래스터 이미지가 없고 "(2) 구성:" 줄 아래에 벡터 그림(get_drawings)이 있으면 그 영역을 2배로
      clip 렌더해 저장하고 rendered=1. "구성:" 뒤에 글자만 있으면 "이미지 없음(문자)"(합성하지 않음).
@@ -61,7 +62,7 @@ from backend.scripts.trials_collect import (  # noqa: E402
 )
 
 DEFAULT_BASE = ML_ROOT / "data" / "trials"
-MIN_SIZE = 40
+MIN_SIZE = 32  # v1(2026-10-08). v0 는 40. CLIP 전처리 최소 입력(preprocess.MIN_SIZE)과 같다
 QA_ROWS = 30
 ROLE_THIS = "this"
 ROLE_TARGET = "target"
@@ -78,7 +79,8 @@ INDEX_COLUMNS = [
 ]
 PAIR_COLUMNS = [
     "심판번호", "종류", "상대번호", "라벨", "판단축", "상표유형", "상표유형_출처", "이미지A",
-    "이미지B", "연결신뢰도", "rendered", "상대role", "매칭",
+    "이미지B", "연결신뢰도", "rendered", "상대role", "매칭", "메모", "this_사진추정",
+    "상대_사진추정",
 ]
 
 # 제목 줄: "(2)" / "(나)" / "가." / "1." 번호 뒤의 본문
@@ -616,7 +618,9 @@ def build_pairs(label_rows: list[dict], index_rows: list[dict]) -> tuple[list[di
             "상표유형": mark_type,
             "상표유형_출처": source if mark_type else "", "이미지A": this["경로"],
             "이미지B": counterpart["경로"], "연결신뢰도": confidence, "rendered": rendered,
-            "상대role": counterpart["role"], "매칭": matched,
+            "상대role": counterpart["role"], "매칭": matched, "메모": row.get("메모", ""),
+            "this_사진추정": this.get("사진추정", ""),
+            "상대_사진추정": counterpart.get("사진추정", ""),
         })
     return pairs, dropped
 
