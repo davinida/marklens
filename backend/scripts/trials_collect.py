@@ -226,7 +226,13 @@ LEGACY_HUMAN_COLUMNS = {"판단축": "판단축_확정"}
 # 사람 확인(Y), 사람이 수정하기 전 LLM 판정(LLM↔사람 일치율용). pass b(이중 라벨링)는 llm_b_* 열.
 LABEL_META_COLUMNS = ("라벨출처", "근거문장", "확신도", "확인여부", "llm_판정_원본")
 LLM_B_COLUMNS = ("llm_b_유사여부", "llm_b_판단축", "llm_b_제외사유", "llm_b_확신도", "llm_b_근거")
-PRESERVED_COLUMNS = HUMAN_COLUMNS + LABEL_META_COLUMNS + LLM_B_COLUMNS
+# 보강 열(backend/scripts/trials_enrich.py): 상대 표장 번호 정규화·명칭(본문/OCR/KIPRIS)·양쪽
+# 지정상품 유사군·X4 자카드. sheet 재생성 때 사람 열과 같이 보존된다.
+ENRICH_COLUMNS = (
+    "상대표장_번호_정규화", "상대표장_명칭_본문", "상대표장_명칭_ocr", "상대표장_명칭_kipris",
+    "goods_codes_this", "goods_codes_prior", "x4_goods",
+)
+PRESERVED_COLUMNS = HUMAN_COLUMNS + LABEL_META_COLUMNS + LLM_B_COLUMNS + ENRICH_COLUMNS
 LABEL_COLUMNS = [
     "심판번호", "종류", "심판상태", "심결월", "상표A_번호", "상표A_명칭", "상표B_번호",
     "상대표장_번호_후보", "상대표장_유형", "지정상품_원문", "조문플래그", "결론조문", "신뢰도",

@@ -29,7 +29,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
 | 관념 X3 | 최소 연결 | `ml/src/axes/x3_semantic.py` 다국어 임베딩(paraphrase-multilingual-MiniLM-L12-v2) + 관념 게이트(wordfreq) + `POST /semantic-search`. 상표명 확인 패널에 "관념 유사 후보" 섹션(발음 섹션과 병렬 요청). 통합 점수에는 미반영 |
 | 통합 모델 | 설계 초안 | [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)(2026-10-01): 판례가 정한 구조, 로지스틱 회귀 입력, 검증 계획. 구현·학습은 정답 데이터 라벨링 후. UI의 지정상품 입력도 현재 숨김 |
-| 정답 데이터(심결례) 수집·라벨링 | 수집·LLM 이중 라벨링 | `backend/scripts/trials_collect.py`(2026-10-01 4단계 + 라벨 도구): 심판사항 API 목록 42,474건, PDF·텍스트 843건, 라벨 시트 1024행(자동 1등급 331건), 큐레이션 큐 355건(430행) LLM 이중 라벨링 완료(A↔B 일치 96%). 사람 검증 진행 중 — 아래 "정답 데이터" 소절 |
+| 정답 데이터(심결례) 수집·라벨링 | 수집·LLM 이중 라벨링 | `backend/scripts/trials_collect.py`(2026-10-01 4단계 + 라벨 도구): 심판사항 API 목록 42,474건, PDF·텍스트 843건, 라벨 시트 1024행(자동 1등급 331건), 큐레이션 큐 355건(430행) LLM 이중 라벨링 완료(A↔B 일치 96%). 보강(2026-10-08, `trials_enrich.py`): 상대 표장 상표명 320/350행(KIPRIS 번호 조회 138회)·지정상품 유사군 양쪽 187행·`x4_goods`. 사람 검증 진행 중 — 아래 "정답 데이터" 소절 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
 | 공개 클라우드 배포 | 템플릿만 제공 | 실제 도메인·TLS·계정 배포는 하지 않음 |
 
@@ -53,7 +53,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 항목 | 담당 | 상태 | 위치 | 비고 |
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X3·X4) | `ml/src/axes/` | |
-| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(수집·자동 선별·LLM 이중 라벨링 완료, 사람 검증 중) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/label/confirm/review/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(67건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치, PR #29): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 라벨 도구(PR #30·#31)로 큐 355건(430행) LLM 이중 라벨링 완료(호출 0): 유사 225·비유사 140·제외 65, LLM A↔B 일치율 96%(414/430), LLM↔정규식 추정 80%, 재검토 큐 130행. 사람 검증(표본 40 + 재검토) 진행 중 — 아래 "정답 데이터" 소절 |
+| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(수집·자동 선별·LLM 이중 라벨링 완료, 사람 검증 중) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/label/confirm/review/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(67건), `backend/scripts/trials_enrich.py`, `backend/tests/test_trials_enrich.py`(17건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치, PR #29): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 라벨 도구(PR #30·#31)로 큐 355건(430행) LLM 이중 라벨링 완료(호출 0): 유사 225·비유사 140·제외 65, LLM A↔B 일치율 96%(414/430), LLM↔정규식 추정 80%, 재검토 큐 130행. 사람 검증(표본 40 + 재검토) 진행 중. 보강(2026-10-08, `feat/trials-enrich`): A·B 일치 350행의 상대 표장 상표명 320행(91%, 출원속보 번호 조회 138회 — 성공 138·0건 0·오류 0)·지정상품 유사군 매핑 63%(양쪽 187행)·`x4_goods`(유사 평균 0.44 · 비유사 0.32) — 아래 "정답 데이터" 소절 |
 | 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21·#22. v1.5(2026-09-30, `normalize_name` 공개 — X3와 정규화 공유). 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | 미착수 | — | X1의 `extra_generic` 입력을 공급할 예정 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
@@ -95,7 +95,7 @@ Browser
 ```
 
 - `frontend/`: Next.js UI, 수동 크롭, Turnstile 검증, BFF(`app/api/*`)
-- `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인·발음 유사도·관념 유사도·상품 검색 API(`src/api/`), 기동 시 캐시(`src/core/phonetic_search.py`·`semantic_search.py`)와 변환표(`src/core/goods.py`), KIPRIS 수집 스크립트(`scripts/`), 심결례 수집 스크립트(`scripts/trials_collect.py`)
+- `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인·발음 유사도·관념 유사도·상품 검색 API(`src/api/`), 기동 시 캐시(`src/core/phonetic_search.py`·`semantic_search.py`)와 변환표(`src/core/goods.py`), KIPRIS 수집 스크립트(`scripts/`), 심결례 수집·보강 스크립트(`scripts/trials_collect.py`·`trials_enrich.py`)
 - `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구
 - `ml/src/axes/`: 다축 모델의 축 함수 — X1 호칭 유사도(`x1_phonetic.py`, 브랜드·지명 로마자표 `korean_brands.py`), X3 관념 유사도(`x3_semantic.py`), X4 상품 견련성(`x4_goods.py`), 변환표 로더(`goods_map.py`)
 - `ml/evaluation/`: 200-pair 라벨링 팩과 강건성 평가 계약
@@ -542,8 +542,23 @@ has_goods(set())                                                               #
   4건), LLM↔정규식 추정 80%(340/424). `review` 재검토 큐 130행(LLM≠추정 84·확신도 low 76·메모 애매 65·A≠B 16,
   중복 포함). 사람 검증(`sample --n 40 --seed 0` 표본 40건 + 재검토 큐) 진행 중 — `confirm`이나 사람 `label`로
   확정하면 `status`의 LLM↔사람 일치율이 채워집니다.
-- 다음 단계: 사람 검증 완료 → 남은 대기열 621건(11월 예산), 선등록 상표명·이미지
-  보강(출원속보 API 등록번호 검색, 건당 1~2회) → 통합 모델 학습.
+- 보강(2026-10-08, 브랜치 `feat/trials-enrich`, `backend/scripts/trials_enrich.py` targets/lookup/goods/status, 테스트 17건):
+  LLM A·B가 일치한 유사·비유사 350행(유사 210·비유사 140)의 상대 표장 상표명과 양쪽 지정상품 유사군을 채웠습니다.
+  상대 표장 유형은 선등록·선출원(번호 있음) 131·국제등록 7·확인대상표장(번호 없음) 204·선사용 1·기타 7. 번호 있는
+  138건(등록 131 + 국제등록 7)은 출원속보 `getAdvancedSearch`(`registerNumber` 13자리 "40+7자리+0000",
+  `internationalRegisterNumber`)로 `lookup --dry-run` 계획표(138회 ≤ 하드캡 400) 확인 뒤 138회 호출 — 성공 138·0건 0·
+  오류 0, 일일 예산은 이 실행에만 명령 앞 `KIPRIS_DAILY_BUDGET=400`(10월 출원속보 누계 148/950) → `prior_marks.csv`(상표명·
+  출원/등록번호·류·비엔나코드·출원인, 원본 XML `enrich_raw/`, 실행 집계 `enrich_calls.json`, 재실행은 조회된 번호를 건너뜀).
+  번호 없는 행은 기초사실 본문의 "확인대상표장 … 구성" 문장(128) → OCR(55). 상표명 확보 320/350행(91.4%: kipris 137·
+  본문 128·ocr 55, 없음 30). 지정상품은 기초사실의 지정상품/사용상품 줄(별지 참조 44행은 별지 절, 표장별 소제목이 있으면
+  해당 절)을 나눠 변환표에 대응 — 완전일치(공백·류 무시 포함) → `search` 상위 1건(정확·접두 단계만, 부분일치 제외): 고유
+  명칭 13,846건 중 8,753건(63.2%), 양쪽 유사군이 있는 행 187(이 사건만 112·상대만 30·없음 21·상대 블록 없음 23).
+  `x4_goods`(자카드)는 유사 107행 평균 0.44(중앙값 0.33)·비유사 80행 평균 0.32(중앙값 0.17). 못 찾은 명칭 상위:
+  레스토랑업 25·간이식당업 19·카페업 16·카페테리아업 12·음식조리대행업 10(고시 43류에 단독 명칭 없음), 국제등록의 영문
+  지정상품(namely 18·proteins 8). 새 열 `상대표장_번호_정규화`·`상대표장_명칭_본문`·`상대표장_명칭_ocr`·
+  `상대표장_명칭_kipris`·`goods_codes_this`·`goods_codes_prior`·`x4_goods`(`labels.csv`, `sheet` 재생성 때 보존).
+- 다음 단계: 사람 검증 완료 → 남은 대기열 621건(11월 예산) → 통합 모델 학습(X2는 벤치마크 이미지 쌍, X4는 `x4_goods`,
+  X1·X3는 확보한 상표명으로 계산).
 - 예산: KIPRIS 월 1,000회 한도를 출원속보 키와 분리해 `KIPRIS_TRIAL_ACCESS_KEY`·
   `KIPRIS_TRIAL_MONTHLY_BUDGET`(기본 950)·`KIPRIS_TRIAL_DAILY_BUDGET`(기본 300)으로 관리하고, 호출마다
   `ml/data/trials/calls.log`, 누계는 `quota.json`에 남깁니다. PDF 다운로드도 1회로 셉니다(가정,
