@@ -208,6 +208,18 @@ class TrialPaths:
         return self.base / "review_queue.csv"
 
     @property
+    def review_bundle_dir(self) -> Path:
+        return self.base / "review_bundle"
+
+    @property
+    def pairs_features_csv(self) -> Path:
+        return self.base / "pairs_features.csv"
+
+    @property
+    def name_review_ids(self) -> Path:
+        return self.base / "name_review_ids.txt"
+
+    @property
     def verify_queue(self) -> Path:
         return self.base / "verify_queue.csv"
 
@@ -2658,7 +2670,198 @@ def build_review_queue(label_rows: list[dict]) -> list[dict]:
     return queue
 
 
+# ---- review --bundle: 사람 검토 묶음 5개(CSV, 각 행에 show 명령·처리 열) ----
+
+BUNDLE_NAMES = ("verify_queue", "ab_disagree", "name_review", "distinct_drop", "weak_tokens_top200")
+BUNDLE_DONE = "처리"  # 사람이 채우는 열 — 재생성 때 보존, status 가 묶음별 처리 수를 센다
+SHOW_COMMAND = "ml/venv/bin/python -m backend.scripts.trials_collect show {number}"
+DISTINCT_DROP_DELTA = 0.1
+WEAK_TOKENS_TOP = 200
+WEAK_TOKENS_PATH = (
+    Path(__file__).resolve().parents[2] / "shared" / "distinctiveness" / "weak_tokens.json"
+)
+AB_DISAGREE_COLUMNS = [
+    "순번", "심판번호", "상표B_번호", "종류", "유사여부_확정", "llm_b_유사여부", "판단축_확정",
+    "llm_b_판단축", "확신도", "llm_b_확신도", "근거문장", "llm_b_근거",
+]
+NAME_REVIEW_COLUMNS = [
+    "순번", "심판번호", "상표B_번호", "종류", "상표A_명칭", "상대표장_명칭_llm",
+    "상대표장_명칭_본문", "상대표장_명칭_ocr", "상대표장_명칭_kipris", "메모", "사유",
+]
+DISTINCT_DROP_COLUMNS = [
+    "순번", "심판번호", "상대번호", "종류", "표장라벨", "최종라벨", "이름A", "이름B", "x1", "x1_d",
+    "x2_text", "x2_text_d", "떼어낸_토큰_A", "떼어낸_토큰_B",
+]
+WEAK_TOKENS_COLUMNS = ["순번", "토큰", "점수", "A", "N", "zipf", "사유"]
+
+
+def _show_command(number: str) -> str:
+    return SHOW_COMMAND.format(number=number) if number else ""
+
+
+def read_name_review_ids(path: Path) -> dict[str, str]:
+    """판정 보고에서 모은 명칭 검토 요청: 줄마다 `심판번호[탭|공백]사유`, # 주석. 없으면 {}."""
+    if not Path(path).exists():
+        return {}
+    ids: dict[str, str] = {}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(None, 1)
+        ids.setdefault(parts[0], parts[1].strip() if len(parts) > 1 else "")
+    return ids
+
+
+def bundle_ab_disagree(label_rows: list[dict]) -> list[dict]:
+    """pass a·b 판정이 둘 다 있고 다른 행."""
+    out = []
+    for row in label_rows:
+        a = (row.get("유사여부_확정") or "").strip()
+        b = (row.get("llm_b_유사여부") or "").strip()
+        if a and b and a != b:
+            out.append({"순번": len(out) + 1,
+                        **{c: row.get(c, "") for c in AB_DISAGREE_COLUMNS[1:]}})
+    return out
+
+
+def bundle_name_review(label_rows: list[dict], ids: dict[str, str]) -> list[dict]:
+    """판정자가 검토를 요청한 명칭 행(목록 파일). 목록이 없으면 메모에 "검토" 가 든 행."""
+    out = []
+    for row in label_rows:
+        number = row["심판번호"]
+        if ids:
+            if number not in ids:
+                continue
+            reason = ids[number]
+        else:
+            if "검토" not in (row.get("메모") or ""):
+                continue
+            reason = "메모에 검토"
+        out.append({"순번": len(out) + 1, **{c: row.get(c, "") for c in NAME_REVIEW_COLUMNS[1:-1]},
+                    "사유": reason})
+    return out
+
+
+def distinct_drop_rows(feature_rows: list[dict], delta: float = DISTINCT_DROP_DELTA) -> list[dict]:
+    """표장 라벨이 유사인데 식별력 v0 적용으로 x1_d < x1 − δ 또는 x2_text_d < x2_text − δ 인 쌍."""
+    out = []
+    for row in feature_rows:
+        if (row.get("표장라벨") or "") != "유사":
+            continue
+        dropped = False
+        for axis in ("x1", "x2_text"):
+            before, after = row.get(axis) or "", row.get(f"{axis}_d") or ""
+            if before and after and float(after) < float(before) - delta - 1e-9:
+                dropped = True
+        if not dropped:
+            continue
+        out.append({
+            "순번": len(out) + 1,
+            **{c: row.get(c, "") for c in DISTINCT_DROP_COLUMNS[1:-2]},
+            "떼어낸_토큰_A": row.get("weak_a", ""), "떼어낸_토큰_B": row.get("weak_b", ""),
+        })
+    return out
+
+
+def bundle_weak_tokens(path: Path, top: int = WEAK_TOKENS_TOP) -> list[dict]:
+    """shared/distinctiveness/weak_tokens.json 의 상위 top(등장 수 N 순)."""
+    if not Path(path).exists():
+        return []
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    tokens = sorted(data.get("tokens", []),
+                    key=lambda t: (-t.get("N", 0), -t.get("A", 0), t["token"]))
+    return [{"순번": i, "토큰": t["token"], "점수": t.get("score", ""), "A": t.get("A", ""),
+             "N": t.get("N", ""), "zipf": t.get("zipf", ""),
+             "사유": "; ".join(t.get("reasons", []))}
+            for i, t in enumerate(tokens[:top], start=1)]
+
+
+def _bundle_key(row: dict) -> str:
+    return "|".join(str(row.get(c, "")) for c in ("심판번호", "상표B_번호", "상대번호", "토큰"))
+
+
+def _preserve_done(path: Path, rows: list[dict]) -> int:
+    """기존 CSV 의 처리 열을 같은 키 행에 옮긴다. 옮긴 수를 돌려준다."""
+    if not path.exists():
+        return 0
+    previous = {_bundle_key(r): (r.get(BUNDLE_DONE) or "") for r in _read_csv(path)}
+    kept = 0
+    for row in rows:
+        value = previous.get(_bundle_key(row), "")
+        if value:
+            row[BUNDLE_DONE] = value
+            kept += 1
+    return kept
+
+
+def build_review_bundle(
+    paths_: TrialPaths, label_rows: list[dict], kinds: dict[str, dict], *,
+    feature_rows: list[dict], weak_path: Path, ids: dict[str, str], seed: int = 0, n: int = 40,
+) -> dict[str, tuple[list[str], list[dict]]]:
+    bundles = {
+        "verify_queue": (VERIFY_COLUMNS, select_verify_sample(label_rows, kinds, n, seed)),
+        "ab_disagree": (AB_DISAGREE_COLUMNS, bundle_ab_disagree(label_rows)),
+        "name_review": (NAME_REVIEW_COLUMNS, bundle_name_review(label_rows, ids)),
+        "distinct_drop": (DISTINCT_DROP_COLUMNS, distinct_drop_rows(feature_rows)),
+        "weak_tokens_top200": (WEAK_TOKENS_COLUMNS, bundle_weak_tokens(weak_path)),
+    }
+    out: dict[str, tuple[list[str], list[dict]]] = {}
+    for name, (columns, rows) in bundles.items():
+        for row in rows:
+            row["show"] = _show_command(row.get("심판번호", ""))
+            row.setdefault(BUNDLE_DONE, "")
+        out[name] = (columns + ["show", BUNDLE_DONE], rows)
+    return out
+
+
+def bundle_progress(paths_: TrialPaths) -> list[tuple[str, int, int]]:
+    """묶음별 (이름, 처리 수, 행 수). 묶음 디렉터리가 없으면 []."""
+    if not paths_.review_bundle_dir.exists():
+        return []
+    out = []
+    for name in BUNDLE_NAMES:
+        path = paths_.review_bundle_dir / f"{name}.csv"
+        if not path.exists():
+            continue
+        rows = _read_csv(path)
+        out.append((name, sum(1 for r in rows if (r.get(BUNDLE_DONE) or "").strip()), len(rows)))
+    return out
+
+
+def run_review_bundle(args: argparse.Namespace, session: Session) -> int:
+    paths_ = session.paths
+    _fieldnames, label_rows = _load_labels(paths_)
+    features_path = Path(args.features) if args.features else paths_.pairs_features_csv
+    feature_rows = _read_csv(features_path) if features_path.exists() else []
+    ids_path = Path(args.name_review_ids) if args.name_review_ids else paths_.name_review_ids
+    ids = read_name_review_ids(ids_path)
+    weak_path = Path(args.weak_tokens) if args.weak_tokens else WEAK_TOKENS_PATH
+    bundles = build_review_bundle(
+        paths_, label_rows, load_kinds(args.kinds_config), feature_rows=feature_rows,
+        weak_path=weak_path, ids=ids, seed=args.seed, n=args.n,
+    )
+    paths_.review_bundle_dir.mkdir(parents=True, exist_ok=True)
+    parts = []
+    for name, (columns, rows) in bundles.items():
+        path = paths_.review_bundle_dir / f"{name}.csv"
+        kept = _preserve_done(path, rows)
+        _write_csv(path, columns, rows)
+        parts.append(f"{name} {len(rows)}행" + (f"(처리 {kept} 보존)" if kept else ""))
+    notes = []
+    if not feature_rows:
+        notes.append(f"특징 파일 없음({features_path}) — distinct_drop 비어 있음")
+    if not ids:
+        notes.append(f"명칭 검토 목록 없음({ids_path}) — 메모의 '검토' 로 대체")
+    print(f"## review --bundle → {paths_.review_bundle_dir}: " + " · ".join(parts))
+    for note in notes:
+        print(f"- {note}")
+    return 0
+
+
 def run_review(args: argparse.Namespace, session: Session) -> int:
+    if getattr(args, "bundle", False):
+        return run_review_bundle(args, session)
     paths_ = session.paths
     _fieldnames, rows = _load_labels(paths_)
     queue = build_review_queue(rows)
@@ -2999,6 +3202,11 @@ def run_status(args: argparse.Namespace, session: Session) -> int:
         print("- " + curation_progress(label_rows))
         for line in label_summary(label_rows, _read_csv(paths_.curation_queue)):
             print("- " + line)
+    progress_bundle = bundle_progress(paths_)
+    if progress_bundle:
+        print("- 검토 묶음(처리/행): " + " · ".join(
+            f"{name} {done}/{total}" for name, done, total in progress_bundle
+        ))
     progress = load_progress(paths_.list_progress)
     for kind, months in progress.items():
         done = sum(1 for m in months.values() if m.get("done"))
@@ -3098,7 +3306,21 @@ def build_parser() -> argparse.ArgumentParser:
     p_confirm = sub.add_parser("confirm", help="LLM 라벨을 그대로 승인(확인여부=Y)")
     p_confirm.add_argument("trial", metavar="심판번호")
     p_confirm.add_argument("--b", default=None, metavar="상대번호")
-    sub.add_parser("review", help="재검토 큐 review_queue.csv(LLM≠추정·확신도 low·메모 애매·A≠B)")
+    p_review = sub.add_parser(
+        "review", help="재검토 큐 review_queue.csv(LLM≠추정·확신도 low·메모 애매·A≠B)"
+    )
+    p_review.add_argument("--bundle", action="store_true",
+                          help="사람 검토 묶음 5개 → review_bundle/*.csv(verify_queue·ab_disagree·"
+                               "name_review·distinct_drop·weak_tokens_top200)")
+    p_review.add_argument("--n", type=int, default=40, help="--bundle 의 verify_queue 표본 수")
+    p_review.add_argument("--seed", type=int, default=0, help="--bundle 의 verify_queue seed")
+    p_review.add_argument("--features", default="", metavar="CSV",
+                          help="distinct_drop 입력(기본 <data-dir>/pairs_features.csv)")
+    p_review.add_argument("--name-review-ids", default="", metavar="FILE",
+                          help="명칭 검토 요청 목록(기본 <data-dir>/name_review_ids.txt, 없으면 "
+                               "메모의 '검토')")
+    p_review.add_argument("--weak-tokens", default="", metavar="JSON",
+                          help="weak_tokens.json(기본 shared/distinctiveness/weak_tokens.json)")
     p_sample = sub.add_parser("sample", help="층화 표본 CSV 생성(호출 없음)")
     p_sample.add_argument("--source", default="", help="목록 CSV(기본 list_all.csv)")
     p_sample.add_argument("--scope", type=int, default=0)

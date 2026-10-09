@@ -148,12 +148,11 @@ def test_axes_with_pair_generic_lower_shared_weak_token(model):
     assert phonetic_similarity("Zorbix Gate", "Hello Gate") == 1.0
     assert phonetic_similarity("Zorbix Gate", "Hello Gate", extra_generic=generic) < 0.5
     assert orthographic_similarity("Zorbix Gate", "Hello Gate", extra_generic=generic) < 0.5
-    # 요부가 없는 쪽(GATE)은 전체로 대비된다. 철자 축은 "zorbix" 대 "gate" 로 내려가지만, X1 은
-    # 제거 전 전체 결합 후보(조빅스게이트)를 유지하고 포함 규칙으로 "게이트" 를 붙잡아 높게 남는다
-    # — 전체 비중 미반영 한계(설계 문서).
+    # 요부가 없는 쪽(GATE)은 전체로 대비된다. 철자 축은 "zorbix" 대 "gate" 로 내려가고, X1 도
+    # v1.6 부터는 약한 토큰만으로 된 "게이트" 를 포함 검사의 짧은 쪽으로 쓰지 않아 내려간다.
     generic = model.pair_generic("Zorbix Gate", "GATE")
     assert orthographic_similarity("Zorbix Gate", "GATE", extra_generic=generic) < 0.5
-    assert phonetic_similarity("Zorbix Gate", "GATE", extra_generic=generic) >= 0.9
+    assert phonetic_similarity("Zorbix Gate", "GATE", extra_generic=generic) < 0.5
 
 
 def test_load_from_stats_file_and_env(tmp_path, monkeypatch):
