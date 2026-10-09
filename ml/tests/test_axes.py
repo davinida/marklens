@@ -284,6 +284,27 @@ def test_contained_compound_marks(a, b, op, threshold, reason):
         assert score <= threshold, f"{a} / {b}: {score:.3f} ({reason})"
 
 
+def test_contain_check_skips_names_made_only_of_weak_tokens():
+    """v1.6: 식별력 없는 토큰만으로 된 이름(extra_generic 으로 전부 제거)은 포함 검사의 짧은 쪽이
+    되지 못하고(2017후2697) 분리관찰 후보도 내지 않는다(2000후2453 — 전체로 대비)."""
+    dream, gate = frozenset({"dream"}), frozenset({"gate"})
+    assert phonetic_similarity("Hello Dream!", "DREAM") == 1.0  # 필터 없이는 분리관찰 그대로
+    score = phonetic_similarity("Hello Dream!", "DREAM", extra_generic=dream)
+    assert score <= 0.5
+    assert score == phonetic_similarity("DREAM", "Hello Dream!", extra_generic=dream)
+    # 3음절 이상 약한 부분: 포함 검사(접미 3/6)가 0.95 를 주던 쌍
+    assert phonetic_similarity("Zorbix Gate", "GATE") >= 0.9
+    assert phonetic_similarity("Zorbix Gate", "GATE", extra_generic=gate) <= 0.5
+    # 전부 약해도 같은 이름끼리는 전체 대비로 1.0, 식별력 있는 짧은 쪽의 포함 검사는 그대로
+    assert phonetic_similarity("DREAM", "DREAM", extra_generic=dream) == 1.0
+    assert phonetic_similarity("스타벅스커피", "스타벅스") >= 0.95
+    assert phonetic_similarity("Zorbix Gate", "ZORBIX", extra_generic=gate) == 1.0
+    # 전부 제거된 이름은 전체 결합음만 후보(토큰별 후보 없음)
+    both = frozenset({"dream", "hello"})
+    assert pronunciation_candidates("Hello Dream!", extra_generic=both) == ["헬로드림"]
+    assert pronunciation_candidates("Hello Dream!", extra_generic=dream) == ["헬로드림", "헬로"]
+
+
 # ------------------------------------------------------------- v1.4 G2P 룰 보강 (2026-09-18)
 
 

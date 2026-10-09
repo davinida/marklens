@@ -54,7 +54,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X2 문자·X3·X4) | `ml/src/axes/` | 2026-10-08 X2 문자 외관(철자) `x2_ortho.py` 추가(`ml/tests/test_x2_ortho.py`) |
 | 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(수집·자동 선별·LLM 이중 라벨링·상대 명칭 LLM 추출 완료, 사람 검증 중) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/label/confirm/review/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(67건), `backend/scripts/trials_enrich.py`, `backend/tests/test_trials_enrich.py`(17건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치, PR #29): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 라벨 도구(PR #30·#31)로 큐 355건(430행) LLM 이중 라벨링 완료(호출 0): 유사 225·비유사 140·제외 65, LLM A↔B 일치율 96%(414/430), LLM↔정규식 추정 80%, 재검토 큐 130행. 사람 검증(표본 40 + 재검토) 진행 중. 보강(2026-10-08, `feat/trials-enrich`): A·B 일치 350행의 상대 표장 상표명 320행(91%, 출원속보 번호 조회 138회 — 성공 138·0건 0·오류 0)·지정상품 유사군 매핑 63%(양쪽 187행)·`x4_goods`(유사 평균 0.44 · 비유사 0.32) — 아래 "정답 데이터" 소절 |
-| 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21·#22. v1.5(2026-09-30, `normalize_name` 공개 — X3와 정규화 공유). 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
+| 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21·#22. v1.5(2026-09-30, `normalize_name` 공개 — X3와 정규화 공유). v1.6(2026-10-09): 식별력 없는 토큰만으로 된 이름은 포함 검사·분리관찰 대상에서 제외(2017후2697·2000후2453, Zorbix Gate/GATE `{gate}` 0.95→0.36). 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
 | 다빈-3 식별력 필터 | 다빈 | **부분(v0, 2026-10-09)** | `ml/src/axes/distinctiveness.py`, `ml/scripts/distinctiveness_build.py`, `shared/distinctiveness/`(`token_stats.json`·`weak_tokens.json`·`report.md`), `ml/tests/test_distinctiveness.py`(31건), `docs/MarkLens_식별력_설계.md` | 판례 요소를 토큰 점수로: 33조1항 1·4·5·6호 0점(3호는 빈 슬롯 `DESCRIPTIVE_TERMS`), 2017후2697 다수 등록(심판 목록 42,474 + DB 1,100 제목의 출원인 수 A·등장 수 N), wordfreq 본질적 식별력, 유명 브랜드 1.0. 약한 토큰 1,513개(점수 < 0.5)를 X1·X2 철자·X3 의 `extra_generic` 으로, 요부 없는 이름은 전체 대비(2000후2453). 심결례 전후 AUC +0.01 안(x1 = 1.0 비유사 27 → 25) — X1 전체 결합·포함 규칙 한계, 설계 문서 §4·§6 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
 | 프론트-1 변경 시안 확정 | 지원 | 미착수 | — | 저장소에 시안 산출물 없음 |
@@ -537,7 +537,11 @@ has_goods(set())                                                               #
   `labels.csv`에 판정·라벨출처·근거문장·확신도·확인여부를 기록합니다(llm은 사람이 확인한 행을 덮어쓰지 못하고,
   pass b는 `llm_b_*` 열에만). `confirm`은 LLM 라벨을 그대로 승인, `review`는 재검토 큐(LLM≠추정·확신도 low·
   메모 애매·pass A≠B), `sample --n 40 --seed 0`은 미확인 LLM 라벨의 종류×판정 층화 검증 표본, `status`는
-  판정 집계와 LLM↔사람·LLM↔추정·LLM A↔B 일치율을 보여 줍니다.
+  판정 집계와 LLM↔사람·LLM↔추정·LLM A↔B 일치율을 보여 줍니다. `review --bundle`(2026-10-09)은 사람 검토 묶음
+  5개를 `review_bundle/*.csv`로 한 번에 뽑습니다 — verify_queue(표본 40, seed 0)·ab_disagree(A≠B)·name_review(판정자가
+  검토를 요청한 명칭 행, `name_review_ids.txt` 없으면 메모의 "검토")·distinct_drop(유사 라벨인데 식별력 적용으로
+  x1_d 또는 x2_text_d가 0.1 넘게 내려간 쌍, 떼어낸 토큰 표시)·weak_tokens_top200. 각 행에 `show` 명령과 `처리` 열이
+  있고(재생성 때 보존) `status`가 묶음별 처리/행 수를 보여 줍니다.
 - LLM 이중 라벨링(2026-10-01, 호출 0): 큐 355건(430행)을 독립 판정자 둘(pass a·b)이 같은 배치 파일만 보고 따로
   판정해 끝냈습니다 — 유사 225·비유사 140·제외 65(라벨출처 llm), LLM A↔B 일치율 96%(414/430, 불일치 16행은
   4건), LLM↔정규식 추정 80%(340/424). `review` 재검토 큐 130행(LLM≠추정 84·확신도 low 76·메모 애매 65·A≠B 16,

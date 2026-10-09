@@ -1867,3 +1867,147 @@ def test_show_ids_writes_name_batches_with_facts_and_judgment(tmp_path, capsys):
     assert "## 1. S5 ·" in batch2 and "S2" not in batch2.split("## 1.")[1]
     for anchor in ("추정", "결정축", "등급사유", "자동등급"):
         assert anchor not in batch1, anchor
+
+
+# ---- review --bundle ---------------------------------------------------------------------------
+
+FEATURE_COLUMNS = [
+    "심판번호", "종류", "상대번호", "최종라벨", "표장라벨", "이름A", "이름B", "x1", "x1_d",
+    "x2_text", "x2_text_d", "weak_a", "weak_b",
+]
+
+
+def _feature(number, mark, x1, x1_d, x2, x2_d, **extra) -> dict:
+    row = {c: "" for c in FEATURE_COLUMNS}
+    row.update({"심판번호": number, "종류": "무효", "표장라벨": mark, "최종라벨": mark,
+                "이름A": "A", "이름B": "B", "x1": x1, "x1_d": x1_d, "x2_text": x2,
+                "x2_text_d": x2_d})
+    row.update(extra)
+    return row
+
+
+def _bundle_fixture(tmp_path):
+    scope, refusal = "권리범위확인(적극적)", "거절결정불복"
+    rows = [
+        _label_row("B1", refusal, b="111", 유사여부_확정="유사",
+                   llm_b_유사여부="비유사", 라벨출처="llm", 확신도="high", 근거문장="e1",
+                   llm_b_근거="e1b", 상대표장_명칭_llm="큐파이어", 상대표장_명칭_본문="본문1",
+                   메모="검토 필요"),
+        _label_row("B2", refusal, b="222", 유사여부_확정="비유사", llm_b_유사여부="비유사",
+                   라벨출처="llm", 확신도="high", 근거문장="e2"),
+        _label_row("B3", scope, 유사여부_확정="유사", llm_b_유사여부="유사", 라벨출처="llm",
+                   확신도="low", 근거문장="e3", 상대표장_명칭_llm="", 메모="애매 · 도형"),
+        _label_row("B4", scope, 유사여부_확정="제외", 제외사유="인지도",
+                   llm_b_유사여부="유사", 라벨출처="llm", 확신도="high", 근거문장="e4"),
+        _label_row("B5", scope, 유사여부_확정="비유사", 라벨출처="human", 확인여부="Y",
+                   확신도="high"),  # 사람 확정 — 표본 대상 아님, pass b 없음
+    ]
+    paths_ = tc.TrialPaths(tmp_path)
+    tc._write_csv(paths_.labels_csv, tc.LABEL_COLUMNS, rows)
+    features = [
+        _feature("B1", "유사", "1.0000", "0.4000", "1.0000", "1.0000", 상대번호="111",
+                 weak_a="gate", weak_b="gate"),  # x1 하락 0.6
+        _feature("B2", "비유사", "1.0000", "0.2000", "1.0000", "0.2000",
+                 상대번호="222"),  # 비유사 제외
+        _feature("B3", "유사", "0.8000", "0.7500", "0.9000", "0.7000",
+                 weak_b="카페"),  # x2 하락 0.2
+        _feature("B4", "유사", "0.8000", "0.7000", "0.5000", "0.4500"),  # 둘 다 경계(−0.1) → 제외
+        _feature("B5", "유사", "0.6000", "", "0.6000", "0.6000"),  # 결측 → 제외
+    ]
+    tc._write_csv(paths_.pairs_features_csv, FEATURE_COLUMNS, features)
+    weak = tmp_path / "weak_tokens.json"
+    weak.write_text(json.dumps({"tokens": [
+        {"token": "gate", "score": 0.0, "A": 12, "N": 30, "zipf": 4.5,
+         "reasons": ["일반어(zipf 4.5)"]},
+        {"token": "coffee", "score": 0.0, "A": 112, "N": 119, "zipf": 4.9,
+         "reasons": ["다수 등록"]},
+        {"token": "dr", "score": 0.0, "A": 125, "N": 141, "zipf": 5.2,
+         "reasons": ["6호 간단 표장"]},
+    ]}, ensure_ascii=False), encoding="utf-8")
+    paths_.name_review_ids.write_text(
+        "# 검토 요청\nB3\t도형 판정 확인\nNOPE\t없는 번호\n", encoding="utf-8"
+    )
+    return paths_, weak
+
+
+def test_review_bundle_writes_five_csvs_with_show_commands(tmp_path, capsys):
+    paths_, weak = _bundle_fixture(tmp_path)
+    assert _label_cli(tmp_path, "review", "--bundle", "--n", "2", "--weak-tokens", str(weak)) == 0
+    out = capsys.readouterr().out
+    assert "review --bundle" in out and "verify_queue 4행" in out  # 층(종류×판정)마다 최소 1
+    assert "ab_disagree 2행" in out
+    bundle = paths_.review_bundle_dir
+    assert sorted(p.name for p in bundle.glob("*.csv")) == [
+        f"{n}.csv" for n in sorted(tc.BUNDLE_NAMES)
+    ]
+    verify = _rows(bundle / "verify_queue.csv")
+    assert len(verify) == 4
+    assert all(r["show"].endswith(f"show {r['심판번호']}") for r in verify)
+    assert verify[0]["처리"] == ""
+    assert verify[0]["show"].startswith("ml/venv/bin/python -m backend")
+    ab = _rows(bundle / "ab_disagree.csv")
+    assert [r["심판번호"] for r in ab] == ["B1", "B4"]
+    assert ab[0]["유사여부_확정"] == "유사" and ab[0]["llm_b_유사여부"] == "비유사"
+    assert ab[0]["근거문장"] == "e1" and ab[0]["llm_b_근거"] == "e1b"
+    names = _rows(bundle / "name_review.csv")
+    # 목록 파일이 있으면 그 번호만(메모의 "검토" 는 무시)
+    assert [(r["심판번호"], r["사유"]) for r in names] == [("B3", "도형 판정 확인")]
+    assert names[0]["메모"] == "애매 · 도형" and names[0]["상대표장_명칭_llm"] == ""
+    drop = _rows(bundle / "distinct_drop.csv")
+    assert [r["심판번호"] for r in drop] == ["B1", "B3"]
+    assert drop[0]["x1"] == "1.0000" and drop[0]["x1_d"] == "0.4000"
+    assert drop[0]["떼어낸_토큰_A"] == "gate"
+    assert drop[1]["떼어낸_토큰_B"] == "카페" and drop[1]["상대번호"] == ""
+    top = _rows(bundle / "weak_tokens_top200.csv")
+    assert [r["토큰"] for r in top] == ["dr", "coffee", "gate"]
+    assert top[0]["show"] == ""
+    assert top[2]["사유"] == "일반어(zipf 4.5)" and top[2]["N"] == "30"
+    # 목록 파일이 없으면 메모의 "검토" 로 대체
+    paths_.name_review_ids.unlink()
+    assert _label_cli(tmp_path, "review", "--bundle", "--weak-tokens", str(weak)) == 0
+    assert "메모의 '검토' 로 대체" in capsys.readouterr().out
+    assert [(r["심판번호"], r["사유"]) for r in _rows(bundle / "name_review.csv")] == [
+        ("B1", "메모에 검토")
+    ]
+
+
+def test_distinct_drop_rule_thresholds():
+    rows = [
+        _feature("D1", "유사", "0.9000", "0.8000", "0.5000", "0.5000"),  # 정확히 −0.1 → 제외
+        _feature("D2", "유사", "0.9000", "0.7999", "0.5000", "0.5000"),  # x1 만 하락
+        _feature("D3", "유사", "0.9000", "0.9000", "0.5000", "0.3000"),  # x2_text 만 하락
+        _feature("D4", "비유사", "1.0000", "0.0000", "1.0000", "0.0000"),  # 비유사 → 제외
+        _feature("D5", "", "1.0000", "0.0000", "1.0000", "0.0000"),  # 표장 라벨 없음
+        _feature("D6", "유사", "", "", "0.9000", "0.5000"),  # x1 결측이어도 x2 하락이면
+    ]
+    dropped = tc.distinct_drop_rows(rows)
+    assert [r["심판번호"] for r in dropped] == ["D2", "D3", "D6"]
+    assert [r["순번"] for r in dropped] == [1, 2, 3]
+    assert tc.distinct_drop_rows(rows, delta=0.05)[0]["심판번호"] == "D1"
+    assert list(dropped[0]) == tc.DISTINCT_DROP_COLUMNS
+
+
+def test_status_counts_bundle_progress_and_regeneration_preserves_done(tmp_path, capsys):
+    paths_, weak = _bundle_fixture(tmp_path)
+    assert _label_cli(tmp_path, "review", "--bundle", "--n", "2", "--weak-tokens", str(weak)) == 0
+    bundle = paths_.review_bundle_dir
+    ab_path = bundle / "ab_disagree.csv"
+    ab = _rows(ab_path)
+    ab[0]["처리"] = "확인 2026-10-09"
+    tc._write_csv(ab_path, list(ab[0]), ab)
+    assert tc.bundle_progress(paths_) == [
+        ("verify_queue", 0, 4), ("ab_disagree", 1, 2), ("name_review", 0, 1),
+        ("distinct_drop", 0, 2), ("weak_tokens_top200", 0, 3),
+    ]
+    tc._write_csv(paths_.curation_queue, tc.CURATION_COLUMNS, [])
+    capsys.readouterr()
+    assert _label_cli(tmp_path, "status") == 0
+    out = capsys.readouterr().out
+    assert "검토 묶음(처리/행): verify_queue 0/4 · ab_disagree 1/2" in out
+    assert "name_review 0/1" in out
+    # 재생성해도 같은 키 행의 처리 열은 남는다
+    assert _label_cli(tmp_path, "review", "--bundle", "--n", "2", "--weak-tokens", str(weak)) == 0
+    assert "ab_disagree 2행(처리 1 보존)" in capsys.readouterr().out
+    assert _rows(ab_path)[0]["처리"] == "확인 2026-10-09"
+    assert _rows(ab_path)[1]["처리"] == ""
+    assert tc.bundle_progress(tc.TrialPaths(tmp_path / "none")) == []

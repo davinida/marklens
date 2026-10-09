@@ -31,6 +31,11 @@ torch·faiss·backend 를 import 하지 않고 표준 라이브러리만 사용�
           토큰은 토큰 수와 무관하게 단독 후보로 둔다(⑤ 병기 표장은 한글로 호칭).
         → 후보 쌍에서 짧은 쪽이 긴 쪽의 접두·접미이면(CONTAIN_*) 포함 점수를 편집거리
           점수와 비교해 큰 쪽을 쓴다 — 띄어쓰기 없이 붙은 결합어("스타벅스커피")의 분리관찰.
+        → v1.6: 식별력 없는 토큰(UNIVERSAL_GENERIC·extra_generic)만으로 된 이름은 요부가 될 수
+          없으므로(2017후2697 — 다수 등록으로 식별력이 약한 부분은 요부가 아니다) 포함 검사의
+          짧은 쪽(포함되는 부분)이 되지 못한다 — 편집거리 점수만 쓴다. 포함 검사는 분리관찰의
+          변형이므로 같은 제한을 받는다. 같은 이유로 전부 제거된 이름은 토큰별 분리관찰 후보 없이
+          전체 결합음만 후보로 남긴다(전부 식별력이 없으면 전체로 대비 — 2000후2453).
     - 불가분 결합의 예외(전체로만 불러야 하는 경우)
         → 제거 전 토큰 전체를 이어붙인 결합음을 항상 후보에 유지한다.
     - 요부관찰(식별력 없는 부분은 제외하고 대비)
@@ -210,7 +215,9 @@ SLOGAN_LEAD_TOKENS: Final = 2
 # CONTAIN_MIN_SYLLABLES 음절 이상, 길이 비율(짧/긴)이 CONTAIN_MIN_COVERAGE 이상이면 포함 점수
 # CONTAIN_BASE_SCORE + (1 − CONTAIN_BASE_SCORE) × 비율을 편집거리 점수와 비교해 큰 쪽을 쓴다.
 # 띄어쓰기 없이 붙은 결합어에서도 요부가 같으면 유사("스타벅스커피"). 2음절 접두(스타/스타벅스)는
-# 불가분 결합으로 보아 제외한다.
+# 불가분 결합으로 보아 제외한다. v1.6: 짧은 쪽이 식별력 없는 토큰만으로 된 이름이면(Zorbix Gate /
+# GATE 에 extra_generic={gate}) 포함 점수를 주지 않는다 — 식별력 없는 부분은 요부가 아니다
+# (2017후2697).
 CONTAIN_MIN_SYLLABLES: Final = 3
 CONTAIN_MIN_COVERAGE: Final = 0.5
 CONTAIN_BASE_SCORE: Final = 0.9
@@ -434,20 +441,31 @@ def _remove_generic(
     return kept
 
 
-def _normalize_tokens(name: str, extra_generic: frozenset[str]) -> tuple[list[str], list[str]]:
-    """상표명 → (제거 전 토큰, 제거 후 토큰).
+@functools.lru_cache(maxsize=256)
+def _token_sets(
+    name: str, extra_generic: frozenset[str]
+) -> tuple[list[str], list[str], bool]:
+    """상표명 → (제거 전 토큰, 제거 후 토큰, 전부 제거됨).
 
     순서: NFKC·casefold → 회사표시 기호 제거 → 기호를 공백으로 → 토큰화(문자 종류 경계 분리,
     한자·기타 문자 토큰 제거) → 연속 중복 토큰 제거(=제거 전) → 보통명칭 제거(=제거 후).
-    제거 후가 비면 제거 전을 그대로 쓴다(빈 문자열 방지).
+    제거 후가 비면 제거 전을 그대로 쓰고(빈 문자열 방지) 세 번째 값을 True 로 둔다 — 식별력 없는
+    토큰만으로 된 이름(v1.6: 포함 검사의 짧은 쪽이 되지 못하고 전체 결합음만 후보).
     """
     text = _COMPANY_MARK_RE.sub(" ", _basic_normalize(name))
     tokens = _tokenize(_clean_chars(text))
     pre = [tok for index, tok in enumerate(tokens) if index == 0 or tok != tokens[index - 1]]
     singles, sequences, reading_targets = _generic_sets(extra_generic)
     post = _remove_generic(pre, singles, sequences, reading_targets)
+    generic_only = bool(pre) and not post
     if not post:
         post = list(pre)
+    return pre, post, generic_only
+
+
+def _normalize_tokens(name: str, extra_generic: frozenset[str]) -> tuple[list[str], list[str]]:
+    """상표명 → (제거 전 토큰, 제거 후 토큰). 세부는 _token_sets."""
+    pre, post, _ = _token_sets(name, extra_generic)
     return pre, post
 
 
@@ -1232,15 +1250,16 @@ def _combos(tokens: list[str], survivors: dict[str, tuple[str, ...]]) -> list[st
 
 @functools.lru_cache(maxsize=4096)
 def _candidates_cached(name: str, extra_generic: frozenset[str]) -> tuple[str, ...]:
-    pre, post = _normalize_tokens(name, extra_generic)
+    pre, post, generic_only = _token_sets(name, extra_generic)
     if not pre:
         return ()
     survivors = _apply_paired_rule(pre, post)
     candidates = _combos(pre, survivors) + _combos(post, survivors)
     # (c) 분리관찰. 한글 토큰은 항상(⑤ 병기 표장은 한글로 호칭), 영문·숫자 유래 읽기는
     # 슬로건형(제거 후 MAX_TOKENS_FOR_SPLIT 초과)이면 앞 SLOGAN_LEAD_TOKENS 개 토큰만.
+    # v1.6: 전부 식별력 없는 토큰이면 분리관찰 없이 전체 결합음만(2000후2453).
     slogan = len(post) > MAX_TOKENS_FOR_SPLIT
-    for index, token in enumerate(post):
+    for index, token in enumerate([] if generic_only else post):
         if _char_class(token[0]) != "H":
             if len(token) == 1:
                 continue  # 알파벳·숫자 1글자 토큰 유래 읽기는 제외(결합음에는 포함)
@@ -1348,6 +1367,12 @@ def _syllable_sim(x: str, y: str) -> float:
     return _syllable_sim_cached(x, y)
 
 
+def _contain_allowed(x: str, y: str, generic_only_a: bool, generic_only_b: bool) -> bool:
+    """포함 검사 적용 여부(v1.6): 짧은 쪽(포함되는 부분)이 식별력 없는 토큰만으로 된 이름의 후보면
+    False. _contain_sim 과 같은 기준으로 짧은 쪽을 고른다(len(x) <= len(y) 면 x)."""
+    return not generic_only_a if len(x) <= len(y) else not generic_only_b
+
+
 def _contain_sim(x: str, y: str) -> float:
     """붙여쓴 결합어 포함 점수(분리관찰). 조건에 안 맞으면 0.0. 대칭.
 
@@ -1428,14 +1453,20 @@ def phonetic_similarity(
         extra_generic: 양쪽에 공통으로 적용할 상품 의존 보통명칭 집합.
     """
     generic = frozenset(extra_generic)
-    candidates_a = _candidates_cached(_as_text(name_a), generic)
-    candidates_b = _candidates_cached(_as_text(name_b), generic)
+    text_a, text_b = _as_text(name_a), _as_text(name_b)
+    candidates_a = _candidates_cached(text_a, generic)
+    candidates_b = _candidates_cached(text_b, generic)
     if not candidates_a or not candidates_b:
         return 0.0
+    # v1.6: 식별력 없는 토큰만으로 된 이름의 후보는 포함 검사의 짧은 쪽이 될 수 없다(2017후2697).
+    generic_only_a = _token_sets(text_a, generic)[2]
+    generic_only_b = _token_sets(text_b, generic)[2]
     best = 0.0
     for x in candidates_a:
         for y in candidates_b:
-            score = max(_syllable_sim(x, y), _contain_sim(x, y))
+            score = _syllable_sim(x, y)
+            if _contain_allowed(x, y, generic_only_a, generic_only_b):
+                score = max(score, _contain_sim(x, y))
             if score > best:
                 best = score
                 if best >= 1.0:
