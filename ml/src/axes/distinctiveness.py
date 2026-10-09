@@ -16,8 +16,12 @@
     - 상표법 33조 1항: 1호 보통명칭(goods_codes 가 있으면 그 류·유사군의 고시 명칭과 일치할 때만,
       없으면 전역 고시 단일 명칭 일치), 4호 현저한 지리적 명칭(X1 지명표 34 + 시·군·구 목록),
       5호 흔한 성(상위 30 + "~네/~가네/~씨네"), 6호 간단하고 흔한 표장(영문 2자 이하·숫자 2자 이하·
-      한글 1음절) → 0점. **3호 기술적 표장은 이번 범위 밖** — `DESCRIPTIVE_TERMS`(토큰 → 세부 유형)
-      빈 슬롯과 적용 코드만 둔다(채우면 0점 처리).
+      한글 1음절) → 0점. 3호 기술적 표장(산지·품질·원재료·효능·용도·수량·형상·가격·생산방법·
+      가공방법·사용방법·시기를 보통으로 사용하는 방법으로 표시)은 `shared/distinctiveness/
+      descriptive_terms.json`(사람이 편집·승인)을 `DESCRIPTIVE_TERMS` 로 적재한다 — 절대적 기술
+      표장(Best·No1·Super·최고 … 지정상품 불문)은 0점, 상대적 표장은 지정상품의 류가 항목의
+      `classes` 안이면 0점·류가 다르면 영향 없음·상품 미상이면 0.5 상한. 판단 기준·후보 생성·승인
+      절차는 docs/MarkLens_식별력_설계.md §3-3.
 
 점수 구성(토큰 하나)
     유명 브랜드(브랜드표 101 + famous_brands.txt) → 1.0 고정.
@@ -51,9 +55,10 @@ from .x1_phonetic import normalize_name
 from .x3_semantic import token_zipf
 
 __all__ = [
-    "Distinctiveness", "TokenJudgement", "load_distinctiveness", "token_score", "salient_tokens",
-    "weak_tokens", "has_distinctive_part", "pair_generic", "famous_tokens", "goods_index",
-    "DESCRIPTIVE_TERMS", "THETA", "THETA_A", "THETA_N",
+    "Distinctiveness", "TokenJudgement", "DescriptiveTerm", "load_distinctiveness", "token_score",
+    "salient_tokens", "weak_tokens", "has_distinctive_part", "pair_generic", "famous_tokens",
+    "goods_index", "read_descriptive_terms", "validate_descriptive_terms", "unapproved_terms",
+    "DESCRIPTIVE_TERMS", "DESCRIPTIVE_KINDS", "THETA", "THETA_A", "THETA_N",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -71,12 +76,96 @@ ZIPF_HIGH = 5.5  # 이 이상(아주 흔한 일반어)은 0.5 하한
 INTRINSIC_FLOOR = 0.5
 MIN_TOKEN_CHARS = 2  # 1글자 토큰은 6호(간단 표장)로 0점이라 집계 대상에서도 뺀다
 
-# ---- 3호 기술적 표장 — 확장 슬롯(이번 범위 밖). 토큰(정규화 형태) → 세부 유형. ----------
+# ---- 3호 기술적 표장: shared/distinctiveness/descriptive_terms.json 적재(코드엔 로더·검증만) --
 DESCRIPTIVE_KINDS: tuple[str, ...] = (
     "산지", "품질", "원재료", "효능", "용도", "수량", "형상", "가격", "생산방법", "가공방법",
     "사용방법", "시기",
 )
-DESCRIPTIVE_TERMS: dict[str, str] = {}
+DEFAULT_DESCRIPTIVE_PATH = DEFAULT_DIR / "descriptive_terms.json"
+ENV_DESCRIPTIVE_PATH = "MARKLENS_DESCRIPTIVE_TERMS"
+DESCRIPTIVE_UNKNOWN_SCORE = 0.5  # 상대적 기술 표장인데 지정상품을 모르면(또는 류 미지정) 점수 상한
+NICE_CLASS_RANGE = range(1, 46)
+
+
+@dataclass(frozen=True, slots=True)
+class DescriptiveTerm:
+    """3호 항목. kind 는 DESCRIPTIVE_KINDS 중 하나, absolute 면 지정상품 불문 0점(Best·No1·최고 …),
+    아니면 classes(류)의 상품에서만 0점. approved 는 사람 승인 여부(미승인도 적용, 보고서에
+    표시)."""
+
+    kind: str
+    absolute: bool = False
+    classes: frozenset[int] | None = None
+    note: str = ""
+    approved: bool = False
+
+
+def validate_descriptive_terms(data: dict) -> dict[str, DescriptiveTerm]:
+    """JSON({"terms": {토큰: {kind, absolute, classes, note, approved}}}) → 항목 사전. 어긋나면
+    ValueError.
+
+    토큰은 X1 정규화 형태(소문자·공백 없는 단일 토큰)여야 한다.
+    """
+    terms = data.get("terms", data) if isinstance(data, dict) else None
+    if not isinstance(terms, dict):
+        raise ValueError("descriptive_terms: 'terms' 객체가 필요합니다")
+    out: dict[str, DescriptiveTerm] = {}
+    for token, item in terms.items():
+        if not isinstance(item, dict):
+            raise ValueError(f"descriptive_terms[{token!r}]: 객체가 아닙니다")
+        if normalize_name(token) != [token]:
+            raise ValueError(f"descriptive_terms[{token!r}]: 정규화 형태(소문자·공백 없는 단일 "
+                             "토큰)가 아닙니다")
+        missing = [key for key in ("kind", "absolute") if key not in item]
+        if missing:
+            raise ValueError(f"descriptive_terms[{token!r}]: 필수 필드 없음 {missing}")
+        kind = item["kind"]
+        if kind not in DESCRIPTIVE_KINDS:
+            raise ValueError(f"descriptive_terms[{token!r}]: kind {kind!r} 는 "
+                             f"{'|'.join(DESCRIPTIVE_KINDS)} 중 하나여야 합니다")
+        absolute = item["absolute"]
+        if not isinstance(absolute, bool):
+            raise ValueError(f"descriptive_terms[{token!r}]: absolute 는 true/false")
+        classes_raw = item.get("classes")
+        classes: frozenset[int] | None = None
+        if classes_raw is not None:
+            if not isinstance(classes_raw, list) or not all(
+                isinstance(c, int) and c in NICE_CLASS_RANGE for c in classes_raw
+            ):
+                raise ValueError(f"descriptive_terms[{token!r}]: classes 는 1~45 류 정수 "
+                                 "목록이거나 null")
+            classes = frozenset(classes_raw)
+        note = item.get("note", "")
+        approved = item.get("approved", False)
+        if not isinstance(note, str) or not isinstance(approved, bool):
+            raise ValueError(f"descriptive_terms[{token!r}]: note 는 문자열, approved 는 "
+                             "true/false")
+        out[token] = DescriptiveTerm(kind, absolute, classes, note, approved)
+    return out
+
+
+def resolve_descriptive_path(path: str | os.PathLike[str] | None = None) -> Path:
+    if path:
+        return Path(path)
+    env = os.environ.get(ENV_DESCRIPTIVE_PATH, "").strip()
+    return Path(env) if env else DEFAULT_DESCRIPTIVE_PATH
+
+
+def read_descriptive_terms(
+    path: str | os.PathLike[str] | None = None,
+) -> dict[str, DescriptiveTerm]:
+    """descriptive_terms.json → 항목 사전. 파일이 없으면 {}(3호 미적용)."""
+    resolved = resolve_descriptive_path(path)
+    if not resolved.exists():
+        return {}
+    return validate_descriptive_terms(json.loads(resolved.read_text(encoding="utf-8")))
+
+
+def unapproved_terms(terms: dict[str, DescriptiveTerm]) -> list[str]:
+    return sorted(token for token, term in terms.items() if not term.approved)
+
+
+DESCRIPTIVE_TERMS: dict[str, DescriptiveTerm] = read_descriptive_terms()
 
 # ---- 5호 흔한 성(통계청 2015 기준 상위 30) + 로마자(단어와 겹치지 않는 표기만) ---------
 COMMON_SURNAMES: frozenset[str] = frozenset(
@@ -269,7 +358,7 @@ class Distinctiveness:
         theta: float = THETA,
         theta_a: int = THETA_A,
         theta_n: int = THETA_N,
-        descriptive: dict[str, str] | None = None,
+        descriptive: dict[str, DescriptiveTerm] | None = None,
     ) -> None:
         self.stats = {token: (int(a), int(n)) for token, (a, n) in stats.items()}
         self.famous = frozenset(famous)
@@ -300,8 +389,23 @@ class Distinctiveness:
             return TokenJudgement(token, 1.0, ("유명 브랜드",))
         reasons: list[str] = []
         descriptive = DESCRIPTIVE_TERMS if self.descriptive is None else self.descriptive
-        if token in descriptive:
-            reasons.append(f"3호 기술적 표장:{descriptive[token]}")
+        cap: float | None = None
+        cap_reason = ""
+        term = descriptive.get(token)
+        if term is not None:
+            if term.absolute:
+                reasons.append(f"3호 기술적 표장(절대):{term.kind}")
+            elif not goods or term.classes is None:
+                cap = DESCRIPTIVE_UNKNOWN_SCORE
+                cap_reason = (f"3호 기술적 표장({'상품 미상' if not goods else '류 미지정'}):"
+                              f"{term.kind}")
+            else:
+                goods_classes: set[int] = set()
+                for code in goods:
+                    goods_classes.update(self.code_classes.get(code, ()))
+                hit = sorted(goods_classes & term.classes)
+                if hit:
+                    reasons.append(f"3호 기술적 표장:{term.kind}(류 {','.join(map(str, hit))})")
         if self.is_generic_name(token, goods):
             reasons.append("1호 보통명칭" + ("" if goods else "(전역)"))
         if is_place(token):
@@ -319,9 +423,13 @@ class Distinctiveness:
             reasons.append(f"일반어(zipf {zipf:.1f})")
         if factor < 1.0:
             reasons.append(f"다수 등록(A={applicants}, N={marks})")
+        score = intrinsic * factor
+        if cap is not None and score > cap:
+            score = cap
+            reasons.append(cap_reason)
         if not reasons:
             reasons.append("조어")
-        return TokenJudgement(token, round(intrinsic * factor, 4), tuple(reasons))
+        return TokenJudgement(token, round(score, 4), tuple(reasons))
 
     def token_score(self, token: str, goods_codes: Iterable[str] | None = None) -> float:
         return self.judge(token, goods_codes).score

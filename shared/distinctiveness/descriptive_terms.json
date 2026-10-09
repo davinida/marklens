@@ -1,0 +1,7470 @@
+{
+ "meta": {
+  "생성일": "2026-10-09",
+  "출처": {
+   "a": 749,
+   "b": 1153,
+   "c": 66,
+   "d": 80,
+   "e": 23
+  },
+  "빈도_미달": 52,
+  "판정": {
+   "보류": 101,
+   "포함": 447,
+   "제외": 896
+  },
+  "kind별_포함": {
+   "시기": 13,
+   "품질": 91,
+   "용도": 222,
+   "원재료": 57,
+   "산지": 2,
+   "형상": 29,
+   "효능": 20,
+   "사용방법": 5,
+   "생산방법": 6,
+   "수량": 2
+  },
+  "절대어": [
+   "aaa",
+   "best",
+   "deluxe",
+   "est",
+   "excellent",
+   "famous",
+   "fine",
+   "first",
+   "good",
+   "great",
+   "max",
+   "mega",
+   "new",
+   "nice",
+   "original",
+   "perfect",
+   "plus",
+   "premium",
+   "prime",
+   "pro",
+   "professional",
+   "quality",
+   "real",
+   "since",
+   "special",
+   "super",
+   "supreme",
+   "top",
+   "ultra",
+   "고급",
+   "굿",
+   "나이스",
+   "넘버원",
+   "뉴",
+   "디럭스",
+   "리얼",
+   "맥스",
+   "명품",
+   "베스트",
+   "슈퍼",
+   "스페셜",
+   "신상",
+   "오리지널",
+   "울트라",
+   "원조",
+   "유명",
+   "으뜸",
+   "일등",
+   "일류",
+   "정상",
+   "정품",
+   "제일",
+   "좋은",
+   "진짜",
+   "진품",
+   "참",
+   "최고",
+   "최상",
+   "최우수",
+   "퀄리티",
+   "탑",
+   "톱",
+   "특급",
+   "특선",
+   "퍼펙트",
+   "프라임",
+   "프로",
+   "프리미엄",
+   "플러스"
+  ],
+  "항목": 447,
+  "승인": 0
+ },
+ "terms": {
+  "1994": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": null,
+   "note": "연도 — SINCE·EST. 창업 시기 표기로 흔히 쓰임(모델명 가능성, 류 미지정)",
+   "examples": [
+    "생 SNOW BEER BULLOMAN classic 1994",
+    "The PREMIUM Pizza Mall QUALIFIED Co. ALL THAT PIZZA & SALAD SINCE 1994",
+    "바람성형외과 For your beautiful Breast & Body BR SINCE 1994"
+   ],
+   "approved": false
+  },
+  "2000": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": null,
+   "note": "연도 — SINCE·EST. 창업 시기 표기로 흔히 쓰임(모델명 가능성, 류 미지정)",
+   "examples": [
+    "FOX 2000",
+    "월드콜 515-2000 TMKC",
+    "아니극과자공방 depuis 2000 YANNICK"
+   ],
+   "approved": false
+  },
+  "2012": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": null,
+   "note": "연도 — SINCE·EST. 창업 시기 표기로 흔히 쓰임(모델명 가능성, 류 미지정)",
+   "examples": [
+    "GENESIS CAMPUS CAFE USA LO GOS NE RI TAS LI BRR TAS 2012",
+    "까사 메르시 CASA MERCI EST.2012",
+    "UNIQRO BEANS CLASSIC TASTE DAAWON BEAN BRODERS 2012"
+   ],
+   "approved": false
+  },
+  "2013": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": null,
+   "note": "연도 — SINCE·EST. 창업 시기 표기로 흔히 쓰임(모델명 가능성, 류 미지정)",
+   "examples": [
+    "땡초 동대문 김밥 DONGDAEMOON SINCE 2013",
+    "삼환 N2013",
+    "희망과 기쁨을 찾아 주는 명가 인생 제2막 since2013"
+   ],
+   "approved": false
+  },
+  "2015": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": null,
+   "note": "연도 — SINCE·EST. 창업 시기 표기로 흔히 쓰임(모델명 가능성, 류 미지정)",
+   "examples": [
+    "crescendo coffee roasters truest expression of coffee est.2015",
+    "레인보우 소프트 아이스크림 Rainbow Soft Ice Since 2015 Bless Ice Dessert Cafe",
+    "오성통닭 OSEONG CHICKEN SINCE 2015"
+   ],
+   "approved": false
+  },
+  "aaa": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "AAA 등급 표기 — 품질 등급 표시(a·aa 는 6호)",
+   "examples": [
+    "에이레벨 칼리지 AAA COLLEGE A-LEVEL COLLEGE"
+   ],
+   "approved": false
+  },
+  "academy": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41
+   ],
+   "note": "교육업·교육 내용(언어) 용도 표시",
+   "examples": [
+    "하이퍼학원 HYPER ACADEMY HYPER SUPREME",
+    "박무웅 무술사관 MOOSOOL MILITARY ACADEMY",
+    "하이퍼수학 HYPER ACADEMY SINCE 2010"
+   ],
+   "approved": false
+  },
+  "ai": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    41,
+    42
+   ],
+   "note": "인공지능·가상현실 기술 표시",
+   "examples": [
+    "아이바오 Ai Bao",
+    "AI 수학",
+    "LG AI.CONN"
+   ],
+   "approved": false
+  },
+  "almond": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "허니버터아몬드 HONEY BUTTER ALMOND",
+    "머거본 허니버터아몬드 Murgerbon HONEY BUTTER ALMOND",
+    "머거본 와사비맛아몬드 Murgerbon WASABI ALMOND"
+   ],
+   "approved": false
+  },
+  "american": {
+   "kind": "산지",
+   "absolute": false,
+   "classes": null,
+   "note": "산지·국적 표시(한국산·미국산) — 류 미지정, 4호 지명과 별개",
+   "examples": [
+    "Goodwear AMERICAN BRAND Established 1983",
+    "ORIGINAL POHANG AMERICAN FRIED",
+    "AMERICAN UNIVERSITY"
+   ],
+   "approved": false
+  },
+  "apple": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "블럭&퍼즐애플 APPLE",
+    "Midnight Apple",
+    "애플 APPLE"
+   ],
+   "approved": false
+  },
+  "aqua": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "AQUA BLACK",
+    "Aqua Guard",
+    "O HUI Aqua Healing HA booster"
+   ],
+   "approved": false
+  },
+  "auto": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    12,
+    37
+   ],
+   "note": "자동차 — 용도·업종 표시",
+   "examples": [
+    "Environmental-friendly, AUTO+",
+    "webOS Auto",
+    "BABi CELL Needle RF+Auto MTS+Meso Gun"
+   ],
+   "approved": false
+  },
+  "automotive": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    12,
+    37
+   ],
+   "note": "자동차 — 용도·업종 표시",
+   "examples": [
+    "AUTOMOTIVE DYTECH DYNAMIC FLUID TECHNOLOGIES",
+    "한국오토모티브컬리지 HANKOOK AUTOMOTIVE COLLEGE",
+    "ASK Automotive Industries Group zendar SIPE"
+   ],
+   "approved": false
+  },
+  "baby": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    16,
+    18,
+    20,
+    21,
+    24,
+    25,
+    28,
+    35,
+    41,
+    44
+   ],
+   "note": "사용자(유아·아동·남성·여성) 용도 표시",
+   "examples": [
+    "Rock a Bye BaBy",
+    "BABY MONET",
+    "Daiz BABY"
+   ],
+   "approved": false
+  },
+  "bakery": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "BLOCK BAKERY",
+    "SAMSONG BAKERY & CAFE Since 1957",
+    "삼송 BNC BAKERY AND CAFE"
+   ],
+   "approved": false
+  },
+  "ball": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    28
+   ],
+   "note": "공 형상 표시",
+   "examples": [
+    "BALL",
+    "mirror ball",
+    "The Unseen Ball"
+   ],
+   "approved": false
+  },
+  "bank": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    16,
+    36
+   ],
+   "note": "금융·결제 용도 표시",
+   "examples": [
+    "STRAIGHT2BANK",
+    "피노키오론 W bank",
+    "오렌지뱅크 Orange Bank"
+   ],
+   "approved": false
+  },
+  "bar": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "BAR",
+    "aroma espresso bar",
+    "LUKE'S OYSTER BAR CHOP HOUSE TRAVIS MASIERO RESTAURANT GROUP"
+   ],
+   "approved": false
+  },
+  "barbecue": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "두레우가 한우 KOREAN BEEF BARBECUE RESTAURANT",
+    "프리미엄 생소고기 전문점 반값+소 \\/2 CHARCOL BARBECUE RESTARANT",
+    "온누리 ONNURI KOREA BARBECUE HOUSE"
+   ],
+   "approved": false
+  },
+  "bbq": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "고고기 GOGO-GI! KOREAN BBQ TO-GO",
+    "구슬김밥 BBQ",
+    "군족 오븐 정성껏 구운 바베큐 족발 OVEN & BBQ JOKBAL"
+   ],
+   "approved": false
+  },
+  "bean": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "JELLY BEAN",
+    "BEYOND THE BEAN",
+    "MONSTER BEAN"
+   ],
+   "approved": false
+  },
+  "beauty": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    35,
+    41,
+    44
+   ],
+   "note": "화장품·미용 — 용도·업종 표시",
+   "examples": [
+    "Im;BEAUTY GUERISSON 9 complex",
+    "Cloud 9 BLANC DE WHITE Im;BEAUTY",
+    "ARELIA THE SECRET OF BEAUTY"
+   ],
+   "approved": false
+  },
+  "beer": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "음료·주류의 종류 표시 — 주점·판매업 취급품",
+   "examples": [
+    "콩콩 COFFEE SKI & COFFEE & BEER",
+    "생 SNOW BEER BULLOMAN classic 1994",
+    "beer @ works CONVICTION TO THE BEER"
+   ],
+   "approved": false
+  },
+  "berry": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "NATURAL HEALTH KEEPER JUNAM BERRY KING ARONIA FARM",
+    "네이처 리퍼블릭 베리 베이비 NATURE REPUBLIC Berry Baby",
+    "닥터베리 Doctor berry"
+   ],
+   "approved": false
+  },
+  "best": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "Best Cosme",
+    "Best Brand Exchange shoespa",
+    "shoespa Best Brand Exchange"
+   ],
+   "approved": false
+  },
+  "bistro": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "보헤미안 비스트로 프라하 PRAHA Bohemian Bistro",
+    "심슨 더 스파이스 Casual Asian Bistro Simpson The Spice",
+    "LUCIE Chicken Bistro Lucie Chicken Bistro"
+   ],
+   "approved": false
+  },
+  "block": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    19,
+    28
+   ],
+   "note": "블록 형상 표시",
+   "examples": [
+    "BLOCK BAKERY",
+    "울트라매직 블럭 UltraMagic Block",
+    "5BLOCK COFFEE & BRUNCH"
+   ],
+   "approved": false
+  },
+  "body": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "balanced body",
+    "온:더바디 스파클링 모공 톡스 ON: THE BODY",
+    "MAKE A BODY"
+   ],
+   "approved": false
+  },
+  "box": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    16,
+    20,
+    35
+   ],
+   "note": "상자 형상·박스 판매 표시",
+   "examples": [
+    "SWEET&SOUR Fresh FRUITS BOX",
+    "TiKi Box",
+    "Smart Share Box"
+   ],
+   "approved": false
+  },
+  "bread": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "the bread and butter",
+    "BREAD LAB.",
+    "bread garden"
+   ],
+   "approved": false
+  },
+  "burger": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "버거트레일러 burger trailer",
+    "Tony TONY BURGER",
+    "길버트 버거 앤 프라이즈 GILBERT'S BURGER&FRIES"
+   ],
+   "approved": false
+  },
+  "butter": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "BUTTER",
+    "the bread and butter",
+    "버터플라이 BUTTER FLY"
+   ],
+   "approved": false
+  },
+  "cafe": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "COFFEE AND SOME Espresso & Dessert Cafe",
+    "CAFE SPAZiO coffee & gelato",
+    "MARTELLO Cafe"
+   ],
+   "approved": false
+  },
+  "cake": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "FRANK's THE GOURMET SPECIALITY CAKE SHOP",
+    "Greek Cake"
+   ],
+   "approved": false
+  },
+  "camp": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    22,
+    25,
+    28,
+    41,
+    43
+   ],
+   "note": "캠핑·아웃도어 용도 표시",
+   "examples": [
+    "franz. Your way to CAMP BECKENBAUER",
+    "노르딕캠프 NORDICAMP Camp for Backpackers, Trekers and Campers by ANYGEAR",
+    "NEPA CAMP"
+   ],
+   "approved": false
+  },
+  "camping": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    22,
+    25,
+    28,
+    41,
+    43
+   ],
+   "note": "캠핑·아웃도어 용도 표시",
+   "examples": [
+    "CAMPING CLUB Camping Club OUTDOOR SPECIALIST SINCE2004",
+    "Camping Trunk",
+    "캠핑크루 camping crew"
+   ],
+   "approved": false
+  },
+  "candy": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "FUJIYA POP CANDY ポップ キャンディ",
+    "SPORTS CANDY HIMALAYA SALT EXTRA COOL Mint Candy Lemon Flavour",
+    "르주르 코튼 캔디 향 Le Jour Cotton candy scent"
+   ],
+   "approved": false
+  },
+  "capital": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    16,
+    36
+   ],
+   "note": "금융·결제 용도 표시",
+   "examples": [
+    "DAYLI Venture Capital",
+    "LIBRA Capital Management",
+    "WB우리캐피탈 WB WOORI CAPITAL"
+   ],
+   "approved": false
+  },
+  "car": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    12,
+    37
+   ],
+   "note": "자동차 — 용도·업종 표시",
+   "examples": [
+    "CAR LINE",
+    "황종연 CP CAR PRO",
+    "CAR 24"
+   ],
+   "approved": false
+  },
+  "carbon": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "CARBON MIX",
+    "CARBON",
+    "CARBON ZAPP"
+   ],
+   "approved": false
+  },
+  "card": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    16,
+    36
+   ],
+   "note": "금융·결제 용도 표시",
+   "examples": [
+    "POST CARD",
+    "d POINT CARD",
+    "NM Card"
+   ],
+   "approved": false
+  },
+  "care": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    44
+   ],
+   "note": "관리·케어 용도 표시(스킨케어·헤어케어 관행)",
+   "examples": [
+    "하츠 에어케어시스템 Haatz Air Care System",
+    "에어케어시스템 Air Care System",
+    "에코생활건강 Earth Care Object"
+   ],
+   "approved": false
+  },
+  "cd": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    38,
+    41,
+    42
+   ],
+   "note": "TV·PC·CD — 기기 종류·용도 표시(방송·IT 서비스 포함)",
+   "examples": [
+    "cd's",
+    "CD",
+    "CD Chalmers Dale"
+   ],
+   "approved": false
+  },
+  "center": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    41,
+    43,
+    44
+   ],
+   "note": "시설·업태 표시(스튜디오·갤러리·클럽·센터)",
+   "examples": [
+    "더리더스 THE LEADERS MEDICAL CENTER",
+    "힐링 메디컬 센터 Healing Medical Center",
+    "농어촌국제교육교류센터 RC-IEEC International Education and Exchange Center"
+   ],
+   "approved": false
+  },
+  "cheese": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "EASY CHEESE",
+    "say... cheese!",
+    "PABLO mini THE CHEESE TART"
+   ],
+   "approved": false
+  },
+  "cherry": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "벚꽃빵 Cherry Blossom Bread",
+    "CHERRY BLOSSOM",
+    "채리CHERRY"
+   ],
+   "approved": false
+  },
+  "chicken": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "아싸라비아 Assarabia Chicken",
+    "둘마니치킨 Two Korean Style Two Chicken",
+    "초대마왕 CHODAEMAWANG CHICKEN"
+   ],
+   "approved": false
+  },
+  "chinese": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41
+   ],
+   "note": "교육업·교육 내용(언어) 용도 표시",
+   "examples": [
+    "명가 Chinese 명품 중국어 명가차이니즈",
+    "LEEGARDEN CHINESE CUISINE Smooth Jazz",
+    "차룽 Express Chinese to go"
+   ],
+   "approved": false
+  },
+  "chocolate": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "CHOCOLATE CIRCLE",
+    "초콜릿 Chocolate",
+    "Ballerina chocolate"
+   ],
+   "approved": false
+  },
+  "clean": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    21,
+    37
+   ],
+   "note": "세정 효능·청소업 용도 표시",
+   "examples": [
+    "영구이사몰 09 CLEAN",
+    "클린빈 CLEAN VIN",
+    "EVER CLEAN"
+   ],
+   "approved": false
+  },
+  "clinic": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "OR'JADE D CLINIC",
+    "공:감 GONG:GAM DENTAL CLINIC",
+    "INSOLUTION AQUARINGER SKIN CLINIC MASK"
+   ],
+   "approved": false
+  },
+  "club": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    41,
+    43,
+    44
+   ],
+   "note": "시설·업태 표시(스튜디오·갤러리·클럽·센터)",
+   "examples": [
+    "OK SPORTS CLUB",
+    "FH FORESTHILL COUNTRY CLUB",
+    "BEACH CLUB COFFEE"
+   ],
+   "approved": false
+  },
+  "coffee": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "커피·커피 음료의 원재료, 카페업(43)·판매업(35)의 취급품 표시",
+   "examples": [
+    "COFFEE AND SOME Espresso & Dessert Cafe",
+    "Amitie COFFEE ESPRESSO",
+    "Dream coffee"
+   ],
+   "approved": false
+  },
+  "construction": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    37
+   ],
+   "note": "건설업 용도 표시",
+   "examples": [
+    "주식회사건영 KUNYOUNG CONSTRUCTION CO., LTD.",
+    "EG건설 EG Construction",
+    "CETEC Construction Equipment Trading & Engineering Company"
+   ],
+   "approved": false
+  },
+  "consulting": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "경영 컨설팅·관리 서비스 용도 표시",
+   "examples": [
+    "Nemo Partners Strategy Consulting Group",
+    "하하하컨설팅그룹(주) HAHAHA CONSULTING GROUP",
+    "아름CNA C Consulting & Asset Management"
+   ],
+   "approved": false
+  },
+  "cookie": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "COOKIE MONSTA",
+    "포춘 쿠키 FORTUNE COOKIE",
+    "크라운 몬트 쿠키 CROWN MONT COOKIE"
+   ],
+   "approved": false
+  },
+  "cool": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    3,
+    11,
+    25,
+    32
+   ],
+   "note": "냉감·시원한 품질 표시",
+   "examples": [
+    "Cool Touch",
+    "COCO Cool Collection",
+    "COOL BELL"
+   ],
+   "approved": false
+  },
+  "cosmetic": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    35,
+    41,
+    44
+   ],
+   "note": "화장품·미용 — 용도·업종 표시",
+   "examples": [
+    "MD MIRACULOUS goodmorning cosmetics GOOD MORNING COSMETIC",
+    "VELLA COSMETIC",
+    "storico Beautiful Story Cosmetic"
+   ],
+   "approved": false
+  },
+  "cosmetics": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    35,
+    41,
+    44
+   ],
+   "note": "화장품·미용 — 용도·업종 표시",
+   "examples": [
+    "씨트리 펩타이드 코스메틱스 C-TRI PEPTIDE COSMETICS",
+    "Dr. MINERAL COSMETICS",
+    "MD MIRACULOUS goodmorning cosmetics GOOD MORNING COSMETIC"
+   ],
+   "approved": false
+  },
+  "cotton": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "ORIGNAL BENDEVIS TREND 100% COTTON JEANS BENDEVIS JEANS",
+    "CLEAN WARM COTTON",
+    "DRY COTTON COOLING QUICK DRY COMFORTABLE"
+   ],
+   "approved": false
+  },
+  "cream": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "BOTOKSEL syn-ake triplex cream",
+    "Madeca Cream",
+    "cream monster"
+   ],
+   "approved": false
+  },
+  "crystal": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "CRYSTAL-X",
+    "CRYSTAL CLEAN",
+    "crystal"
+   ],
+   "approved": false
+  },
+  "cube": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    28,
+    30
+   ],
+   "note": "정육면체 형상 표시",
+   "examples": [
+    "TACTICAL CUBE",
+    "CUBE",
+    "BLACK CUBE"
+   ],
+   "approved": false
+  },
+  "cup": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    21,
+    30,
+    43
+   ],
+   "note": "컵 형상·컵 단위 표시",
+   "examples": [
+    "Philz Coffee ONE CUP AT A TIME",
+    "KOREA GOLF TEACHERS CUP USGTF-KOREA",
+    "EVE Cup"
+   ],
+   "approved": false
+  },
+  "cure": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    41,
+    44
+   ],
+   "note": "치유·회복 효능 표시",
+   "examples": [
+    "TerraSeal Cure Potasium",
+    "TerraSeal Cure Lithium",
+    "PUTTO CURE"
+   ],
+   "approved": false
+  },
+  "cushion": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    20,
+    24
+   ],
+   "note": "쿠션형 제형·형상 표시",
+   "examples": [
+    "MAGIC IN THE CUSHION ETUDE HOUSE",
+    "MAGIC ANY CUSHION ETUDEHOUSE",
+    "Magic Cushion"
+   ],
+   "approved": false
+  },
+  "daily": {
+   "kind": "사용방법",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    25,
+    30
+   ],
+   "note": "매일 사용·일상용 사용방법 표시",
+   "examples": [
+    "데일리 플래닛 DAILY PLANET",
+    "Daily",
+    "데일리 daily INTERNET CAFE"
+   ],
+   "approved": false
+  },
+  "data": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    35,
+    38,
+    42
+   ],
+   "note": "디지털·데이터·온라인·모바일 — IT 상품·서비스의 용도 표시",
+   "examples": [
+    "e-DATA",
+    "일공일공데이타 1010DATA",
+    "TREASURE DATA"
+   ],
+   "approved": false
+  },
+  "delicious": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    32,
+    43
+   ],
+   "note": "맛의 품질 표시",
+   "examples": [
+    "SO DELICIOUS",
+    "광장 맛있는 광장갈비 DELICIOUS GWANGJANG GALBI",
+    "맛있닭 LIFE is DELICIOUS"
+   ],
+   "approved": false
+  },
+  "deluxe": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "GOLDEN GOOSE DELUXE BRAND",
+    "A CHINO DELUXE ICE CREAM THE MOST FAVORITE CHOICE"
+   ],
+   "approved": false
+  },
+  "dental": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "서울장수치과 Seoul JangSu Dental Clinics",
+    "공:감 GONG:GAM DENTAL CLINIC",
+    "탑플란트치과 TOPPLANT DENTAL CLINIC"
+   ],
+   "approved": false
+  },
+  "design": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    42
+   ],
+   "note": "디자인업 용도 표시",
+   "examples": [
+    "골팡 golfpang design your field",
+    "PARKLAND DESIGN & MANUFACTURING",
+    "PARKLAND DESIGN AND MANUFACTURING"
+   ],
+   "approved": false
+  },
+  "designer": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    42
+   ],
+   "note": "디자인업 용도 표시",
+   "examples": [
+    "Designer Whey",
+    "i Doll Story I'm a designer",
+    "EYE FRAME DESIGNER"
+   ],
+   "approved": false
+  },
+  "dessert": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "COFFEE AND SOME Espresso & Dessert Cafe",
+    "HOTEL DESSERT",
+    "레인보우 소프트 아이스크림 Rainbow Soft Ice Since 2015 Bless Ice Dessert Cafe"
+   ],
+   "approved": false
+  },
+  "development": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41,
+    42
+   ],
+   "note": "연구·개발·과학 — 서비스 용도 표시",
+   "examples": [
+    "일상해양산업 ILSANG OCEAN DEVELOPMENT",
+    "EUNSUNG 그룹 Innovation Development Leader",
+    "한국성공인재개발원 Korea Success Human Resource Development Center"
+   ],
+   "approved": false
+  },
+  "diamond": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "Gold Diamond",
+    "people diamond",
+    "POLAR BEAR DIAMOND"
+   ],
+   "approved": false
+  },
+  "diet": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    25,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "체중 감량 효능·용도 표시",
+   "examples": [
+    "VB DIET LAB cafe delight",
+    "VB DIET LAB",
+    "악마다이어트 devil diet"
+   ],
+   "approved": false
+  },
+  "digital": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    35,
+    38,
+    42
+   ],
+   "note": "디지털·데이터·온라인·모바일 — IT 상품·서비스의 용도 표시",
+   "examples": [
+    "디지털 몬스터 DIGITAL MONSTER",
+    "DIGITAL CROWN",
+    "FINE DIGITAL FINE Vu"
+   ],
+   "approved": false
+  },
+  "dining": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "My First Fine Dining Babi 술술 Good Food, Good Feelings",
+    "MR.KKONG casual dining restaurant",
+    "미스터꽁 casual dining restaurant"
+   ],
+   "approved": false
+  },
+  "dry": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    3,
+    11,
+    25
+   ],
+   "note": "건조·드라이 기능 표시",
+   "examples": [
+    "수퍼 드라이 SUPER DRY",
+    "EX-DRY",
+    "DM Dry Man"
+   ],
+   "approved": false
+  },
+  "easy": {
+   "kind": "사용방법",
+   "absolute": false,
+   "classes": null,
+   "note": "사용이 쉬움을 뜻하는 사용방법 표시(류 미지정)",
+   "examples": [
+    "동양이지텍 DONG YANG EASY TECH",
+    "TI EASY CONNECT",
+    "이지토크 Easy Talk"
+   ],
+   "approved": false
+  },
+  "eau": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "SECRET D'EAU",
+    "BIOTHERM EAU RELAX",
+    "L'EAU CLAIRE"
+   ],
+   "approved": false
+  },
+  "education": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41
+   ],
+   "note": "교육업·교육 내용(언어) 용도 표시",
+   "examples": [
+    "농어촌국제교육교류센터 RC-IEEC International Education and Exchange Center",
+    "EDUCATION UTOPIA",
+    "PIE Photo In Education"
+   ],
+   "approved": false
+  },
+  "egg": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "WIBRO Egg",
+    "3G Egg",
+    "Easter Egg"
+   ],
+   "approved": false
+  },
+  "electric": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    7,
+    9,
+    11,
+    12
+   ],
+   "note": "전기·하이브리드·태양광 동력 방식 표시",
+   "examples": [
+    "ELECTRIC",
+    "신진계전주식회사 SHIN JIN INSTRUMENT & ELECTRIC CO.,LTD",
+    "AVALANCHE ELECTRIC WEAR by Parsons"
+   ],
+   "approved": false
+  },
+  "energy": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    5,
+    32
+   ],
+   "note": "에너지 보충 효능 표시(음료·보충제)",
+   "examples": [
+    "ODIN ENERGY",
+    "XTREME ENERGY",
+    "SEP Solar Energy Platform"
+   ],
+   "approved": false
+  },
+  "engineering": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "SUM ENGINEERING",
+    "KOREA INSTITUTE of CIVIL ENGINEERING and BUILDING TECHNOLOGY",
+    "this is_engineering;"
+   ],
+   "approved": false
+  },
+  "english": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41
+   ],
+   "note": "교육업·교육 내용(언어) 용도 표시",
+   "examples": [
+    "잉글리시티 ENGLISH TEA",
+    "BOOKLISH CLT ENGLISH",
+    "잉글리쉬PaL iBT English Pal"
+   ],
+   "approved": false
+  },
+  "espresso": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "커피·커피 음료의 원재료, 카페업(43)·판매업(35)의 취급품 표시",
+   "examples": [
+    "COFFEE AND SOME Espresso & Dessert Cafe",
+    "Amitie COFFEE ESPRESSO",
+    "THE MOUNTAIN OF SEATTLE Mt.RAINIER ESPRESSO & MILK"
+   ],
+   "approved": false
+  },
+  "essence": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "e essence",
+    "젠틀러 올인원 에센스 GENTLER ALL IN ONE ESSENCE",
+    "Essence of Argan"
+   ],
+   "approved": false
+  },
+  "est": {
+   "kind": "시기",
+   "absolute": true,
+   "classes": null,
+   "note": "SINCE·EST. + 연도의 창업 시기 표시(보통으로 사용하는 방법)",
+   "examples": [
+    "crescendo coffee roasters truest expression of coffee est.2015",
+    "EST",
+    "NUMBER TWENTY-ONE EST.2011"
+   ],
+   "approved": false
+  },
+  "ev": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    7,
+    9,
+    11,
+    12
+   ],
+   "note": "전기·하이브리드·태양광 동력 방식 표시",
+   "examples": [
+    "G-DOCK ev",
+    "나누EV",
+    "IMK-EV"
+   ],
+   "approved": false
+  },
+  "everyday": {
+   "kind": "사용방법",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    25,
+    30
+   ],
+   "note": "매일 사용·일상용 사용방법 표시",
+   "examples": [
+    "Cafe Everyday & Everywhere 25",
+    "건강기능식품 트리플러스 멀티비타민+미네랄+오메가-3 CENOVIS Health Functional Food Triplus EVERYDAY HEALTH 92 Capsules(120.5g)",
+    "YOON'S EVERYDAY PHONICS"
+   ],
+   "approved": false
+  },
+  "excellent": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "eXe EXE excellent excitement",
+    "Elyes Your excellent stay"
+   ],
+   "approved": false
+  },
+  "express": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    35,
+    39,
+    42
+   ],
+   "note": "신속 배송·처리 품질 표시(운송·판매·서비스)",
+   "examples": [
+    "HK express",
+    "ASCO EXPRESS",
+    "Johnny EXPRESS"
+   ],
+   "approved": false
+  },
+  "eye": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "MULTI-EYE",
+    "eye Born",
+    "아이러브안과 eye love i love.com"
+   ],
+   "approved": false
+  },
+  "eyes": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "보브 컬렉션 아이즈 VOV COLLECTION EYES",
+    "e.l.f. eyes.lips.face",
+    "VISUAL EYES"
+   ],
+   "approved": false
+  },
+  "face": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "NEW FACE",
+    "VOLTE FACE",
+    "뉴페이스 NEW FACE"
+   ],
+   "approved": false
+  },
+  "famous": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "fast": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    35,
+    39,
+    42
+   ],
+   "note": "신속 배송·처리 품질 표시(운송·판매·서비스)",
+   "examples": [
+    "slow food fast",
+    "onbap fresh fast food bibimbap",
+    "FAST RETAILING"
+   ],
+   "approved": false
+  },
+  "filter": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    7,
+    11
+   ],
+   "note": "여과 용도 표시",
+   "examples": [
+    "HEPAPRO FILTER SYSTEM",
+    "AIR+ BAMBOO CHARCOAL FILTER",
+    "FUJI FILTER"
+   ],
+   "approved": false
+  },
+  "fine": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "My First Fine Dining Babi 술술 Good Food, Good Feelings",
+    "피죤 화인 데오 후레쉬 Fine Deo Fresh",
+    "FINE DIGITAL FINE Vu"
+   ],
+   "approved": false
+  },
+  "first": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "ARTEFILL THE FIRST TO LAST",
+    "My First Fine Dining Babi 술술 Good Food, Good Feelings",
+    "퍼스트 레이디 가구 FL First lady Time to come cenoville"
+   ],
+   "approved": false
+  },
+  "fish": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "PASSE PUB FISH&CHIP",
+    "Fish and Chips",
+    "더 피쉬 THE FISH"
+   ],
+   "approved": false
+  },
+  "fitness": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    25,
+    28,
+    41,
+    44
+   ],
+   "note": "운동·스포츠 용도 표시",
+   "examples": [
+    "FACIAL FITNESS",
+    "Fitness First",
+    "JAMESGYM FITNESS CENTER"
+   ],
+   "approved": false
+  },
+  "foam": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "이액형 폴리우레탄폼 이지-Z ez FOAM",
+    "[주]광성테크 이액형 폴리우레탄폼 ez FOAM",
+    "Micro foam cushion"
+   ],
+   "approved": false
+  },
+  "food": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품·식사 — 식품류·요식업의 용도 표시",
+   "examples": [
+    "세스코식품안전 세스코 Food Safety Zone CESCO FS Food Safety Members",
+    "My First Fine Dining Babi 술술 Good Food, Good Feelings",
+    "노아식품 Noah Food"
+   ],
+   "approved": false
+  },
+  "foods": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품·식사 — 식품류·요식업의 용도 표시",
+   "examples": [
+    "RUDOLPH Foods",
+    "SWEET EARTH NATURAL FOODS",
+    "WHOLE FOODS MARKET"
+   ],
+   "approved": false
+  },
+  "foot": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "THE FOOT SHOP",
+    "기 Chi Foot Patches",
+    "FOOT LOCKER"
+   ],
+   "approved": false
+  },
+  "fresh": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    3,
+    29,
+    30,
+    31,
+    32,
+    43
+   ],
+   "note": "신선한 — 식품·화장품의 품질 표시",
+   "examples": [
+    "SWEET&SOUR Fresh FRUITS BOX",
+    "FRESH LIGHT",
+    "FRESH! e"
+   ],
+   "approved": false
+  },
+  "fruit": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "SIROP Sport L'ENERGIE AU COEUR DU FRUIT",
+    "지노 sweet fruit drip",
+    "10 STRAWBERRY Pureut fruit The taste of 10"
+   ],
+   "approved": false
+  },
+  "fruits": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "SWEET&SOUR Fresh FRUITS BOX",
+    "YOUNG&NEW IDEA OF FRUITS YOUNG FARMERS",
+    "탐'스팜 Tom's Farm PREMIUM DRIED NUTS AND FRUITS"
+   ],
+   "approved": false
+  },
+  "gallery": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    41,
+    43,
+    44
+   ],
+   "note": "시설·업태 표시(스튜디오·갤러리·클럽·센터)",
+   "examples": [
+    "갤러리 칸 화랑 한국예술망 GALLERY KAN",
+    "RISING GALLERY",
+    "[in] Gallery"
+   ],
+   "approved": false
+  },
+  "game": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    28,
+    41
+   ],
+   "note": "게임 — 용도 표시",
+   "examples": [
+    "GAME GOLF",
+    "GAME",
+    "10분 교과서 game"
+   ],
+   "approved": false
+  },
+  "games": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    28,
+    41
+   ],
+   "note": "게임 — 용도 표시",
+   "examples": [
+    "XL2GAMES",
+    "CROWN GAMES",
+    "RUNIC GAMES"
+   ],
+   "approved": false
+  },
+  "gel": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "αGEL Discover Softness.",
+    "purifee Patch & Sports Gel",
+    "SANG A DIO GEL"
+   ],
+   "approved": false
+  },
+  "glass": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "VR GLASS",
+    "2.5D Edge Glass",
+    "2.5D Rounded Glass"
+   ],
+   "approved": false
+  },
+  "glow": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    44
+   ],
+   "note": "윤기·광채·리프팅 효능 표시",
+   "examples": [
+    "GLOW TONIC",
+    "UNICORN GLOW",
+    "4gf glow factor"
+   ],
+   "approved": false
+  },
+  "gold": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "한국표준금거래소 KOREA GOLD STANDARD",
+    "Teal Gold",
+    "Gold Diamond"
+   ],
+   "approved": false
+  },
+  "golf": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    25,
+    28,
+    35,
+    41
+   ],
+   "note": "골프 용품·골프장업 용도 표시",
+   "examples": [
+    "Golf it!",
+    "GAME GOLF",
+    "SEOSAN GOLF&RESORT"
+   ],
+   "approved": false
+  },
+  "good": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "THAT'S GOOD SCIENCE!",
+    "My First Fine Dining Babi 술술 Good Food, Good Feelings",
+    "FUNCTIONAL PILLOW GOLD LABEL Good잠"
+   ],
+   "approved": false
+  },
+  "great": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "트러스트미 TRUST미 GREAT FOOD SOLUTION",
+    "ASPIRE LIFESTYLES MAKING GREAT BRANDS BETTER",
+    "M ZERO SUGaR HYDRO GREAT WHITE"
+   ],
+   "approved": false
+  },
+  "grill": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "BONEFISH GRILL",
+    "한남돼지 GRILL HOUSE",
+    "자연의 맛을 품고있는 맛의 정상 미소마루 미소마루인 NATURE FOOD & GRILL"
+   ],
+   "approved": false
+  },
+  "gym": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    25,
+    28,
+    41,
+    44
+   ],
+   "note": "운동·스포츠 용도 표시",
+   "examples": [
+    "비전짐 Vision Gym",
+    "GYM LVFT",
+    "English GYM"
+   ],
+   "approved": false
+  },
+  "hair": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "LUNA HAIR",
+    "헤어 락 Hair Rak RAK",
+    "감이조아 Hair color Gamijoa"
+   ],
+   "approved": false
+  },
+  "hand": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "KOBEANS Korean Hand made caffe beans A wind blew in from the sea",
+    "Hand-Ray",
+    "H HANTTAM since 2016 HAND MADE IN KOREA"
+   ],
+   "approved": false
+  },
+  "handmade": {
+   "kind": "생산방법",
+   "absolute": false,
+   "classes": null,
+   "note": "수제·핸드메이드 생산방법 표시(류 불문이나 절대어는 아님 → 류 미지정)",
+   "examples": [
+    "Handmade Rainbow Dessert Cafe Bless Cafe ROLL.ICE.COFFEE",
+    "AIRELOOM CALIFORNIA DESIGN HANDMADE",
+    "AROMA ROSEE Candle & Diffuser Handmade"
+   ],
+   "approved": false
+  },
+  "hands": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "BLU hands",
+    "FORTE HANDS COFFEE",
+    "GOOD & FRESH BROWN HANDS"
+   ],
+   "approved": false
+  },
+  "hd": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    11,
+    38
+   ],
+   "note": "LED·HD·UV 기술 사양 표시",
+   "examples": [
+    "한국호간보HD-1GOLD",
+    "호간보 HD-2GOLD",
+    "HD"
+   ],
+   "approved": false
+  },
+  "heal": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    41,
+    44
+   ],
+   "note": "치유·회복 효능 표시",
+   "examples": [
+    "다힐 DA HeAL",
+    "아쿠아힐 AQUA HEAL",
+    "Medi heal"
+   ],
+   "approved": false
+  },
+  "healing": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    41,
+    44
+   ],
+   "note": "치유·회복 효능 표시",
+   "examples": [
+    "365Healing (365힐링)",
+    "힐링 메디컬 센터 Healing Medical Center",
+    "힐링의원 Healing Medical Center 365"
+   ],
+   "approved": false
+  },
+  "health": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    5,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "건강 효능·용도 표시(건강식품·의료업·운동업)",
+   "examples": [
+    "NATURAL HEALTH KEEPER JUNAM BERRY KING ARONIA FARM",
+    "Health Up ABC Mix System",
+    "IMS HEALTH NEXXUS"
+   ],
+   "approved": false
+  },
+  "healthcare": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    5,
+    10,
+    44
+   ],
+   "note": "의약·의료·치료 — 상품·서비스 용도 표시",
+   "examples": [
+    "Seoul National University Bundang Hospital Healthcare Innovation Park",
+    "헬스케어타운 힐링힐즈 HEALING HILLS HEALTHCARE TOWN",
+    "E&S Healthcare"
+   ],
+   "approved": false
+  },
+  "healthy": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    5,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "건강 효능·용도 표시(건강식품·의료업·운동업)",
+   "examples": [
+    "ECO HENNA DETOX HEALTHY BENEFIT ORGANIC",
+    "[윌리브] wIllive your healthy life partner",
+    "Healthy Fry"
+   ],
+   "approved": false
+  },
+  "honey": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "Honey Bunch",
+    "허니버터아몬드 HONEY BUTTER ALMOND",
+    "머거본 허니버터아몬드 Murgerbon HONEY BUTTER ALMOND"
+   ],
+   "approved": false
+  },
+  "hospital": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "굳센병원 GOOD SSEN HOSPITAL",
+    "GS안과 Good Sight Eye Hospital",
+    "L.Hospital"
+   ],
+   "approved": false
+  },
+  "hot": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    11,
+    30,
+    43
+   ],
+   "note": "뜨거운·매운 성질 표시",
+   "examples": [
+    "HOT COLD APOLLO",
+    "신전떡볶이 HOT TEMPLE caution ! VERY VERY HOT",
+    "HOT STAR Never Ending Fantastic"
+   ],
+   "approved": false
+  },
+  "hotel": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    43,
+    44
+   ],
+   "note": "숙박·미용 업태 표시",
+   "examples": [
+    "Comfy hotel",
+    "LQ HOTEL",
+    "Hard Rock HOTEL & CASINO"
+   ],
+   "approved": false
+  },
+  "hotels": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    43,
+    44
+   ],
+   "note": "숙박·미용 업태 표시",
+   "examples": [
+    "DELTA HOTELS AND RESORTS",
+    "DELTA HOTELS",
+    "W HOTELS"
+   ],
+   "approved": false
+  },
+  "house": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "MAGIC IN THE CUSHION ETUDE HOUSE",
+    "REGATTA HOUSE",
+    "벽창호 BCH House Make Up"
+   ],
+   "approved": false
+  },
+  "hybrid": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    7,
+    9,
+    11,
+    12
+   ],
+   "note": "전기·하이브리드·태양광 동력 방식 표시",
+   "examples": [
+    "lil HYBRID",
+    "HYBRID",
+    "하이브리드 HYBRID"
+   ],
+   "approved": false
+  },
+  "institute": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41
+   ],
+   "note": "교육업·교육 내용(언어) 용도 표시",
+   "examples": [
+    "KOREA INSTITUTE of CIVIL ENGINEERING and BUILDING TECHNOLOGY",
+    "감정노동연구소 ELi Emotional Labor institute",
+    "링구아어학원 LANGUAGE INSTITUTE LINGUA THE REAL iBT LANGUAGE INSTITUTE"
+   ],
+   "approved": false
+  },
+  "internet": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    35,
+    38,
+    42
+   ],
+   "note": "디지털·데이터·온라인·모바일 — IT 상품·서비스의 용도 표시",
+   "examples": [
+    "해법 영어교실 Internet Based Test iBT",
+    "데일리 daily INTERNET CAFE",
+    "IOP INTERNET OF PESTS"
+   ],
+   "approved": false
+  },
+  "investment": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    16,
+    36
+   ],
+   "note": "금융·결제 용도 표시",
+   "examples": [
+    "DSC INVESTMENT",
+    "AskVERITAS financial INVESTMENT",
+    "위브 플래닝 Investment & Development"
+   ],
+   "approved": false
+  },
+  "jelly": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "JELLY BEAN",
+    "HEAVENLY JELLY",
+    "멜티젤리 MELTY JELLY"
+   ],
+   "approved": false
+  },
+  "juice": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "음료·주류의 종류 표시 — 주점·판매업 취급품",
+   "examples": [
+    "Green Monster Juice",
+    "Cafe MAMAS cafe mamas Enjoy!!! Coffee,sandwich,fresh juice home made salad",
+    "GO JUICE"
+   ],
+   "approved": false
+  },
+  "junior": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    16,
+    18,
+    20,
+    21,
+    24,
+    25,
+    28,
+    35,
+    41,
+    44
+   ],
+   "note": "사용자(유아·아동·남성·여성) 용도 표시",
+   "examples": [
+    "SS seostech IBT junior",
+    "NOTON JUNIOR",
+    "뽀빠이 POPEYE JUNIOR"
+   ],
+   "approved": false
+  },
+  "kids": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    16,
+    18,
+    20,
+    21,
+    24,
+    25,
+    28,
+    35,
+    41,
+    44
+   ],
+   "note": "사용자(유아·아동·남성·여성) 용도 표시",
+   "examples": [
+    "UNDEFEATED UNDFTD KIDS",
+    "KIDS HYUNDAI",
+    "Teddy Bear kids"
+   ],
+   "approved": false
+  },
+  "kitchen": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "Organic noodle Kitchen",
+    "KITCHEN FIT",
+    "P LOUISIANA KITCHEN"
+   ],
+   "approved": false
+  },
+  "korean": {
+   "kind": "산지",
+   "absolute": false,
+   "classes": null,
+   "note": "산지·국적 표시(한국산·미국산) — 류 미지정, 4호 지명과 별개",
+   "examples": [
+    "사단법인 문화나눔 Korean Culture to the World",
+    "둘마니치킨 Two Korean Style Two Chicken",
+    "고고기 GOGO-GI! KOREAN BBQ TO-GO"
+   ],
+   "approved": false
+  },
+  "lab": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    42,
+    44
+   ],
+   "note": "연구소 — 업종 표시",
+   "examples": [
+    "DR+ LAB",
+    "DL Dr.LAB SINCE 1984",
+    "FORHAIR FORMULA DREAM BIOMEDICAL LAB"
+   ],
+   "approved": false
+  },
+  "laboratory": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    42,
+    44
+   ],
+   "note": "연구소 — 업종 표시",
+   "examples": [
+    "부강연구소 Fortro Laboratory",
+    "HUMAN BIO SCIENCE LABORATORY HUBISLAB HUMAN BIO SCIENCE LAB",
+    "THE SOOP LANDSCAPE LABORATORY"
+   ],
+   "approved": false
+  },
+  "labs": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    42,
+    44
+   ],
+   "note": "연구소 — 업종 표시",
+   "examples": [
+    "KLAIRE LABS",
+    "AIVE LABS",
+    "IMINE Labs"
+   ],
+   "approved": false
+  },
+  "leather": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "Genuine Cordovan Leather",
+    "Cordovan Leather",
+    "Genuine Red Leather"
+   ],
+   "approved": false
+  },
+  "led": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    11,
+    38
+   ],
+   "note": "LED·HD·UV 기술 사양 표시",
+   "examples": [
+    "LED BRT",
+    "OSRAM LED SUPERSTAR",
+    "이모션 LED"
+   ],
+   "approved": false
+  },
+  "lemon": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "Lemon-Aid",
+    "SPORTS CANDY HIMALAYA SALT EXTRA COOL Mint Candy Lemon Flavour",
+    "BLUE LEMON"
+   ],
+   "approved": false
+  },
+  "lift": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    44
+   ],
+   "note": "윤기·광채·리프팅 효능 표시",
+   "examples": [
+    "HANSA HEAVY LIFT",
+    "THE DOGGIE LIFT",
+    "EASY LIFT"
+   ],
+   "approved": false
+  },
+  "light": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    11,
+    25,
+    29,
+    30,
+    32,
+    33
+   ],
+   "note": "가벼운·저칼로리 품질 표시",
+   "examples": [
+    "FRESH LIGHT",
+    "magnic light",
+    "Candle light"
+   ],
+   "approved": false
+  },
+  "lip": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "Festival Lip Drop",
+    "TONYMOLY LIP LUX",
+    "TONYMOLY KISS LOVER LIP LUX"
+   ],
+   "approved": false
+  },
+  "lite": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    11,
+    25,
+    29,
+    30,
+    32,
+    33
+   ],
+   "note": "가벼운·저칼로리 품질 표시",
+   "examples": [
+    "ATOMIC LITE 파동수",
+    "MID-LITE",
+    "Q-LITE"
+   ],
+   "approved": false
+  },
+  "lock": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    6,
+    9
+   ],
+   "note": "잠금 용도 표시",
+   "examples": [
+    "더블락리프팅 Double Lock Lifting",
+    "아토락 Ato Lock",
+    "브랜드 마케팅 비용을 소비자께 돌려드리겠습니다. NO Brand LOCK STAR"
+   ],
+   "approved": false
+  },
+  "logistics": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    39
+   ],
+   "note": "물류업 용도 표시",
+   "examples": [
+    "HANJIN Logistics Corporation",
+    "중통국제 International Logistics",
+    "Samyang Logistics"
+   ],
+   "approved": false
+  },
+  "lounge": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "T T Lounge Travel Service",
+    "AMORE BEAUTY LOUNGE",
+    "lounge 보름"
+   ],
+   "approved": false
+  },
+  "makeup": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    35,
+    41,
+    44
+   ],
+   "note": "화장품·미용 — 용도·업종 표시",
+   "examples": [
+    "Makeup Plus",
+    "Milk MAKEUP",
+    "MAKEUP BY MARIO PRO"
+   ],
+   "approved": false
+  },
+  "mall": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "판매업 업태 표시",
+   "examples": [
+    "디텍스 몰 A.P.M DETAX mall by-apm",
+    "Gotcha! mall",
+    "The PREMIUM Pizza Mall QUALIFIED Co. ALL THAT PIZZA & SALAD SINCE 1994"
+   ],
+   "approved": false
+  },
+  "management": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "경영 컨설팅·관리 서비스 용도 표시",
+   "examples": [
+    "KOEM Korea Marine Environment Management Corporation",
+    "해양환경관리공단 KOEM Korea Marine Environment Management Corporation",
+    "WOORI Global Asset Management"
+   ],
+   "approved": false
+  },
+  "mango": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "MIGHTY MANGO",
+    "M MANGO",
+    "Mango"
+   ],
+   "approved": false
+  },
+  "market": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "판매업 업태 표시",
+   "examples": [
+    "로켓펀치마켓 Rocket Punch Market",
+    "베스처 파머스 마켓 Besture Farmer's Market",
+    "SSAMZIE MARKET"
+   ],
+   "approved": false
+  },
+  "mart": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "판매업 업태 표시",
+   "examples": [
+    "브리즈 마트 BREEZE MART",
+    "다농 L mart",
+    "NC Mart"
+   ],
+   "approved": false
+  },
+  "mask": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10
+   ],
+   "note": "마스크 — 용도·형상 표시",
+   "examples": [
+    "INSOLUTION AQUARINGER SKIN CLINIC MASK",
+    "DUO MASK",
+    "러버마스크 Rubber Mask"
+   ],
+   "approved": false
+  },
+  "max": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "Super 와 같은 정도·우수성 강조어(심사실무상 식별력 없는 부가어) — 승인 검토 권장",
+   "examples": [
+    "K-max",
+    "GEORGIA MAX COFFEE",
+    "idea MAX FOR A BETTER VALUE"
+   ],
+   "approved": false
+  },
+  "meal": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품·식사 — 식품류·요식업의 용도 표시",
+   "examples": [
+    "밀고 땅기는 맛! 밀땅 떡볶이 Meal",
+    "우리곡물 올바른한끼 곡물 건강을 위해 가족을 위해 어머니의 따뜻한 마음으로 정성을 다해 채웠습니다 a Healthy Meal",
+    "어니스트밀 HONEST MEAL"
+   ],
+   "approved": false
+  },
+  "meat": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "미트박스 meat box",
+    "Hello! NICE TO MEAT",
+    "음메닷컴 UMME Urban Meat Market Express"
+   ],
+   "approved": false
+  },
+  "media": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    38,
+    41
+   ],
+   "note": "미디어 — 방송·광고업 용도 표시",
+   "examples": [
+    "フジ·メディア·ホㅡルディングス Fuji Media Holdings",
+    "yello Shopping Media",
+    "MEDIA MACHINE"
+   ],
+   "approved": false
+  },
+  "medical": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    5,
+    10,
+    44
+   ],
+   "note": "의약·의료·치료 — 상품·서비스 용도 표시",
+   "examples": [
+    "더리더스 THE LEADERS MEDICAL CENTER",
+    "힐링 메디컬 센터 Healing Medical Center",
+    "Medical Sportainment"
+   ],
+   "approved": false
+  },
+  "medicine": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    5,
+    10,
+    44
+   ],
+   "note": "의약·의료·치료 — 상품·서비스 용도 표시",
+   "examples": [
+    "노아한의원 NOA ORIENTAL MEDICINE",
+    "SCIENCE TO MEDICINE",
+    "생체활성의학 BAM Bio-Active Medicine"
+   ],
+   "approved": false
+  },
+  "mega": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "Super 와 같은 정도·우수성 강조어(심사실무상 식별력 없는 부가어) — 승인 검토 권장",
+   "examples": [
+    "Mega Flux",
+    "Mega Value Innovator",
+    "XERA-MEGA"
+   ],
+   "approved": false
+  },
+  "men": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    16,
+    18,
+    20,
+    21,
+    24,
+    25,
+    28,
+    35,
+    41,
+    44
+   ],
+   "note": "사용자(유아·아동·남성·여성) 용도 표시",
+   "examples": [
+    "닥터퍼틸에이더 맨&우먼 Dr. FERTILAIDER MEN&WOMEN",
+    "B.A Men",
+    "모베러맨 Mo' better men"
+   ],
+   "approved": false
+  },
+  "metal": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "ALPINE METAL TECH",
+    "METAL",
+    "스카이 테크노 메탈 SKY Techno Metal"
+   ],
+   "approved": false
+  },
+  "micro": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    9,
+    10,
+    42
+   ],
+   "note": "초소형·미세 표시",
+   "examples": [
+    "Micro foam cushion",
+    "MICRO TRAINING CLAIM THE LIFE YOU DESERVE",
+    "MICRO"
+   ],
+   "approved": false
+  },
+  "milk": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "MONSTER MILK",
+    "THE MOUNTAIN OF SEATTLE Mt.RAINIER ESPRESSO & MILK",
+    "백미당 백미당 LAUREL TOP BAEKMIDANG 1964 Organic Milk"
+   ],
+   "approved": false
+  },
+  "mini": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": null,
+   "note": "소형 형상 표시(류 미지정)",
+   "examples": [
+    "NX MINI",
+    "LINEAR MINI",
+    "mini chichi"
+   ],
+   "approved": false
+  },
+  "mist": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "ALGO MIST",
+    "조성아 투웬티투 스노우 볼 미스트 chosungah ver. 22 Snow Ball Mist",
+    "그린 미스트 Green Mist"
+   ],
+   "approved": false
+  },
+  "mobile": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    35,
+    38,
+    42
+   ],
+   "note": "디지털·데이터·온라인·모바일 — IT 상품·서비스의 용도 표시",
+   "examples": [
+    "헤이스트 Lineage mobile",
+    "해피모바일 HAPPY mobile",
+    "yello mobile"
+   ],
+   "approved": false
+  },
+  "morning": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    30,
+    43
+   ],
+   "note": "사용 시기(아침·밤용) 표시",
+   "examples": [
+    "MD MIRACULOUS goodmorning cosmetics GOOD MORNING COSMETIC",
+    "모닝스쿨 Morning School",
+    "모닝글로리 MORNING GLORY"
+   ],
+   "approved": false
+  },
+  "motors": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    12,
+    37
+   ],
+   "note": "자동차 — 용도·업종 표시",
+   "examples": [
+    "장수 motors",
+    "EDISON MOTORS",
+    "STAR motors"
+   ],
+   "approved": false
+  },
+  "museum": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    41,
+    43,
+    44
+   ],
+   "note": "시설·업태 표시(스튜디오·갤러리·클럽·센터)",
+   "examples": [
+    "심 SIM SAMSUNG INNOVATION MUSEUM",
+    "teddy bear museum",
+    "CURLYBROWN TEDDY BEAR MUSEUM"
+   ],
+   "approved": false
+  },
+  "music": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    15,
+    41
+   ],
+   "note": "음악 — 용도 표시",
+   "examples": [
+    "Meerkat Music Recommendation & Curation System",
+    "BRANDNEW MUSIC",
+    "뮤직시티 MUSIC CITY"
+   ],
+   "approved": false
+  },
+  "nail": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "Nailympics Asia International Nail Competition",
+    "NAIL EXPO",
+    "banila NAIL & BEAUTY"
+   ],
+   "approved": false
+  },
+  "natural": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    1,
+    3,
+    5,
+    29,
+    30,
+    31,
+    32
+   ],
+   "note": "천연 성분·원재료 표시",
+   "examples": [
+    "SMART NATURAL TECHNOLOGY",
+    "NATURAL HEALTH KEEPER JUNAM BERRY KING ARONIA FARM",
+    "신선원 Super natural"
+   ],
+   "approved": false
+  },
+  "naturally": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    1,
+    3,
+    5,
+    29,
+    30,
+    31,
+    32
+   ],
+   "note": "천연 성분·원재료 표시",
+   "examples": [
+    "친환경 천연자연 비료 Y&C Copration naturally... Activit 4-3-2",
+    "WIREPAS Things connected - Naturally",
+    "NATURALLY JOJO"
+   ],
+   "approved": false
+  },
+  "network": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "WORLD STARS NETWORK",
+    "S.N.O.W SOOKMYUNG NETWORK FOR OPEN WORLD",
+    "ZIO Millennium Network Frontier"
+   ],
+   "approved": false
+  },
+  "networks": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "SEGA NETWORKS",
+    "GOLFZON NETWORKS",
+    "DIVA NETWORKS"
+   ],
+   "approved": false
+  },
+  "new": {
+   "kind": "시기",
+   "absolute": true,
+   "classes": null,
+   "note": "신제품·신규를 뜻하는 시기·품질 표시(NEW 접두 관행)",
+   "examples": [
+    "NEW매직",
+    "NEW MILLENNIUM",
+    "NEW SCIENCE VENTURES"
+   ],
+   "approved": false
+  },
+  "nice": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "사나이스 4NICE",
+    "Hello! NICE TO MEAT",
+    "Nice and Slow"
+   ],
+   "approved": false
+  },
+  "night": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    30,
+    43
+   ],
+   "note": "사용 시기(아침·밤용) 표시",
+   "examples": [
+    "SUPER BOOST NIGHT SERUM WITH ALASTA",
+    "SUPER NIGHT VISION",
+    "다크나이트 DARK NIGHT"
+   ],
+   "approved": false
+  },
+  "oil": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "es Elastine Moroccan Oil",
+    "REC-OIL",
+    "닥터스랩 블루마린 드라이 오일 dR doctorslab Bluemarine Dry Oil"
+   ],
+   "approved": false
+  },
+  "online": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    35,
+    38,
+    42
+   ],
+   "note": "디지털·데이터·온라인·모바일 — IT 상품·서비스의 용도 표시",
+   "examples": [
+    "IRiS ONLINE",
+    "불멸 ONLINE",
+    "서유기 전 Online"
+   ],
+   "approved": false
+  },
+  "organic": {
+   "kind": "생산방법",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    31,
+    32
+   ],
+   "note": "유기농 생산방법 표시",
+   "examples": [
+    "Organic noodle Kitchen",
+    "Organic Honesty",
+    "ECO HENNA DETOX HEALTHY BENEFIT ORGANIC"
+   ],
+   "approved": false
+  },
+  "oriental": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32,
+    44
+   ],
+   "note": "원재료·성분 표시(홍삼·단백질·한방 성분) — 건강식품·화장품·의료업",
+   "examples": [
+    "노아한의원 NOA ORIENTAL MEDICINE",
+    "궁중비책 내추럴 한방에센스 성분 Natural Oriental-Rx",
+    "궁중비책 Oriental Formula for Babies"
+   ],
+   "approved": false
+  },
+  "original": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "ORIGINAL JAMS",
+    "더페이스샵 오리지널 소스 100 THEFACESHOP Original Source 100",
+    "Original 어린이 캣's"
+   ],
+   "approved": false
+  },
+  "outdoor": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    22,
+    25,
+    28,
+    41,
+    43
+   ],
+   "note": "캠핑·아웃도어 용도 표시",
+   "examples": [
+    "T outdoor",
+    "OUTDOOR PRODUCTS",
+    "VISTA OUTDOOR"
+   ],
+   "approved": false
+  },
+  "pack": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    16
+   ],
+   "note": "팩 형태·포장 단위 표시",
+   "examples": [
+    "잇츠스킨 토닥토닥 팩 It˚S SKIN TODAK TODAK PACK",
+    "i-Pack",
+    "YEOSIN PROTEIN BOMB PERFUME SHAMPOO PACK"
+   ],
+   "approved": false
+  },
+  "paper": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "Paper Garden",
+    "PAPER DOLL",
+    "idea WORK SUPER PREMIUM PAPER FOR BETTER QUALITY"
+   ],
+   "approved": false
+  },
+  "pasta": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "Yellow Cab Pizza & Pasta",
+    "I Love PASTA",
+    "pasta ZARA"
+   ],
+   "approved": false
+  },
+  "patch": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10
+   ],
+   "note": "패치 제형 표시",
+   "examples": [
+    "purifee Patch & Sports Gel",
+    "ALOE SOOTHING MARINE EYE PATCH MiSKIN",
+    "S Patch"
+   ],
+   "approved": false
+  },
+  "pay": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    16,
+    36
+   ],
+   "note": "금융·결제 용도 표시",
+   "examples": [
+    "019 EZ-pay",
+    "COZY PAY",
+    "L.pay"
+   ],
+   "approved": false
+  },
+  "pc": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    38,
+    41,
+    42
+   ],
+   "note": "TV·PC·CD — 기기 종류·용도 표시(방송·IT 서비스 포함)",
+   "examples": [
+    "벙커PC방 KARMA Ⅱ",
+    "SHOW TIME PC&CAFE",
+    "Pc Kinder Coding"
+   ],
+   "approved": false
+  },
+  "perfect": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "Perfect Black",
+    "THE PERFECT POTION",
+    "Perfect U"
+   ],
+   "approved": false
+  },
+  "pet": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    18,
+    31,
+    35,
+    44
+   ],
+   "note": "반려동물 용도 표시",
+   "examples": [
+    "쥬펫 Zoo PET",
+    "Pet Rescue Saga",
+    "PetStory For your lovely pet"
+   ],
+   "approved": false
+  },
+  "pharma": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    5,
+    10,
+    44
+   ],
+   "note": "의약·의료·치료 — 상품·서비스 용도 표시",
+   "examples": [
+    "Dr.Muller PHARMA",
+    "Forward Pharma",
+    "Horizon Pharma"
+   ],
+   "approved": false
+  },
+  "pilates": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    25,
+    28,
+    41,
+    44
+   ],
+   "note": "운동·스포츠 용도 표시",
+   "examples": [
+    "STELLA YOGA & PILATES",
+    "INTERNATIONAL MIU PILATES",
+    "피크필라테스 한국 에듀케이션 센터 PEAK PILATES KOREA EDUCATION CENTER"
+   ],
+   "approved": false
+  },
+  "pizza": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "Yellow Cab Pizza & Pasta",
+    "1905 GIANT MONSTER PIZZA",
+    "울엄마 피자&스파게티 Wool Umma Pizza & Spaghetti"
+   ],
+   "approved": false
+  },
+  "plastic": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    10,
+    17,
+    20,
+    21,
+    44
+   ],
+   "note": "플라스틱 재질 / 성형외과(plastic surgery) 표시",
+   "examples": [
+    "FOUR Season PLASTIC SURGERY",
+    "글로벌성형외과 피부과 항노화센터 GLOBAL PLASTIC SURGERY",
+    "라비앙 성형외과 LAVIAN PLASTIC SURGERY"
+   ],
+   "approved": false
+  },
+  "platinum": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "닥터스랩 리터닝 플래티늄 마스크 dR doctorslab Returning Platinum Mask",
+    "Platinum",
+    "PLATINUM VILLE"
+   ],
+   "approved": false
+  },
+  "plus": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "Super 와 같은 정도·우수성 강조어(심사실무상 식별력 없는 부가어) — 승인 검토 권장",
+   "examples": [
+    "Channel Plus",
+    "VIEW PLUS",
+    "맵시플러스 Mab-C PLUS"
+   ],
+   "approved": false
+  },
+  "pork": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "직구삼 직화구이 배달 삼겹 직화 삼겹 www.homepork.co.kr Ziggu Home Pork",
+    "서경 양돈 청PORK 청-포크",
+    "황금돈까스 PORK CUTLET . PASTA . PIZZA . BEER"
+   ],
+   "approved": false
+  },
+  "powder": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "기름에 튀기지 않는 웰빙시즈닝가루 초간편 마법의 시즈닝가루 가루만 묻혀 전자레인지로5분, 전기오븐으로 30분이면 OK!! Wellbeing Seasoning Powder",
+    "기름에 튀기지 않는 웰빙치킨가루 초간편 마법의 치킨가루 닭고기에 가루만 묻혀 전자레인지로 5분, 전기오븐으로 30분이면 OK!! Well being Chicken Powder",
+    "Sophie powder rooms"
+   ],
+   "approved": false
+  },
+  "premium": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "해피니스 Happiness Premium eco facial tissue",
+    "Sumifru NATURE'S CHOICE Premium Brand by Sumifru",
+    "PREMIUM SIGNATURE ANGUS"
+   ],
+   "approved": false
+  },
+  "prime": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "프라임 맥 Prime Mac",
+    "PRIME UHD TV",
+    "Prime"
+   ],
+   "approved": false
+  },
+  "pro": {
+   "kind": "용도",
+   "absolute": true,
+   "classes": null,
+   "note": "전문가용·전문가 수준을 뜻하는 용도·품질 표시(PRO 접미 관행)",
+   "examples": [
+    "황종연 CP CAR PRO",
+    "IONIC PRO TURBO",
+    "ELACTION PRO"
+   ],
+   "approved": false
+  },
+  "professional": {
+   "kind": "용도",
+   "absolute": true,
+   "classes": null,
+   "note": "전문가용·전문가 수준을 뜻하는 용도·품질 표시(PRO 접미 관행)",
+   "examples": [
+    "JOWAY PROFESSIONAL",
+    "DLUX PROFESSIONAL",
+    "LINUX PROFESSIONAL INSTITUTE"
+   ],
+   "approved": false
+  },
+  "protein": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32,
+    44
+   ],
+   "note": "원재료·성분 표시(홍삼·단백질·한방 성분) — 건강식품·화장품·의료업",
+   "examples": [
+    "YEOSIN PROTEIN BOMB PERFUME SHAMPOO PACK",
+    "Premier Protein",
+    "PROTEIN MONSTER"
+   ],
+   "approved": false
+  },
+  "pub": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "PASSE PUB FISH&CHIP",
+    "날라리 MISS 츄 spanish churros pub",
+    "우 Tomo JAPANESE DINNING & PUB"
+   ],
+   "approved": false
+  },
+  "pure": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    1,
+    3,
+    5,
+    29,
+    30,
+    31,
+    32,
+    33
+   ],
+   "note": "순수·순도 품질 표시",
+   "examples": [
+    "Frosted pure cloud",
+    "PURE CALI",
+    "ORLANE PURE JEUNESSE"
+   ],
+   "approved": false
+  },
+  "quality": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "-THE PERLA COMPANY- QUALITY GUARANTEE",
+    "Taylor QUALITY GUITARS",
+    "AONE World Best Design & Quality"
+   ],
+   "approved": false
+  },
+  "quick": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    35,
+    39,
+    42
+   ],
+   "note": "신속 배송·처리 품질 표시(운송·판매·서비스)",
+   "examples": [
+    "QUICK-CHANGE ZEUS",
+    "Quick Help",
+    "QUICK PAY"
+   ],
+   "approved": false
+  },
+  "real": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "I'm Real",
+    "F.C.Real Bristol",
+    "REAL MONSTER YAP!"
+   ],
+   "approved": false
+  },
+  "research": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41,
+    42
+   ],
+   "note": "연구·개발·과학 — 서비스 용도 표시",
+   "examples": [
+    "Lam RESEARCH",
+    "페더리서치웍스 Feather Research Works",
+    "한국항공우주연구원 KARI KOREA AEROSPACE ReSEARCH INSTITUTE 1989"
+   ],
+   "approved": false
+  },
+  "resort": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    43,
+    44
+   ],
+   "note": "숙박·미용 업태 표시",
+   "examples": [
+    "SEOSAN GOLF&RESORT",
+    "아일랜드 캐슬 Metro WaterPark Resort ISLAND CASTLE",
+    "The Ocean RESORT"
+   ],
+   "approved": false
+  },
+  "restaurant": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "김선생 Food RestauranT",
+    "한국전통음식점 우미관 KOREAN RESTAURANT",
+    "PALETTE RESTAURANT"
+   ],
+   "approved": false
+  },
+  "rice": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "SRB STABILIZED RICE BRAN",
+    "MEDI RICE",
+    "RICE & CHICKEN JOY CUPS"
+   ],
+   "approved": false
+  },
+  "ring": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    14
+   ],
+   "note": "반지·링 형상 표시",
+   "examples": [
+    "Angel's Ring Holika Holika",
+    "STYLE RING",
+    "엔젤 링 ANGEL RING"
+   ],
+   "approved": false
+  },
+  "robot": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    7,
+    9,
+    28
+   ],
+   "note": "로봇 — 상품 종류·용도 표시",
+   "examples": [
+    "카트로봇 THE KART ROBOT",
+    "HELLO ROBOT",
+    "TOYO FA&ROBOT"
+   ],
+   "approved": false
+  },
+  "rubber": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "러버마스크 Rubber Mask",
+    "동일고무벨트주식회사 DONGIL DONGIL RUBBER BELT CO, LTD",
+    "동일고무벨트주식회사 DONGIL DONGIL RUBBER BELT CO,LTD"
+   ],
+   "approved": false
+  },
+  "ruby": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "RUBY",
+    "Ruby-Cell",
+    "BASIS RUBY"
+   ],
+   "approved": false
+  },
+  "safe": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    10,
+    12,
+    37,
+    45
+   ],
+   "note": "안전 품질 표시(안전장치·보안업)",
+   "examples": [
+    "En' Safe",
+    "SAFE LOCK LEO",
+    "SAFE H DECK by marine aluminium"
+   ],
+   "approved": false
+  },
+  "safety": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    10,
+    12,
+    37,
+    45
+   ],
+   "note": "안전 품질 표시(안전장치·보안업)",
+   "examples": [
+    "세스코식품안전 세스코 Food Safety Zone CESCO FS Food Safety Members",
+    "SAFETY TOTAL SOLUTION UNILINE",
+    "KASK safety concept 100% made in Italy"
+   ],
+   "approved": false
+  },
+  "salon": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    43,
+    44
+   ],
+   "note": "숙박·미용 업태 표시",
+   "examples": [
+    "컬러 디멘션 헤어 살롱 헤어 컬러 두피관리 전문점 Korea Beauty Edutainment Hair Salon Color Dimension",
+    "VANILLA BOUQUET Premium Nail Salon",
+    "VIDAL SASSOON SALON SCIENCE"
+   ],
+   "approved": false
+  },
+  "salt": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "salt",
+    "SPORTS CANDY HIMALAYA SALT EXTRA COOL Mint Candy Lemon Flavour",
+    "히말라야 크리스탈마운틴 salt"
+   ],
+   "approved": false
+  },
+  "sapphire": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "Sapphire",
+    "BLACK SAPPHIRE",
+    "SWEET SAPPHIRE"
+   ],
+   "approved": false
+  },
+  "school": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41
+   ],
+   "note": "교육업·교육 내용(언어) 용도 표시",
+   "examples": [
+    "모닝스쿨 Morning School",
+    "링컨하우스스쿨 위쎈 LINCOLN HOUSE SCHOOL LH",
+    "BTS BACK TO SCHOOL"
+   ],
+   "approved": false
+  },
+  "science": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41,
+    42
+   ],
+   "note": "연구·개발·과학 — 서비스 용도 표시",
+   "examples": [
+    "THAT'S GOOD SCIENCE!",
+    "NEW SCIENCE VENTURES",
+    "SMART NATURE SCIENCE"
+   ],
+   "approved": false
+  },
+  "seafood": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "진보해선 JUMBO SEAFOOD 식",
+    "SANFORD BEAUTIFUL NEW ZEALAND SEAFOOD",
+    "SEAFOOD FROM NORWAY"
+   ],
+   "approved": false
+  },
+  "series": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": null,
+   "note": "제품군(시리즈) 표시 — 류 미지정",
+   "examples": [
+    "3X-Series",
+    "Q Series",
+    "S Series"
+   ],
+   "approved": false
+  },
+  "service": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "waasup wireless as a service up",
+    "아쉬 콜렉션 ASH&ASH ALL SERVICE HIGH",
+    "NIT SERVICE"
+   ],
+   "approved": false
+  },
+  "set": {
+   "kind": "수량",
+   "absolute": false,
+   "classes": null,
+   "note": "세트 구성 수량 표시 — 류 미지정",
+   "examples": [
+    "MAGFORMERS SUPER S.T.E.A.M SET",
+    "UP SET"
+   ],
+   "approved": false
+  },
+  "shine": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    44
+   ],
+   "note": "윤기·광채·리프팅 효능 표시",
+   "examples": [
+    "워터 샤인 WATER SHINE",
+    "INFINITE SHINE",
+    "샤인미 Shine 미"
+   ],
+   "approved": false
+  },
+  "shop": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "판매업 업태 표시",
+   "examples": [
+    "MAGNUM THE BOTTLE SHOP",
+    "FRANK's THE GOURMET SPECIALITY CAKE SHOP",
+    "메모리숍 Memory Shop"
+   ],
+   "approved": false
+  },
+  "shopping": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "판매업 업태 표시",
+   "examples": [
+    "yello Shopping Media",
+    "plein 해외쇼핑 by GSeshop Global Shopping",
+    "OTM Shopping"
+   ],
+   "approved": false
+  },
+  "silver": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "Silver Line",
+    "CENTIREX SILVER",
+    "SILVER REED"
+   ],
+   "approved": false
+  },
+  "since": {
+   "kind": "시기",
+   "absolute": true,
+   "classes": null,
+   "note": "SINCE·EST. + 연도의 창업 시기 표시(보통으로 사용하는 방법)",
+   "examples": [
+    "BEDDINHOUSE SINCE 1978 beddinghouse",
+    "바다명가 since1998",
+    "아딸 한국인의 평생별미 튀김 떡볶이 아딸 플러스 since 1972"
+   ],
+   "approved": false
+  },
+  "skin": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "잇츠스킨 토닥토닥 팩 It˚S SKIN TODAK TODAK PACK",
+    "SKIN O2",
+    "INSOLUTION AQUARINGER SKIN CLINIC MASK"
+   ],
+   "approved": false
+  },
+  "skincare": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    35,
+    41,
+    44
+   ],
+   "note": "화장품·미용 — 용도·업종 표시",
+   "examples": [
+    "ibom ATO BABY&KIDS SKINCARE",
+    "Princess SKINCARE",
+    "RODAN + FIELDS LIFE-CHANGING SKINCARE"
+   ],
+   "approved": false
+  },
+  "sleep": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    5,
+    10,
+    20,
+    24
+   ],
+   "note": "수면용 용도 표시",
+   "examples": [
+    "D-Sleep",
+    "굿슬립 Good sleep",
+    "SLEEP SPA"
+   ],
+   "approved": false
+  },
+  "slim": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    25,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "체중 감량 효능·용도 표시",
+   "examples": [
+    "AIR SLIM",
+    "RAZOR SLIM",
+    "광기가Slim"
+   ],
+   "approved": false
+  },
+  "smart": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    35,
+    38,
+    42
+   ],
+   "note": "지능형·스마트 기능 표시(전자기기·IT 서비스)",
+   "examples": [
+    "T smart",
+    "SMART LINEAR",
+    "Smart suggestion"
+   ],
+   "approved": false
+  },
+  "soap": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "the 숲솝 the SOOP soap",
+    "Soap",
+    "Clean Soap Basol"
+   ],
+   "approved": false
+  },
+  "soda": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "음료·주류의 종류 표시 — 주점·판매업 취급품",
+   "examples": [
+    "SODA",
+    "OSAKA SODA",
+    "SCOTCH & SODA"
+   ],
+   "approved": false
+  },
+  "soft": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    3,
+    16,
+    24,
+    25
+   ],
+   "note": "부드러운 촉감 품질 표시(섬유·화장지·의류)",
+   "examples": [
+    "Visibly Soft",
+    "Living SOFT TISSUE",
+    "레인보우 소프트 아이스크림 Rainbow Soft Ice Since 2015 Bless Ice Dessert Cafe"
+   ],
+   "approved": false
+  },
+  "solar": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    7,
+    9,
+    11,
+    12
+   ],
+   "note": "전기·하이브리드·태양광 동력 방식 표시",
+   "examples": [
+    "SEP Solar Energy Platform",
+    "BODY SOLAR",
+    "SOLAR"
+   ],
+   "approved": false
+  },
+  "solution": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "V Solution",
+    "M3 Solution Center",
+    "SAFETY TOTAL SOLUTION UNILINE"
+   ],
+   "approved": false
+  },
+  "solutions": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "ARIUM SCALP&HAIR SOLUTIONS",
+    "TACO COMFORT SOLUTIONS",
+    "NEO-Solutions"
+   ],
+   "approved": false
+  },
+  "spa": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    43,
+    44
+   ],
+   "note": "숙박·미용 업태 표시",
+   "examples": [
+    "휴 쉼 Shim spa",
+    "O'SPA",
+    "후 SPA PALACE"
+   ],
+   "approved": false
+  },
+  "special": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "나캇타노 なかったの! Special",
+    "다이아스페샬 DIA +special",
+    "EMIS Every Moment Is Special"
+   ],
+   "approved": false
+  },
+  "sport": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    25,
+    28,
+    41,
+    44
+   ],
+   "note": "운동·스포츠 용도 표시",
+   "examples": [
+    "P KING PIA SPORT",
+    "SIROP Sport L'ENERGIE AU COEUR DU FRUIT",
+    "DRAGON SPORT"
+   ],
+   "approved": false
+  },
+  "sports": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    25,
+    28,
+    41,
+    44
+   ],
+   "note": "운동·스포츠 용도 표시",
+   "examples": [
+    "SPORTS TOMMYATKINS",
+    "PARADISE SPORTS",
+    "BEIN SPORTS"
+   ],
+   "approved": false
+  },
+  "steak": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "THE STEAK HOUSE",
+    "Premium Steak Restaurant THEre STEAKki-PLUS by factory",
+    "헤비 스테이크 HEAVY STEAK"
+   ],
+   "approved": false
+  },
+  "stone": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "STONE AGE",
+    "MILE STONE",
+    "BLACK STONE EXCLUSIVE GOLF CLUB"
+   ],
+   "approved": false
+  },
+  "store": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "판매업 업태 표시",
+   "examples": [
+    "IBOOKS STORE",
+    "the ARRIVAL STORE.com",
+    "APP STORE"
+   ],
+   "approved": false
+  },
+  "studio": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    41,
+    43,
+    44
+   ],
+   "note": "시설·업태 표시(스튜디오·갤러리·클럽·센터)",
+   "examples": [
+    "TEDDY BEAR STUDIO",
+    "Silicon Studio",
+    "NEWFACE Studio Et Creative"
+   ],
+   "approved": false
+  },
+  "super": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "로케트하이슈퍼 ROCKER HI-SUPER",
+    "신선원 Super natural",
+    "SUPER WHITE 377 Extra Deeper Formula"
+   ],
+   "approved": false
+  },
+  "supreme": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "하이퍼학원 HYPER ACADEMY HYPER SUPREME",
+    "SUPREME",
+    "Real SUPREME STAR"
+   ],
+   "approved": false
+  },
+  "surgery": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "FOUR Season PLASTIC SURGERY",
+    "글로벌성형외과 피부과 항노화센터 GLOBAL PLASTIC SURGERY",
+    "라비앙 성형외과 LAVIAN PLASTIC SURGERY"
+   ],
+   "approved": false
+  },
+  "surgical": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "포리아 신경외과용 스폰지 POLYA. NEURO SURGICAL SPONGES",
+    "VERB SURGICAL",
+    "THINK SURGICAL"
+   ],
+   "approved": false
+  },
+  "sushi": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "요요Sushi 요 요요스시 Japanese Restaurant",
+    "스시조 Sushi-Joe",
+    "생활스시 Sushi せいかつすし"
+   ],
+   "approved": false
+  },
+  "sweet": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    30,
+    32,
+    43
+   ],
+   "note": "단맛 품질 표시",
+   "examples": [
+    "SWEET&SOUR Fresh FRUITS BOX",
+    "SWEET MONSTER",
+    "Sweet MONSTER Monster Popcorn"
+   ],
+   "approved": false
+  },
+  "system": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "HEPAPRO FILTER SYSTEM",
+    "ESST SYSTEM",
+    "Health Up ABC Mix System"
+   ],
+   "approved": false
+  },
+  "systems": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "OVERWATCH TEXTRON SYSTEMS",
+    "Jacobs Vehicle Systems",
+    "ECOWATER SYSTEMS"
+   ],
+   "approved": false
+  },
+  "tea": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "차 — 원재료·취급품 표시",
+   "examples": [
+    "가벼운 하루의 시작 Li-tea",
+    "천년의 Tea-um",
+    "Tea-um"
+   ],
+   "approved": false
+  },
+  "tech": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "TECH Tire Repairs",
+    "동양이지텍 DONG YANG EASY TECH",
+    "ALPINE METAL TECH"
+   ],
+   "approved": false
+  },
+  "technical": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "R.T.S. ROCHEM Technical Services",
+    "TECHNICAL LUXURY",
+    "TECHNICAL EDITION"
+   ],
+   "approved": false
+  },
+  "technologies": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "life technologies",
+    "PHOENIX TECHNOLOGIES",
+    "AUTOMOTIVE DYTECH DYNAMIC FLUID TECHNOLOGIES"
+   ],
+   "approved": false
+  },
+  "technology": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    37,
+    38,
+    42
+   ],
+   "note": "테크·시스템·솔루션·서비스·네트워크 — 업종·용도 부가어(심사실무상 식별력 없음)",
+   "examples": [
+    "Will technology",
+    "ZEN TECH TECHNOLOGY",
+    "SMART NATURAL TECHNOLOGY"
+   ],
+   "approved": false
+  },
+  "therapeutics": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    5,
+    10,
+    44
+   ],
+   "note": "의약·의료·치료 — 상품·서비스 용도 표시",
+   "examples": [
+    "juno THERAPEUTICS",
+    "NUON THERAPEUTICS",
+    "ENTASIS THERAPEUTICS"
+   ],
+   "approved": false
+  },
+  "therapy": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    5,
+    10,
+    44
+   ],
+   "note": "의약·의료·치료 — 상품·서비스 용도 표시",
+   "examples": [
+    "coffee therapy",
+    "IMPACT IMmune Personalized And Creative Therapy",
+    "Essay Therapy"
+   ],
+   "approved": false
+  },
+  "tomato": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "TOMATO",
+    "토마토 TOMATO",
+    "단마토 danmato Highly Sweet Tomato"
+   ],
+   "approved": false
+  },
+  "top": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "SOLO TOP",
+    "THINK FORWARD 2018 GLOBAL TOP 20",
+    "TOP SE7EN 7"
+   ],
+   "approved": false
+  },
+  "tour": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    39,
+    43
+   ],
+   "note": "여행업 용도 표시",
+   "examples": [
+    "서울시티투어버스 Seoul City Tour Bus",
+    "에어서울투어닷컴 AIR SEOUL TOUR.COM",
+    "에어서울투어 AIR SEOUL TOUR"
+   ],
+   "approved": false
+  },
+  "traditional": {
+   "kind": "생산방법",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    33,
+    41,
+    43
+   ],
+   "note": "전통 방식 생산·전통 음식 표시",
+   "examples": [
+    "전통이 살아있는 맛깔스런 고집 황소고집 HWANGSOGOJIB KOREAN TRADITIONAL RESTAURANT",
+    "백년갈비 MANHOMEAT BAEKNYOUN GALBI Korea Traditional Restaurant",
+    "신응수가 통뼈본가 신응수가 TONG BBYEO BON GA KOREAN TRADITIONAL RESTAURANT TONG BBYEO BON GA"
+   ],
+   "approved": false
+  },
+  "travel": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    39,
+    43
+   ],
+   "note": "여행업 용도 표시",
+   "examples": [
+    "travel CHANNEL",
+    "24HRS travel",
+    "TRASURE TRAVEL + LEISURE"
+   ],
+   "approved": false
+  },
+  "tv": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    38,
+    41,
+    42
+   ],
+   "note": "TV·PC·CD — 기기 종류·용도 표시(방송·IT 서비스 포함)",
+   "examples": [
+    "Curved TV PANORAMA",
+    "u DIF 거울TV",
+    "SUPER TV"
+   ],
+   "approved": false
+  },
+  "ultra": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "Super 와 같은 정도·우수성 강조어(심사실무상 식별력 없는 부가어) — 승인 검토 권장",
+   "examples": [
+    "Ultra Tech",
+    "Ultra Vera",
+    "ULTRA MUSIC FESTIVAL"
+   ],
+   "approved": false
+  },
+  "uv": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    11,
+    38
+   ],
+   "note": "LED·HD·UV 기술 사양 표시",
+   "examples": [
+    "Uv채널",
+    "UV365",
+    "UV CHECKER"
+   ],
+   "approved": false
+  },
+  "velvet": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    6,
+    9,
+    12,
+    14,
+    16,
+    17,
+    18,
+    19,
+    21,
+    23,
+    24,
+    25,
+    28
+   ],
+   "note": "재질·원재료 표시",
+   "examples": [
+    "IRENE SEULGI WENDY JOY Red Velvet",
+    "BLACK VELVET",
+    "VELVET"
+   ],
+   "approved": false
+  },
+  "vintage": {
+   "kind": "시기",
+   "absolute": false,
+   "classes": [
+    20,
+    25,
+    33
+   ],
+   "note": "빈티지 — 제조 시기·양식 표시(가구·의류·주류)",
+   "examples": [
+    "COCKTAIL C Vintage Couture Casual",
+    "VINTAGE CASUAL",
+    "Vintage rose"
+   ],
+   "approved": false
+  },
+  "vr": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    41,
+    42
+   ],
+   "note": "인공지능·가상현실 기술 표시",
+   "examples": [
+    "SOCIAL VR",
+    "VR GLASS",
+    "VR Tour"
+   ],
+   "approved": false
+  },
+  "water": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "DMZ WATER",
+    "오투웰 O2 Well LIVE WATER",
+    "워터 샤인 WATER SHINE"
+   ],
+   "approved": false
+  },
+  "wedding": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    25,
+    41,
+    45
+   ],
+   "note": "웨딩 — 용도 표시",
+   "examples": [
+    "W WEDDING W-wedding",
+    "더블유웨딩 W WEDDING W - wedding",
+    "웨딩 쿨 Wedding CooL"
+   ],
+   "approved": false
+  },
+  "white": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    2,
+    3,
+    21
+   ],
+   "note": "색채·미백(화이트닝) 표시",
+   "examples": [
+    "NIVEA invisible FOR BLACK & WHITE",
+    "Cloud 9 BLANC DE WHITE Im;BEAUTY",
+    "DAZZLING WHITE"
+   ],
+   "approved": false
+  },
+  "woman": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    16,
+    18,
+    20,
+    21,
+    24,
+    25,
+    28,
+    35,
+    41,
+    44
+   ],
+   "note": "사용자(유아·아동·남성·여성) 용도 표시",
+   "examples": [
+    "Dot & Stripes CHILD WOMAN",
+    "THE PIONEER WOMAN",
+    "TOURISM SOUVENIR w Ander woman FOR WOMEN"
+   ],
+   "approved": false
+  },
+  "women": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    16,
+    18,
+    20,
+    21,
+    24,
+    25,
+    28,
+    35,
+    41,
+    44
+   ],
+   "note": "사용자(유아·아동·남성·여성) 용도 표시",
+   "examples": [
+    "TOURISM SOUVENIR w Ander woman FOR WOMEN",
+    "TOURISM SOUVENIR wAnder woman FOR WOMEN",
+    "닥터퍼틸에이더 맨&우먼 Dr. FERTILAIDER MEN&WOMEN"
+   ],
+   "approved": false
+  },
+  "yogurt": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "YOGURT FARM",
+    "sweetFrog premium frozen yogurt",
+    "HEY YOGURT"
+   ],
+   "approved": false
+  },
+  "zero": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제로(무가당·무칼로리) 품질 표시",
+   "examples": [
+    "ZERO",
+    "ZERO SECOND",
+    "NOX ZERO"
+   ],
+   "approved": false
+  },
+  "가구": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "퍼스트 레이디 가구 FL First lady Time to come cenoville",
+    "에이스 가구 ACE FURNITURE",
+    "사랑이 꽃피는 가구 iloom"
+   ],
+   "approved": false
+  },
+  "갈비찜": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "대웅 미트코리아 덤앤덤 5단계 매운맛 매운 갈비찜 신",
+    "킹왕 갈비찜&찜닭"
+   ],
+   "approved": false
+  },
+  "감자탕": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "덩더꿍 감자탕 체인점 문의 본점",
+    "아낌없이 퍼 준다. 제1탄 청춘 감자탕",
+    "청춘 뼈다귀 감자탕 청춘"
+   ],
+   "approved": false
+  },
+  "건강한": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    5,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "건강 효능·용도 표시(건강식품·의료업·운동업)",
+   "examples": [
+    "The 더 건강한",
+    "건강한 맛, 우리 시래기 따봉 시래기",
+    "건강한 약속 바른"
+   ],
+   "approved": false
+  },
+  "고급": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "동원코팅 고급 동"
+   ],
+   "approved": false
+  },
+  "골드": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "고려인삼 홍삼 파낙스 골드 KOREAN RED GINSENG",
+    "개로나민 골드",
+    "블루아이 루테인 골드 BLUEEYE LUTEIN Gold"
+   ],
+   "approved": false
+  },
+  "곱창": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "팔합 팔합 곱창 용주",
+    "군자 그녀가 선택한 곱창 대한곱창 대한",
+    "재경이네 곱창"
+   ],
+   "approved": false
+  },
+  "국수": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "환 미소 국수 환한 미소가 가득한 국수집",
+    "신의 국수",
+    "국수.모듬전 한식 전문 이자까야 셰프의국수전 국수전인"
+   ],
+   "approved": false
+  },
+  "굿": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "굿 라이프"
+   ],
+   "approved": false
+  },
+  "김밥": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "몬스터 김밥 MONSTER GIMBAP",
+    "땡초 동대문 김밥 DONGDAEMOON SINCE 2013",
+    "사나이 김밥"
+   ],
+   "approved": false
+  },
+  "나이스": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "넘버원": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "누룽지": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "아빠닭 참나무 누룽지 장작구이",
+    "햇반 가마솥 누룽지를 담은 누룽지 숭늉"
+   ],
+   "approved": false
+  },
+  "뉴": {
+   "kind": "시기",
+   "absolute": true,
+   "classes": null,
+   "note": "신제품·신규를 뜻하는 시기·품질 표시(NEW 접두 관행)",
+   "examples": [
+    "힌스 뉴 뎁스 아이섀도우"
+   ],
+   "approved": false
+  },
+  "다이아몬드": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "블랙 다이아몬드",
+    "다이아몬드",
+    "다이아몬드 스마일라식"
+   ],
+   "approved": false
+  },
+  "다이어트": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    25,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "체중 감량 효능·용도 표시",
+   "examples": [
+    "그린 실루엣 다이어트",
+    "챔피온 다이어트 워킹슈즈",
+    "그린 몬스터 다이어트"
+   ],
+   "approved": false
+  },
+  "닭갈비": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "고수 닭갈비",
+    "강촌식당 닭갈비 & 꼬막요리 전문점 강촌식당 닭갈비 꼬막비빔밥",
+    "숯불에 구운 닭갈비 여우골숯닭"
+   ],
+   "approved": false
+  },
+  "닭강정": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "신포 닭강정 국제시장",
+    "월 월이 메밀 닭강정",
+    "육림 닭강정"
+   ],
+   "approved": false
+  },
+  "데일리": {
+   "kind": "사용방법",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    25,
+    30
+   ],
+   "note": "매일 사용·일상용 사용방법 표시",
+   "examples": [
+    "데일리 플래닛 DAILY PLANET",
+    "데일리 휴 PHOTOTHERAPY 휴",
+    "데일리"
+   ],
+   "approved": false
+  },
+  "동이": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "땡초랑 같이 먹는 동이 왕 돈까스",
+    "동이"
+   ],
+   "approved": false
+  },
+  "디럭스": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "떡볶이": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "아딸 한국인의 평생별미 튀김 떡볶이 아딸 플러스 since 1972",
+    "한국인의 평생별미 튀김 떡볶이 아딸 since 1972",
+    "킹콩 떡볶이 킹콩떡볶이와 즐거운 만남!"
+   ],
+   "approved": false
+  },
+  "뚝배기": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "경성 뚝배기 탕",
+    "숯불구이의 명가 도산 도산 뚝배기 장대살 돈안창살 소국밥 불고기"
+   ],
+   "approved": false
+  },
+  "리얼": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "디딤돌 진 수능기출 씨&리얼",
+    "쇼 리얼 베리어 마데카 앰플 마스크 SHO Special Homecare Origin Skin calming + Skin protection MADECASSOSIDE"
+   ],
+   "approved": false
+  },
+  "마카롱": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "오색 마카롱",
+    "마카롱",
+    "마카롱 MACARON"
+   ],
+   "approved": false
+  },
+  "마트": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35
+   ],
+   "note": "판매업 업태 표시",
+   "examples": [
+    "브리즈 마트 BREEZE MART",
+    "NC 마트",
+    "다농 마트 Danong Mart"
+   ],
+   "approved": false
+  },
+  "막걸리": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "음료·주류의 종류 표시 — 주점·판매업 취급품",
+   "examples": [
+    "금정산성 고담봉 막걸리",
+    "청양 푸른맑은 빛 막걸리"
+   ],
+   "approved": false
+  },
+  "막국수": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "삼교리 동치미 막국수",
+    "뱅뱅 막국수"
+   ],
+   "approved": false
+  },
+  "만두": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "맛있는 만두 전문점 장수손만두 1976",
+    "맛있는 만두 전문점 1976 인천 굴림만두의 원조 장수 손 만두 원조"
+   ],
+   "approved": false
+  },
+  "맛있는": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    32,
+    43
+   ],
+   "note": "맛의 품질 표시",
+   "examples": [
+    "맛있는 행복",
+    "맛있는 고집 영진어묵",
+    "새우표 맛있는 고집 영진어묵 since1966"
+   ],
+   "approved": false
+  },
+  "매트": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "대일제약E매트",
+    "알앤비 매트",
+    "유한 매트"
+   ],
+   "approved": false
+  },
+  "맥반석": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "맥반석",
+    "맥반석 면역농 면역농 Sangguk immune agriculture"
+   ],
+   "approved": false
+  },
+  "맥스": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "Super 와 같은 정도·우수성 강조어(심사실무상 식별력 없는 부가어) — 승인 검토 권장",
+   "examples": [
+    "조지아 맥스 커피",
+    "에이-맥스 A-MAX",
+    "미니:맥스"
+   ],
+   "approved": false
+  },
+  "맥주": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "음료·주류의 종류 표시 — 주점·판매업 취급품",
+   "examples": [
+    "난리피자 화덕피자와 맥주 Nanli Pizza",
+    "오리온 맥주"
+   ],
+   "approved": false
+  },
+  "명품": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "명품 백년 돌침대",
+    "명가 Chinese 명품 중국어 명가차이니즈",
+    "부뚜막 명품 찜 보리굴비"
+   ],
+   "approved": false
+  },
+  "물티슈": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "우리집 잘된다 생생타올 물티슈",
+    "100 C 고온살균정제 물티슈 네모난물",
+    "100 C 고온살균 물티슈 네모난물"
+   ],
+   "approved": false
+  },
+  "밥상": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "약이되는 밥상 약밥",
+    "바다 밥상 돌잠미역국",
+    "풍경이 있는 밥상 어울림 수풀림 갈비"
+   ],
+   "approved": false
+  },
+  "베스트": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "부대찌개": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "킹콩 부대찌개 KINGKONG",
+    "허기숙할머니 원조 오뎅식당 오뎅집인 대한민국 최초 부대찌개 1호점 since1960",
+    "의정부 보영 의정부 부대찌개 보영식당 BOYOUNG KOREAN RESTAURANT SINCE 2005 BOYOUNG Korean Restaurant www.boyoung1129.co.kr"
+   ],
+   "approved": false
+  },
+  "불고기": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "닭똥집 불고기 전문점 똥꼬집",
+    "숯불구이의 명가 도산 도산 뚝배기 장대살 돈안창살 소국밥 불고기",
+    "언양 기와집 불고기 Eonyang Giwhajip Bulgogi"
+   ],
+   "approved": false
+  },
+  "뷰티": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    35,
+    41,
+    44
+   ],
+   "note": "화장품·미용 — 용도·업종 표시",
+   "examples": [
+    "인사이드 뷰티 케어 INSIDE BEAUTY CARE",
+    "상아 뷰티 SANGA Beauty",
+    "아이오스 뷰티"
+   ],
+   "approved": false
+  },
+  "비스킷": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "비스킷 VISCUIT",
+    "비스킷",
+    "비스킷 탭"
+   ],
+   "approved": false
+  },
+  "사이다": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "음료·주류의 종류 표시 — 주점·판매업 취급품",
+   "examples": [
+    "사이다"
+   ],
+   "approved": false
+  },
+  "삼겹살": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "백억식당 백억 생 삼겹살",
+    "삼겹살도시락 집으로 삼겹살 돼지 GOLD&FOOD",
+    "뚱뚜루 삼겹살"
+   ],
+   "approved": false
+  },
+  "성형외과": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "아이리스 성형외과",
+    "포시즌 성형외과 O+fs",
+    "라비앙 성형외과 LAVIAN PLASTIC SURGERY"
+   ],
+   "approved": false
+  },
+  "세트": {
+   "kind": "수량",
+   "absolute": false,
+   "classes": null,
+   "note": "세트 구성 수량 표시 — 류 미지정",
+   "examples": [
+    "더페이스샵 비 마이 원 러브 수지향수 스페셜 세트"
+   ],
+   "approved": false
+  },
+  "소스": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "더페이스샵 오리지널 소스 100 THEFACESHOP Original Source 100",
+    "응급실 떡볶이 소스"
+   ],
+   "approved": false
+  },
+  "수제": {
+   "kind": "생산방법",
+   "absolute": false,
+   "classes": null,
+   "note": "수제·핸드메이드 생산방법 표시(류 불문이나 절대어는 아님 → 류 미지정)",
+   "examples": [],
+   "approved": false
+  },
+  "순대": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "또순이 순대.막창구이 신",
+    "호동 순대",
+    "정미자 신림동 또순이 순대"
+   ],
+   "approved": false
+  },
+  "순수": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    1,
+    3,
+    5,
+    29,
+    30,
+    31,
+    32,
+    33
+   ],
+   "note": "순수·순도 품질 표시",
+   "examples": [
+    "3겹 DECO Soft & Strong CIP New 땡큐 100% 순수 천연펄프 30롤",
+    "순수 순수백과"
+   ],
+   "approved": false
+  },
+  "슈퍼": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "슈퍼 하보끼",
+    "알록달록 콩콩이 슈퍼R콩"
+   ],
+   "approved": false
+  },
+  "스마트": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    9,
+    35,
+    38,
+    42
+   ],
+   "note": "지능형·스마트 기능 표시(전자기기·IT 서비스)",
+   "examples": [
+    "스마트 센스 SMART SENSE",
+    "하츠 스마트 클린 시스템 Haatz Smart Clean System",
+    "하츠 스마트 후드 Haatz Smart Hood"
+   ],
+   "approved": false
+  },
+  "스킨": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "스킨 매치 클래식 Skin match Classic",
+    "스킨79 커버스트 SKIN79 Coverst",
+    "sound바디 sound스킨"
+   ],
+   "approved": false
+  },
+  "스파게티": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "울엄마 피자&스파게티 Wool Umma Pizza & Spaghetti",
+    "베티 스파게티 Betty SPAGhetty"
+   ],
+   "approved": false
+  },
+  "스페셜": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "더페이스샵 비 마이 원 러브 수지향수 스페셜 세트"
+   ],
+   "approved": false
+  },
+  "슬림": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    25,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "체중 감량 효능·용도 표시",
+   "examples": [
+    "헬레네 슬림 HELENE SLIM",
+    "무풍에어컨 슬림",
+    "무풍 슬림"
+   ],
+   "approved": false
+  },
+  "시리즈": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": null,
+   "note": "제품군(시리즈) 표시 — 류 미지정",
+   "examples": [],
+   "approved": false
+  },
+  "식탁": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "지미방 식탁 오빠부대찌개",
+    "오늘의 식탁 today table",
+    "오늘의 식탁"
+   ],
+   "approved": false
+  },
+  "신발": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "신발 위생관리기 슈스타일러",
+    "신광준의 혹 달린 신발"
+   ],
+   "approved": false
+  },
+  "신상": {
+   "kind": "시기",
+   "absolute": true,
+   "classes": null,
+   "note": "신제품·신규를 뜻하는 시기·품질 표시(NEW 접두 관행)",
+   "examples": [],
+   "approved": false
+  },
+  "신선": {
+   "kind": "품질",
+   "absolute": false,
+   "classes": [
+    3,
+    29,
+    30,
+    31,
+    32,
+    43
+   ],
+   "note": "신선한 — 식품·화장품의 품질 표시",
+   "examples": [
+    "The 신선 연구소"
+   ],
+   "approved": false
+  },
+  "아이스크림": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "레인보우 소프트 아이스크림 Rainbow Soft Ice Since 2015 Bless Ice Dessert Cafe",
+    "아이스크림 가게 ICECREAM",
+    "아이스크림 베스킨 샵 IceCreamShop"
+   ],
+   "approved": false
+  },
+  "아카데미": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    41
+   ],
+   "note": "교육업·교육 내용(언어) 용도 표시",
+   "examples": [
+    "피움 아카데미",
+    "내일배움 아카데미",
+    "킥복싱을 통한 자존감의 회복! 리스펙트 킥복싱 아카데미 RK ACADEMY RESPECT KICKBOXING ACADEMY RKA"
+   ],
+   "approved": false
+  },
+  "안경": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "369안경",
+    "010 안경"
+   ],
+   "approved": false
+  },
+  "양말": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "금강 양말",
+    "상상 양말"
+   ],
+   "approved": false
+  },
+  "에너지": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    5,
+    32
+   ],
+   "note": "에너지 보충 효능 표시(음료·보충제)",
+   "examples": [
+    "오딘 에너지",
+    "긍정의 에너지 플라잉베어 회오리핫도그 FLYING BEAR",
+    "엘마르 바이칼 코어 에너지 세럼 EL MAR BAIKAL CORE ENERGY SERUM"
+   ],
+   "approved": false
+  },
+  "에스프레소": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "커피·커피 음료의 원재료, 카페업(43)·판매업(35)의 취급품 표시",
+   "examples": [],
+   "approved": false
+  },
+  "오리지널": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "바삭하고 고소한 꾸이중에 꾸이! 꾸잉꾸잉 오리지널 Seasoned Grilled Fishmeat",
+    "바삭하고 고소한 꾸이중에 꾸이! 미니 꾸잉꾸잉 오리지널 Seasoned Grilled Fishmeat",
+    "백세인 파벽발효 흑홍삼 더쑥쑥앙팡 오리지널"
+   ],
+   "approved": false
+  },
+  "요요": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "요요Sushi 요 요요스시 Japanese Restaurant",
+    "요요",
+    "요요 YOYO"
+   ],
+   "approved": false
+  },
+  "우유": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "우유 눈꽃 빙수 스노우 카페 Snow Cafe",
+    "a2 우유",
+    "소화가 잘되는 우유"
+   ],
+   "approved": false
+  },
+  "울트라": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "Super 와 같은 정도·우수성 강조어(심사실무상 식별력 없는 부가어) — 승인 검토 권장",
+   "examples": [
+    "Super 울트라 HDTV",
+    "울트라 샷 ultra shot"
+   ],
+   "approved": false
+  },
+  "워터": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "보브 워터 틴트",
+    "워터 샤인 WATER SHINE",
+    "크리스탈 워터 クリスタルウォ-タ- Crystal Water"
+   ],
+   "approved": false
+  },
+  "원조": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "굿맘 원조 할매순대국 & 양선지해장국 SINCE 1939 77년 전통",
+    "원조 팥 요리 전문점 콩지팥찌 KONGZI PATZZI",
+    "정순옥 세계제일 원조 의정부부대찌개 볶음 친구네집 SINCE 1977 Friend's House"
+   ],
+   "approved": false
+  },
+  "유기농": {
+   "kind": "생산방법",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    31,
+    32
+   ],
+   "note": "유기농 생산방법 표시",
+   "examples": [],
+   "approved": false
+  },
+  "유명": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "으뜸": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "이지": {
+   "kind": "사용방법",
+   "absolute": false,
+   "classes": null,
+   "note": "사용이 쉬움을 뜻하는 사용방법 표시(류 미지정)",
+   "examples": [
+    "이액형 폴리우레탄폼 이지-Z ez FOAM",
+    "이지 Izzy",
+    "이지 izzi"
+   ],
+   "approved": false
+  },
+  "일등": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "일류": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "전문점": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "폭주족발 신개념 족발 전문점 POKZUZOKBAL",
+    "컬러 디멘션 헤어 살롱 헤어 컬러 두피관리 전문점 Korea Beauty Edutainment Hair Salon Color Dimension",
+    "닭똥집 불고기 전문점 똥꼬집"
+   ],
+   "approved": false
+  },
+  "전통": {
+   "kind": "생산방법",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    33,
+    41,
+    43
+   ],
+   "note": "전통 방식 생산·전통 음식 표시",
+   "examples": [
+    "굿맘 원조 할매순대국 & 양선지해장국 SINCE 1939 77년 전통",
+    "천년마루 전통 고가구",
+    "영하당 전통 감자탕 뼈찜전문점"
+   ],
+   "approved": false
+  },
+  "정상": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "자연의 맛을 품고있는 맛의 정상 미소마루 미소마루인 NATURE FOOD & GRILL",
+    "정상 JLS"
+   ],
+   "approved": false
+  },
+  "정품": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "우리몸에 KOG콕 정품"
+   ],
+   "approved": false
+  },
+  "제일": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "젤": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "질경이 데일리 에코아 워시 젤"
+   ],
+   "approved": false
+  },
+  "젤라또": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "젤라또",
+    "더페이스샵 젤라또"
+   ],
+   "approved": false
+  },
+  "족발": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "폭주족발 신개념 족발 전문점 POKZUZOKBAL",
+    "군족 오븐 정성껏 구운 바베큐 족발 OVEN & BBQ JOKBAL",
+    "훈이네 통구이 족발"
+   ],
+   "approved": false
+  },
+  "좋은": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "좋은 남자 good man",
+    "느낌이 좋은",
+    "좋은 기분 Feel So Good"
+   ],
+   "approved": false
+  },
+  "진짜": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [],
+   "approved": false
+  },
+  "진품": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "오리온 오징어 땅콩 30년 진품' 진[진]"
+   ],
+   "approved": false
+  },
+  "찜닭": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "달인의 찜닭",
+    "킹왕 갈비찜&찜닭",
+    "복닭방 치킨 찜닭 닭밝 야식 매매"
+   ],
+   "approved": false
+  },
+  "참": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
+   "examples": [
+    "참 참다운"
+   ],
+   "approved": false
+  },
+  "천연": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    1,
+    3,
+    5,
+    29,
+    30,
+    31,
+    32
+   ],
+   "note": "천연 성분·원재료 표시",
+   "examples": [
+    "가야산 천년수 내 몸을 위한 천연 미네랄 밸런스",
+    "청청' 무화과 천연 파우더 Natural Green fig Powder"
+   ],
+   "approved": false
+  },
+  "초콜릿": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "초콜릿 Chocolate",
+    "발레리나 초콜릿"
+   ],
+   "approved": false
+  },
+  "최고": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "최상": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "최우수": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "치과": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "보임 치과 BOIM",
+    "아름다운차이 치과",
+    "인텔리지 치과 iT GDN INTELLEGE DENTAL CLINIC"
+   ],
+   "approved": false
+  },
+  "치아": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "치아, 구강엔 치탄 구탄",
+    "의약외품 이제는 99세까지 28개의 건강한 치아를! 치아 마모방지 PROFESSIONAL TEETH DENTISTRY by 페리오"
+   ],
+   "approved": false
+  },
+  "치즈": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "식품의 원재료·종류 표시(음식점·판매업에서는 취급품)",
+   "examples": [
+    "치즈 Cheez",
+    "치즈 Ch_z"
+   ],
+   "approved": false
+  },
+  "치킨": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "오븐마루 치킨",
+    "텃밭 두마리 치킨 TEOT BAT two chicken",
+    "부어 치킨 Bauer chicken"
+   ],
+   "approved": false
+  },
+  "침대": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "퍼스트 레이디 침대 FL First lady Time to come cenoville",
+    "S.O.K 백년희 흙 침대",
+    "침대072"
+   ],
+   "approved": false
+  },
+  "카드": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    9,
+    16,
+    36
+   ],
+   "note": "금융·결제 용도 표시",
+   "examples": [
+    "Galaxy 카드",
+    "KB Galaxy 카드",
+    "KB국민 Galaxy 카드"
+   ],
+   "approved": false
+  },
+  "카페": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "카페 드 벨 Cafe de Belle",
+    "베티 카페 티룸 Bettys Cafe Tearoom",
+    "오롯 카페.오롯"
+   ],
+   "approved": false
+  },
+  "칼국수": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "멘도롱 칼국수",
+    "얼크니 손 칼국수",
+    "한림 칼국수"
+   ],
+   "approved": false
+  },
+  "캔디바": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "캔디바 CANDY BAR",
+    "캔디바"
+   ],
+   "approved": false
+  },
+  "커피": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "커피·커피 음료의 원재료, 카페업(43)·판매업(35)의 취급품 표시",
+   "examples": [
+    "조지아 맥스 커피",
+    "커피하우스 에버그린 에버그린과 함께... 커피, 그 이상을 즐기세요 Enjoy more than coffee with Evergreen Beans EVERGREEN BEANS",
+    "앤드류스 에그타르트 앤 커피 Andrew's Eggtart & Coffee"
+   ],
+   "approved": false
+  },
+  "케어": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    44
+   ],
+   "note": "관리·케어 용도 표시(스킨케어·헤어케어 관행)",
+   "examples": [
+    "하츠 에이스-에어 케어 엑스퍼트 Haatz Ace-Air Care Expert",
+    "인사이드 뷰티 케어 INSIDE BEAUTY CARE",
+    "드림 케어 DREAM MEDICAL GROUP"
+   ],
+   "approved": false
+  },
+  "콜라": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "음료·주류의 종류 표시 — 주점·판매업 취급품",
+   "examples": [
+    "우주에서 온 콜라",
+    "제주 크래프트 콜라 JEJU CRAFT COLA SINCE 2023"
+   ],
+   "approved": false
+  },
+  "쿠션": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    20,
+    24
+   ],
+   "note": "쿠션형 제형·형상 표시",
+   "examples": [
+    "비씨데이션 파운 커버 쿠션 BCDATION FOUN COVER CUSHION",
+    "쿠션 펌프 CUSHION PUMP",
+    "백설기 쿠션"
+   ],
+   "approved": false
+  },
+  "쿠키": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "포춘 쿠키 FORTUNE COOKIE",
+    "크라운 몬트 쿠키 CROWN MONT COOKIE"
+   ],
+   "approved": false
+  },
+  "퀄리티": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "큐브": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    28,
+    30
+   ],
+   "note": "정육면체 형상 표시",
+   "examples": [
+    "파워 큐브 POWER CUBE",
+    "큐브 스트라이커"
+   ],
+   "approved": false
+  },
+  "크리스탈": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    14,
+    21
+   ],
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "examples": [
+    "셀럽 크리스탈 살롱컬러 벨지움 다크 쇼콜라",
+    "크리스탈",
+    "크리스탈 워터 クリスタルウォ-タ- Crystal Water"
+   ],
+   "approved": false
+  },
+  "크림": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32
+   ],
+   "note": "제형·원재료 표시(젤·미스트·에센스·파우더·폼·비누·오일·크림·물)",
+   "examples": [
+    "마데카 크림",
+    "닥터스랩 블루마린 크림 dR doctorslab Bluemarine Cream",
+    "살리실 크림"
+   ],
+   "approved": false
+  },
+  "클럽": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    41,
+    43,
+    44
+   ],
+   "note": "시설·업태 표시(스튜디오·갤러리·클럽·센터)",
+   "examples": [
+    "영자 클럽 OJ O:Ja club",
+    "에머슨내셔널 컨트리 클럽",
+    "애머슨내셔널 컨트리 클럽"
+   ],
+   "approved": false
+  },
+  "클린": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    3,
+    21,
+    37
+   ],
+   "note": "세정 효능·청소업 용도 표시",
+   "examples": [
+    "하츠 스마트 클린 시스템 Haatz Smart Clean System",
+    "디 클린 D-CLEAN"
+   ],
+   "approved": false
+  },
+  "타코": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "타코",
+    "멕시칸 요녀석 타코 잘 만드는 녀석"
+   ],
+   "approved": false
+  },
+  "탑": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "구미호 유혹의 탑"
+   ],
+   "approved": false
+  },
+  "톱": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "KS 톱 10 KS TOP 10"
+   ],
+   "approved": false
+  },
+  "특급": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "특선": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [],
+   "approved": false
+  },
+  "파르페": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    30,
+    35,
+    43
+   ],
+   "note": "디저트·과자류 — 취급품·제공 음식 표시",
+   "examples": [
+    "파르페",
+    "파르페 스테이션",
+    "해태 아이리스 파르페"
+   ],
+   "approved": false
+  },
+  "파운데이션": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "메이뉴욕 포어 킬 커버 파운데이션 MAYNEWYORK PORE KILL COVER FOUNDATION",
+    "에블리 더퍼스트 파운데이션 볼륨업 리모델링"
+   ],
+   "approved": false
+  },
+  "퍼펙트": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "퍼펙트 케이오"
+   ],
+   "approved": false
+  },
+  "프라임": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "프라임 맥 Prime Mac",
+    "프라임 드마리스"
+   ],
+   "approved": false
+  },
+  "프로": {
+   "kind": "용도",
+   "absolute": true,
+   "classes": null,
+   "note": "전문가용·전문가 수준을 뜻하는 용도·품질 표시(PRO 접미 관행)",
+   "examples": [
+    "더페이스샵 프로-랩 THEFACESHOP Pro-LAB",
+    "바노바기 울쎄라 프로 pro",
+    "프로 락티움 PRO LACTIUM"
+   ],
+   "approved": false
+  },
+  "프리미엄": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
+   "examples": [
+    "프리미엄 생소고기 전문점 반값+소 \\/2 CHARCOL BARBECUE RESTARANT",
+    "프리미엄 휴나 99 Premium HUNA 99",
+    "프리미엄 맥주전문점 비플 Beer&Restaurant beeple"
+   ],
+   "approved": false
+  },
+  "프리즘": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "프리즘",
+    "프리즘 PRISM",
+    "프리즘 Frism"
+   ],
+   "approved": false
+  },
+  "플러스": {
+   "kind": "품질",
+   "absolute": true,
+   "classes": null,
+   "note": "Super 와 같은 정도·우수성 강조어(심사실무상 식별력 없는 부가어) — 승인 검토 권장",
+   "examples": [
+    "아딸 한국인의 평생별미 튀김 떡볶이 아딸 플러스 since 1972",
+    "하이-C100 플러스",
+    "단골+ 단골 플러스"
+   ],
+   "approved": false
+  },
+  "피부과": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "글로벌성형외과 피부과 항노화센터 GLOBAL PLASTIC SURGERY",
+    "HB HB피부과 HEALTH & BEAUTY",
+    "소유 피부과 SOYOO DERMATOLOGY"
+   ],
+   "approved": false
+  },
+  "피자": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    29,
+    30,
+    31,
+    32,
+    33,
+    35,
+    43
+   ],
+   "note": "제공 음식·취급 식품 표시(음식점업·판매업에서 용도, 같은 류 상품은 1호)",
+   "examples": [
+    "피자 부라보",
+    "울엄마 피자&스파게티 Wool Umma Pizza & Spaghetti",
+    "피자 파조 Pizza Pazzo"
+   ],
+   "approved": false
+  },
+  "하우스": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    35,
+    43
+   ],
+   "note": "음식점·업태 표시(카페·베이커리·그릴·바·하우스·전문점) — 43류 요식업·35류 판매업의 업종 표시",
+   "examples": [
+    "펜트 하우스 PENTHOUSE",
+    "로드 하우스",
+    "에이븐 하우스"
+   ],
+   "approved": false
+  },
+  "한방": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32,
+    44
+   ],
+   "note": "원재료·성분 표시(홍삼·단백질·한방 성분) — 건강식품·화장품·의료업",
+   "examples": [
+    "수려한 한방 발아 Complex",
+    "한방 옥수꼬",
+    "한방 피부를 다스리는 천상의 기운 더궁"
+   ],
+   "approved": false
+  },
+  "한복": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "박우근 한복 아씨 Park woo keun's Hanbok The ASSI",
+    "김영미 한복 테이블 램프 YoungMi Hansok Table Lamp"
+   ],
+   "approved": false
+  },
+  "한의원": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    10,
+    44
+   ],
+   "note": "의료업·진료과 표시",
+   "examples": [
+    "팔팔 한의원",
+    "해봄 한의원 Korean Medical Clinic",
+    "사임당 한의원"
+   ],
+   "approved": false
+  },
+  "헤어": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    10,
+    25,
+    26,
+    44
+   ],
+   "note": "사용 부위(모발·손톱·피부·몸·얼굴·눈·입술·발·손) 용도 표시",
+   "examples": [
+    "헤어 락 Hair Rak RAK",
+    "컬러 디멘션 헤어 살롱 헤어 컬러 두피관리 전문점 Korea Beauty Edutainment Hair Salon Color Dimension",
+    "이지영 헤어 컬러 틴트"
+   ],
+   "approved": false
+  },
+  "헬스": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    5,
+    29,
+    30,
+    32,
+    41,
+    44
+   ],
+   "note": "건강 효능·용도 표시(건강식품·의료업·운동업)",
+   "examples": [
+    "상아 헬스 SANGA Health",
+    "헬스 메이트"
+   ],
+   "approved": false
+  },
+  "홀로그램": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "홀로그램 HOLOGRAM",
+    "홀로그램 렌즈 HOLOGRAM LENS"
+   ],
+   "approved": false
+  },
+  "홍삼": {
+   "kind": "원재료",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    29,
+    30,
+    32,
+    44
+   ],
+   "note": "원재료·성분 표시(홍삼·단백질·한방 성분) — 건강식품·화장품·의료업",
+   "examples": [
+    "홍삼 장쾌력",
+    "홍삼나라 홍삼",
+    "고려인삼 홍삼 파낙스 골드 KOREAN RED GINSENG"
+   ],
+   "approved": false
+  },
+  "화이트": {
+   "kind": "효능",
+   "absolute": false,
+   "classes": [
+    2,
+    3,
+    21
+   ],
+   "note": "색채·미백(화이트닝) 표시",
+   "examples": [
+    "화이트 플라워",
+    "화이트 서지",
+    "피죤 화이트 밸런스 Pigeon White Balance"
+   ],
+   "approved": false
+  },
+  "후드": {
+   "kind": "용도",
+   "absolute": false,
+   "classes": [
+    3,
+    5,
+    9,
+    10,
+    11,
+    16,
+    20,
+    21,
+    25,
+    27,
+    28,
+    35,
+    37,
+    40,
+    44
+   ],
+   "note": "상품 종류 표시(고시 명칭) — 같은 류는 1호, 판매·수리·관련 서비스에서는 취급품 용도 표시",
+   "examples": [
+    "하츠 스마트 후드 Haatz Smart Hood",
+    "하츠 스마트 후드 퓨어 Haatz Smart Hood Pure"
+   ],
+   "approved": false
+  }
+ }
+}
