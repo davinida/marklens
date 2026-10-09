@@ -22,6 +22,11 @@
       그때의 재현율(유사 쌍 중 잡힌 비율) — 안전장치 설계용.
 게이트 효과: has_meaning 꺼진 쌍의 x3_raw(게이트 없는 X3) 분포·AUC, has_pronunciation 꺼진 쌍의 x1.
 히스토그램: 축마다 axes_hist_v1_<축>.png(유사·비유사, Pillow).
+식별력 전후(v0, ml/src/axes/distinctiveness.py): x1_d·x2_text_d·x3_d(약한 토큰을 extra_generic 으로
+      넘긴 값)를 같은 부분집합으로 평가하고 전후 표, x1 = 1.0 이던 쌍(비유사 포함)의 전후, 유사 쌍이
+      내려간 수(부작용)를 낸다.
+현실 분포(--with-easy-negatives [pairs_features_easy.csv]): 쉬운 음성(교차·DB, 비유사 가정)을 더해
+      심결만 / 심결+cross / 심결+cross+db 세 묶음의 AUC 를 낸다(이름 축·x4 만).
 """
 
 from __future__ import annotations
@@ -44,6 +49,7 @@ from scripts import x2_benchmark as x2b  # noqa: E402  (torch → faiss 순서�
 DEFAULT_BASE = ML_ROOT / "data" / "trials"
 DEFAULT_FEATURES = DEFAULT_BASE / "pairs_features.csv"
 DEFAULT_OUT = DEFAULT_BASE / "axes_benchmark_v1.json"
+DEFAULT_EASY = DEFAULT_BASE / "pairs_features_easy.csv"
 
 # (열, 표시, 판단축 단어, 라벨 종류, 게이트 플래그 열)
 AXES = (
@@ -53,12 +59,19 @@ AXES = (
     ("x2_whole", "X2 전체 이미지 CLIP", "외관", "표장", ("has_image",)),
     ("x3", "X3 관념", "관념", "표장", ("has_meaning_a", "has_meaning_b")),
     ("x4", "X4 상품 견련성", "상품", "최종", ("has_goods",)),
+    ("x1_d", "X1 호칭 + 식별력", "호칭", "표장", ("has_pron_a", "has_pron_b")),
+    ("x2_text_d", "X2 철자 + 식별력", "외관", "표장", ("has_spelling_a", "has_spelling_b")),
+    ("x3_d", "X3 관념 + 식별력", "관념", "표장", ("has_meaning_a", "has_meaning_b")),
 )
-NAME_AXES = ("x1", "x2_text", "x3")
+NAME_AXES = ("x1", "x2_text", "x3", "x1_d", "x2_text_d", "x3_d")
+DISTINCT_PAIRS = (("x1", "x1_d"), ("x2_text", "x2_text_d"), ("x3", "x3_d"))
+EASY_AXES = ("x1", "x1_d", "x2_text", "x2_text_d", "x3", "x3_d", "x4")
+EASY_GROUPS = (("심결", ("trial",)), ("심결+cross", ("trial", "cross")),
+               ("심결+cross+db", ("trial", "cross", "db")))
 SOURCES = ("kipris", "본문", "ocr")
 KINDS = ("거절결정불복", "무효", "권리범위확인(적극적)", "권리범위확인(소극적)")
 CORRELATION_AXES = ("x1", "x2_text", "x2_fig", "x2_whole", "x3", "x4")
-NUMERIC = ("x1", "x2_text", "x2_fig", "x2_whole", "x3", "x3_raw", "x4")
+NUMERIC = ("x1", "x2_text", "x2_fig", "x2_whole", "x3", "x3_raw", "x4", "x1_d", "x2_text_d", "x3_d")
 FLAGS = (
     "has_names", "has_pron_a", "has_pron_b", "has_meaning_a", "has_meaning_b", "has_spelling_a",
     "has_spelling_b", "has_goods", "has_image", "has_fig",
@@ -76,6 +89,9 @@ def load_features(path: Path) -> list[dict]:
             row[column] = float(raw) if raw not in (None, "") else np.nan
         for column in FLAGS:
             row[column] = int(row.get(column) or 0)
+        row.setdefault("pair_source", "trial")
+        if not row["pair_source"]:
+            row["pair_source"] = "trial"
     return rows
 
 
@@ -236,8 +252,63 @@ def gate_effect(features: list[dict], *, seed: int, bootstrap: int) -> dict:
     return result
 
 
+def distinctiveness_effect(features: list[dict], result: dict) -> dict:
+    """식별력 전후: 부분집합별 AUC 전후 + x = 1.0 이던 쌍의 전후 + 유사 쌍 하락 수(부작용)."""
+    mark = labels_for(features, "표장")
+    out: dict = {}
+    for before, after in DISTINCT_PAIRS:
+        sub_b, sub_a = result["축"][before]["부분집합"], result["축"][after]["부분집합"]
+        keys = ["a_전체", "b_판단축", "c_게이트"] + [f"e_{kind}" for kind in KINDS]
+        x, y = scores_for(features, before), scores_for(features, after)
+        valid = ~np.isnan(x) & ~np.isnan(y) & (mark >= 0)
+        ones = valid & (x >= 0.9999)
+        still = ones & (y >= 0.9999)
+        similar, dissimilar = valid & (mark == 1), valid & (mark == 0)
+        drop_similar = similar & (y < x - 1e-9)
+        drop_dissimilar = dissimilar & (y < x - 1e-9)
+        out[before] = {
+            "부분집합": {key: {"전": sub_b[key]["auc"], "후": sub_a[key]["auc"],
+                           "후_ci95": sub_a[key]["auc_ci95"], "n": sub_a[key]["n"]}
+                      for key in keys},
+            "점수_1.0_쌍": {
+                "전": {"n": int(ones.sum()), "유사": int((ones & (mark == 1)).sum()),
+                      "비유사": int((ones & (mark == 0)).sum())},
+                "후_그대로_1.0": {"n": int(still.sum()), "유사": int((still & (mark == 1)).sum()),
+                               "비유사": int((still & (mark == 0)).sum())},
+            },
+            "내려간_쌍": {
+                "유사": {"n": int(drop_similar.sum()),
+                       "평균_하락": x2b._round(float((x - y)[drop_similar].mean()))
+                       if drop_similar.any() else None},
+                "비유사": {"n": int(drop_dissimilar.sum()),
+                        "평균_하락": x2b._round(float((x - y)[drop_dissimilar].mean()))
+                        if drop_dissimilar.any() else None},
+            },
+        }
+    return out
+
+
+def realistic_distribution(features: list[dict], easy: list[dict], *, seed: int,
+                           bootstrap: int) -> dict:
+    """쉬운 음성을 더한 세 묶음의 AUC(이름 축·x4). 쉬운 음성은 비유사(0)."""
+    rows = features + easy
+    sources = np.asarray([r.get("pair_source") or "trial" for r in rows])
+    out: dict = {"쉬운_음성": {src: int((sources == src).sum()) for src in ("cross", "db")},
+                 "축": {}}
+    for axis in EASY_AXES:
+        label_kind = next(a[3] for a in AXES if a[0] == axis)
+        labels = labels_for(rows, label_kind)
+        scores = scores_for(rows, axis)
+        out["축"][axis] = {}
+        for name, allowed in EASY_GROUPS:
+            mask = np.isin(sources, allowed) & ~np.isnan(scores) & (labels >= 0)
+            out["축"][axis][name] = evaluate_subset(scores[mask], labels[mask], seed=seed,
+                                                  bootstrap=bootstrap)
+    return out
+
+
 def run(features_path: Path, *, out_path: Path, hist_dir: Path | None, seed: int = 0,
-        bootstrap: int = x2b.BOOTSTRAP_ROUNDS) -> dict:
+        bootstrap: int = x2b.BOOTSTRAP_ROUNDS, easy_path: Path | None = None) -> dict:
     features = load_features(features_path)
     mark = labels_for(features, "표장")
     result: dict = {
@@ -264,6 +335,10 @@ def run(features_path: Path, *, out_path: Path, hist_dir: Path | None, seed: int
             result["히스토그램"][column] = str(path)
     result["상관_스피어만"] = correlation_matrix(features)
     result["게이트_효과"] = gate_effect(features, seed=seed, bootstrap=bootstrap)
+    result["식별력_전후"] = distinctiveness_effect(features, result)
+    if easy_path is not None and Path(easy_path).exists():
+        easy = load_features(easy_path)
+        result["현실_분포"] = realistic_distribution(features, easy, seed=seed, bootstrap=bootstrap)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
     return result
@@ -326,6 +401,42 @@ def threshold_table(result: dict) -> str:
     return "\n".join(lines)
 
 
+def distinctiveness_table(result: dict) -> str:
+    keys = ["a_전체", "b_판단축", "c_게이트"] + [f"e_{kind}" for kind in KINDS]
+    lines = ["| 축 | " + " | ".join(k.split("_", 1)[1] for k in keys)
+             + " | 점수 1.0 쌍(유사/비유사) 전→후 | 유사 하락 n(평균) | 비유사 하락 n(평균) |",
+             "|---|" + "---|" * (len(keys) + 3)]
+    for axis, item in result["식별력_전후"].items():
+        cells = []
+        for key in keys:
+            sub = item["부분집합"][key]
+            before = "-" if sub["전"] is None else f"{sub['전']:.2f}"
+            after = "-" if sub["후"] is None else f"{sub['후']:.2f}"
+            cells.append(f"{before}→{after}")
+        ones = item["점수_1.0_쌍"]
+        drop = item["내려간_쌍"]
+        lines.append(
+            f"| {axis} | " + " | ".join(cells)
+            + f" | {ones['전']['유사']}/{ones['전']['비유사']} → "
+              f"{ones['후_그대로_1.0']['유사']}/{ones['후_그대로_1.0']['비유사']}"
+            + f" | {drop['유사']['n']} ({drop['유사']['평균_하락']}) "
+              f"| {drop['비유사']['n']} ({drop['비유사']['평균_하락']}) |"
+        )
+    return "\n".join(lines)
+
+
+def realistic_table(result: dict) -> str:
+    real = result.get("현실_분포")
+    if not real:
+        return "(쉬운 음성 없음 — --with-easy-negatives)"
+    groups = [name for name, _ in EASY_GROUPS]
+    lines = [f"쉬운 음성: cross {real['쉬운_음성']['cross']} · db {real['쉬운_음성']['db']}", "",
+             "| 축 | " + " | ".join(groups) + " |", "|---|" + "---|" * len(groups)]
+    for axis, items in real["축"].items():
+        lines.append(f"| {axis} | " + " | ".join(_cell(items[g]) for g in groups) + " |")
+    return "\n".join(lines)
+
+
 def report_text(result: dict) -> str:
     parts = [
         f"대상 {result['대상_행']}행 · 표장 라벨 유사 {result['표장라벨']['유사']}·비유사 "
@@ -341,6 +452,10 @@ def report_text(result: dict) -> str:
         correlation_table(result),
         "\n## 단독 임계값(정밀도 ≥ 0.9 가 되는 최소 점수)",
         threshold_table(result),
+        "\n## 식별력 v0 전후 (AUC 전→후; 쌍 수는 _d 축 기준)",
+        distinctiveness_table(result),
+        "\n## 현실 분포 (쉬운 음성 추가, 비유사 가정)",
+        realistic_table(result),
     ]
     gate = result["게이트_효과"]
     off, on, x1_off = gate["x3_raw_게이트꺼짐"], gate["x3_raw_게이트켜짐"], gate["x1_게이트꺼짐"]
@@ -363,9 +478,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--no-hist", action="store_true")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--bootstrap", type=int, default=x2b.BOOTSTRAP_ROUNDS)
+    parser.add_argument("--with-easy-negatives", nargs="?", const=str(DEFAULT_EASY), default=None,
+                        metavar="CSV", help="쉬운 음성 CSV(기본 pairs_features_easy.csv)를 더한 "
+                                            "현실 분포 평가")
     args = parser.parse_args(argv)
+    easy_path = Path(args.with_easy_negatives) if args.with_easy_negatives else None
     result = run(args.features, out_path=args.out, hist_dir=None if args.no_hist else args.hist_dir,
-                 seed=args.seed, bootstrap=args.bootstrap)
+                 seed=args.seed, bootstrap=args.bootstrap, easy_path=easy_path)
     print(report_text(result))
     print(f"\nJSON: {args.out}")
     return 0

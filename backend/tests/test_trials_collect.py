@@ -1819,3 +1819,51 @@ def test_review_queue_reasons_and_status_agreement(tmp_path, capsys):
     tc._write_csv(paths_.curation_queue, tc.CURATION_COLUMNS, curation)
     assert tc.main(["--data-dir", str(tmp_path), "status"]) == 0
     assert "LLM↔사람 일치율 1/2 (50%)" in capsys.readouterr().out
+
+
+def test_label_name_b_records_counterpart_name_without_touching_verdict(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    assert _label_cli(tmp_path, "label", "S2", "유사", "--source", "llm", "--evidence", "x",
+                      "--confidence", "high", "--memo", "애매: 축 명시 없음") == 0
+    before = _labels_by_trial(paths_)["S2"]
+    assert _label_cli(tmp_path, "label", "S2", "--name-b", "  큐 파이어  Q-FIRE ", "--source",
+                      "llm") == 0
+    row = _labels_by_trial(paths_)["S2"]
+    assert row["상대표장_명칭_llm"] == "큐 파이어 Q-FIRE"
+    assert {k: v for k, v in row.items() if k != "상대표장_명칭_llm"} == {
+        k: v for k, v in before.items() if k != "상대표장_명칭_llm"
+    }  # 판정·근거·메모 그대로
+    assert "상대 명칭 기록: S2 1행" in capsys.readouterr().out
+    # 도형만: 빈 값 + memo 는 기존 메모 뒤에 덧붙인다(덮어쓰지 않음), 두 번 써도 한 번만
+    for _ in range(2):
+        assert _label_cli(tmp_path, "label", "S2", "--name-b", "", "--source", "llm",
+                          "--memo", "도형") == 0
+    row = _labels_by_trial(paths_)["S2"]
+    assert row["상대표장_명칭_llm"] == "" and row["메모"] == "애매: 축 명시 없음 · 도형"
+    assert row["유사여부_확정"] == "유사" and row["라벨출처"] == "llm"
+    # human 출처로는 기록하지 않는다, 판정과 같이 주면 둘 다 기록
+    assert _label_cli(tmp_path, "label", "S2", "--name-b", "X", "--source", "human") != 0
+    assert _label_cli(tmp_path, "label", "S5", "비유사", "--name-b", "에스오", "--source", "llm",
+                      "--evidence", "y", "--confidence", "low") == 0
+    row = _labels_by_trial(paths_)["S5"]
+    assert row["유사여부_확정"] == "비유사" and row["상대표장_명칭_llm"] == "에스오"
+    assert "상대표장_명칭_llm" in tc.PRESERVED_COLUMNS
+
+
+def test_show_ids_writes_name_batches_with_facts_and_judgment(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    ids = tmp_path / "ids.txt"
+    ids.write_text("# 명칭 추출 대상\nS2\nS5\nS2\nNOPE\n", encoding="utf-8")
+    assert _label_cli(tmp_path, "show", "--batch", "1", "--ids", str(ids)) == 0
+    out = capsys.readouterr().out
+    assert "명칭 배치 2개: 2건(목록 3, labels 에 없음 1)" in out
+    batch1 = (tmp_path / "batch_1.md").read_text(encoding="utf-8")
+    batch2 = (tmp_path / "batch_2.md").read_text(encoding="utf-8")
+    assert batch1.startswith("# 상대 표장 명칭 배치 1 — 1건")
+    assert "## 1. S2 · 권리범위확인(소극적) · 상표A: B · 상대 번호: - · 기존 명칭: 본문 -" in batch1
+    assert "### 기초사실" in batch1 and "### 판단 절" in batch1
+    assert "4. 확인대상표장이 이 사건 등록상표의 권리범위에 속하는지 여부" in batch1  # 판단 절
+    assert '--name-b "<문자열>" --source llm' in batch1
+    assert "## 1. S5 ·" in batch2 and "S2" not in batch2.split("## 1.")[1]
+    for anchor in ("추정", "결정축", "등급사유", "자동등급"):
+        assert anchor not in batch1, anchor

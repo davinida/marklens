@@ -141,3 +141,81 @@ def test_report_text_lists_axes(features_csv, tmp_path):
         assert f"({column})" in text
     assert "스피어만" in text and "단독 임계값" in text and "게이트 효과" in text
     assert result["히스토그램"] == {}
+
+
+def _with_distinctiveness(rows: list[dict]) -> list[dict]:
+    """x1_d: 유사 쌍은 그대로, 비유사 쌍 중 x1 = 1.0 은 0.2 로 내려간 것처럼."""
+    for row in rows:
+        for axis in ("x1", "x2_text", "x3"):
+            value = row[axis]
+            if value and row["최종라벨"] == "비유사" and float(value) >= 0.9:
+                value = "0.2000"
+            row[f"{axis}_d"] = value
+        row["has_distinctive_part_a"] = 1
+        row["has_distinctive_part_b"] = 1
+        row["weak_a"] = row["weak_b"] = ""
+        row["pair_source"] = "trial"
+    return rows
+
+
+def _easy_rows(n: int = 20) -> list[dict]:
+    rows = []
+    for i in range(n):
+        row = {column: "" for column in pf.COLUMNS}
+        row.update({
+            "심판번호": f"cross:{i}", "최종라벨": "비유사", "표장라벨": "비유사", "이름A": "a",
+            "이름B": "b", "pair_source": "cross" if i % 2 == 0 else "db",
+            "x1": f"{0.05 + i / (4 * n):.4f}", "x1_d": f"{0.05 + i / (4 * n):.4f}",
+            "x2_text": "0.1000", "x2_text_d": "0.1000", "x3": "0.0000", "x3_d": "0.0000",
+            "x4": "0.0000" if i % 3 else "", "has_names": 1, "has_pron_a": 1, "has_pron_b": 1,
+            "has_meaning_a": 0, "has_meaning_b": 0, "has_spelling_a": 1, "has_spelling_b": 1,
+            "has_goods": 1 if i % 3 else 0,
+        })
+        rows.append(row)
+    return rows
+
+
+@pytest.fixture
+def features_with_d(tmp_path):
+    rows = _with_distinctiveness(_rows())
+    # 비유사 쌍 둘에 x1 = 1.0 을 심어 "점수 1.0 쌍" 전후를 만든다
+    rows[1]["x1"] = rows[3]["x1"] = "1.0000"
+    rows[1]["x1_d"] = rows[3]["x1_d"] = "0.2000"
+    path = tmp_path / "pairs_features.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=pf.COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+    easy = tmp_path / "pairs_features_easy.csv"
+    with easy.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=pf.COLUMNS)
+        writer.writeheader()
+        writer.writerows(_easy_rows())
+    return path, easy
+
+
+def test_distinctiveness_effect_and_realistic_distribution(features_with_d, tmp_path):
+    path, easy = features_with_d
+    result = ab.run(path, out_path=tmp_path / "out.json", hist_dir=None, bootstrap=20,
+                    easy_path=easy)
+    effect = result["식별력_전후"]["x1"]
+    assert effect["부분집합"]["a_전체"]["전"] < effect["부분집합"]["a_전체"]["후"]
+    ones = effect["점수_1.0_쌍"]
+    assert ones["전"]["비유사"] == 2 and ones["후_그대로_1.0"]["비유사"] == 0
+    assert effect["내려간_쌍"]["유사"]["n"] == 0 and effect["내려간_쌍"]["비유사"]["n"] >= 2
+    assert set(result["식별력_전후"]) == {"x1", "x2_text", "x3"}
+    assert "x1_d" in result["축"] and result["축"]["x1_d"]["부분집합"]["b_판단축"]["n"] > 0
+    real = result["현실_분포"]
+    assert real["쉬운_음성"] == {"cross": 10, "db": 10}
+    x1 = real["축"]["x1"]
+    base = result["축"]["x1"]["부분집합"]["a_전체"]["n"]
+    assert x1["심결"]["n"] == base and x1["심결+cross"]["n"] == base + 10
+    assert x1["심결+cross+db"]["n"] == base + 20
+    assert x1["심결+cross+db"]["n_비유사"] > x1["심결"]["n_비유사"]
+    assert x1["심결+cross+db"]["auc"] > x1["심결"]["auc"]  # 쉬운 음성은 점수가 낮아 AUC 가 오른다
+    x4_base = result["축"]["x4"]["부분집합"]["a_전체"]["n"]
+    assert real["축"]["x4"]["심결+cross+db"]["n"] == x4_base + 13
+    text = ab.report_text(result)
+    assert "식별력 v0 전후" in text and "현실 분포" in text and "| x1 |" in text
+    no_easy = ab.run(path, out_path=tmp_path / "out2.json", hist_dir=None, bootstrap=10)
+    assert "현실_분포" not in no_easy and "쉬운 음성 없음" in ab.report_text(no_easy)
