@@ -8,6 +8,8 @@ import json
 
 import pytest
 from src.axes import x3_semantic as x3
+from src.axes.distinctiveness import Distinctiveness, goods_index
+from src.axes.goods_map import GoodsEntry, GoodsMap
 
 from scripts import pairs_features as pf
 
@@ -141,7 +143,8 @@ def test_run_writes_csv_and_report(paths):
     assert report["대상_행"] == 4
     assert report["이름B_출처"] == {"kipris": 1, "본문": 1, "ocr": 1, "(없음)": 1}
     assert report["축별_결측"] == {
-        "x1": 1, "x2_text": 1, "x2_fig": 3, "x2_whole": 2, "x3": 1, "x3_raw": 1, "x4": 3
+        "x1": 1, "x2_text": 1, "x2_fig": 3, "x2_whole": 2, "x3": 1, "x3_raw": 1, "x4": 3,
+        "x1_d": 1, "x2_text_d": 1, "x3_d": 1,
     }
     # 스타벅스(조어)·커피빈(붙여쓴 합성어 폴백 실패)·Zyqrt 가 has_meaning False → R1·R2·R5
     assert report["게이트_꺼짐"]["x3(has_meaning 한쪽 False)"] == 3
@@ -149,3 +152,100 @@ def test_run_writes_csv_and_report(paths):
     assert report["x3_모델"] == "fake"
     saved = json.loads(out.with_name("pairs_features_report.json").read_text(encoding="utf-8"))
     assert saved["대상_행"] == 4
+
+
+# ---- 식별력 v0·LLM 명칭·쉬운 음성 ------------------------------------------------------------
+
+
+
+def _fake_model() -> Distinctiveness:
+    names, classes = goods_index(GoodsMap([GoodsEntry("커피", 30, ("G0301",))]))
+    return Distinctiveness({"gate": (12, 30), "dream": (44, 48)}, famous={"스타벅스"},
+                           goods_names=names, code_classes=classes)
+
+
+def test_name_b_prefers_llm_over_body_and_respects_figure_memo():
+    row = _label(상대표장_명칭_llm="큐파이어", 상대표장_명칭_본문="본문", 상대표장_명칭_ocr="ocr")
+    assert pf.name_b(row) == ("큐파이어", "llm")
+    row = _label(상대표장_명칭_kipris="K", 상대표장_명칭_llm="L")
+    assert pf.name_b(row) == ("K", "kipris")
+    figure = _label(상대표장_명칭_본문="㈜영명", 메모="애매: 축 명시 없음 · 도형")
+    # LLM 이 도형만이라고 적은 행은 본문으로 내려가지 않는다
+    assert pf.name_b(figure) == ("", "도형")
+    assert pf.name_b(_label(상대표장_명칭_본문="본문", 메모="도형적")) == ("본문", "본문")
+
+
+def test_distinctiveness_columns_and_whole_comparison_rule():
+    model = _fake_model()
+    rows = [
+        _label(심판번호="D1", 종류="무효", 상표A_명칭="Zorbix Gate", 상표B_번호="1",
+               유사여부_확정="비유사", 판단축_확정="외관|호칭", llm_b_유사여부="비유사",
+               상대표장_명칭_kipris="Hello Gate"),
+        _label(심판번호="D2", 종류="무효", 상표A_명칭="GATE", 상표B_번호="2",
+               유사여부_확정="비유사", 판단축_확정="외관", llm_b_유사여부="비유사",
+               상대표장_명칭_kipris="GATE"),
+        # 상품 상대적: 커피 유사군이면 커피가 1호 → 약한 토큰, 화장품이면 둘 다 요부
+        _label(심판번호="D3", 종류="무효", 상표A_명칭="Zorbix 커피", 상표B_번호="3",
+               유사여부_확정="유사", 판단축_확정="호칭", llm_b_유사여부="유사",
+               상대표장_명칭_kipris="Qwzk 커피", goods_codes_this="G0301",
+               goods_codes_prior="G0301", x4_goods="1.0000"),
+    ]
+    features = {f["심판번호"]: f for f in pf.build_features(rows, [], model=model)}
+    d1 = features["D1"]
+    assert d1["x1"] == "1.0000" and float(d1["x1_d"]) < 0.5
+    assert float(d1["x2_text_d"]) < 0.5
+    assert d1["weak_a"] == "gate" and d1["weak_b"] == "gate"
+    assert d1["has_distinctive_part_a"] == 1 and d1["has_distinctive_part_b"] == 1
+    d2 = features["D2"]  # 양쪽 다 요부 없음 → 전체 대비, 값 변화 없음
+    assert d2["has_distinctive_part_a"] == 0 and d2["x1_d"] == d2["x1"] == "1.0000"
+    assert d2["x2_text_d"] == d2["x2_text"] and d2["x3_d"] == d2["x3"]
+    d3 = features["D3"]
+    assert d3["weak_a"] == "커피" and d3["x1"] == "1.0000" and float(d3["x1_d"]) < 0.6
+    assert d3["pair_source"] == "trial" and list(d3) == pf.COLUMNS
+
+
+def test_easy_negatives_are_deterministic_and_exclude_coincidental_similarity(tmp_path):
+    model = _fake_model()
+    rows = [
+        _label(심판번호=f"E{i}", 종류="무효", 상표A_명칭=name_a, 상표B_번호=str(i),
+               유사여부_확정="유사", 판단축_확정="호칭", llm_b_유사여부="유사",
+               상대표장_명칭_kipris=name_b, goods_codes_this="G0301", goods_codes_prior="G0302")
+        for i, (name_a, name_b) in enumerate([("Zorbix", "Zorbix"), ("Qwzk", "Qwzk"),
+                                               ("Plumtaro", "Plumtaro"), ("Vexlin", "Vexlin")])
+    ]
+    features = pf.build_features(rows, [], model=model)
+    db = [("Alpharo", frozenset({"G0301"})), ("Betamix", frozenset({"G0303"})),
+          ("Zorbix", frozenset()), ("Gammatek", frozenset({"G0301"}))]
+    easy, report = pf.easy_negatives(features, rows, db, model=model, seed=0, n_cross=6, n_db=4)
+    again, _ = pf.easy_negatives(features, rows, db, model=model, seed=0, n_cross=6, n_db=4)
+    assert [r["심판번호"] for r in easy] == [r["심판번호"] for r in again]  # seed 고정
+    cross = [r for r in easy if r["pair_source"] == "cross"]
+    db_rows = [r for r in easy if r["pair_source"] == "db"]
+    assert len(cross) == 6 and len(db_rows) == 4 and report["cross"] == 6 and report["db"] == 4
+    for row in easy:
+        assert row["최종라벨"] == "비유사" and row["표장라벨"] == "비유사" and row["x2_whole"] == ""
+        assert float(row["x1"]) < 0.8 and float(row["x2_text"]) < 0.8
+        assert row["x1_d"] != "" and list(row) == pf.COLUMNS
+    assert all(r["심판번호"].split(":")[1].split("|")[0] != r["심판번호"].split("|")[1]
+               for r in cross)  # 다른 사건끼리
+    assert any(r["x4"] for r in cross) and any(r["x4"] == "" for r in db_rows)  # 유사군 있을 때만
+    assert report["우연_유사_제외"]["cross"] >= 0 and report["제외_기준"].startswith("x1 또는")
+    # 같은 이름끼리(Zorbix/Zorbix 교차)는 1.0 이라 제외되어 cross 에 없다
+    assert all(not (r["이름A"] == "Zorbix" and r["이름B"] == "Zorbix") for r in cross)
+
+
+def test_run_with_easy_negatives_writes_second_csv(paths, monkeypatch):
+    labels, pairs, out = paths
+    metadata = out.parent / "meta.json"
+    metadata.write_text(json.dumps({"trademarks": [
+        {"상표한글명": "알파로", "출원인": "a", "유사군": ["G0301"]},
+        {"상표한글명": None, "상표영문명": "Betamix", "출원인": "b", "유사군": []},
+        {"상표한글명": "감마텍", "출원인": "c", "유사군": ["G0302"]},
+    ]}, ensure_ascii=False), encoding="utf-8")
+    report = pf.run(labels, pairs, out, model=_fake_model(), easy=True, metadata_path=metadata)
+    easy_rows = pf.read_csv(out.with_name("pairs_features_easy.csv"))
+    assert report["쉬운_음성"]["db_이름"] == 3 and report["쉬운_음성"]["db"] == len(
+        [r for r in easy_rows if r["pair_source"] == "db"]
+    )
+    assert report["식별력"]["theta"] == 0.5 and "식별력_적용으로_바뀐_쌍" in report
+    assert all(r["pair_source"] in ("cross", "db") for r in easy_rows)

@@ -231,6 +231,7 @@ LLM_B_COLUMNS = ("llm_b_유사여부", "llm_b_판단축", "llm_b_제외사유", 
 ENRICH_COLUMNS = (
     "상대표장_번호_정규화", "상대표장_명칭_본문", "상대표장_명칭_ocr", "상대표장_명칭_kipris",
     "goods_codes_this", "goods_codes_prior", "x4_goods",
+    "상대표장_명칭_llm",  # label --name-b: 판단 절에서 LLM 이 옮긴 문자 표기(도형만이면 빈 값)
 )
 PRESERVED_COLUMNS = HUMAN_COLUMNS + LABEL_META_COLUMNS + LLM_B_COLUMNS + ENRICH_COLUMNS
 LABEL_COLUMNS = [
@@ -2078,7 +2079,7 @@ def run_show(args: argparse.Namespace, session: Session) -> int:
     labels: dict[str, dict] = {}
     for row in label_rows:
         labels.setdefault(row["심판번호"], row)
-    if getattr(args, "batch", 0):
+    if getattr(args, "batch", 0) or getattr(args, "ids", ""):
         return run_batch(args, session)
     trials = list(getattr(args, "trial", None) or [])
     if getattr(args, "next", False):
@@ -2368,17 +2369,52 @@ def _label_args_summary(args: argparse.Namespace) -> str:
     return " · ".join(parts)
 
 
+def apply_name_b(
+    rows: list[dict], number: str, name_b: str, *, b: str | None = None, memo: str | None = None,
+    source: str = "llm",
+) -> list[dict]:
+    """상대 표장 명칭(문자 표기)을 상대표장_명칭_llm 에 기록한다 — 판정·근거 열은 건드리지 않는다.
+
+    도형만이면 빈 문자열을 쓰고 memo(예: "도형")를 기존 메모 뒤에 덧붙인다(메모를 덮어쓰지 않음).
+    """
+    if source != "llm":
+        raise LabelError("--name-b 는 --source llm 으로만 기록합니다")
+    targets = _target_rows(rows, number, b)
+    value = " ".join((name_b or "").split())
+    for row in targets:
+        row["상대표장_명칭_llm"] = value
+        if memo:
+            previous = (row.get("메모") or "").strip()
+            parts = [part.strip() for part in previous.split("·")]
+            if memo not in parts:  # 별도 항목으로 없을 때만 덧붙인다("…도형만으로…" 문장과 구분)
+                row["메모"] = f"{previous} · {memo}" if previous else memo
+    return targets
+
+
 def run_label(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
+    name_b = getattr(args, "name_b", None)
     with _labels_lock(paths_):
         fieldnames, rows = _load_labels(paths_)
-        changed = apply_label(
-            rows, args.trial, args.verdict,
-            axis=args.axis, mark_type=args.mark_type, reason=args.reason, memo=args.memo,
-            b=args.b, source=args.source, evidence=args.evidence, confidence=args.confidence,
-            pass_=args.pass_, undo=args.undo,
-        )
+        if name_b is not None and not args.verdict and not args.undo:
+            changed = apply_name_b(
+                rows, args.trial, name_b, b=args.b, memo=args.memo, source=args.source or "llm"
+            )
+        else:
+            changed = apply_label(
+                rows, args.trial, args.verdict,
+                axis=args.axis, mark_type=args.mark_type, reason=args.reason, memo=args.memo,
+                b=args.b, source=args.source, evidence=args.evidence, confidence=args.confidence,
+                pass_=args.pass_, undo=args.undo,
+            )
+            if name_b is not None:
+                apply_name_b(rows, args.trial, name_b, b=args.b, source="llm")
         _write_csv_atomic(paths_.labels_csv, fieldnames, rows)
+    if name_b is not None and not args.verdict and not args.undo:
+        print(f"## 상대 명칭 기록: {args.trial} {len(changed)}행 "
+              f"(name-b {name_b!r}{' · memo ' + args.memo if args.memo else ''}) "
+              f"→ {paths_.labels_csv}")
+        return 0
     action = "라벨 비움" if args.undo else "라벨 기록"
     print(f"## {action}: {args.trial} {len(changed)}행 ({_label_args_summary(args)}) "
           f"→ {paths_.labels_csv}")
@@ -2462,8 +2498,79 @@ def render_batch(
     return "\n".join(lines)
 
 
+NAME_BATCH_GUIDE = (
+    "상대 표장 명칭 추출 배치 — 판단 절(없으면 기초사실)에서 **상대 표장**(확인대상표장·선등록상표·"
+    "선사용표장 — 이 사건 등록·출원상표의 상대)의 문자 표기를 심결문에 적힌 그대로 옮긴다. "
+    "명령: `label <심판번호> --name-b \"<문자열>\" --source llm` · 도형만이고 글자가 없으면 "
+    "`label <심판번호> --name-b \"\" --source llm --memo 도형` · 판정·근거 열은 건드리지 않는다."
+)
+
+
+def render_name_batch(items: list[dict], paths_: TrialPaths, *, index: int) -> str:
+    """상대 표장 명칭 추출용 배치: 심판번호·종류·상표A·상대 번호·기존 명칭(본문/OCR/KIPRIS)·
+    기초사실·판단 절. 자동 판정은 넣지 않는다."""
+    from backend.scripts.trials_enrich import facts_text  # 순환 import 방지(지연)
+
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    lines = [f"# 상대 표장 명칭 배치 {index} — {len(items)}건 · {stamp}", "", NAME_BATCH_GUIDE, ""]
+    for order, item in enumerate(items, start=1):
+        number = item["심판번호"]
+        text_path = paths_.text_dir / f"{number}.txt"
+        text = text_path.read_text(encoding="utf-8") if text_path.exists() else ""
+        existing = " / ".join(
+            f"{label} {item.get(column) or '-'}" for label, column in (
+                ("본문", "상대표장_명칭_본문"), ("OCR", "상대표장_명칭_ocr"),
+                ("KIPRIS", "상대표장_명칭_kipris"),
+            )
+        )
+        lines += [
+            f"## {order}. {number} · {item.get('종류', '')} · "
+            f"상표A: {item.get('상표A_명칭') or '-'} · 상대 번호: {item.get('상표B_번호') or '-'}"
+            f" · 기존 명칭: {existing}",
+            "",
+            "### 기초사실",
+            "```text",
+            (facts_text(text) if text else "") or "(기초사실을 찾지 못함)",
+            "```",
+            "",
+            "### 판단 절",
+            "```text",
+            (judgment_text(text) if text else "") or "(판단 절을 찾지 못함 — 텍스트 없음)",
+            "```",
+            "",
+        ]
+    return "\n".join(lines)
+
+
+def run_name_batches(args: argparse.Namespace, session: Session) -> int:
+    """--ids FILE: 심판번호 목록(줄마다 하나)을 --batch N 건씩 명칭 추출 배치 파일로."""
+    paths_ = session.paths
+    ids = [line.strip() for line in Path(args.ids).read_text(encoding="utf-8").splitlines()]
+    ids = list(dict.fromkeys(i for i in ids if i and not i.startswith("#")))
+    label_rows = _read_csv(paths_.labels_csv)
+    by_number: dict[str, dict] = {}
+    for row in label_rows:
+        by_number.setdefault(row["심판번호"], row)
+    items = [by_number[i] for i in ids if i in by_number]
+    missing = [i for i in ids if i not in by_number]
+    size = max(1, args.batch or 10)
+    index = next_batch_index(paths_.base)
+    outputs: list[Path] = []
+    for start in range(0, len(items), size):
+        chunk = items[start:start + size]
+        out = paths_.base / f"batch_{index}.md"
+        out.write_text(render_name_batch(chunk, paths_, index=index), encoding="utf-8")
+        outputs.append(out)
+        index += 1
+    print(f"## 명칭 배치 {len(outputs)}개: {len(items)}건(목록 {len(ids)}, labels 에 없음 "
+          f"{len(missing)}) → " + ", ".join(str(o) for o in outputs))
+    return 0
+
+
 def run_batch(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
+    if getattr(args, "ids", None):
+        return run_name_batches(args, session)
     pass_ = getattr(args, "pass_", "a") or "a"
     if pass_ not in LABEL_PASSES:
         raise LabelError("--pass 는 a 또는 b 입니다")
@@ -2965,6 +3072,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_show.add_argument("--batch", type=int, default=0, metavar="N",
                         help="큐에서 라벨 없는 다음 N건을 batch_<k>.md 로(자동 판정은 넣지 않음)")
     p_show.add_argument("--pass", dest="pass_", default="a", help="--batch 기준 pass: a(기본)|b")
+    p_show.add_argument("--ids", default="", metavar="FILE",
+                        help="심판번호 목록 파일 → --batch N 건씩 상대 표장 명칭 추출 배치"
+                             "(기초사실·판단 절, 라벨 여부 무관)")
     p_label = sub.add_parser("label", help="큐레이션 라벨 기록(호출 없음)")
     p_label.add_argument("trial", metavar="심판번호")
     p_label.add_argument("verdict", nargs="?", default="", metavar="유사|비유사|제외")
@@ -2982,6 +3092,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_label.add_argument("--pass", dest="pass_", default="a",
                          help="a(기본, 판정 열)|b(llm_b_* 열, 이중 라벨링)")
     p_label.add_argument("--undo", action="store_true", help="해당 pass 의 라벨 열을 비운다")
+    p_label.add_argument("--name-b", dest="name_b", default=None, metavar="문자열",
+                         help="상대 표장 문자 표기 → 상대표장_명칭_llm(판정 없이 단독 사용 가능, "
+                              "도형만이면 \"\" + --memo 도형)")
     p_confirm = sub.add_parser("confirm", help="LLM 라벨을 그대로 승인(확인여부=Y)")
     p_confirm.add_argument("trial", metavar="심판번호")
     p_confirm.add_argument("--b", default=None, metavar="상대번호")
