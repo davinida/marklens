@@ -26,11 +26,15 @@ STATS = {
 }
 
 
-@pytest.fixture
-def model():
+def _model(descriptive=None) -> dx.Distinctiveness:
     names, classes = dx.goods_index(GOODS)
     return dx.Distinctiveness(STATS, famous={"삼성", "starbucks", "스타벅스"}, goods_names=names,
-                              code_classes=classes)
+                              code_classes=classes, descriptive=descriptive)
+
+
+@pytest.fixture
+def model():
+    return _model(descriptive={})  # 실제 descriptive_terms.json 과 분리(3호는 전용 테스트에서)
 
 
 def test_goods_index_single_token_names_and_aliases():
@@ -79,15 +83,63 @@ def test_simple_marks(token, simple):
     assert dx.is_simple_mark(token) is simple
 
 
-def test_descriptive_slot_is_empty_but_applied(model, monkeypatch):
-    assert dx.DESCRIPTIVE_TERMS == {}
-    before = model.token_score("프리미엄")
-    monkeypatch.setattr(dx, "DESCRIPTIVE_TERMS", {"프리미엄": "품질", "천연": "원재료"})
-    assert model.judge("프리미엄").reasons == ("3호 기술적 표장:품질",)
-    assert model.token_score("프리미엄") == 0.0 and model.token_score("천연") == 0.0
-    assert before > 0.0
-    explicit = dx.Distinctiveness({}, descriptive={"수제": "생산방법"})
-    assert explicit.judge("수제").reasons == ("3호 기술적 표장:생산방법",)
+def test_descriptive_terms_score_rules(monkeypatch):
+    """3호: 절대 → 0 / classes 와 지정상품의 류가 겹치면 0 / 류 불일치면 영향 없음 / 상품 미상·류
+    미지정은 0.5 상한."""
+    model = _model(descriptive=None)  # 모듈 상수 DESCRIPTIVE_TERMS 를 본다(monkeypatch 대상)
+    monkeypatch.setattr(dx, "DESCRIPTIVE_TERMS", {
+        "best": dx.DescriptiveTerm("품질", absolute=True, note="판례 예시"),
+        "zorbix": dx.DescriptiveTerm("원재료", classes=frozenset({30, 32})),
+        "plumtaro": dx.DescriptiveTerm("용도"),  # 류 미지정
+    })
+    assert model.judge("best").reasons == ("3호 기술적 표장(절대):품질",)
+    assert model.token_score("best", {"G1201"}) == 0.0 and model.token_score("best") == 0.0
+    assert model.judge("zorbix", {"G0301"}).reasons == ("3호 기술적 표장:원재료(류 30)",)
+    assert model.token_score("zorbix", {"G0301"}) == 0.0
+    assert model.judge("zorbix", {"G1201"}) == dx.TokenJudgement("zorbix", 1.0, ("조어",))  # 3류
+    unknown = model.judge("zorbix")  # 상품 미상
+    assert unknown.score == 0.5 and unknown.reasons == ("3호 기술적 표장(상품 미상):원재료",)
+    assert model.judge("plumtaro", {"G0301"}).reasons == ("3호 기술적 표장(류 미지정):용도",)
+    assert model.token_score("plumtaro", {"G0301"}) == 0.5
+    # 상한은 다른 요소보다 낮을 때만 작용한다(dream 은 이미 0)
+    monkeypatch.setattr(dx, "DESCRIPTIVE_TERMS", {"dream": dx.DescriptiveTerm("효능")})
+    assert model.judge("dream").score == 0.0 and "3호" not in " ".join(model.judge("dream").reasons)
+    explicit = dx.Distinctiveness({}, descriptive={"수제": dx.DescriptiveTerm("생산방법", True)})
+    assert explicit.judge("수제").reasons == ("3호 기술적 표장(절대):생산방법",)
+    assert explicit.salient_tokens("수제 Zorbix") == [("zorbix", 1.0)]
+
+
+def test_descriptive_terms_loader_validates(tmp_path, monkeypatch):
+    good = {"meta": {"v": 1}, "terms": {
+        "best": {"kind": "품질", "absolute": True, "classes": None, "note": "n", "approved": True},
+        "천연": {"kind": "원재료", "absolute": False, "classes": [3, 5], "note": "",
+               "approved": False},
+    }}
+    terms = dx.validate_descriptive_terms(good)
+    assert terms["best"] == dx.DescriptiveTerm("품질", True, None, "n", True)
+    assert terms["천연"].classes == frozenset({3, 5}) and not terms["천연"].approved
+    assert dx.unapproved_terms(terms) == ["천연"]
+    for bad in (
+        {"terms": {"Best": {"kind": "품질", "absolute": True}}},  # 정규화 형태 아님(대문자)
+        {"terms": {"천연 비누": {"kind": "원재료", "absolute": False}}},  # 두 토큰
+        {"terms": {"best": {"kind": "최상", "absolute": True}}},  # kind 허용값 밖
+        {"terms": {"best": {"absolute": True}}},  # kind 없음
+        {"terms": {"best": {"kind": "품질", "absolute": "yes"}}},
+        {"terms": {"best": {"kind": "품질", "absolute": False, "classes": [0, 3]}}},
+        {"terms": {"best": {"kind": "품질", "absolute": False, "classes": "3"}}},
+        {"terms": {"best": {"kind": "품질", "absolute": True, "approved": "true"}}},
+        {"terms": "x"},
+    ):
+        with pytest.raises(ValueError):
+            dx.validate_descriptive_terms(bad)
+    path = tmp_path / "descriptive_terms.json"
+    path.write_text(json.dumps(good, ensure_ascii=False), encoding="utf-8")
+    assert set(dx.read_descriptive_terms(path)) == {"best", "천연"}
+    assert dx.read_descriptive_terms(tmp_path / "missing.json") == {}
+    monkeypatch.setenv(dx.ENV_DESCRIPTIVE_PATH, str(path))
+    assert dx.resolve_descriptive_path() == path
+    monkeypatch.delenv(dx.ENV_DESCRIPTIVE_PATH)
+    assert dx.resolve_descriptive_path() == dx.DEFAULT_DESCRIPTIVE_PATH
 
 
 def test_registration_factor_and_thresholds(model):
