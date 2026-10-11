@@ -541,7 +541,12 @@ has_goods(set())                                                               #
   5개를 `review_bundle/*.csv`로 한 번에 뽑습니다 — verify_queue(표본 40, seed 0)·ab_disagree(A≠B)·name_review(판정자가
   검토를 요청한 명칭 행, `name_review_ids.txt` 없으면 메모의 "검토")·distinct_drop(유사 라벨인데 식별력 적용으로
   x1_d 또는 x2_text_d가 0.1 넘게 내려간 쌍, 떼어낸 토큰 표시)·weak_tokens_top200. 각 행에 `show` 명령과 `처리` 열이
-  있고(재생성 때 보존) `status`가 묶음별 처리/행 수를 보여 줍니다.
+  있고(재생성 때 보존) `status`가 묶음별 처리/행 수를 보여 줍니다. 묶음을 브라우저에서 카드 단위로 처리하려면
+  `ml/venv/bin/python -m backend.scripts.review_ui`(개발 전용, http://127.0.0.1:8010, `--port`)를 띄웁니다 — 탭 6개
+  (표본·A≠B·명칭 검토·식별력 하락·기술적 표장·약한 토큰), 키 Enter 승인·1/2/3 판정·a 판단축·m 메모·u undo·←/→
+  이동. 저장은 `trials_collect.py`의 label·confirm·name-b 함수(잠금·사람 열 보존)와 `distinctiveness.py`의
+  승인·제외 갱신 함수만 거치며, 식별력 하락·명칭 결정은 `ml/data/trials/review_decisions.json`, 약한 토큰 해제는
+  `shared/distinctiveness/weak_token_overrides.json`(로더가 읽어 점수 1.0)에 남습니다.
 - LLM 이중 라벨링(2026-10-01, 호출 0): 큐 355건(430행)을 독립 판정자 둘(pass a·b)이 같은 배치 파일만 보고 따로
   판정해 끝냈습니다 — 유사 225·비유사 140·제외 65(라벨출처 llm), LLM A↔B 일치율 96%(414/430, 불일치 16행은
   4건), LLM↔정규식 추정 80%(340/424). `review` 재검토 큐 130행(LLM≠추정 84·확신도 low 76·메모 애매 65·A≠B 16,

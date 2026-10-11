@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>MarkLens 심결례 검토</title>
+<style>
+body{font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;margin:0;background:#f4f4f6;color:#222}
+header{display:flex;gap:6px;align-items:center;padding:8px 12px;background:#1f2937;color:#fff;position:sticky;top:0;z-index:2}
+header button{background:#374151;color:#fff;border:0;padding:6px 10px;border-radius:6px;cursor:pointer}
+header button.on{background:#2563eb}
+#bar{display:flex;gap:12px;align-items:center;padding:8px 12px;background:#fff;border-bottom:1px solid #ddd;font-size:14px}
+#bar button,.card button,.grp button{border:1px solid #bbb;background:#fff;padding:4px 10px;border-radius:6px;cursor:pointer}
+#msg{margin-left:auto;color:#047857}#msg.err{color:#b91c1c}
+.card{max-width:1180px;margin:12px auto;background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px 18px}
+.row{display:flex;gap:18px;flex-wrap:wrap}.col{flex:1;min-width:280px}
+.name{font-size:20px;font-weight:600}.sub{color:#555;font-size:13px}
+img.mark{max-width:260px;max-height:160px;border:1px solid #ccc;background:#fff;display:block;margin-top:6px}
+.noimg{color:#888;font-size:13px;margin-top:6px}
+pre.jud{white-space:pre-wrap;font-size:13px;line-height:1.45;max-height:420px;overflow:auto;background:#fafafa;border:1px solid #eee;padding:10px}
+mark.ev{background:#fde68a}mark.sim{background:#bbf7d0}mark.dis{background:#fecaca}mark.app{background:#bfdbfe}
+.llm{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}.llm div{border:1px solid #ddd;border-radius:8px;padding:6px 10px;font-size:13px;background:#fafafa;cursor:pointer}
+.llm div.sel{outline:2px solid #2563eb}
+.done{display:inline-block;padding:2px 8px;border-radius:10px;background:#d1fae5;font-size:12px;margin-left:6px}
+.keys{font-size:12px;color:#666;margin-top:8px}
+input.name{font-size:16px;padding:6px;width:60%}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid #eee;padding:4px 6px;text-align:left;vertical-align:top}
+.grp{max-width:1180px;margin:12px auto;background:#fff;border:1px solid #ddd;border-radius:10px;padding:10px 16px}
+.grp h3{margin:4px 0 8px;display:flex;gap:10px;align-items:center}
+.pill{font-size:12px;background:#eef;padding:2px 8px;border-radius:10px}
+.rej{color:#b91c1c}.ok{color:#047857}
+</style></head><body>
+<header><b style="margin-right:8px">MarkLens 검토</b><span id="tabs"></span><button id="statusBtn" style="margin-left:auto">status</button></header>
+<div id="bar"><span id="prog"></span><button id="prevBtn">←</button><button id="nextBtn">→</button><button id="nextOpen">다음 미처리로</button><span id="msg"></span></div>
+<div id="view"></div>
+<pre id="status" style="display:none;max-width:1180px;margin:12px auto;background:#fff;padding:12px;border:1px solid #ddd;white-space:pre-wrap"></pre>
+<script>
+const TABS = __TABS__;
+const EXCLUDE_REASONS = __REASONS__;
+let state = {tab: TABS[0][0], data: null, idx: 0};
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function msg(t, err) { const m = $("#msg"); m.textContent = t; m.className = err ? "err" : ""; }
+async function api(path, body) {
+  const r = await fetch(path, body ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)} : {});
+  const j = await r.json();
+  if (!r.ok) { msg(j.detail || "오류", true); throw new Error(j.detail || "오류"); }
+  return j;
+}
+function renderTabs() {
+  $("#tabs").innerHTML = TABS.map(([k, label]) => `<button data-tab="${k}" class="${k === state.tab ? "on" : ""}">${label}</button>`).join("");
+  document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => { state.tab = b.dataset.tab; state.idx = 0; load(); });
+}
+function isDone(item) {
+  if (state.tab === "descriptive") return item.approved || item.rejected;
+  if (state.tab === "weak_tokens_top200") return item.excluded || item.kept || !!item["처리"];
+  return !!item["처리"];
+}
+async function load(keepIdx) {
+  renderTabs();
+  state.data = await api(`/api/bundle/${state.tab}`);
+  if (!keepIdx) state.idx = 0;
+  render();
+}
+function highlight(text, evidence) {
+  let h = esc(text);
+  const ev = (evidence || "").trim();
+  if (ev.length >= 6) {
+    const key = esc(ev.slice(0, 40));
+    h = h.split(key).join(`<mark class="ev">${key}</mark>`);
+  }
+  return h.replace(/비유사/g, '<mark class="dis">비유사</mark>').replace(/(?<![비])유사/g, '<mark class="sim">유사</mark>').replace(/해당/g, '<mark class="app">해당</mark>');
+}
+function progressText() {
+  const p = state.data.progress || {done: 0, total: 0};
+  const items = state.data.items || [];
+  const pos = items.length ? ` · ${state.idx + 1}/${items.length}` : "";
+  return `${TABS.find(t => t[0] === state.tab)[1]} 진행 ${p.done}/${p.total}${pos}`;
+}
+function render() {
+  $("#prog").textContent = progressText();
+  const v = $("#view");
+  if (!state.data.exists) { v.innerHTML = `<div class="card">입력 파일이 없습니다 — review --bundle 또는 descriptive_candidates.py 를 먼저 실행하세요.</div>`; return; }
+  if (state.tab === "descriptive") return renderDescriptive(v);
+  if (state.tab === "weak_tokens_top200") return renderWeak(v);
+  const items = state.data.items;
+  if (!items.length) { v.innerHTML = `<div class="card">행이 없습니다.</div>`; return; }
+  state.idx = Math.max(0, Math.min(state.idx, items.length - 1));
+  v.innerHTML = renderCard(items[state.idx]);
+  bindCard(items[state.idx]);
+  const first = v.querySelector("mark.ev"); if (first) first.scrollIntoView({block: "center"});
+}
+function llmBox(label, d, sel) {
+  return `<div class="${sel ? "sel" : ""}" data-verdict="${esc(d["판정"])}"><b>${label}</b> ${esc(d["판정"]) || "-"} · 축 ${esc(d["판단축"]) || "-"} · 확신도 ${esc(d["확신도"]) || "-"}${d["제외사유"] ? " · 제외 " + esc(d["제외사유"]) : ""}<br><span class="sub">${esc((d["근거"] || "").slice(0, 160))}</span></div>`;
+}
+function renderCard(it) {
+  const img = (side) => it["이미지"] && it["이미지"][side] ? `<img class="mark" src="${it["이미지"][side]}">` : `<div class="noimg">이미지 없음</div>`;
+  const done = it["처리"] ? `<span class="done">처리 ${esc(it["처리"])}</span>` : "";
+  let extra = "";
+  if (state.tab === "name_review") {
+    extra = `<p><b>상대 표장 명칭(llm)</b> <input class="name" id="nameInput" value="${esc(it["명칭_llm"])}"> <button id="saveName">저장(Enter)</button> <button id="figBtn">도형만</button><br><span class="sub">본문 ${esc(it["명칭_본문"]) || "-"} · OCR ${esc(it["명칭_ocr"]) || "-"} · KIPRIS ${esc(it["명칭_kipris"]) || "-"} · 검토 사유: ${esc(it["사유"] || "")}</span></p>`;
+  } else if (state.tab === "distinct_drop") {
+    const d = it["결정"] || {};
+    extra = `<p><b>식별력 적용 전후</b> x1 ${esc(it.x1)} → ${esc(it.x1_d)} · x2_text ${esc(it.x2_text)} → ${esc(it.x2_text_d)} · 떼어낸 토큰 A [${esc(it["떼어낸_토큰_A"])}] B [${esc(it["떼어낸_토큰_B"])}] · 표장라벨 ${esc(it["표장라벨"])}</p>
+    <p><label><input type="radio" name="dec" value="결합 규칙 후보" ${d.decision === "결합 규칙 후보" ? "checked" : ""}> 결합 규칙 후보(공통 결합이 요부)</label> &nbsp; <label><input type="radio" name="dec" value="그대로" ${d.decision === "그대로" ? "checked" : ""}> 그대로</label> &nbsp; <input id="decMemo" placeholder="메모" value="${esc(d.memo || "")}"> <button id="saveDec">기록</button></p>`;
+  }
+  const abSel = state.tab === "ab_disagree";
+  return `<div class="card">
+  <div class="sub">${esc(it["심판번호"])} · ${esc(it["종류"])} · 상대번호 ${esc(it.b) || "-"} ${done} · 라벨출처 ${esc(it["라벨출처"]) || "-"} · 확인 ${esc(it["확인여부"]) || "-"}${it["llm_판정_원본"] ? " · LLM 원본 " + esc(it["llm_판정_원본"]) : ""}</div>
+  <div class="row"><div class="col"><div class="name">A: ${esc(it["이름A"]) || "(이름 없음)"}</div>${img("A")}</div>
+  <div class="col"><div class="name">B: ${esc(it["이름B"]) || "(이름 없음)"} <span class="sub">${esc(it["이름B_출처"])}</span></div>${img("B")}</div></div>
+  ${extra}
+  <p><b>주문</b> ${esc(it["주문"]) || "(주문을 찾지 못함)"}</p>
+  <div class="llm">${llmBox("LLM A", it.llm_a, abSel)}${llmBox("LLM B", it.llm_b, abSel)}</div>
+  <p><b>메모</b> <span id="memoText">${esc(it["메모"]) || "-"}</span></p>
+  <pre class="jud">${it["텍스트"] ? (highlight(it["판단절"], it.llm_a["근거"]) || "(판단 절을 찾지 못함)") : "(텍스트 없음)"}</pre>
+  <div class="keys">Enter 승인(confirm) · 1 유사 · 2 비유사 · 3 제외(사유) · a 판단축 · m 메모 · u undo · ←/→ 이동${abSel ? " · A/B 판정 상자 클릭 = 그 판정으로 라벨" : ""}</div>
+  </div>`;
+}
+function current() { return (state.data.items || [])[state.idx]; }
+async function decide(body) {
+  const it = current();
+  const res = await api("/api/decide", {tab: state.tab, "심판번호": it["심판번호"], b: it.b, key: it.key, ...body});
+  msg(res.message);
+  Object.assign(it, res.card || {});
+  state.data.progress.done = (state.data.items || []).filter(isDone).length;
+  return res;
+}
+async function decideAndNext(body) { await decide(body); gotoNextOpen(); }
+function gotoNextOpen() {
+  const items = state.data.items || [];
+  for (let i = 1; i <= items.length; i++) { const j = (state.idx + i) % items.length; if (!isDone(items[j])) { state.idx = j; render(); return; } }
+  render(); msg("미처리 항목이 없습니다");
+}
+function bindCard(it) {
+  document.querySelectorAll(".llm div.sel").forEach(d => d.onclick = () => { const v = d.dataset.verdict; if (v) labelWith(v); });
+  const ni = $("#nameInput");
+  if (ni) { ni.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); saveName(ni.value); } e.stopPropagation(); }; $("#saveName").onclick = () => saveName(ni.value); $("#figBtn").onclick = () => saveName("", "도형"); }
+  const sd = $("#saveDec");
+  if (sd) sd.onclick = () => { const r = document.querySelector("input[name=dec]:checked"); if (!r) { msg("결정을 고르세요", true); return; } decideAndNext({action: "decision", decision: r.value, memo: $("#decMemo").value}); };
+  const dm = $("#decMemo"); if (dm) dm.onkeydown = (e) => e.stopPropagation();
+}
+async function saveName(name, memo) { await decideAndNext({action: "name_b", name, memo: memo || null}); }
+async function labelWith(verdict) {
+  const body = {action: "label", verdict};
+  if (verdict === "제외") { const r = prompt("제외 사유: " + EXCLUDE_REASONS.join("|"), EXCLUDE_REASONS[0]); if (!r) return; body.reason = r; }
+  await decideAndNext(body);
+}
+document.addEventListener("keydown", async (e) => {
+  if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+  if (!state.data || state.tab === "descriptive" || state.tab === "weak_tokens_top200") return;
+  const items = state.data.items || []; if (!items.length) return;
+  if (e.key === "ArrowLeft") { state.idx = (state.idx - 1 + items.length) % items.length; render(); }
+  else if (e.key === "ArrowRight") { state.idx = (state.idx + 1) % items.length; render(); }
+  else if (e.key === "Enter") { e.preventDefault(); if (state.tab === "name_review") saveName($("#nameInput").value); else decideAndNext({action: "confirm"}); }
+  else if (e.key === "1") labelWith("유사");
+  else if (e.key === "2") labelWith("비유사");
+  else if (e.key === "3") labelWith("제외");
+  else if (e.key === "a") { const a = prompt("판단축(외관,호칭,관념,상품 쉼표)", current().llm_a["판단축"]); if (a !== null) decide({action: "label", verdict: current().llm_a["판정"] || "유사", axis: a}); }
+  else if (e.key === "m") { const m = prompt("메모", current()["메모"]); if (m !== null) decide({action: "label", verdict: current().llm_a["판정"] || "유사", memo: m}); }
+  else if (e.key === "u") decide({action: "undo"});
+});
+$("#prevBtn").onclick = () => { const n = (state.data.items || []).length; if (n) { state.idx = (state.idx - 1 + n) % n; render(); } };
+$("#nextBtn").onclick = () => { const n = (state.data.items || []).length; if (n) { state.idx = (state.idx + 1) % n; render(); } };
+$("#nextOpen").onclick = () => { if (state.tab === "descriptive" || state.tab === "weak_tokens_top200") { const el = document.querySelector("tr.open"); if (el) el.scrollIntoView({block: "center"}); } else gotoNextOpen(); };
+$("#statusBtn").onclick = async () => { const s = await api("/api/status"); const el = $("#status"); el.textContent = s.lines.join("\n"); el.style.display = el.style.display === "none" ? "block" : "none"; };
+function renderDescriptive(v) {
+  v.innerHTML = state.data.groups.map((g, gi) => `<div class="grp" data-g="${gi}"><h3>${esc(g.name)} <span class="pill">${g.items.length}</span><button class="allOn">이 묶음 모두 승인</button><button class="allOff">선택 해제</button><button class="save">저장</button></h3>
+  <table><tr><th></th><th>토큰</th><th>kind</th><th>절대</th><th>적용 류</th><th>근거</th><th>상표 예시</th><th>상태</th></tr>
+  ${g.items.map(t => `<tr class="${t.approved || t.rejected ? "" : "open"}"><td><input type="checkbox" data-token="${esc(t["토큰"])}" ${t.rejected ? "" : "checked"}></td><td><b>${esc(t["토큰"])}</b></td><td>${esc(t.kind)}</td><td>${t.absolute ? "O" : ""}</td><td>${t.absolute ? "불문" : (t.classes ? t.classes.join(",") : "-")}</td><td>${esc(t.note)}</td><td class="sub">${(t.examples || []).map(esc).join(" · ")}</td><td>${t.approved ? '<span class="ok">승인</span>' : t.rejected ? '<span class="rej">해제</span>' : "미승인"}</td></tr>`).join("")}
+  </table></div>`).join("");
+  document.querySelectorAll(".grp").forEach(el => {
+    const boxes = () => Array.from(el.querySelectorAll("input[type=checkbox]"));
+    const save = async () => { const approvals = {}; boxes().forEach(b => approvals[b.dataset.token] = b.checked); const r = await api("/api/decide", {action: "approve", approvals}); msg(r.message); load(true); };
+    el.querySelector(".allOn").onclick = () => { boxes().forEach(b => b.checked = true); save(); };
+    el.querySelector(".allOff").onclick = () => { boxes().forEach(b => b.checked = false); };
+    el.querySelector(".save").onclick = save;
+  });
+}
+function renderWeak(v) {
+  const items = state.data.items;
+  v.innerHTML = `<div class="grp"><h3>약한 토큰 상위 ${items.length} <span class="sub">체크 = 유지(기본), 해제 = 약한 토큰에서 제외(weak_token_overrides.json)</span><button id="saveWeak">저장</button></h3>
+  <table><tr><th></th><th>토큰</th><th>사유</th><th>출원인 수 A</th><th>등장 수 N</th><th>점수</th><th>상태</th></tr>
+  ${items.map(t => `<tr class="${isDone(t) ? "" : "open"}"><td><input type="checkbox" data-token="${esc(t["토큰"])}" ${t.excluded ? "" : "checked"}></td><td><b>${esc(t["토큰"])}</b></td><td>${esc(t["사유"])}</td><td>${esc(t.A)}</td><td>${esc(t.N)}</td><td>${esc(t["점수"])}</td><td>${t.excluded ? '<span class="rej">제외</span>' : t.kept ? '<span class="ok">유지 확인</span>' : "미검토"}</td></tr>`).join("")}
+  </table></div>`;
+  $("#saveWeak").onclick = async () => {
+    const boxes = Array.from(document.querySelectorAll("#view input[type=checkbox]"));
+    const excluded = boxes.filter(b => !b.checked).map(b => b.dataset.token), kept = boxes.filter(b => b.checked).map(b => b.dataset.token);
+    const r = await api("/api/decide", {action: "override", excluded, kept}); msg(r.message); load(true);
+  };
+}
+load();
+</script></body></html>

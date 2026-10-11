@@ -1841,8 +1841,10 @@ def test_label_name_b_records_counterpart_name_without_touching_verdict(tmp_path
     row = _labels_by_trial(paths_)["S2"]
     assert row["상대표장_명칭_llm"] == "" and row["메모"] == "애매: 축 명시 없음 · 도형"
     assert row["유사여부_확정"] == "유사" and row["라벨출처"] == "llm"
-    # human 출처로는 기록하지 않는다, 판정과 같이 주면 둘 다 기록
-    assert _label_cli(tmp_path, "label", "S2", "--name-b", "X", "--source", "human") != 0
+    # 사람 출처(검토 화면)로도 같은 열에 기록, llm·human 밖의 출처는 거부. 판정과 같이 주면 둘 다
+    assert _label_cli(tmp_path, "label", "S2", "--name-b", "X", "--source", "human") == 0
+    assert _labels_by_trial(paths_)["S2"]["상대표장_명칭_llm"] == "X"
+    assert _label_cli(tmp_path, "label", "S2", "--name-b", "Y", "--source", "기계") != 0
     assert _label_cli(tmp_path, "label", "S5", "비유사", "--name-b", "에스오", "--source", "llm",
                       "--evidence", "y", "--confidence", "low") == 0
     row = _labels_by_trial(paths_)["S5"]
