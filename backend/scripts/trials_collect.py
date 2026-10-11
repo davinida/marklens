@@ -2389,8 +2389,8 @@ def apply_name_b(
 
     도형만이면 빈 문자열을 쓰고 memo(예: "도형")를 기존 메모 뒤에 덧붙인다(메모를 덮어쓰지 않음).
     """
-    if source != "llm":
-        raise LabelError("--name-b 는 --source llm 으로만 기록합니다")
+    if source not in LABEL_SOURCES:
+        raise LabelError("--name-b 는 --source llm 또는 human 으로 기록합니다")
     targets = _target_rows(rows, number, b)
     value = " ".join((name_b or "").split())
     for row in targets:
@@ -2813,6 +2813,29 @@ def build_review_bundle(
             row.setdefault(BUNDLE_DONE, "")
         out[name] = (columns + ["show", BUNDLE_DONE], rows)
     return out
+
+
+def mark_bundle_done(paths_: TrialPaths, name: str, key: str, value: str) -> int:
+    """검토 묶음 CSV 의 처리 열을 바꾼다(review_ui 등 검토 도구용). 같은 키 행 수를 돌려준다.
+
+    key 는 _bundle_key 형식("심판번호|상표B_번호|상대번호|토큰"), value 가 빈 문자열이면 처리 취소.
+    """
+    if name not in BUNDLE_NAMES:
+        raise LabelError(f"검토 묶음 이름이 아닙니다: {name}")
+    path = paths_.review_bundle_dir / f"{name}.csv"
+    if not path.exists():
+        return 0
+    rows = _read_csv(path)
+    if not rows:
+        return 0
+    hits = 0
+    for row in rows:
+        if _bundle_key(row) == key:
+            row[BUNDLE_DONE] = value
+            hits += 1
+    if hits:
+        _write_csv(path, list(rows[0].keys()), rows)
+    return hits
 
 
 def bundle_progress(paths_: TrialPaths) -> list[tuple[str, int, int]]:

@@ -58,6 +58,7 @@ __all__ = [
     "Distinctiveness", "TokenJudgement", "DescriptiveTerm", "load_distinctiveness", "token_score",
     "salient_tokens", "weak_tokens", "has_distinctive_part", "pair_generic", "famous_tokens",
     "goods_index", "read_descriptive_terms", "validate_descriptive_terms", "unapproved_terms",
+    "update_descriptive_approvals", "read_weak_overrides", "update_weak_overrides",
     "DESCRIPTIVE_TERMS", "DESCRIPTIVE_KINDS", "THETA", "THETA_A", "THETA_N",
 ]
 
@@ -83,6 +84,9 @@ DESCRIPTIVE_KINDS: tuple[str, ...] = (
 )
 DEFAULT_DESCRIPTIVE_PATH = DEFAULT_DIR / "descriptive_terms.json"
 ENV_DESCRIPTIVE_PATH = "MARKLENS_DESCRIPTIVE_TERMS"
+# 사람 검토(review_ui 약한 토큰 탭)가 "약하지 않다"고 뺀 토큰 — 적재 때 읽어 점수 1.0 으로 둔다
+DEFAULT_OVERRIDES_PATH = DEFAULT_DIR / "weak_token_overrides.json"
+ENV_OVERRIDES_PATH = "MARKLENS_WEAK_TOKEN_OVERRIDES"
 DESCRIPTIVE_UNKNOWN_SCORE = 0.5  # 상대적 기술 표장인데 지정상품을 모르면(또는 류 미지정) 점수 상한
 NICE_CLASS_RANGE = range(1, 46)
 
@@ -113,6 +117,8 @@ def validate_descriptive_terms(data: dict) -> dict[str, DescriptiveTerm]:
     for token, item in terms.items():
         if not isinstance(item, dict):
             raise ValueError(f"descriptive_terms[{token!r}]: 객체가 아닙니다")
+        if item.get("rejected") is True:  # 사람이 승인 해제한 항목은 적용하지 않는다
+            continue
         if normalize_name(token) != [token]:
             raise ValueError(f"descriptive_terms[{token!r}]: 정규화 형태(소문자·공백 없는 단일 "
                              "토큰)가 아닙니다")
@@ -163,6 +169,84 @@ def read_descriptive_terms(
 
 def unapproved_terms(terms: dict[str, DescriptiveTerm]) -> list[str]:
     return sorted(token for token, term in terms.items() if not term.approved)
+
+
+def update_descriptive_approvals(
+    approvals: dict[str, bool], path: str | os.PathLike[str] | None = None, *, memo: str = ""
+) -> dict:
+    """descriptive_terms.json 의 approved 를 바꾼다(검토 도구용). 해제는 approved false +
+    rejected true.
+
+    돌려주는 값: {"승인": n, "해제": n, "없음": [토큰]}. 쓰기 전에 검증해 깨진 파일을 남기지 않는다.
+    """
+    resolved = resolve_descriptive_path(path)
+    data = json.loads(resolved.read_text(encoding="utf-8")) if resolved.exists() else {"terms": {}}
+    terms = data.setdefault("terms", {})
+    result = {"승인": 0, "해제": 0, "없음": []}
+    for token, approved in approvals.items():
+        item = terms.get(token)
+        if item is None:
+            result["없음"].append(token)
+            continue
+        item["approved"] = bool(approved)
+        if approved:
+            item.pop("rejected", None)
+            result["승인"] += 1
+        else:
+            item["rejected"] = True
+            result["해제"] += 1
+        if memo:
+            item["review_memo"] = memo
+    validate_descriptive_terms(data)
+    meta = data.setdefault("meta", {})
+    meta["승인"] = sum(1 for t in terms.values() if t.get("approved"))
+    meta["해제"] = sum(1 for t in terms.values() if t.get("rejected"))
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    return result
+
+
+def resolve_overrides_path(path: str | os.PathLike[str] | None = None) -> Path:
+    if path:
+        return Path(path)
+    env = os.environ.get(ENV_OVERRIDES_PATH, "").strip()
+    return Path(env) if env else DEFAULT_OVERRIDES_PATH
+
+
+def read_weak_overrides(path: str | os.PathLike[str] | None = None) -> frozenset[str]:
+    """weak_token_overrides.json 의 excluded 토큰(약하지 않다고 사람이 뺀 것). 파일이 없으면 빈
+    집합."""
+    resolved = resolve_overrides_path(path)
+    if not resolved.exists():
+        return frozenset()
+    data = json.loads(resolved.read_text(encoding="utf-8"))
+    excluded = data.get("excluded", data) if isinstance(data, dict) else data
+    if isinstance(excluded, dict):
+        return frozenset(str(t) for t in excluded)
+    return frozenset(str(t) for t in excluded)
+
+
+def update_weak_overrides(
+    excluded: Iterable[str], kept: Iterable[str] = (), path: str | os.PathLike[str] | None = None,
+    *, memo: str = "",
+) -> dict:
+    """weak_token_overrides.json 갱신(검토 도구용): excluded = 약한 토큰에서 뺄 것, kept = 유지로
+    확인한 것. kept 로 넘어온 토큰은 excluded 에서 지운다. 돌려주는 값: {"excluded": n,
+    "kept": n}."""
+    resolved = resolve_overrides_path(path)
+    data = json.loads(resolved.read_text(encoding="utf-8")) if resolved.exists() else {}
+    ex = data.setdefault("excluded", {}) if isinstance(data.get("excluded"), dict) else {}
+    kp = data.setdefault("kept", {}) if isinstance(data.get("kept"), dict) else {}
+    data["excluded"], data["kept"] = ex, kp
+    for token in excluded:
+        ex[str(token)] = {"memo": memo}
+        kp.pop(str(token), None)
+    for token in kept:
+        kp[str(token)] = {"memo": memo}
+        ex.pop(str(token), None)
+    resolved.parent.mkdir(parents=True, exist_ok=True)
+    resolved.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    return {"excluded": len(ex), "kept": len(kp)}
 
 
 DESCRIPTIVE_TERMS: dict[str, DescriptiveTerm] = read_descriptive_terms()
@@ -359,9 +443,11 @@ class Distinctiveness:
         theta_a: int = THETA_A,
         theta_n: int = THETA_N,
         descriptive: dict[str, DescriptiveTerm] | None = None,
+        overrides: Iterable[str] = (),
     ) -> None:
         self.stats = {token: (int(a), int(n)) for token, (a, n) in stats.items()}
         self.famous = frozenset(famous)
+        self.overrides = frozenset(overrides)  # 사람 검토가 약한 토큰에서 뺀 것 → 1.0
         self.goods_names: GoodsNameIndex = goods_names or {}
         self.code_classes = code_classes or {}
         self.theta, self.theta_a, self.theta_n = theta, theta_a, theta_n
@@ -387,6 +473,8 @@ class Distinctiveness:
         goods = frozenset(c.strip().upper() for c in (goods_codes or ()) if c and c.strip())
         if token in self.famous:
             return TokenJudgement(token, 1.0, ("유명 브랜드",))
+        if token in self.overrides:
+            return TokenJudgement(token, 1.0, ("사람 검토 제외(weak_token_overrides)",))
         reasons: list[str] = []
         descriptive = DESCRIPTIVE_TERMS if self.descriptive is None else self.descriptive
         cap: float | None = None
@@ -491,11 +579,13 @@ def read_stats(path: Path) -> dict[str, tuple[int, int]]:
 def build(
     stats: dict[str, tuple[int, int]], *, goods_map=None, famous: Iterable[str] | None = None,
     theta: float = THETA, theta_a: int = THETA_A, theta_n: int = THETA_N,
+    overrides: Iterable[str] | None = None,
 ) -> Distinctiveness:
     goods_names, code_classes = goods_index(goods_map) if goods_map is not None else ({}, {})
     return Distinctiveness(
         stats, famous=famous_tokens() if famous is None else famous, goods_names=goods_names,
         code_classes=code_classes, theta=theta, theta_a=theta_a, theta_n=theta_n,
+        overrides=read_weak_overrides() if overrides is None else overrides,
     )
 
 
