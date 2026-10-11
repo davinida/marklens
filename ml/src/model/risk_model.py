@@ -1,5 +1,5 @@
-"""통합 모델 v1 런타임 — 4축 점수(X1 호칭·X2 외관·X3 관념·X4 상품)를 출처 혼동 위험도 p(0~1)·등급·
-기여도로 합치는 순수 함수. 설계는 docs/MarkLens_통합모델_설계.md §3·§4-3·§7.
+"""통합 모델 런타임(v1 → v1.1) — 4축 점수(X1 호칭·X2 외관·X3 관념·X4 상품)를 출처 혼동 위험도
+p(0~1)·등급·기여도로 합치는 순수 함수. 설계는 docs/MarkLens_통합모델_설계.md §3·§4-3·§7·§7-1.
 
 계수는 JSON(`shared/model/risk_model_v1.json`, 학습 스크립트 `ml/scripts/train_risk_model.py` 가
 쓴다)에서 읽는다 — 입력 정의·계수·절편·등급 임계값·단독 임계값·학습 메타. 픽클 없음, numpy 없음,
@@ -12,7 +12,10 @@
 
 입력 규약(§4-3): 축 점수가 None 이면 결측 — 값 0 + 결측 지시변수 1. X3 는 `has_meaning_both` 가
 False 면 게이트 꺼짐 = 결측. 상표 유형은 문자·도형·결합-문자요부·결합-도형요부, 그 밖(미상·결합)은
-문자. 교호작용 x1_d×문자계(문자·결합-문자요부)·x2_whole×도형계(도형·결합-도형요부).
+문자. 교호작용 x1_d×문자계(문자·결합-문자요부)·x2_whole×도형계(도형·결합-도형요부). v1.1 계수
+JSON(§7-1)은 유형 주효과·miss_x1·miss_x2text 를 쓰지 않고(유형은 교호작용으로만), `monotone` 이
+있으면 적재 때 단조 제약(유사도 축 본체 ≥ 0, 본체 + 교호작용 ≥ 0)을 검증한다. 단독 임계값
+`standalone_thresholds`(정밀도 ≥ 0.7 지점)는 축 하나가 τ 이상이면 등급 하한을 "검토 권장"으로.
 """
 
 from __future__ import annotations
@@ -25,14 +28,17 @@ from pathlib import Path
 
 __all__ = [
     "risk_score", "design_values", "design_vector", "load_model", "validate_model", "grade_for",
-    "axis_contributions", "mark_type_level", "GRADES", "TYPE_LEVELS", "AXIS_INPUTS",
-    "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH",
+    "axis_contributions", "mark_type_level", "monotone_violations", "GRADES", "TYPE_LEVELS",
+    "AXIS_INPUTS", "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1"
+MODEL_VERSION = "risk_model_v1.1"
+SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1")
+INTERACTION_OF = {"x1_d": "x1_d×문자계", "x2_whole": "x2_whole×도형계"}
+MONOTONE_AXES = ("x1_d", "x2_text_d", "x2_whole", "x3_d", "x4")
 
 AXIS_INPUTS = (
     ("x1_d", "miss_x1"), ("x2_text_d", "miss_x2text"), ("x2_whole", "miss_x2img"),
@@ -128,8 +134,8 @@ def validate_model(data: dict) -> dict:
     """계수 JSON 검증 — 어긋나면 ValueError. 검증된 사전을 돌려준다."""
     if not isinstance(data, dict):
         raise ValueError("risk_model: JSON 객체가 아닙니다")
-    if data.get("version") != MODEL_VERSION:
-        raise ValueError(f"risk_model: version 은 {MODEL_VERSION!r} 이어야 합니다")
+    if data.get("version") not in SUPPORTED_VERSIONS:
+        raise ValueError(f"risk_model: version 은 {SUPPORTED_VERSIONS} 중 하나여야 합니다")
     names = data.get("features")
     if not isinstance(names, list) or not names or len(set(names)) != len(names):
         raise ValueError("risk_model: features 는 비어 있지 않은 고유 이름 목록이어야 합니다")
@@ -160,7 +166,23 @@ def validate_model(data: dict) -> dict:
             raise ValueError(f"risk_model: 단독 임계값의 축 {axis!r} 를 모릅니다")
         if tau is not None and not (isinstance(tau, (int, float)) and 0.0 <= float(tau) <= 1.0):
             raise ValueError(f"risk_model: 단독 임계값 {axis} 는 null 또는 0~1")
+    if data.get("monotone"):
+        for violation in monotone_violations(coefficients):
+            raise ValueError(f"risk_model: 단조 제약 위반 — {violation}")
     return data
+
+
+def monotone_violations(coefficients: dict, tolerance: float = 1e-9) -> list[str]:
+    """v1.1 단조 제약(유사도 축 본체 ≥ 0, 본체 + 교호작용 ≥ 0)을 어기는 항 설명 목록."""
+    out = []
+    for axis in MONOTONE_AXES:
+        base = float(coefficients.get(axis, 0.0))
+        if base < -tolerance:
+            out.append(f"{axis} {base}")
+        interaction = INTERACTION_OF.get(axis)
+        if interaction in coefficients and base + float(coefficients[interaction]) < -tolerance:
+            out.append(f"{axis} + {interaction} {base + float(coefficients[interaction])}")
+    return out
 
 
 def resolve_model_path(path: str | os.PathLike[str] | None = None) -> Path:

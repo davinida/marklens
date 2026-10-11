@@ -144,6 +144,77 @@ def test_validate_model_rejects_broken_json(tmp_path, monkeypatch):
     assert rm.resolve_model_path() == rm.DEFAULT_MODEL_PATH
 
 
+V11_FEATURES = [
+    "x1_d", "x2_text_d", "x2_whole", "x3_d", "x4", "miss_x2img", "miss_x3", "miss_x4",
+    "has_distinctive_part_a", "has_distinctive_part_b", "x1_d×문자계", "x2_whole×도형계",
+]
+V11_COEFFICIENTS = {
+    "x1_d": 1.4, "x2_text_d": 1.1, "x2_whole": 0.1, "x3_d": 0.3, "x4": 1.2,
+    "miss_x2img": 0.2, "miss_x3": 0.3, "miss_x4": 0.2,
+    "has_distinctive_part_a": -0.1, "has_distinctive_part_b": -0.2,
+    "x1_d×문자계": 2.2, "x2_whole×도형계": -0.1,
+}
+
+
+def _model_v11(**overrides) -> dict:
+    model = _model(features=list(V11_FEATURES), coefficients=dict(V11_COEFFICIENTS),
+                   intercept=-3.2, method="prior_monotone_logistic",
+                   removed_terms=["type_도형", "type_결합-문자요부", "type_결합-도형요부",
+                                  "miss_x1", "miss_x2text"],
+                   prior={"mu": {"x1_d": 1.0}, "sigma": 1.0},
+                   monotone={"features": ["x1_d", "x2_whole"],
+                             "constraint": "본체 ≥ 0, 본체 + 교호작용 ≥ 0"})
+    model.update(overrides)
+    return rm.validate_model(model)
+
+
+def test_v11_type_only_difference_changes_only_interactions():
+    """v1.1: 유형 주효과가 없으므로 유형만 다른 두 입력의 로짓 차는 교호작용 항에서만 난다."""
+    model = _model_v11()
+    base = {"x1_d": 0.8, "x2_text_d": 0.6, "x2_whole": 0.5, "x3_d": 0.4, "x4": 0.7,
+            "has_meaning_both": True, "mark_type": "문자"}
+    prob_text, _, c_text = rm.risk_score(base, model)
+    prob_combo, _, c_combo = rm.risk_score({**base, "mark_type": "결합-문자요부"}, model)
+    assert prob_text == pytest.approx(prob_combo)  # 둘 다 문자계
+    prob_fig, _, c_fig = rm.risk_score({**base, "mark_type": "도형"}, model)
+    diff = sum(c_text.values()) - sum(c_fig.values())
+    expected = V11_COEFFICIENTS["x1_d×문자계"] * 0.8 - V11_COEFFICIENTS["x2_whole×도형계"] * 0.5
+    assert diff == pytest.approx(expected)
+    changed = {k for k in c_text if c_text[k] != c_fig[k]}
+    assert changed == {"x1_d×문자계", "x2_whole×도형계"}
+    assert rm.risk_score({**base, "mark_type": "미상"}, model)[0] == pytest.approx(prob_text)
+
+
+def test_v11_monotone_validation_and_non_decreasing_probability():
+    assert rm.monotone_violations(V11_COEFFICIENTS) == []
+    bad = {**V11_COEFFICIENTS, "x4": -0.3}
+    assert rm.monotone_violations(bad) == ["x4 -0.3"]
+    with pytest.raises(ValueError):
+        _model_v11(coefficients=bad)
+    worse = {**V11_COEFFICIENTS, "x2_whole×도형계": -0.5}  # 0.1 − 0.5 < 0
+    assert rm.monotone_violations(worse) == ["x2_whole + x2_whole×도형계 -0.4"]
+    with pytest.raises(ValueError):
+        _model_v11(coefficients=worse)
+    assert rm.validate_model({**_model_v11(), "monotone": None, "coefficients": worse})  # 검증 생략
+    model = _model_v11()
+    for mark_type in ("문자", "도형", "결합-도형요부"):
+        for axis in ("x1_d", "x2_text_d", "x2_whole", "x3_d", "x4"):
+            previous = -1.0
+            for value in (0.0, 0.25, 0.5, 0.75, 1.0):
+                prob = rm.risk_score({"x1_d": 0.3, "x2_text_d": 0.3, "x2_whole": 0.3, "x3_d": 0.3,
+                                      "x4": 0.3, "has_meaning_both": True,
+                                      "mark_type": mark_type, axis: value}, model)[0]
+                assert prob >= previous - 1e-12  # 축 점수를 올리면 확률 비감소
+                previous = prob
+
+
+def test_versions_accepted():
+    assert _model(version="risk_model_v1")["version"] == "risk_model_v1"
+    assert rm.MODEL_VERSION == "risk_model_v1.1"
+    with pytest.raises(ValueError):
+        _model(version="risk_model_v2")
+
+
 def test_shipped_model_file_is_valid():
     """저장소의 shared/model/risk_model_v1.json 이 검증을 통과하고 점수를 낸다."""
     if not rm.DEFAULT_MODEL_PATH.exists():
@@ -155,3 +226,8 @@ def test_shipped_model_file_is_valid():
     assert 0.0 <= prob <= 1.0 and grade in rm.GRADES
     assert sum(contributions.values()) == pytest.approx(math.log(prob / (1 - prob)))
     assert model["meta"]["n_trial"] > 0
+    if model.get("monotone"):
+        assert rm.monotone_violations(model["coefficients"]) == []
+    if model["version"] == "risk_model_v1.1":
+        assert not any(name.startswith("type_") for name in model["features"])
+        assert model["standalone_precision"] == 0.7
