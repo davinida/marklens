@@ -1,4 +1,4 @@
-# 식별력·요부 필터 v0.2 산출물 (다빈-3)
+# 식별력·요부 필터 v0.3 산출물 (다빈-3)
 
 `ml/scripts/distinctiveness_build.py` 가 만든다(KIPRIS 호출 0, 3~4초). 설계·근거는 `docs/MarkLens_식별력_설계.md`, 런타임은 `ml/src/axes/distinctiveness.py`.
 
@@ -21,4 +21,4 @@ ml/venv/bin/python ml/scripts/descriptive_candidates.py                # 3호 �
 
 3호 승인: `descriptive_candidates.md` 를 보고 `descriptive_terms.json` 의 `approved` 를 `true` 로 바꾸거나 항목을 지운다(근거·절차는 `docs/MarkLens_식별력_설계.md` §3-3). 브라우저로 하려면 `ml/venv/bin/python -m backend.scripts.review_ui`(기술적 표장·약한 토큰 탭; 해제는 `approved false` + `rejected true`, 로더는 rejected 를 건너뛴다).
 
-입력 `ml/data/trials/list_all.csv`·`ml/data/kipris_metadata.json` 은 비공개 데이터 저장소에 있다. 유명 브랜드 예외는 `shared/famous_brands.txt`(출원인명 + 브랜드 토큰 줄 갤럭시·GALAXY·오리온·ORION)와 `ml/src/axes/korean_brands.py` 를 적재 때 읽는다(235 토큰). 결합 규칙 v0.2(약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 요부 후보)는 `combined_weak_run` — `docs/MarkLens_식별력_설계.md` §4-1.
+입력 `ml/data/trials/list_all.csv`·`ml/data/kipris_metadata.json` 은 비공개 데이터 저장소에 있다. 유명 브랜드 예외는 `shared/famous_brands.txt`(출원인명 + 브랜드 토큰 줄 갤럭시·GALAXY·오리온·ORION)와 `ml/src/axes/korean_brands.py` 를 적재 때 읽는다(235 토큰). 결합 규칙 v0.2(약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 요부 후보)는 `combined_weak_run`, v0.3(붙여쓴 결합어 대 띄어쓴 토큰열)은 `combined_single_match` — `docs/MarkLens_식별력_설계.md` §4-1·§4-2.

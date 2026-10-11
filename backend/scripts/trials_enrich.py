@@ -34,6 +34,7 @@ import argparse
 import json
 import re
 import sys
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -49,7 +50,8 @@ if str(paths.ML_ROOT) not in sys.path:
     sys.path.insert(0, str(paths.ML_ROOT))
 
 from scripts.trials_extract_images import _HEADING_LINE_RE, classify_heading  # noqa: E402
-from src.axes.goods_map import TIER_PREFIX, load_goods_map  # noqa: E402
+from src.axes.goods_map import load_goods_map  # noqa: E402
+from src.axes.goods_map import normalize as goods_normalize  # noqa: E402
 from src.axes.x4_goods import goods_similarity  # noqa: E402
 
 POSITIVE = ("유사", "비유사")
@@ -114,11 +116,9 @@ def now_text() -> str:
 
 
 def target_rows(rows: list[dict]) -> list[dict]:
-    """pass a·b 가 일치하고 유사·비유사인 행(labels.csv 순서)."""
-    return [
-        r for r in rows
-        if r.get("유사여부_확정") in POSITIVE and r.get("유사여부_확정") == r.get("llm_b_유사여부")
-    ]
+    """유사여부_확정이 유사·비유사인 행(labels.csv 순서) — pairs_features.target_rows 와 같은 기준
+    (2026-10-11 부터 pass b 일치를 요구하지 않는다)."""
+    return [r for r in rows if r.get("유사여부_확정") in POSITIVE]
 
 
 # ---- A. 번호 정규화·범주 ----
@@ -600,32 +600,88 @@ def appendix_text(text: str, reference: str) -> str:
     return match.group(1) if match else ""
 
 
-class SpacelessIndex:
-    """goods_map 의 name·alias 를 공백 없이 casefold 한 정확 일치 색인. PDF 텍스트는 명칭 안 공백이
-    빠져 오므로("컴퓨터소프트웨어" vs 고시 "컴퓨터 소프트웨어") codes_for 다음에 한 번 더 찾는다."""
+JACCARD_MIN = 0.8  # 부분 일치 채택 하한(토큰 집합 자카드) — 접두 부분 일치는 채택하지 않는다
+_QUALIFIER_RE = re.compile(r"[{\[(（【][^{}\[\]()（）【】]*[}\])）】]")  # {기계부품}·(琥珀)·[점퍼]
+_SYNONYM_RE = re.compile(r"\[([^\[\]]+)\]")  # 고시 표기의 [동의어]
+_KEY_SYMBOL_RE = re.compile(r"[\s·ㆍ/\\\-–—_,.'\"`~!?:;+&*※]+")
+GENERIC_SUFFIXES = ("류", "제품", "용품", "용")  # 접미를 떼면 고시 명칭이 되는 것(신발류 → 신발)
+
+
+def goods_key(name: str) -> str:
+    """매핑 키: NFKC·casefold, 괄호 한정어 제거, 공백·중점·기호 제거("컴퓨터 소프트웨어" ==
+    "컴퓨터소프트웨어", "광학기기{안경과사진기기는제외}" == "광학기기")."""
+    folded = unicodedata.normalize("NFKC", name or "").casefold()
+    return _KEY_SYMBOL_RE.sub("", _QUALIFIER_RE.sub("", folded))
+
+
+def goods_tokens(name: str) -> frozenset[str]:
+    """자카드용 토큰 집합: 괄호 한정어를 뗀 뒤 공백·기호로 나눈다."""
+    text = _QUALIFIER_RE.sub(" ", goods_normalize(name or ""))
+    return frozenset(token for token in _KEY_SYMBOL_RE.split(text) if token)
+
+
+class GoodsMatcher:
+    """goods_map 의 name·alias 를 매핑 키로 색인한 정확 일치 + 토큰 자카드 부분 일치.
+
+    PDF 텍스트는 명칭 안 공백이 빠지거나(컴퓨터소프트웨어) 줄 넘김 공백이 끼고(선물 용포장지),
+    고시 표기의 괄호 한정어·한자·[동의어]가 붙어 오므로 키를 맞춰 한 번 더 찾는다. 키가 같은 항목이
+    여러 류에 있으면 류로 좁히고, 류를 모르면 합집합(키 충돌 69개)."""
 
     def __init__(self, goods_map) -> None:
-        self.table: dict[tuple[str, int], set[str]] = {}
-        for entry in getattr(goods_map, "entries", []):
-            for name in (entry.name, *entry.aliases):
-                key = (self.key(name), entry.nice_class)
-                self.table.setdefault(key, set()).update(entry.similarity_codes)
+        self.by_key: dict[str, dict[int, tuple[set[str], str]]] = {}
+        self.entries = list(getattr(goods_map, "entries", []))
+        self.tokens: list[frozenset[str]] = []
+        self.by_token: dict[str, list[int]] = {}
+        for index, entry in enumerate(self.entries):
+            for text, via in ((entry.name, "name"), *((a, "alias") for a in entry.aliases)):
+                key = goods_key(text)
+                if not key:
+                    continue
+                slot = self.by_key.setdefault(key, {}).setdefault(entry.nice_class, (set(), via))
+                slot[0].update(entry.similarity_codes)
+            tokens = goods_tokens(entry.name)
+            self.tokens.append(tokens)
+            for token in tokens:
+                self.by_token.setdefault(token, []).append(index)
 
-    @staticmethod
-    def key(name: str) -> str:
-        return re.sub(r"\s+", "", name or "").casefold()
-
-    def codes_for(self, name: str, nice_class: int | None = None) -> frozenset[str]:
-        key = self.key(name)
-        if not key:
-            return frozenset()
+    def exact(self, key: str, nice_class: int | None) -> tuple[frozenset[str], str] | None:
+        """키 정확 일치 → (코드, "name"|"alias"). 없으면 None."""
+        slot = self.by_key.get(key)
+        if not slot:
+            return None
         if nice_class is not None:
-            return frozenset(self.table.get((key, nice_class), set()))
+            hit = slot.get(nice_class)
+            return (frozenset(hit[0]), hit[1]) if hit else None
         codes: set[str] = set()
-        for (entry_key, _cls), values in self.table.items():
-            if entry_key == key:
-                codes.update(values)
-        return frozenset(codes)
+        via = "name"
+        for found, kind in slot.values():
+            codes.update(found)
+            via = "alias" if kind == "alias" else via
+        return frozenset(codes), via
+
+    def jaccard(self, name: str, nice_class: int | None,
+                minimum: float = JACCARD_MIN) -> tuple[frozenset[str], str, float] | None:
+        """토큰 집합 자카드 ≥ minimum 인 상위 1건 → (코드, 고시 명칭, 자카드). 토큰이 하나뿐인
+        명칭은 부분 일치를 시도하지 않는다(접두·포함 일치는 과매핑 — 통신기기 → 통신기기 임대업)."""
+        tokens = goods_tokens(name)
+        if len(tokens) < 2:
+            return None
+        counts: dict[int, int] = {}
+        for token in tokens:
+            for index in self.by_token.get(token, ()):
+                counts[index] = counts.get(index, 0) + 1
+        best: tuple[float, int] | None = None
+        for index, shared in counts.items():
+            entry = self.entries[index]
+            if nice_class is not None and entry.nice_class != nice_class:
+                continue
+            score = shared / len(tokens | self.tokens[index])
+            if score >= minimum and (best is None or score > best[0]):
+                best = (score, index)
+        if best is None:
+            return None
+        entry = self.entries[best[1]]
+        return frozenset(entry.similarity_codes), entry.name, best[0]
 
 
 _SUBHEAD_RE = re.compile(r"(?m)^\s*[●○■□◆◇▪•ㅇo]\s*([^\n]*?(?:상표|서비스표|표장)[^\n]*)$")
@@ -717,27 +773,45 @@ def split_goods(text: str) -> list[tuple[str, int | None]]:
 
 
 def map_goods(names: list[tuple[str, int | None]], goods_map,
-              spaceless: SpacelessIndex | None = None) -> tuple[set[str], list[dict]]:
-    """codes_for(정확·alias) → 공백 무시 정확 → 류 무시 정확 → search 상위 1건(정확·접두만).
-    (코드 집합, 상세)."""
-    if spaceless is None:
-        spaceless = SpacelessIndex(goods_map)
+              matcher: GoodsMatcher | None = None) -> tuple[set[str], list[dict]]:
+    """codes_for(정확·alias) → 키 정규화 정확(공백·기호·괄호 한정어 무시, 류 무시 포함) →
+    [동의어] 괄호 안 명칭 → "~류/~제품/~용품/~용" 접미 제거 → 토큰 자카드 ≥ 0.8 상위 1건.
+    (코드 집합, 상세). 임계 미달은 미매핑(fail)으로 둔다 — 접두 부분 일치는 2026-10-12 부터
+    채택하지 않는다(통신기기 → 통신기기 임대업 같은 과매핑)."""
+    if matcher is None:
+        matcher = GoodsMatcher(goods_map)
     codes: set[str] = set()
     details: list[dict] = []
     for name, nice_class in names:
         found = goods_map.codes_for(name, nice_class)
         method = "exact"
+        key = goods_key(name)
         if not found:
-            found = spaceless.codes_for(name, nice_class)
-            method = "exact(공백 무시)"
-        if not found and nice_class is not None:
-            found = goods_map.codes_for(name) or spaceless.codes_for(name)
-            method = "exact(류 무시)"
+            hit = matcher.exact(key, nice_class)
+            method = "exact(정규화)"
+            if not hit and nice_class is not None:  # PDF 류 표기가 틀린 경우(기존 "류 무시" 단계)
+                hit = matcher.exact(key, None)
+                method = "exact(정규화·류 무시)"
+            if hit:
+                found = hit[0]
+                method = "alias" if hit[1] == "alias" else method
         if not found:
-            matches = goods_map.search(name, limit=1, nice_class=nice_class)
-            if matches and matches[0].tier <= TIER_PREFIX:
-                found = frozenset(matches[0].similarity_codes)
-                method = f"search:{matches[0].name}"
+            for inner in _SYNONYM_RE.findall(unicodedata.normalize("NFKC", name)):
+                hit = matcher.exact(goods_key(inner), nice_class)
+                if hit:
+                    found, method = hit[0], "exact([동의어])"
+                    break
+        if not found:
+            for suffix in GENERIC_SUFFIXES:
+                stem = key[: -len(suffix)] if key.endswith(suffix) else ""
+                hit = matcher.exact(stem, nice_class) if len(stem) >= 2 else None
+                if hit:
+                    found, method = hit[0], f"접미({suffix})"
+                    break
+        if not found:
+            hit = matcher.jaccard(name, nice_class)
+            if hit:
+                found, method = hit[0], f"jaccard:{hit[1]}({hit[2]:.2f})"
         if found:
             codes.update(found)
             details.append(
@@ -765,7 +839,7 @@ def counterpart_block(row: dict, blocks: list[dict], ordinal: int) -> dict | Non
 
 def run_goods(paths_: tc.TrialPaths, goods_map=None) -> dict:
     goods_map = goods_map or load_goods_map()
-    spaceless = SpacelessIndex(goods_map)
+    matcher = GoodsMatcher(goods_map)
     labels = tc._read_csv(paths_.labels_csv)
     rows = target_rows(labels)
     cache: dict[str, tuple[str, list[dict]]] = {}
@@ -795,10 +869,11 @@ def run_goods(paths_: tc.TrialPaths, goods_map=None) -> dict:
             if _APPENDIX_REF_RE.search(block["text"]):
                 coverage["별지"] += 1
             names = split_goods(raw)
-            codes, details = map_goods(names, goods_map, spaceless)
+            codes, details = map_goods(names, goods_map, matcher)
             for detail in details:
                 stat = name_stats.setdefault(
-                    detail["name"], {"n": 0, "ok": detail["method"] != "fail"}
+                    detail["name"], {"n": 0, "ok": detail["method"] != "fail",
+                                     "method": detail["method"].split(":")[0]}
                 )
                 stat["n"] += 1
             sides[key] = codes
@@ -820,13 +895,22 @@ def run_goods(paths_: tc.TrialPaths, goods_map=None) -> dict:
     failures = sorted(
         ((s["n"], name) for name, s in name_stats.items() if not s["ok"]), reverse=True
     )
+    by_method: dict[str, int] = {}
+    for stat in name_stats.values():
+        by_method[stat["method"]] = by_method.get(stat["method"], 0) + 1
+    occurrences = sum(s["n"] for s in name_stats.values())
+    mapped_occurrences = sum(s["n"] for s in name_stats.values() if s["ok"])
     report = {
         "대상_행": len(rows),
         "명칭": {
             "고유": len(name_stats), "매핑": mapped,
             "매핑률": round(mapped / len(name_stats), 3) if name_stats else None,
+            "등장": occurrences, "등장_매핑률": (
+                round(mapped_occurrences / occurrences, 3) if occurrences else None
+            ),
+            "방법별(고유)": dict(sorted(by_method.items(), key=lambda item: -item[1])),
         },
-        "실패_상위20": [{"명칭": name, "횟수": n} for n, name in failures[:20]],
+        "실패_상위50": [{"명칭": name, "횟수": n} for n, name in failures[:50]],
         "행_커버리지": coverage,
         "x4": {label: _dist(values) for label, values in x4_by_label.items()},
         "labels_갱신_칸": changed,
