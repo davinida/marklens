@@ -89,12 +89,11 @@ def read_csv(path: Path) -> list[dict]:
 
 
 def target_rows(rows: list[dict]) -> list[dict]:
-    """pass a·b 가 일치하고 유사·비유사인 행(labels.csv 순서) — trials_enrich.target_rows 와
-    같다."""
-    return [
-        r for r in rows
-        if r.get("유사여부_확정") in POSITIVE and r.get("유사여부_확정") == r.get("llm_b_유사여부")
-    ]
+    """유사여부_확정이 유사·비유사인 행(labels.csv 순서). 2026-10-11 부터 pass b 일치를 요구하지
+    않는다 — A≠B 16행이 사람 검증·규칙으로 전부 처리돼 유사여부_확정(사람 라벨 우선)이 최종이다.
+    새 불일치는 `review --bundle` 의 ab_disagree 로 드러난다. (trials_enrich.target_rows 는 아직
+    A·B 일치 기준.)"""
+    return [r for r in rows if r.get("유사여부_확정") in POSITIVE]
 
 
 def _memo_says_figure(row: dict) -> bool:

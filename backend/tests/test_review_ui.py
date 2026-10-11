@@ -249,12 +249,15 @@ def test_override_writes_file_and_loader_excludes(client: TestClient, base: Path
     _decide(client, action="override", excluded=["gate"], kept=[])
     assert dx.read_weak_overrides(overrides) == frozenset({"coffee", "gate"})
     # 로더: excluded 토큰은 점수 1.0(다수 등록이어도)
-    model = dx.Distinctiveness({"coffee": (112, 119)}, overrides=dx.read_weak_overrides(overrides))
+    model = dx.Distinctiveness({"coffee": (112, 119)}, overrides=dx.read_weak_overrides(overrides),
+                               descriptive={})  # 실제 3호 목록과 분리(coffee 는 3호 상대어)
     assert model.judge("coffee") == dx.TokenJudgement(
         "coffee", 1.0, ("사람 검토 제외(weak_token_overrides)",)
     )
     assert dx.Distinctiveness({"coffee": (112, 119)}).token_score("coffee") == 0.0
     monkeypatch.setenv(dx.ENV_OVERRIDES_PATH, str(overrides))
     assert dx.resolve_overrides_path() == overrides
-    assert dx.build({"coffee": (112, 119)}, famous=set()).token_score("coffee") == 1.0
+    judged = dx.build({"coffee": (112, 119)}, famous=set()).judge("coffee")
+    # 환경변수 경로의 overrides 가 적용된다(실제 3호 목록에 coffee 가 상대어라 상품 미상 상한 0.5)
+    assert judged.reasons[0] == "사람 검토 제외(weak_token_overrides)" and judged.score >= dx.THETA
     assert dx.read_weak_overrides(base / "none.json") == frozenset()

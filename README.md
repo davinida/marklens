@@ -3,17 +3,17 @@
 MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·호칭·관념·상품 견련성
 4축으로 평가하는 비상업적 교육·연구용 웹 서비스입니다. 1학기에 외관(CLIP) 검색과
 백엔드를 완성했고, 2학기에 다축 모델로 확장 중입니다 — 호칭 축(X1)과 관념 축(X3)은
-서비스에 연결했고, 상품 축(X4)은 라이브러리로 구현했으며, 통합 모델은 설계 초안(2026-10-01)
-단계입니다.
+서비스에 연결했고, 상품 축(X4)은 라이브러리로 구현했으며, 통합 모델은 정답 데이터(심결례
+라벨)를 2026-10-11에 마감하고 학습 입력을 확정한 단계(학습 전)입니다.
 
 결과는 참고 정보입니다. 상표 등록 가능성, 침해 여부, 법적 위험 확률 또는 검색
 범위 밖 권리의 부재를 판정하지 않습니다.
 
-| 항목 | 2026-10-01 현재 |
+| 항목 | 2026-10-11 현재 |
 |---|---|
-| 마지막 갱신 | 2026-10-01 (`main` = `develop` = `7e56b0a`) |
+| 마지막 갱신 | 2026-10-11 (`main` = `develop` = `49c64f3`, PR #40 까지; 이 브랜치 `feat/review-wrapup` 스테이징) |
 | 데이터 | KIPRIS 등록상표 1,100건, generation `20260827T035002Z-25f84a6eeb26` (2026-08-27) |
-| 테스트 | Python `886 passed, 26 skipped`(가짜 ML 모드, 2026-10-08 X2 벤치마크·요부 분리·변형 52건 포함; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `77 passed`(19 파일) · Playwright 스펙 5개 × 뷰포트 3개 = 15 |
+| 테스트 | Python `1075 passed, 26 skipped`(가짜 ML 모드, 2026-10-11 — 식별력 37·검토 화면 4·심결례 도구 포함; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `77 passed`(19 파일) · Playwright 스펙 5개 × 뷰포트 3개 = 15 |
 | CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — PR #28~#31(2026-10-01 develop `7e56b0a`) |
 
 ## 현재 범위
@@ -28,8 +28,8 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 상품↔유사군 변환표·상품 검색 API | 구현 | 파서·검증기 + 로더(`ml/src/axes/goods_map.py`) + `GET /goods/search`·`/goods/classes`(BFF `/api/goods/*`). 변환표 `goods_map.json.gz` 저장소 포함(공공누리 제1유형, 출처표시). 지정상품 입력 화면(프론트-6)은 구현(`GoodsPicker`), `/search` 연동은 유사군 백필 후 |
 | 상품 견련성 X4 | 라이브러리 | `ml/src/axes/x4_goods.py` 자카드. DB 유사군 보유 100/1,100건이라 서비스 적용은 백필 후 |
 | 관념 X3 | 최소 연결 | `ml/src/axes/x3_semantic.py` 다국어 임베딩(paraphrase-multilingual-MiniLM-L12-v2) + 관념 게이트(wordfreq) + `POST /semantic-search`. 상표명 확인 패널에 "관념 유사 후보" 섹션(발음 섹션과 병렬 요청). 통합 점수에는 미반영 |
-| 통합 모델 | 설계 초안 | [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)(2026-10-01): 판례가 정한 구조, 로지스틱 회귀 입력, 검증 계획. 구현·학습은 정답 데이터 라벨링 후. UI의 지정상품 입력도 현재 숨김 |
-| 정답 데이터(심결례) 수집·라벨링 | 수집·LLM 이중 라벨링 | `backend/scripts/trials_collect.py`(2026-10-01 4단계 + 라벨 도구): 심판사항 API 목록 42,474건, PDF·텍스트 843건, 라벨 시트 1024행(자동 1등급 331건), 큐레이션 큐 355건(430행) LLM 이중 라벨링 완료(A↔B 일치 96%). 보강(2026-10-08, `trials_enrich.py`): 상대 표장 상표명 320/350행(KIPRIS 번호 조회 138회)·지정상품 유사군 양쪽 187행·`x4_goods`. 사람 검증 진행 중 — 아래 "정답 데이터" 소절 |
+| 통합 모델 | 학습 입력 확정(학습 전) | [통합 모델 설계](docs/MarkLens_통합모델_설계.md): 판례가 정한 구조(2026-10-01), 축별 벤치마크(§4-1·§4-2), 2026-10-11 §4-3 학습 입력 정의 표(축·플래그·결측 규칙·라벨)와 학습 가용 n(355행, 4축 완전 관측 134). 구현·학습은 다음 단계. UI의 지정상품 입력은 현재 숨김 |
+| 정답 데이터(심결례) 수집·라벨링 | **마감(2026-10-11)** | `backend/scripts/trials_collect.py`·`trials_enrich.py`·`review_ui.py`: 수집 843건 → 자동 선별 → LLM 이중 라벨 430행(A↔B 96% → 처리 후 99%) → 보강(상표명 320/350·유사군 187) → 4축 벤치마크 → 사람 검증 37건(LLM↔사람 97%) → 식별력 v0.1 승인·v0.2. 라벨 유사 214·비유사 141·제외 75 — 아래 "정답 데이터" 소절 |
 | 법적 위험 확률·등록 가능성 판단 | 미구현 | 제품 범위 밖 |
 | 공개 클라우드 배포 | 템플릿만 제공 | 실제 도메인·TLS·계정 배포는 하지 않음 |
 
@@ -53,21 +53,21 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 항목 | 담당 | 상태 | 위치 | 비고 |
 |---|---|---|---|---|
 | 공통 축 함수 규약 `ml/src/axes/` | 다빈 | 완료(X1·X2 문자·X3·X4) | `ml/src/axes/` | 2026-10-08 X2 문자 외관(철자) `x2_ortho.py` 추가(`ml/tests/test_x2_ortho.py`) |
-| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | 부분(수집·자동 선별·LLM 이중 라벨링·상대 명칭 LLM 추출 완료, 사람 검증 중) | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/label/confirm/review/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(67건), `backend/scripts/trials_enrich.py`, `backend/tests/test_trials_enrich.py`(17건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치, PR #29): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 라벨 도구(PR #30·#31)로 큐 355건(430행) LLM 이중 라벨링 완료(호출 0): 유사 225·비유사 140·제외 65, LLM A↔B 일치율 96%(414/430), LLM↔정규식 추정 80%, 재검토 큐 130행. 사람 검증(표본 40 + 재검토) 진행 중. 보강(2026-10-08, `feat/trials-enrich`): A·B 일치 350행의 상대 표장 상표명 320행(91%, 출원속보 번호 조회 138회 — 성공 138·0건 0·오류 0)·지정상품 유사군 매핑 63%(양쪽 187행)·`x4_goods`(유사 평균 0.44 · 비유사 0.32) — 아래 "정답 데이터" 소절 |
+| 다빈-1 정답 데이터(심결 라벨표) | 다빈 | **완료(2026-10-11 마감 — 수집·자동 선별·LLM 이중 라벨·보강·사람 검증 37건·A≠B 규칙 처리; 남은 사람 결정 5행은 통합 모델 설계 §6)** | `backend/scripts/trials_collect.py`(list/fetch/extract/sheet/show/label/confirm/review/sample/biblio/status), `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py`(67건), `backend/scripts/trials_enrich.py`, `backend/tests/test_trials_enrich.py`(17건) | 2026-09-30 1~3단계(커밋 8fb53b0·f84e85d·6e24930) + 2026-10-01 4단계(규칙 공백 수정·큐레이션 보조·2차 배치, PR #29): 목록 129개월 42,474건, PDF·텍스트 843건(1차 373 + 시범 20 + 2차 450), `labels.csv` 1024행(자동 1등급 331: 거절 106·무효 30·권리범위 195), `curation_queue.csv` 355건. 호출 9월 924/950 · 10월 900/950. 라벨 도구(PR #30·#31)로 큐 355건(430행) LLM 이중 라벨링 완료(호출 0): 유사 225·비유사 140·제외 65, LLM A↔B 일치율 96%(414/430), LLM↔정규식 추정 80%, 재검토 큐 130행. 보강(2026-10-08, `feat/trials-enrich`): A·B 일치 350행의 상대 표장 상표명 320행(91%, 출원속보 번호 조회 138회 — 성공 138·0건 0·오류 0)·지정상품 유사군 매핑 63%(양쪽 187행)·`x4_goods`(유사 평균 0.44 · 비유사 0.32). 사람 검증·마감(2026-10-11, `feat/review-ui` → `feat/review-wrapup`): 검토 화면으로 표본 37/40 확인(LLM↔사람 97%), 명칭 검토 31, 약한 토큰 200, A≠B 16행 규칙 처리(A↔B 99%), 식별력 하락 14건 결정 → 유사 214·비유사 141·제외 75, 학습 특징 355행 — 아래 "정답 데이터" 소절 |
 | 다빈-2 호칭 X1 | 다빈 | **완료** | `ml/src/axes/x1_phonetic.py`, `korean_brands.py`, `ml/tests/test_axes.py`(123건), `docs/MarkLens_X1_호칭유사도_설계.md` | PR #21·#22. v1.5(2026-09-30, `normalize_name` 공개 — X3와 정규화 공유). v1.6(2026-10-09): 식별력 없는 토큰만으로 된 이름은 포함 검사·분리관찰 대상에서 제외(2017후2697·2000후2453, Zorbix Gate/GATE `{gate}` 0.95→0.36). 최소 연결(`/phonetic-search`, `backend/src/core/phonetic_search.py`) |
-| 다빈-3 식별력 필터 | 다빈 | **부분(v0, 2026-10-09)** | `ml/src/axes/distinctiveness.py`, `ml/scripts/distinctiveness_build.py`, `shared/distinctiveness/`(`token_stats.json`·`weak_tokens.json`·`report.md`), `ml/tests/test_distinctiveness.py`(33건), `ml/tests/test_descriptive_candidates.py`(2건), `docs/MarkLens_식별력_설계.md` | 판례 요소를 토큰 점수로: 33조1항 1·4·5·6호 0점, 3호 기술적 표장은 판례 기준 분류 초안 447항목(절대어 69, 미승인 — `shared/distinctiveness/descriptive_terms.json`, 승인용 표 `descriptive_candidates.md`, 후보·분류 `ml/scripts/descriptive_candidates.py`; 절대어 0·류 일치 0·상품 미상 0.5 상한), 2017후2697 다수 등록(심판 목록 42,474 + DB 1,100 제목의 출원인 수 A·등장 수 N), wordfreq 본질적 식별력, 유명 브랜드 1.0. 약한 토큰 1,513개(점수 < 0.5)를 X1·X2 철자·X3 의 `extra_generic` 으로, 요부 없는 이름은 전체 대비(2000후2453). 심결례 전후 AUC +0.01 안(x1 = 1.0 비유사 27 → 25) — X1 전체 결합·포함 규칙 한계, 설계 문서 §4·§6 |
+| 다빈-3 식별력 필터 | 다빈 | **v0.2(2026-10-11 — 3호 사람 승인 반영 + 결합 규칙; 통합 모델 연결 전)** | `ml/src/axes/distinctiveness.py`, `ml/scripts/distinctiveness_build.py`, `shared/distinctiveness/`(`token_stats.json`·`weak_tokens.json`·`report.md`·`descriptive_terms.json`·`weak_token_overrides.json`), `ml/tests/test_distinctiveness.py`(37건), `ml/tests/test_descriptive_candidates.py`(2건), `docs/MarkLens_식별력_설계.md` | 판례 요소를 토큰 점수로: 33조1항 1·4·5·6호 0점, 3호 기술적 표장은 판례 기준 분류 초안 447 → 사람 승인 449항목(절대어 57 승인·12 해제, 상대어 380 전부 승인; 절대어 0·류 일치 0·상품 미상 0.5 상한), 2017후2697 다수 등록(심판 목록 42,474 + DB 1,100 제목의 출원인 수 A·등장 수 N), wordfreq 본질적 식별력, 유명 브랜드 235(갤럭시·오리온 추가) 1.0, 사람 검토 제외 7 토큰은 통계 약화만 건너뜀. 약한 토큰 1,527개(점수 < 0.5)를 X1·X2 철자·X3 의 `extra_generic` 으로, 요부 없는 이름은 전체 대비(2000후2453), 결합 규칙(약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 요부 후보 — 2015후1690, 식별력 하락 14건 중 후보 13). 심결례 전후 AUC 변화 CI 안(x1 바뀐 쌍 25 → 19) — 설계 문서 §4·§4-1·§6 |
 | 다빈-4 변환표 검증 | 다빈 | **완료** | `shared/goods_map/README.md` §4 절차 | 2026-09-17 원본 xlsx로 91,591건·표본 10개 대조. 35류 병합 항목은 원 명칭을 `aliases`로 보존(PR #23) |
 | 프론트-1 변경 시안 확정 | 지원 | 미착수 | — | 저장소에 시안 산출물 없음 |
 | 프론트-2 상품↔유사군 변환표 | 지원 | 부분 | `shared/goods_map/`, `shared/types/goods.ts` | 파서·검증기 완료(PR #19), 원 명칭 aliases 보존(PR #23). 변환표 gz 포함(공공누리 제1유형, 출처표시, 2026-09-30 확인). aliases 보존·검증기 확장·테스트: 다빈 |
-| 프론트-3 유명 로고 브랜드 목록 | 지원 | 부분 | `shared/famous_brands.txt` | DRAFT 39건(출원인명), 아직 수집 전 |
+| 프론트-3 유명 로고 브랜드 목록 | 지원 | 부분 | `shared/famous_brands.txt` | DRAFT 39건(출원인명), 아직 수집 전. 2026-10-11 식별력 요부 판단용 브랜드 토큰 줄 4(갤럭시·GALAXY·오리온·ORION — 출원인 검색에는 쓰지 않음) |
 | 프론트-4 화면 골격(3층 결과 화면) | 현수 | 완료 | `frontend/app/page.tsx`, `frontend/components/ResultView.tsx` | 이후 추가: 상표명 패널의 발음 유사·관념 유사 두 섹션(병렬 요청, 1회용 Turnstile 토큰을 발음 → 관념 순으로 소비), 결과 화면 분석 범위의 "호칭·관념 조회됨" 표시(PR #22·#26) |
 | 프론트-5 백엔드 1차 연동 | 현수 | 완료 | `frontend/app/api/*`(BFF) | |
 | 프론트-6 지정상품 입력 UI | 다빈 | **완료(범위 ②, v1.1)** | `frontend/components/GoodsPicker.tsx`(+테스트), `lib/goods.ts`, `SearchForm.tsx`·`ResultView.tsx`, `shared/goods_map/business_presets.json`, `GET /goods/search`(q 선택·offset·`presets`)·`/goods/classes`, BFF `frontend/app/api/goods/*` | 2026-09-21 API·zod 계약(PR #24) → 2026-10-01 화면(PR #27): 상품명 검색(디바운스 250ms·2글자·류 배지·고시 명칭·키보드) + 분류로 찾기 + 선택 칩(최대 20, 유사군 합집합). v1.1: 업종 세트 25개·79건(일상어 → 여러 류 묶음, 고시 13판 원본으로 확인·실제 gz 검증 경고 0) 카드와 "자주 찾는 업종" 칩 12개, 류 목록 상품/서비스 두 묶음(모바일 접힘), 유사군 풀이. 이름 확인·검색을 거쳐도 유지, 결과 화면 상단 요약. ③ `/search` 연동은 유사군 백필 후 |
 | 프론트-7 관념 X3 | 다빈 | **완료(축 함수 v1.3 + 최소 연결)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`(219건), `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md`, `backend/src/core/semantic_search.py`, `backend/src/api/semantic_search.py`, `frontend/components/SemanticMatchesSection.tsx` | PR #25·#26(2026-09-30). MiniLM-L12-v2 + wordfreq 표제어 게이트(합성어 폴백, 영문 3자 이상, 1음절 명사 목록), 하한 0.55. `POST /semantic-search`(BFF `/api/semantic-search`)로 상표명 확인 패널에 연결, 관념 없는 입력은 안내 문구. 통합 모델 전 |
 | 프론트-8 상품 견련성 X4 | 다빈 | **완료(축 함수)** | `ml/src/axes/x4_goods.py`, `ml/src/axes/goods_map.py`(로더), `backend/src/api/goods.py`(상품 검색 API), `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21(PR #24). 서비스 적용은 DB 유사군 백필(현재 100/1,100건) 후 |
-| 프론트-9 통합 모델·재보정 | 다빈 | 설계 초안 + 축별 벤치마크 | `docs/MarkLens_통합모델_설계.md` | 2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획·결정 대기). 2026-10-08 §4-1 정답 데이터 특징·축별 벤치마크(학습 전 측정). 구현·학습은 식별력 필터·명칭 품질 정리 후 |
+| 프론트-9 통합 모델·재보정 | 다빈 | 설계 + 학습 입력 확정(학습 전) | `docs/MarkLens_통합모델_설계.md` | 2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획·결정 대기). 2026-10-08 §4-1 정답 데이터 특징·축별 벤치마크, 2026-10-09 §4-2 재측정·현실 분포, 2026-10-11 §4-3 학습 입력 정의 표·학습 가용 n(355행, 4축 완전 관측 134 = 유사 83·비유사 51). 다음: 구현·학습(층화 5-fold, L2) |
 | X2 외관 벤치마크(심결 이미지 쌍) | 다빈 | 부분(v0 기준선 + v1 ① 요부 분리) | `ml/scripts/trials_extract_images.py`, `ml/scripts/x2_benchmark.py`, `ml/scripts/x2_split.py`, `ml/scripts/x2_variants.py`, `ml/tests/test_trials_extract_images.py`·`test_x2_benchmark.py`·`test_x2_split.py`·`test_x2_variants.py`(52건), `docs/MarkLens_X2_외관_설계.md` | 2026-10-08 v0: 심결문 PDF에서 양쪽 표장 이미지를 뽑아 제목에 연결(QA 시트 30쌍 눈 확인) → LLM 라벨이 붙은 이미지 쌍 286/350행(82%). 현재 CLIP 코사인의 ROC AUC 전체 0.51 · 판단축 외관 0.62 — 섞은 라벨 0.50. v1 ①(같은 날): 소형 기준 32px → 306쌍, 결론 대신 **표장 라벨**(유사 189·비유사 95·제외 22), 부트스트랩 95% CI, easyocr로 문자·도형 영역 분리(유형 일치 76%, OCR 완전 일치 51%). 철자 유사(`x2_text_ortho`) 외관축 AUC 0.72(0.57~0.86), 전체 이미지 0.63, 도형 크롭은 쌍 80·도형 29로 판단 보류, 사진 표장에서는 역전. v1 ②(`x2_variants.py`): 전체 이미지 변형 5종(흑백·윤곽선·다중 해상도·DINOv2·앙상블) 모두 채택 없음(최대 외관축 +0.026, CI 겹침), OCR 노이즈 진단은 ±0.01(철자 신호 상한은 신호 자체), 유형 게이팅 `x2_gate` 외관축 0.70(잠정 후보). 서비스 반영은 다음 PR. 데이터는 `ml/data/trials/`(비공개) |
-| 축별 벤치마크(심결례 4축 특징) | 다빈 | 부분(측정 v1 + 10-09 재측정, 학습 전) | `ml/scripts/pairs_features.py`, `ml/scripts/axes_benchmark.py`, `ml/src/axes/x2_ortho.py`, `ml/tests/test_pairs_features.py`·`test_axes_benchmark.py`·`test_x2_ortho.py`(119건) | 2026-10-08(`feat/axes-benchmark`): 라벨 일치 350쌍에 X1·X2 문자(철자)·X2 CLIP(전체·도형 크롭)·X3(실제 모델)·X4 점수와 결측 플래그 → `pairs_features.csv`. 표장 라벨 ROC AUC (a) 전체 / (b) 판단축 포함: X1 0.54/0.54, X2 철자 0.50/0.65, X2 CLIP 전체 0.49/0.63, X3 0.50/0.53(게이트 켜짐 75쌍뿐), X4 0.60(최종 라벨, 거절결정불복 0.83). 정밀도 0.9 단독 임계값 없음, X1↔X2 철자 ρ 0.63. 낮은 원인: 식별력 없는 공통 부분(GATE/GATE 비유사)을 분리관찰이 1.0 으로, 본문·OCR 명칭 오추출, 경계 사례 편중 — [통합 모델 설계 §4-1](docs/MarkLens_통합모델_설계.md). 2026-10-09 세 원인 처리 후 재측정(§4-2): 상대 명칭 LLM 추출(176/183행, 기존과 불일치 116) → X1 0.60·X2 철자 외관축 0.73; 식별력 v0 `x1_d` 등 +0.01 안; 쉬운 음성 700쌍(교차 350·DB 350, `--easy-negatives`/`--with-easy-negatives`)을 더한 현실 분포에서 X1 0.90·X2 철자 0.83·X4 0.81 |
+| 축별 벤치마크(심결례 4축 특징) | 다빈 | 부분(측정 v1 + 10-09·10-11 재측정, 학습 전) | `ml/scripts/pairs_features.py`, `ml/scripts/axes_benchmark.py`, `ml/src/axes/x2_ortho.py`, `ml/tests/test_pairs_features.py`·`test_axes_benchmark.py`·`test_x2_ortho.py`(119건) | 2026-10-08(`feat/axes-benchmark`): 라벨 일치 350쌍에 X1·X2 문자(철자)·X2 CLIP(전체·도형 크롭)·X3(실제 모델)·X4 점수와 결측 플래그 → `pairs_features.csv`. 표장 라벨 ROC AUC (a) 전체 / (b) 판단축 포함: X1 0.54/0.54, X2 철자 0.50/0.65, X2 CLIP 전체 0.49/0.63, X3 0.50/0.53(게이트 켜짐 75쌍뿐), X4 0.60(최종 라벨, 거절결정불복 0.83). 정밀도 0.9 단독 임계값 없음, X1↔X2 철자 ρ 0.63. 낮은 원인: 식별력 없는 공통 부분(GATE/GATE 비유사)을 분리관찰이 1.0 으로, 본문·OCR 명칭 오추출, 경계 사례 편중 — [통합 모델 설계 §4-1](docs/MarkLens_통합모델_설계.md). 2026-10-09 세 원인 처리 후 재측정(§4-2): 상대 명칭 LLM 추출(176/183행, 기존과 불일치 116) → X1 0.60·X2 철자 외관축 0.73; 식별력 v0 `x1_d` 등 +0.01 안; 쉬운 음성 700쌍(교차 350·DB 350, `--easy-negatives`/`--with-easy-negatives`)을 더한 현실 분포에서 X1 0.90·X2 철자 0.83·X4 0.81. 2026-10-11 마감 재측정(§4-3, 355행 — `유사여부_확정` 기준, pass b 일치 불요): X1 0.59·X2 철자 0.56(외관축 0.73)·X3 0.50·X4 0.60, 식별력 v0.2 `_d` 축 CI 안, 현실 분포 X1 0.89·X2 철자 0.82·X4 0.81 |
 | 백엔드-1 PostgreSQL 설계 | 현수 | 완료 | `backend/migrations/001_init.sql` | |
 | 백엔드-2 JSON→DB 마이그레이션 | 현수 | 완료 | `backend/scripts/migrate_json_to_db.py` | |
 | 백엔드-3 이미지 S3 | 현수 | 보류 | `backend/src/core/storage.py` | 로컬 심 계층 + 경로 오버라이드만 |
@@ -82,7 +82,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 - 검색 입력은 **아직 이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음).
 - 상표명 확인(`/name-check`)은 검색과 분리된 별도 기능이며 검색 점수에 영향을 주지 않습니다.
-- X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. 검색 점수·등급에는 반영되지 않습니다(통합 모델은 설계 초안 단계).
+- X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. 검색 점수·등급에는 반영되지 않습니다(통합 모델은 학습 전).
 - X3는 같은 방식으로 `POST /semantic-search`에 연결되어 같은 패널에 관념 유사 후보(최대 5건, 하한 0.55)를 보여 줍니다. 기동 시 DB 상표명 중 관념이 있는 515건을 임베딩해 캐시하며 `MARKLENS_X3_ENABLED=0`이면 이 엔드포인트만 503입니다.
 
 ## 구조
@@ -394,9 +394,11 @@ production compose의 gateway는 여기에 사용자별 검색 5회/분·명칭 
 |---|---|---|
 | X1 호칭 | 두 상표명의 발음 유사도. 판례 5규칙(호칭 최우선, 첫음절 강세, 여러 호칭 중 최댓값, 외국어의 국내 발음, 한영 병기 시 한글 우선) | **완료** — 서비스 연결(`/phonetic-search`, 검색 등급에는 미반영) |
 | X2 외관 | OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색 | 완료 — 현재 서비스. 심결 이미지 쌍 벤치마크(2026-10-08): v0 286쌍 AUC 0.51·외관축 0.62, v1 ① 표장 라벨·요부 분리 — 철자 유사 외관축 0.72, v1 ② 전체 이미지 변형 5종 채택 없음·유형 게이팅 0.70(잠정). 문자 외관(철자) 축 함수 `ml/src/axes/x2_ortho.py`(2026-10-08: X1 정규화 + 자모 편집거리, 심결례 350쌍 상표명 기준 외관축 AUC 0.65) — [X2 외관 설계](docs/MarkLens_X2_외관_설계.md) §9 |
+| X2 문자 외관(철자) | 상표명 문자열의 철자 유사(X1 정규화 토큰 + 자모 편집거리, `ml/src/axes/x2_ortho.py`). 결합상표의 문자 부분을 이미지와 별도로 본다 | **라이브러리 완료(2026-10-08)** — 심결례 외관축 AUC 0.73(`x2_text_d`), 서비스 미연결 — [X2 외관 설계](docs/MarkLens_X2_외관_설계.md) §9 |
 | X3 관념 | 상표명 의미를 다국어 문장 임베딩(paraphrase-multilingual-MiniLM-L12-v2)의 코사인으로 비교(DB 200쌍 기준선으로 재보정). 관념 게이트(wordfreq 빈도표)로 조어·기호는 결측 | **완료** — 서비스 연결(`/semantic-search`, 검색 등급에는 미반영) |
 | X4 상품 견련성 | 유사군 코드 집합 간 자카드 계수 | **완료** — 라이브러리(서비스 적용은 DB 유사군 백필 후) |
-| 통합 | 4축 점수를 로지스틱 회귀로 결합해 출처 혼동 위험도(0~1)와 등급. 심결례 정답 데이터로 가중치 학습 | 설계 초안 — [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)(2026-10-01). 구현·학습은 라벨링 후 |
+| 식별력·요부 필터 | 상표명 토큰의 식별력 점수(33조1항 1·3·4·5·6호 0점, 다수 등록 A·N, 일반어 빈도, 유명 브랜드 1.0)로 약한 토큰을 X1·X2 철자·X3 의 `extra_generic` 으로 넘기고, 요부 없는 이름은 전체 대비, 약한 토큰 결합은 요부 후보(`ml/src/axes/distinctiveness.py`) | **v0.2(2026-10-11)** — 3호 기술적 표장 449항목 사람 승인, 결합 규칙. 심결례 AUC 효과는 CI 안 — [식별력 설계](docs/MarkLens_식별력_설계.md) |
+| 통합 | 4축 점수를 로지스틱 회귀로 결합해 출처 혼동 위험도(0~1)와 등급. 심결례 정답 데이터로 가중치 학습 | 학습 입력 확정 — [통합 모델 설계](docs/MarkLens_통합모델_설계.md) §4-3(2026-10-11). 구현·학습은 다음 단계 |
 
 축 함수 공통 규약: 위치 `ml/src/axes/`, 입력은 상표명 문자열 2개(X1·X2 문자 외관·X3) 또는
 유사군 코드 집합 2개(X4), 출력은 0.0~1.0 float(높을수록 유사), 순수 함수·대칭·
@@ -421,7 +423,7 @@ phonetic_similarity("카페 봄", "봄", extra_generic=frozenset({"카페"}))  #
   G2P, 국내 브랜드 로마자표 101개·지명표 34개, 예외 사전 63개, 복수 읽기 사전 21개, 낱자·숫자 읽기,
   한영 병기 판정) → 후보 조합 → 위치 가중 음절 레벤슈타인 → 최댓값.
 - `has_pronunciation`이 False인 상표(순수 도형·한자만)는 X1을 결측으로 두고
-  다른 축만으로 판단합니다. `extra_generic`에는 식별력 필터(다빈-3, 미착수)가 넘길 상품
+  다른 축만으로 판단합니다. `extra_generic`에는 식별력 필터(다빈-3, v0.2 `pair_generic`)가 넘길 상품
   의존 보통명칭 집합을 넣습니다.
 - 성능: 데이터 상표명 1,000쌍 0.21초(cold) — DB 전수 계산이 가능한 수준.
   G2P 벤치마크 60단어는 순수 룰 기준 정확 일치 48/60(브랜드·지명 로마자표와 예외 사전은
@@ -479,10 +481,11 @@ has_goods(set())                                                               #
   DB 1,100건 중 유사군 보유는 100건뿐이라 DB 전건 X4 계산은 유사군 백필 후에 가능합니다.
 - 설계·한계·실측: [X4 설계 문서](docs/MarkLens_X4_상품견련성_설계.md)(v1, 2026-09-21).
 
-### 통합 모델 — 판례가 정한 구조 (설계 초안, 2026-10-01)
+### 통합 모델 — 판례가 정한 구조 (설계 2026-10-01, 학습 입력 확정 2026-10-11)
 
 4축 점수를 로지스틱 회귀로 결합해 출처 혼동 위험도(0~1)와 등급을 내는 모델입니다. 가중치는
-심결례 정답 데이터로 학습하며, 아직 구현·학습 전입니다. 구조는 판례를 따릅니다.
+심결례 정답 데이터로 학습하며, 정답 데이터는 2026-10-11에 마감했고(355행) 구현·학습은 다음
+단계입니다. 구조는 판례를 따릅니다.
 
 | 상황 | 원칙 | 근거 |
 |---|---|---|
@@ -499,13 +502,16 @@ has_goods(set())                                                               #
 - 단독 임계값: 한 축이 축별 임계값을 넘으면 등급을 최소 "검토 권장"으로 올리되(97후3050 후단) 자동
   "위험"으로는 올리지 않습니다(전단). 거래실정(대법원 2013. 6. 27. 선고 2011다97065)과 인지도 조항
   (34조 1항 9·11·12·13호)은 범위 밖입니다.
-- 입력·학습·검증 계획과 결정 대기 항목: [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md).
+- 입력·학습·검증 계획, 학습 입력 정의 표(§4-3)와 결정 대기 항목: [통합 모델 설계](docs/MarkLens_통합모델_설계.md).
 
 ### 정답 데이터 — 심결례 수집
 
 통합 모델의 학습 데이터입니다. 특허심판원 심결문을 KIPRIS Plus 심판사항 API(항목별 검색 →
 심결문 조회 → PDF)로 받아 텍스트를 뽑고, 정규식으로 주문·결론 조문·선등록 번호를 추출해
-3등급으로 자동 선별한 뒤 사람이 라벨링합니다. 코드(`backend/scripts/trials_collect.py`,
+3등급으로 자동 선별한 뒤 LLM 이중 라벨과 사람 검증으로 라벨링합니다. 2026-10-11 마감까지의 흐름:
+**수집 843건 → 자동 선별(1등급 331) → LLM 이중 라벨 430행(A↔B 96%) → 보강(상표명 320/350·
+유사군 187) → 4축 벤치마크 → 사람 검증 37건(LLM↔사람 97%) + A≠B 16행 규칙 처리(A↔B 99%) →
+식별력 v0.1 3호 승인·v0.2 결합 규칙 → 학습 특징 355행**(유사 214·비유사 141·제외 75). 코드(`backend/scripts/trials_collect.py`,
 `backend/scripts/trials_kinds.json`, `backend/tests/test_trials_collect.py` 67건)와 설정
 (`KIPRIS_TRIAL_*`, `pymupdf==1.28.2`)은 저장소에 있고, 데이터(`ml/data/trials/`)는 저장소에 넣지
 않습니다.
@@ -550,8 +556,8 @@ has_goods(set())                                                               #
 - LLM 이중 라벨링(2026-10-01, 호출 0): 큐 355건(430행)을 독립 판정자 둘(pass a·b)이 같은 배치 파일만 보고 따로
   판정해 끝냈습니다 — 유사 225·비유사 140·제외 65(라벨출처 llm), LLM A↔B 일치율 96%(414/430, 불일치 16행은
   4건), LLM↔정규식 추정 80%(340/424). `review` 재검토 큐 130행(LLM≠추정 84·확신도 low 76·메모 애매 65·A≠B 16,
-  중복 포함). 사람 검증(`sample --n 40 --seed 0` 표본 40건 + 재검토 큐) 진행 중 — `confirm`이나 사람 `label`로
-  확정하면 `status`의 LLM↔사람 일치율이 채워집니다.
+  중복 포함). 사람 검증은 `sample --n 40 --seed 0` 표본 40건을 검토 화면에서 `confirm`·사람 `label`로 확정해
+  `status`의 LLM↔사람 일치율로 봅니다(2026-10-11: 36/37 = 97%, 미처리 3).
 - 보강(2026-10-08, 브랜치 `feat/trials-enrich`, `backend/scripts/trials_enrich.py` targets/lookup/goods/status, 테스트 17건):
   LLM A·B가 일치한 유사·비유사 350행(유사 210·비유사 140)의 상대 표장 상표명과 양쪽 지정상품 유사군을 채웠습니다.
   상대 표장 유형은 선등록·선출원(번호 있음) 131·국제등록 7·확인대상표장(번호 없음) 204·선사용 1·기타 7. 번호 있는
@@ -572,8 +578,17 @@ has_goods(set())                                                               #
   그대로 `label <심판번호> --name-b "<문자열>" --source llm`(새 열 `상대표장_명칭_llm`, 도형만이면 빈 값 + `--memo 도형`)으로
   기록했습니다 — 성공 176·도형 6·실패 1, 기존 본문·OCR 명칭과 불일치 116/176. 특징 생성의 이름 우선순위는 kipris > llm >
   본문 > ocr 입니다(통합 모델 설계 §4-2).
-- 다음 단계: 사람 검증 완료 → 남은 대기열 621건(11월 예산) → 통합 모델 학습(X2는 벤치마크 이미지 쌍, X4는 `x4_goods`,
-  X1·X3는 확보한 상표명으로 계산).
+- 마감(2026-10-11, 브랜치 `feat/review-wrapup`, 호출 0): 검토 화면(`review_ui`)으로 표본 37/40 확인(LLM↔사람 36/37 = 97%,
+  미처리 3행은 "미처리(사람)"으로 표시만), 명칭 검토 31·약한 토큰 200 처리. A≠B 16행은 규칙으로 처리(`--source llm`, 사람
+  출처로 기록하지 않음): 2016101003128 은 심결이 대비한 선등록상표4(제157519호)만 유사·나머지 제외 "심결 미대비"(사람이
+  확정한 2행 731170·28720 은 llm 으로 덮지 않음), 2021100001808 은 90조1항1호 효력제한이라 제외, 2023100001455 는 표장
+  동일·상품 대비에 이른 비사용 사건이라 비유사·상품, 2023100001617 은 family 상이라 유사(호칭) → LLM A↔B 일치 426/430(99%),
+  라벨 유사 214·비유사 141·제외 75. 식별력 하락 14건은 LLM 판정자가 소결을 읽어 `review_decisions.json` 에 결정(결합 규칙
+  후보 13·그대로 1) → 식별력 v0.2 결합 규칙 구현, 3호 사람 승인 반영(절대어 57·해제 12·상대어 380), 유명 브랜드 토큰
+  갤럭시·오리온. 특징 파일은 `유사여부_확정` 기준 355행(pass b 일치 불요)으로 재생성, 벤치마크 재측정은 통합 모델 설계 §4-3
+  (4축 완전 관측 134행). 남은 사람 결정: 표본 미처리 3행, 사람 확정 2행, 쌍 오류 의심 2행(통합 모델 설계 §6).
+- 다음 단계: 통합 모델 구현·학습(X2는 벤치마크 이미지 쌍, X4는 `x4_goods`, X1·X3는 확보한 상표명으로 계산) → 남은
+  대기열 621건(11월 예산)으로 표본 확대.
 - 예산: KIPRIS 월 1,000회 한도를 출원속보 키와 분리해 `KIPRIS_TRIAL_ACCESS_KEY`·
   `KIPRIS_TRIAL_MONTHLY_BUDGET`(기본 950)·`KIPRIS_TRIAL_DAILY_BUDGET`(기본 300)으로 관리하고, 호출마다
   `ml/data/trials/calls.log`, 누계는 `quota.json`에 남깁니다. PDF 다운로드도 1회로 셉니다(가정,
@@ -645,10 +660,10 @@ npm run typecheck && npm run lint && npm test && npm run test:e2e && npm run bui
 npm audit --omit=dev --audit-level=high
 ```
 
-2026-10-01 검증(`feat/trials-collect`, develop `7a4067b` 병합 후): Python `835 passed, 26 skipped`
-(가짜 ML 모드, X1 123건·X3 174건·심결례 파이프라인 67건 포함), X3 실제 모델 검증 `219 passed`,
-ruff 통과, frontend Vitest `77 passed`(19 파일), Playwright `15 passed`(스펙 5개 × 뷰포트 3개
-320x568, 667x375, desktop). 2026-09-30 file 모드 실서버 스모크에서 `/health`가 `index_size`·`trademark_count` 1,100과
+2026-10-11 검증(`feat/review-wrapup`, develop `49c64f3` 기준): Python `1075 passed, 26 skipped`
+(가짜 ML 모드, X1 123건·X3 174건·심결례 파이프라인·식별력 37건·검토 화면 4건 포함), ruff 통과.
+2026-10-01 검증: X3 실제 모델 검증 `219 passed`, frontend Vitest `77 passed`(19 파일), Playwright
+`15 passed`(스펙 5개 × 뷰포트 3개 320x568, 667x375, desktop). 2026-09-30 file 모드 실서버 스모크에서 `/health`가 `index_size`·`trademark_count` 1,100과
 generation `20260827T035002Z-25f84a6eeb26`을 반환했고, X3 캐시 515건·`/semantic-search`
 cold 10~18ms·warm 2ms를 확인했습니다. 이 검증에서 KIPRIS `/name-check`는 호출하지 않았습니다.
 직전 기록(2026-09-22, `b6b9bba`)은 Python `541 passed, 1 skipped`, Vitest `52 passed`였습니다.
@@ -741,7 +756,9 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
   `main`으로 동기화(PR)합니다.
 - 2026-10-01 병합(base `develop`): PR #29 심결례 수집 1~4단계 → #30 라벨 도구(`label`·`confirm`·`show --batch`·
   `review`·`sample`·`status` 일치율) → #31 `labels.csv` 프로세스 간 잠금·원자적 쓰기(라벨링 에이전트 둘의 동시
-  실행 대비). 병합 후 `main` = `develop` = `7e56b0a`.
+  실행 대비). 병합 후 `main` = `develop` = `7e56b0a`. 2026-10-08~11 병합: PR #35 정답 데이터 보강 → #36 4축 벤치마크·X2 철자
+  → #37 식별력 v0·명칭 LLM 추출·현실 분포 → #38 X1 v1.6·`review --bundle` → #39 3호 기술적 표장 v0.1 → #40 검토 웹 화면
+  (`main` = `develop` = `49c64f3`).
 - 커밋 메시지는 `유형(범위): 설명` 형식입니다. 예: `feat(ml): X1 호칭 유사도 축`,
   `fix(backend): …`, `docs(readme): …`.
 - `.env`, `ml/data/`(데이터·인덱스·호출 카운터), 인증키는 커밋하지 않습니다.
@@ -756,8 +773,10 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
 - [X2 외관 벤치마크 설계](docs/MarkLens_X2_외관_설계.md)
 - [X3 관념 유사도 설계](docs/MarkLens_X3_관념유사도_설계.md)
 - [X4 상품 견련성 설계](docs/MarkLens_X4_상품견련성_설계.md)
-- [통합 모델 설계 초안](docs/MarkLens_통합모델_설계.md)
+- [식별력·요부 필터 설계](docs/MarkLens_식별력_설계.md)
+- [통합 모델 설계](docs/MarkLens_통합모델_설계.md)
 - [상품↔유사군 변환표 절차](shared/goods_map/README.md)
+- [식별력 산출물 안내](shared/distinctiveness/README.md)
 - [2026-2학기 16주 계획과 4주 단위 제출 문서](docs/course/2026-2/README.md)
 - [2026-08 기술 재감사 보고서](docs/MarkLens_기술감사보고서_2026-08.md)
 - [API 계약](docs/MarkLens_API계약_v1.md)

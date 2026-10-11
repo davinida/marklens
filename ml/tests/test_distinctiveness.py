@@ -194,6 +194,73 @@ def test_salient_tokens_and_whole_comparison_rule(model):
     assert [t for t, _ in model.salient_tokens("Zorbix 커피", {"G1201"})] == ["zorbix", "커피"]
 
 
+def _model_with_weak(*tokens: str) -> dx.Distinctiveness:
+    """픽스처 통계에 다수 등록 토큰을 더한 모델(A·N 이 포화점이라 점수 0 → 약한 토큰)."""
+    names, classes = dx.goods_index(GOODS)
+    stats = {**STATS, **{token: (20, 40) for token in tokens}}
+    return dx.Distinctiveness(stats, famous={"삼성"}, goods_names=names, code_classes=classes,
+                              descriptive={})
+
+
+def test_combined_weak_run_keeps_cool_touch_whole():
+    # v0.2 결합 규칙(2015후1690 결합상태): 약한 토큰 2개가 같은 순서로 양쪽에 있으면 그 결합은
+    # 요부 후보 — pair_generic 이 넘기지 않아 Cool Touch / 쿨터치 COOL TOUCH 는 전체로 대비(1.0)
+    model = _model_with_weak("cool", "touch")
+    assert model.weak_tokens("쿨터치 COOL TOUCH") == frozenset({"cool", "touch"})
+    assert model.combined_weak_run("Cool Touch", "쿨터치 COOL TOUCH") == ("cool", "touch")
+    generic = model.pair_generic("Cool Touch", "쿨터치 COOL TOUCH")
+    assert generic == frozenset()
+    assert phonetic_similarity("Cool Touch", "쿨터치 COOL TOUCH", extra_generic=generic) == 1.0
+    # 결합에 들지 않은 약한 토큰(mp)은 여전히 넘긴다
+    model = _model_with_weak("q", "fire", "mp")
+    assert model.combined_weak_run("Q-FIRE", "Q-FIRE 500MP") == ("q", "fire")
+    assert model.pair_generic("Q-FIRE", "Q-FIRE 500MP") == frozenset({"mp"})
+
+
+def test_combined_weak_run_ignores_single_shared_token(model):
+    # 공통 약한 토큰이 하나뿐이면 결합이 아니다 — gate 는 그대로 넘긴다(v0·v1.6 과 같음)
+    assert model.combined_weak_run("Zorbix Gate", "Hello Gate") == ()
+    assert model.pair_generic("Zorbix Gate", "Hello Gate") == frozenset({"gate"})
+    assert model.combined_weak_run("Zorbix Gate", "GATE") == ()
+    assert model.pair_generic("Zorbix Gate", "GATE") == frozenset({"gate"})
+
+
+def test_combined_weak_run_requires_same_order():
+    model = _model_with_weak("cool", "touch")
+    assert model.combined_weak_run("Touch Cool Zorbix", "Cool Touch Qwzy") == ()
+    generic = model.pair_generic("Touch Cool Zorbix", "Cool Touch Qwzy")
+    assert generic == frozenset({"cool", "touch"})
+    assert phonetic_similarity("Touch Cool Zorbix", "Cool Touch Qwzy") == 1.0  # 공통 토큰 분리관찰
+    assert phonetic_similarity("Touch Cool Zorbix", "Cool Touch Qwzy", extra_generic=generic) < 0.6
+    # 인접하지 않아도 순서가 같으면 결합(공통 부분열)
+    assert model.combined_weak_run("Cool Zorbix Touch", "Cool Touch Qwzy") == ("cool", "touch")
+    assert dx._common_subsequence(["a", "b", "c"], ["b", "c", "a"]) == ("b", "c")
+    assert dx._common_subsequence([], ["a"]) == ()
+
+
+def test_overrides_skip_statistics_but_not_legal_zero():
+    # v0.2: 사람 검토 제외 토큰은 통계 약화만 건너뛴다 — 3호 상대어(류 일치)는 0, 류 불일치는 1.0,
+    # 상품 미상이면 3호 상한 0.5
+    term = dx.DescriptiveTerm("원재료", False, frozenset({3}), "", True)
+    names, classes = dx.goods_index(GOODS)
+    model = dx.Distinctiveness({"crystal": (20, 40)}, goods_names=names, code_classes=classes,
+                               descriptive={"crystal": term}, overrides={"crystal"})
+    assert model.judge("crystal", {"G1201"}) == dx.TokenJudgement(
+        "crystal", 0.0, ("3호 기술적 표장:원재료(류 3)",)
+    )
+    assert model.judge("crystal", {"G0301"}) == dx.TokenJudgement(
+        "crystal", 1.0, ("사람 검토 제외(weak_token_overrides)",)
+    )
+    assert model.judge("crystal", None) == dx.TokenJudgement(
+        "crystal", 0.5,
+        ("사람 검토 제외(weak_token_overrides)", "3호 기술적 표장(상품 미상):원재료"),
+    )
+    assert model.judge("서울", None).score == 0.0  # 4호 지명은 overrides 가 있어도 0
+    assert dx.Distinctiveness({"서울": (20, 40)}, overrides={"서울"}).judge("서울").reasons == (
+        "4호 지명",
+    )
+
+
 def test_axes_with_pair_generic_lower_shared_weak_token(model):
     generic = model.pair_generic("Zorbix Gate", "Hello Gate")
     assert generic == frozenset({"gate"})

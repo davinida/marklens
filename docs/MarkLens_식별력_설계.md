@@ -1,6 +1,6 @@
 # MarkLens 식별력·요부 필터 v0 설계 (다빈-3)
 
-- 기준일: 2026-10-09 (v0 → v0.1 같은 날 3호 기술적 표장 초안) · 상태: **v0.1 — 판례 요소를 점수로 옮긴 첫 판 + 3호 기술적 표장 447항목 초안(사람 승인 전, §3-3)** · 구현: `ml/src/axes/distinctiveness.py` · 집계·산출물: `ml/scripts/distinctiveness_build.py` → `shared/distinctiveness/`(`token_stats.json`·`weak_tokens.json`·`report.md`), 3호 후보·분류: `ml/scripts/descriptive_candidates.py`(+ `descriptive_judgements.json`) → `descriptive_candidates.md`·`descriptive_terms.json` · 테스트: `ml/tests/test_distinctiveness.py`(33건)·`test_descriptive_candidates.py`(2건) · 브랜치 `feat/distinctiveness-v0` → `feat/descriptive-terms`
+- 기준일: 2026-10-11 (v0 2026-10-09 → v0.1 같은 날 3호 초안 → **v0.2 2026-10-11 사람 승인 반영 + 결합 규칙**) · 상태: **v0.2 — 3호 기술적 표장 사람 승인 완료(상대어 380 전부·절대어 57, 해제 12, §3-3), 결합 규칙(약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 요부 후보 — 2015후1690 결합상태, §4), 사람 검토 제외(overrides)는 통계 약화만 건너뜀** · 구현: `ml/src/axes/distinctiveness.py` · 집계·산출물: `ml/scripts/distinctiveness_build.py` → `shared/distinctiveness/`(`token_stats.json`·`weak_tokens.json`·`report.md`), 3호 후보·분류: `ml/scripts/descriptive_candidates.py`(+ `descriptive_judgements.json`) → `descriptive_candidates.md`·`descriptive_terms.json`, 사람 검토 화면: `backend/scripts/review_ui.py` · 테스트: `ml/tests/test_distinctiveness.py`(37건)·`test_descriptive_candidates.py`(2건) · 브랜치 `feat/distinctiveness-v0` → `feat/descriptive-terms` → `feat/review-ui` → `feat/review-wrapup`
 - 역할: X1 호칭·X2 문자 외관(철자)·X3 관념이 `extra_generic` 으로 넘겨받을 "식별력 없는 토큰"을 공급하고, 이름에 요부(식별력 있는 부분)가 하나도 없는지(`has_distinctive_part`)를 판정한다. 축 함수가 아니므로 공통-2 규약(파일 없음)은 적용하지 않고 `goods_map` 처럼 집계 파일을 적재한다. 학습 없음, KIPRIS 호출 없음.
 - 관련 문서: [X1 설계](MarkLens_X1_호칭유사도_설계.md) §8-1, [X2 설계](MarkLens_X2_외관_설계.md) §9, [X3 설계](MarkLens_X3_관념유사도_설계.md) §7-1, [통합 모델 설계](MarkLens_통합모델_설계.md) §4-1·§4-2.
 
@@ -8,19 +8,20 @@
 
 | 근거 | 판례·조문이 보는 요소 | v0 반영 | 미반영·한계 |
 |---|---|---|---|
-| 대법원 2015후1690 (요부 판단) | 표장의 일부가 수요자에게 강한 인상을 주는지, 전체에서 높은 비중을 차지하는지, 주지·저명한지, 식별력이 없는지를 종합 | "식별력이 없는 부분"만 토큰 점수로 걸러 요부 후보를 남긴다. 주지·저명은 유명 브랜드 예외(1.0 고정)로 근사 | 강한 인상·전체 비중·결합으로 생기는 새 관념은 미반영(후속) |
+| 대법원 2015후1690 (요부 판단) | 표장의 일부가 수요자에게 강한 인상을 주는지, 전체에서 높은 비중을 차지하는지, 주지·저명한지, 식별력이 없는지를 종합. 식별력 없는 부분들도 결합된 상태로 인식되면 그 결합이 요부가 될 수 있다 | "식별력이 없는 부분"만 토큰 점수로 걸러 요부 후보를 남긴다. 주지·저명은 유명 브랜드 예외(1.0 고정)로 근사. **v0.2 결합 규칙**: 약한 토큰 2개 이상이 같은 순서로 양쪽 이름에 있으면 그 결합을 요부 후보로 보아 `pair_generic` 이 넘기지 않는다(`combined_weak_run`, §4) | 강한 인상·전체 비중·결합으로 생기는 새 관념은 미반영. 결합 규칙은 양쪽 토큰열에만 — 붙여쓴 결합어(QUICKPATH) 대 띄어쓴 토큰열(QUICK PASS)은 미적용(§4 결정 대기) |
 | 대법원 2017후2697 (다수 등록·출원공고) | 같은 부분이 다수의 등록·출원공고 상표에 쓰였는지 — 등록 수, 출원인 수, 그 부분의 본질적 식별력, 지정상품과의 관계 | 토큰별 서로 다른 출원인 수 A·등장 수 N(심판 목록 42,474건 + DB 1,100건 제목) → 다수 등록 계수, wordfreq 빈도 → 본질적 식별력, 쌍의 유사군 → 1호 판정의 상품 상대성 | A·N 은 등록원부가 아니라 심판 목록 표본이라 실제보다 작다(GATE 는 A 4) |
 | 대법원 2000후2453 (전부 식별력 없을 때) | 구성 부분 전부가 식별력이 없으면 전체로 대비한다 | 요부가 하나도 없는 이름(`has_distinctive_part` False)은 토큰을 넘기지 않고 전체 문자열로 대비(`pair_generic`) | X1 은 제거 전 전체 결합 후보와 포함 규칙을 유지하므로(전체관찰) 요부가 없는 쪽이 상대 이름에 포함되면 점수가 그대로 높다(§6) |
 | 상표법 33조 1항 1호 보통명칭 | 지정상품의 보통명칭만으로 된 표장 | `goods_codes` 가 있으면 그 류·유사군의 고시 명칭(공백 없는 단일 명칭·별칭)과 일치할 때만 0점, 없으면 전역 고시 단일 명칭 일치 | 영문 고시 명칭 미대조, 두 토큰 이상 명칭("커피 음료") 미대조 |
-| 33조 1항 3호 기술적 표장 | 산지·품질·원재료·효능·용도·수량·형상·가격·생산방법·가공방법·사용방법·시기 표시 | `shared/distinctiveness/descriptive_terms.json`(v0.1, 판례 기준 분류 초안 447항목·미승인)을 `DESCRIPTIVE_TERMS` 로 적재. 절대어 69개는 류 불문 0점, 상대어는 항목의 `classes` 와 지정상품의 류가 겹칠 때 0점·류가 다르면 영향 없음·상품 미상이면 0.5 상한(§3-3) | 도안화·거래실정·암시 판단은 사람 승인에 맡긴다 |
+| 33조 1항 3호 기술적 표장 | 산지·품질·원재료·효능·용도·수량·형상·가격·생산방법·가공방법·사용방법·시기 표시 | `shared/distinctiveness/descriptive_terms.json`(v0.1 판례 기준 분류 초안 447 → v0.2 사람 승인 449항목: 절대어 57 승인·12 해제, 상대어 380 전부 승인)을 `DESCRIPTIVE_TERMS` 로 적재(해제 항목은 로더가 건너뜀). 절대어는 류 불문 0점, 상대어는 항목의 `classes` 와 지정상품의 류가 겹칠 때 0점·류가 다르면 영향 없음·상품 미상이면 0.5 상한(§3-3) | 도안화·거래실정·암시 판단은 사람 승인에 맡긴다 |
 | 33조 1항 4호 현저한 지리적 명칭 | 시·도·시·군·구, 널리 알려진 동·산·강, 외국 지명 | X1 지명표 34(로마자·한글) + 시·도 17·시 75·군 82·자치구 69 + 널리 알려진 동·산·강·외국 지명 + 행정 접미사(시·군·구·도·동·읍·면·리) 제거 후 일치 | 읍·면 단위 미포함 |
 | 33조 1항 5호 흔한 성·명칭 | 흔히 있는 성 또는 명칭만으로 된 표장 | 통계청 상위 30 성 + "~네/~가네/~씨네" + 단어와 겹치지 않는 로마자 성(kim·lee·park …) | "moon·song·han" 같은 단어 겹침 성은 뺐다 |
 | 33조 1항 6호 간단·흔한 표장 | 간단하고 흔히 있는 표장만으로 된 것 | 영문 2자 이하, 숫자 2자 이하, 한글 1음절 → 0점(토큰은 문자 종류 경계로 이미 나뉨) | 도형 요소는 대상 아님 |
 
 ## 2. 점수 구성 (토큰 하나, `Distinctiveness.judge`)
 
-1. 유명 브랜드(브랜드표 101개의 로마자·한글 + `shared/famous_brands.txt` 출원인명의 상호 핵심 토큰, 합계 231) → **1.0 고정**(주지·저명 근사).
+1. 유명 브랜드(브랜드표 101개의 로마자·한글 + `shared/famous_brands.txt` 출원인명의 상호 핵심 토큰 + 브랜드 토큰 줄(2026-10-11 갤럭시·GALAXY·오리온·ORION — 주지·저명, 2017후2697 요부 판단의 첫 요소), 합계 235) → **1.0 고정**(주지·저명 근사).
 2. 33조 1항 유형(1·3·4·5·6호)에 하나라도 해당 → **0.0**(사유에 해당 호를 모두 적는다).
+2-1. 사람 검토 제외(`weak_token_overrides.json` 의 `excluded`, 2026-10-11 현재 crown·crystal·galaxy·iris·orion·secret·teddy) → 아래 3.의 통계 약화를 건너뛰고 **1.0**(3호 상대어의 상품 미상 상한 0.5 는 적용). v0.1 까지는 overrides 가 법정 사유보다 앞섰으나 v0.2 부터 법정 사유가 먼저다(crystal 은 14·21류 쌍에서 0, 그 밖의 류에서 1.0).
 3. 그 외 → **본질적 식별력 × 다수 등록 계수**
    - 본질적 식별력 = 1 − 0.5 × clamp((zipf − 3.0) / (5.5 − 3.0), 0, 1). wordfreq 표제어 빈도 zipf 3.0 이하(희귀어·조어·숫자)는 1, 5.5 이상(아주 흔한 일반어)은 0.5 하한. X3 의 `token_zipf` 를 재사용한다.
    - 다수 등록 계수 = 1 − min(1, A/θ_A) × min(1, N/θ_N). 서로 다른 출원인 수 A 와 등장 수 N 이 **둘 다** 커야 0 에 가깝다(한 출원인이 50개를 가진 하우스마크는 약해지지 않는다). A·N 은 `token_stats.json`(N ≥ 2 인 7,118 토큰)에서 읽고 없으면 계수 1.
@@ -31,15 +32,16 @@
 ### 축 연결(`pair_generic`, `ml/scripts/pairs_features.py`)
 
 - 쌍의 유사군 = `goods_codes_this ∪ goods_codes_prior`(없으면 전역). 두 이름 각각 `has_distinctive_part` 이면 그 이름의 약한 토큰을 모아 `extra_generic` 으로 X1·X2 철자·X3 에 넘긴다 → `x1_d`·`x2_text_d`·`x3_d`. 요부가 없는 이름은 토큰을 넘기지 않는다(2000후2453).
+- **결합 규칙 v0.2**(`combined_weak_run`, 2026-10-11): 양쪽 이름의 약한 토큰열(이름 순서)의 가장 긴 공통 부분열이 2개 이상이면 그 토큰들은 결합된 요부 후보로 보아 넘기지 않는다(2015후1690 결합상태). Cool Touch / 쿨터치 COOL TOUCH → (cool, touch) 결합이라 `extra_generic` 비어 전체 대비 1.0 유지, Q-FIRE / Q-FIRE 500MP → (q, fire) 결합·mp 만 넘김. 공통 약한 토큰이 하나뿐이면(Zorbix Gate / Hello Gate 의 gate) 그대로 넘기고, 순서가 다르면(Touch Cool / Cool Touch) 적용하지 않는다.
 - X1 의 "제거 전 전체 결합" 후보는 X1 이 그대로 유지한다(전체관찰). X2 철자는 제거 후 토큰만 비교하므로 효과가 더 크다.
 
-## 3. 집계와 산출물 (`distinctiveness_build.py`, 2026-10-09)
+## 3. 집계와 산출물 (`distinctiveness_build.py`, 2026-10-09 → 2026-10-11 재집계)
 
 ### 3-1. 집계 산출물
 
 - 입력: `ml/data/trials/list_all.csv` 심판 목록 제목 41,753건(제목 있는 것) + `ml/data/kipris_metadata.json` DB 제목 993건 → 같은 (제목, 소유자) 제외 32,598쌍, 토큰 33,703개(2글자 이상). 소유자 열: 거절결정불복·권리범위확인(적극적)은 청구인, 무효·취소·권리범위확인(소극적)은 피청구인. 소유자명은 X1 정규화로 회사 형태를 뗀다.
 - `shared/distinctiveness/token_stats.json`(110KB): N ≥ 2 인 7,118 토큰의 [A, N]. 런타임이 적재한다(집계값만, 당사자명 없음).
-- `shared/distinctiveness/weak_tokens.json`(226KB): 전역 판정 점수 < θ 인 **1,513 토큰**(한글 318·영문 등 1,195)과 점수·A·N·zipf·사유. 사유별(중복 포함): 다수 등록 728·일반어 719·6호 469·1호 184·4호 106·5호 31. 법정 0점만으로 약한 토큰 785.
+- `shared/distinctiveness/weak_tokens.json`(226KB): 전역 판정 점수 < θ 인 **1,513 토큰**(한글 318·영문 등 1,195)과 점수·A·N·zipf·사유. 사유별(중복 포함): 다수 등록 728·일반어 719·6호 469·1호 184·4호 106·5호 31. 법정 0점만으로 약한 토큰 785. (v0.1 3호 초안 적용 후 1,534 → **v0.2 2026-10-11 재집계 1,527**: 다수 등록 708·일반어 699·6호 469·1호 184·4호 106·3호 34·5호 31, 유명 브랜드 235. 빠진 7 토큰 = galaxy·orion(유명 브랜드 등재)과 mega·리얼·맥스·울트라·프로(절대어 해제 → 통계상 약하지 않음).)
 - `shared/distinctiveness/report.md`: 사유별 건수, **상위 200(등장 수 순, 사람 검토용)** — 상위는 dr·coffee·since·cafe·smart·life·in·on·beauty·de·club·one·skin·air·black …, 한글은 전문점·닥터·떡볶이·홍삼·맛있는·카페·커피·치킨·스마트·행복한·한의원·명가·제주·서울 —, 임계 민감도 표.
 
 ### 3-2. 임계 민감도
@@ -68,7 +70,7 @@
 
 어느 칸도 95% CI(±0.07) 안에서 구분되지 않는다. 기본값은 설계 의도대로 **θ 0.5 · θ_A 10 · θ_N 20** 을 유지하고, 표본 확대(11월 대기열 621건) 뒤 다시 잰다. 5/10 은 약한 토큰이 2,222개로 늘어 유사 쌍 하락(부작용)이 12건까지 커진다.
 
-### 3-3. 3호 기술적 표장 (2026-10-09 v0.1 — 판례 기준 분류 초안, 사람 승인 전)
+### 3-3. 3호 기술적 표장 (2026-10-09 v0.1 판례 기준 분류 초안 → 2026-10-11 사람 승인 완료)
 
 `ml/scripts/descriptive_candidates.py` 가 후보를 뽑아 증거를 붙이고, 분류표(`ml/scripts/descriptive_judgements.json`, 판례 기준으로 토큰마다 판정·kind·절대 여부·적용 류·이유)를 적용해 `shared/distinctiveness/descriptive_candidates.md`(사람 승인용 표)와 `shared/distinctiveness/descriptive_terms.json`(포함 항목 초안, 모두 `approved: false`)을 쓴다. 런타임(`ml/src/axes/distinctiveness.py`)은 JSON 을 `DescriptiveTerm(kind, absolute, classes, note, approved)` 로 적재·검증만 한다(`read_descriptive_terms`·`validate_descriptive_terms`, 환경변수 `MARKLENS_DESCRIPTIVE_TERMS`).
 
@@ -101,7 +103,9 @@
 
 영향 쌍 9: 비유사 하락 3 — MEGAMARKET / Homeplus MEGA FOOD MARKET(x1_d 0.64 → 0.25, x2_text_d 0.40 → 0.10), 메가커피 / MEGA MGC COFFEE BIG SIZE 2 SHOT(x1_d 0.64 → 0.34) — mega 제거; 유사 상승 3 — PARADISE / CAMPING PARADISE CHILDREN CAMP(x2_text_d 0.30 → 1.0, x3_d 0.17 → 0.70 — camping 제거), REALPT / 리얼P.T(x2_text_d 0 → 0.29 — 리얼 제거); 유사 하락 1 — 요거트홀릭 YOGURT HOLIC / Yogurt holic(x3_d 0.95 → 0 — yogurt 를 떼자 "홀릭"만 남아 X3 게이트가 닫힘); 비유사 상승 2 — Easter Egg / EASTER(x3_d 0.42 → 1.0 — egg 제거), 청담 족발 / 청담족발 오늘 삶은 국내산 생족(x2_text_d 0.19 → 0.38). 모두 CI 안의 변화이며, `review --bundle` 의 distinct_drop 은 15 → 14행(재생성, 처리 열 보존).
 
-**한계**: 도안화(글자를 압도하는 도형)·거래실정(실제 사용례)·암시 판단의 주관성은 사람 승인에 기댄다. 결합상표 전체 판단은 못 한다. 상품 미상 쌍은 0.5 상한이라 제거되지 않는다. 영어 외 외국어는 대조하지 않는다. 후보 풀이 심판 사건 제목(경계 사례)이라 일반 등록 상표의 성질 표시어가 빠질 수 있다 — (e) 로 일부 보완.
+**사람 승인 결과(2026-10-11, 검토 화면 기술적 표장 탭 + `feat/review-wrapup` 반영)**: 절대어 69 중 **승인 57** — aaa, best, deluxe, excellent, famous, fine, first, good, great, new, nice, original, perfect, plus, premium, prime, quality, real, special, super, supreme, top, 고급, 굿, 나이스, 넘버원, 뉴, 디럭스, 명품, 베스트, 슈퍼, 스페셜, 신상, 오리지널, 원조, 유명, 으뜸, 일등, 일류, 정상, 정품, 제일, 좋은, 진짜, 진품, 참, 최고, 최상, 최우수, 퀄리티, 탑, 톱, 특급, 특선, 퍼펙트, 프라임, 프리미엄 · **해제 12**(`rejected: true`, 로더가 건너뜀) — est, max, mega, pro, professional, since, ultra, 리얼, 맥스, 울트라, 프로, 플러스. 상대어 378 은 사람이 개별 판정하지 않고 **전부 `approved: true`** 로 두었다(상품 류가 일치할 때만 0점이라 오판 위험이 작다 — 상품 미상 쌍에서는 0.5 상한으로 요부 후보에 남는다). 추가 결정 2건: crystal/크리스탈 은 초안대로 원재료·14·21류 승인, teddy/테디 는 형상(테디베어 — 28류 완구의 보통명칭 성격)·28류로 **항목 추가**(`meta.추가`) — 두 토큰 모두 약한 토큰 overrides 의 `excluded` 에 남아 있어, v0.2 는 overrides 를 법정 사유 뒤로 옮겨 3호(류 일치 0점)가 먼저 적용되게 했다(§2 2-1). 적재 항목 449(승인 437 + 해제 12). 재집계·재측정은 §3-1·§4.
+
+**한계**: 도안화(글자를 압도하는 도형)·거래실정(실제 사용례)·암시 판단의 주관성은 사람 승인에 기댄다. 결합상표 전체 판단은 못 한다. 상품 미상 쌍은 0.5 상한이라 제거되지 않는다. 영어 외 외국어는 대조하지 않는다. 후보 풀이 심판 사건 제목(경계 사례)이라 일반 등록 상표의 성질 표시어가 빠질 수 있다 — (e) 로 일부 보완. 상대어 일괄 승인은 "류 일치" 판정을 분류 초안에 맡긴 것이므로, 거짓 0점이 보이면 그 항목만 검토 화면에서 해제한다.
 
 ## 4. 심결례 벤치마크 전후 (2026-10-09, `axes_benchmark.py` "식별력 v0 전후", 표장 라벨)
 
@@ -117,15 +121,50 @@
 - 2026-10-09 X1 v1.6(식별력 없는 토큰만으로 된 이름은 포함 검사의 짧은 쪽이 되지 못함, X1 설계 §9): Zorbix Gate / GATE 류는 0.95 → 0.36 으로 내려갔으나 심결례 `x1_d` 는 (a) 0.59·x1 = 1.0 비유사 25 → 25 — 남은 쌍은 `pair_generic` 이 요부 없는 이름의 토큰을 넘기지 않거나 공통 토큰이 통계상 약하지 않은 경우다(합집합을 항상 넘기는 대안은 25 → 22, 유사 하락 13; 결정 대기).
 - 결론: v0 는 "식별력 없는 공통 부분 때문에 1.0 이 되는" 오류를 구조적으로 줄이지 못한다. 그 오류의 대부분은 전체 대비 규칙과 X1 의 포함 규칙(전체 비중 미반영)에서 나오므로, 다음 단계는 (1) 요부가 없는 이름끼리의 전체 대비에서 "비중"(짧은 공통 부분이 긴 이름의 일부일 때)을 반영할지, (2) 3호 목록, (3) 등록원부 규모의 A·N 이다. 통합 모델에는 x1·x2_text 와 함께 `has_distinctive_part_a/b` 를 지시변수로 넣는다.
 
+### 4-1. 식별력 하락 14건 결정과 결합 규칙 v0.2 (2026-10-11, `feat/review-wrapup`)
+
+`review --bundle` 의 distinct_drop(유사 라벨인데 식별력 적용으로 `x1_d` 또는 `x2_text_d` 가 0.1 넘게 내려간 쌍) 14건을 LLM 판정자가 각 심결의 표장 유사 소결을 읽고 "심결이 떼어낸 공통 토큰(들)을 요부 또는 유사의 근거로 명시했는가"로 결정했다(`ml/data/trials/review_decisions.json` distinct_drop, source llm, 근거 문장 인용). **결합 규칙 후보 13 · 그대로 1**:
+
+| # | 심판번호 | 이름 A / 이름 B | 떼어낸 토큰 | 결정 | 심결이 든 근거(요지) |
+|---|---|---|---|---|---|
+| 1 | 2014101006458 | Cool Touch / 쿨터치 COOL TOUCH | cool·touch 양쪽 | 후보 | 호칭·관념 동일(청구인 불다툼) — 전체가 곧 cool+touch |
+| 2 | 2016101000711 | 부산에어 BUSAN AIR / 에어부산 | air·busan(A) | 후보 | 부산·에어 각각 약함을 인정하되 배열만 바뀐 동일 결합 → 호칭 유사·관념 동일 |
+| 3 | 2016101004991 | REALTIMES / 리얼타임테크 REAL TIME TECH | real·time·tech(B) | 후보 | TECH 만 식별력 없음, ‘REAL TIME/리얼타임’ 결합이 요부 |
+| 4 | 2017100002365 | LOVE PINK / DAWN FIELD | love·pink(A)·field(B) | 후보 | ‘LOVE PINK’ 부분이 요부, ‘러브핑크’ 호칭·관념 동일. ⚠ 이름 B(상대번호 731325)는 심결문에 없음 — 대비 상대는 제162532호 ‘I LOVE PINK’(쌍 오류 의심) |
+| 5 | 2019101000806 | rainbow / RAINBOW RESPOSABLE | rainbow 양쪽 | 후보 | RESPOSABLE 이 기술적, ‘RAINBOW’ 가 요부 — 단일 토큰이라 결합 규칙 범위 밖(통계 약화 자체의 문제) |
+| 6 | 2019101002654 | 송도 타임스 스퀘어 songdo times square / Times Square | times·square 양쪽 | 후보 | ‘Times Square’ 현저한 지리적 명칭 주장 배척, ‘times square’ 부분 분리관찰·호칭 동일 |
+| 7 | 2019101003568 | SLIMLINE / Slim Line | line(B) | 후보 | SLIMLINE 전체를 한 단어로 보아 호칭 ‘슬림라인’·관념 동일 — 단일 토큰·한쪽 |
+| 8 | 2020100001867 | 로얄비 ROYAL BEE / ROYALEBEE | bee·royal(A) | 후보 | ROYAL(E)+BEE 결합 전체가 식별력 있음, ‘로얄비’ 호칭·‘왕의 벌’ 관념 동일 |
+| 9 | 2020101002190 | SOFY / WORLDWIDE EXPRESS CO.,LTD. | express(B) | **그대로** | 심결의 선등록상표는 제13158호 ‘SOPI’(호칭 ‘소피’ 동일) — express 는 대비 대상이 아님. ⚠ 상대번호 13158 이 41 계열로 정규화돼 다른 등록건이 조회됨(쌍 오류 의심) |
+| 10 | 2021100002629 | 신광준의 혹 달린 신발 / 혹달린신발 | 혹·신발(A) | 후보 | ‘혹달린신발’ 부분이 주요부(식별력 없다고 볼 증거 없음), 구성문자·호칭·관념 동일 |
+| 11 | 2021101000268 | QUICKPATH / 퀵패스 QUICK PASS | pass·quick(B) | 후보 | ‘QUICK PASS/퀵패스’ 전체 호칭 동일, 식별력 약함 주장 명시적 배척 |
+| 12 | 2022100000702 | 어반정글 / My Urban Jungle | my·urban(B) | 후보 | My 는 식별력 없음, ‘Urban Jungle’ 부분 분리인식 → ‘어반정글’ 호칭 동일 |
+| 13 | 2023100000403 | Q-FIRE / Q-FIRE 500MP | q·fire 양쪽, mp(B) | 후보 | 500MP 는 식별력 없음, ‘Q-FIRE’ 부분만으로 분리관찰 → 호칭 동일 |
+| 14 | 2023100002190 | 나다움 NADAUM / NA:DAUM | na(B) | 후보 | NA:DAUM 전체를 조어로 보아 호칭 ‘나다움’ 동일 — 단일 토큰·한쪽 |
+
+후보가 5건 이상이라 **결합 규칙 v0.2** 를 구현했다(§2 축 연결, `combined_weak_run`): 약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 그 결합을 요부 후보로 보고 `pair_generic` 이 넘기지 않는다. 테스트 3건(Cool Touch 유지·단일 토큰 무영향·순서 다르면 미적용) + overrides 순서 1건. 14건 중 규칙이 실제로 닿는 쌍은 **3건**(1·6·13: `x1_d` 0.76/0.51/0.54 → 1.0, `x2_text_d` 0/0.04/0 → 1.0/0.31/1.0). 나머지 10건의 후보는 유형이 다르다 — (i) **붙여쓴 결합어 대 띄어쓴 토큰열**(2·3·8·10·11·12: 에어부산 / BUSAN AIR, REALTIMES / REAL TIME, ROYALEBEE / ROYAL BEE, 혹달린신발 / 혹 달린 신발, QUICKPATH / QUICK PASS, 어반정글 / Urban Jungle — 한쪽이 단일 토큰이라 "양쪽 토큰열" 조건에 안 걸림; X1 은 제거 전 전체 결합 후보로 대부분 유지하지만 X2 철자는 내려감), (ii) **단일 공통 토큰을 심결이 요부로 본 경우**(5·7·14: rainbow·line·na — 결합이 아니라 통계 약화 자체가 심결과 다름), (iii) 쌍 오류 의심 2건(4·9). (i)은 "약한 토큰열을 붙인 문자열이 상대 이름의 토큰과 같으면 결합으로 본다"는 v0.3 후보로 결정 대기, (ii)는 등록원부 규모의 A·N 또는 θ 재검토 대상, (iii)은 라벨 시트의 상대번호 수정(사람).
+
+**v0.2 재측정(2026-10-11, 표장 라벨, 355행 — A≠B 처리로 5행 추가, 이름 축 n 292)**:
+
+| 축 | (a) 전체 전 → 후 | (b) 판단축 전 → 후 | (c) 게이트 전 → 후 | 점수 1.0 쌍(유사/비유사) 전 → 후 | 유사 하락 n(평균) | 비유사 하락 n(평균) |
+|---|---|---|---|---|---|---|
+| x1 → x1_d | 0.59 → 0.59 (0.53~0.66) | 0.61 → 0.61 | 0.60 → 0.60 | 95/27 → 94/26 | 6 (0.23) | 4 (0.11) |
+| x2_text → x2_text_d | 0.56 → 0.58 (0.51~0.65) | 0.73 → 0.73 | 0.56 → 0.58 | 67/19 → 64/19 | 14 (0.28) | 7 (0.19) |
+| x3 → x3_d | 0.50 → 0.51 (0.46~0.56) | 0.54 → 0.54 | 0.47 → 0.46 | 9/3 → 8/3 | 7 (0.55) | 5 (0.33) |
+
+- 식별력으로 값이 바뀐 쌍 x1 **19**(v0.1 25) · x2_text 55 · x3 40(43). 유사 쌍 하락(부작용)은 x1 8 → 6, x2_text 17 → 14, x3 9 → 7 로 줄었고 AUC 는 여전히 CI 안의 변화다. distinct_drop 을 같은 기준으로 다시 세면 14 → 12행(1·6·13 해소, REALPT / 리얼P.T 추가 — 리얼이 절대어에서 해제되자 6호 p·t 만 떼어 x2_text_d 0.29 → 0).
+- 현실 분포(쉬운 음성 700 추가): x1_d 0.59 → 0.86 → 0.89, x2_text_d 0.58 → 0.79 → 0.82, x3_d 0.51 → 0.57 → 0.58 — v0.1 과 같다(통합 모델 설계 §4-3).
+
 ## 5. 유명 브랜드 예외·3호 확장 슬롯
 
-- 유명 브랜드: `famous_tokens()` = `korean_brands.KOREAN_BRAND_ROMANIZATION` 키·값(101) + `shared/famous_brands.txt`(DRAFT 39개 출원인명) 각 줄을 X1 정규화한 첫 토큰(회사 형태·국적·법인 표기 토큰은 `_FAMOUS_SKIP` 으로 건너뜀) → 231개. 목록 파일이 바뀌면 다음 적재 때 반영된다. 유명 브랜드 토큰은 다수 등록·일반어 계수와 무관하게 1.0 이다(삼성·현대처럼 A 가 큰 하우스마크 보호).
-- 3호: v0.1 부터 `shared/distinctiveness/descriptive_terms.json` 을 적재한다(§3-3). 항목 `DescriptiveTerm(kind, absolute, classes, note, approved)`, 세부 유형 `DESCRIPTIVE_KINDS`(산지·품질·원재료·효능·용도·수량·형상·가격·생산방법·가공방법·사용방법·시기). 미승인 항목도 적용되며 보고서가 미승인 수를 표시한다.
+- 유명 브랜드: `famous_tokens()` = `korean_brands.KOREAN_BRAND_ROMANIZATION` 키·값(101) + `shared/famous_brands.txt`(DRAFT 39개 출원인명 + 2026-10-11 브랜드 토큰 줄 4: 갤럭시·GALAXY·오리온·ORION — 주지·저명 상표의 호칭, 한글·영문을 줄 하나씩) 각 줄을 X1 정규화한 첫 토큰(회사 형태·국적·법인 표기 토큰은 `_FAMOUS_SKIP` 으로 건너뜀) → 235개. 목록 파일이 바뀌면 다음 적재 때 반영된다. 유명 브랜드 토큰은 다수 등록·일반어 계수와 무관하게 1.0 이다(삼성·현대처럼 A 가 큰 하우스마크 보호). 브랜드 토큰 줄은 출원인명이 아니므로 `collect_pipeline --applicants-file` 에는 쓰지 않는다(파일 주석).
+- 3호: v0.1 부터 `shared/distinctiveness/descriptive_terms.json` 을 적재한다(§3-3). 항목 `DescriptiveTerm(kind, absolute, classes, note, approved)`, 세부 유형 `DESCRIPTIVE_KINDS`(산지·품질·원재료·효능·용도·수량·형상·가격·생산방법·가공방법·사용방법·시기). 2026-10-11 사람 승인 완료(449항목: 승인 437·해제 12, 미승인 0) — 해제(`rejected`) 항목은 로더가 건너뛴다.
+- 사람 검토 제외(`weak_token_overrides.json`): v0.2 부터 법정 사유(1·3·4·5·6호) 뒤에서 통계 약화만 건너뛴다(§2 2-1).
 
 ## 6. 한계(v0)
 
-- **3호는 v0.1 초안(447항목, 미승인)** — 도안화가 글자를 압도하는 경우(X2 유형 판정 과제), 거래실정(실제 사용례), 암시·강조 판단의 주관성은 사람 승인에 기대며, 상품 미상 쌍(163)에서는 상대어가 0.5 상한에 머물러 제거되지 않는다(§3-3).
-- **강한 인상·전체 비중·결합으로 인한 새 관념 미반영**(2015후1690 의 나머지 요소). X1 v1.6 이 "약한 토큰만으로 된 이름"의 포함 검사는 막았지만, 요부 없는 이름끼리의 전체 대비에서 전체 비중(28지킴이 / 지킴이)은 여전히 반영하지 못한다.
+- **3호는 사람 승인 목록(449항목)에 한정** — 상대어 378 은 일괄 승인이라 분류 초안의 류 판정이 그대로 쓰인다. 도안화가 글자를 압도하는 경우(X2 유형 판정 과제), 거래실정(실제 사용례), 암시·강조 판단의 주관성은 사람 승인에 기대며, 상품 미상 쌍(163)에서는 상대어가 0.5 상한에 머물러 제거되지 않는다(§3-3).
+- **강한 인상·전체 비중·결합으로 인한 새 관념은 결합 규칙 v0.2 만큼만 반영**(2015후1690). 양쪽에 같은 순서로 있는 약한 토큰열만 결합으로 보고, 붙여쓴 결합어 대 띄어쓴 토큰열(QUICKPATH / QUICK PASS 류 6건)과 단일 공통 토큰을 심결이 요부로 본 경우(rainbow 류 3건)는 못 본다(§4-1). X1 v1.6 이 "약한 토큰만으로 된 이름"의 포함 검사는 막았지만, 요부 없는 이름끼리의 전체 대비에서 전체 비중(28지킴이 / 지킴이)은 여전히 반영하지 못한다.
 - A·N 은 심판 목록 표본(42k)이라 실제 등록원부보다 훨씬 작다. GATE 처럼 실제로는 수백 건 등록된 부분이 A 4 로 잡힌다. 민감도 표의 θ_A 5 가 이를 일부 보정하지만 유사 쌍 부작용이 함께 는다.
 - 1호 판정은 공백 없는 단일 고시 명칭·별칭만 대조한다. 영문 고시 명칭과 두 토큰 이상 명칭("커피 음료")은 못 본다.
 - 지명·성 목록은 손으로 쓴 목록이다(읍·면, 희귀 성, 단어와 겹치는 로마자 성 제외).
@@ -143,17 +182,21 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_distinctiveness
 
 ```python
 import sys; sys.path.insert(0, "ml")   # 프로젝트 루트에서
-from src.axes.distinctiveness import has_distinctive_part, pair_generic, salient_tokens, token_score
+from src.axes.distinctiveness import (
+    combined_weak_run, has_distinctive_part, pair_generic, salient_tokens, token_score,
+)
 
 token_score("커피", {"G0301"})           # 0.0  — 커피 유사군이면 1호 보통명칭(화장품 유사군이면 일반어 0.61)
 salient_tokens("스타벅스 커피")            # [("스타벅스", 1.0)]
 has_distinctive_part("GATE")             # 토큰 점수에 따라 False 면 전체 대비
 pair_generic("Zorbix Gate", "Hello Gate")  # frozenset({"gate"}) → X1·X2 철자·X3 의 extra_generic
+combined_weak_run("Cool Touch", "쿨터치 COOL TOUCH")  # ("cool", "touch") — 결합 규칙 v0.2, pair_generic 은 비어 전체 대비
 ```
 
 - 환경변수 `MARKLENS_DISTINCTIVENESS_STATS` 로 통계 파일을 바꿀 수 있다. `load_distinctiveness(with_goods=False)` 는 변환표 없이(1호 전역 판정 없이) 적재한다.
 
 ## 8. 변경 이력
 
+- **v0.2 (2026-10-11, `feat/review-wrapup`)**: 3호 사람 승인 반영(절대어 57 승인·12 해제, 상대어 380 전부 승인, crystal/크리스탈 승인·teddy/테디 추가 → 449항목), 유명 브랜드 토큰 줄(갤럭시·GALAXY·오리온·ORION, 235개), 사람 검토 제외(overrides)를 법정 사유 뒤로(통계 약화만 건너뜀), **결합 규칙**(`combined_weak_run`: 약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 요부 후보 — distinct_drop 14건 LLM 결정 후보 13·그대로 1), 재집계(약한 토큰 1,534 → 1,527, 3호 사유 46 → 34), 재측정(x1 바뀐 쌍 25 → 19, AUC 변화 CI 안). 테스트 +4(결합 규칙 3·overrides 순서 1).
 - **v0.1 (2026-10-09, `feat/descriptive-terms`)**: 3호 기술적 표장 — `DescriptiveTerm`(kind·absolute·classes·note·approved)과 JSON 로더·검증, 점수 규칙(절대 0 / 류 일치 0 / 류 불일치 무영향 / 상품 미상 0.5 상한), 후보 생성·판례 기준 분류 스크립트(후보 1,444 → 포함 447·보류 101·제외 896, 절대어 69), `descriptive_candidates.md`(승인용 표)·`descriptive_terms.json`(초안, approved false), build 사유 "3호 기술적 표장" 46, 재측정(3호만 전후 AUC 변화 ±0.01 안, 영향 쌍 9). 테스트 +4(점수 규칙·로더 검증·후보 분류 형식).
 - **v0 (2026-10-09, `feat/distinctiveness-v0`)**: 초판 — 토큰 점수(1·4·5·6호 0점, 3호 슬롯, 다수 등록 A·N, wordfreq 본질적 식별력, 유명 브랜드 예외), 요부 선정·전체 대비 규칙, 축 연결(`x1_d`·`x2_text_d`·`x3_d`), 집계 산출물 3종, 심결례 전후 측정(AUC 변화 +0.01 안, x1 = 1.0 비유사 27 → 25), 임계 민감도 표.

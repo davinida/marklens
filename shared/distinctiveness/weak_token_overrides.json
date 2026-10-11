@@ -1,0 +1,606 @@
+{
+ "excluded": {
+  "secret": {
+   "memo": ""
+  },
+  "iris": {
+   "memo": ""
+  },
+  "orion": {
+   "memo": ""
+  },
+  "teddy": {
+   "memo": ""
+  },
+  "crystal": {
+   "memo": ""
+  },
+  "crown": {
+   "memo": ""
+  },
+  "galaxy": {
+   "memo": ""
+  }
+ },
+ "kept": {
+  "dr": {
+   "memo": ""
+  },
+  "coffee": {
+   "memo": ""
+  },
+  "since": {
+   "memo": ""
+  },
+  "cafe": {
+   "memo": ""
+  },
+  "smart": {
+   "memo": ""
+  },
+  "life": {
+   "memo": ""
+  },
+  "in": {
+   "memo": ""
+  },
+  "on": {
+   "memo": ""
+  },
+  "beauty": {
+   "memo": ""
+  },
+  "de": {
+   "memo": ""
+  },
+  "club": {
+   "memo": ""
+  },
+  "one": {
+   "memo": ""
+  },
+  "skin": {
+   "memo": ""
+  },
+  "air": {
+   "memo": ""
+  },
+  "black": {
+   "memo": ""
+  },
+  "la": {
+   "memo": ""
+  },
+  "korean": {
+   "memo": ""
+  },
+  "blue": {
+   "memo": ""
+  },
+  "lab": {
+   "memo": ""
+  },
+  "world": {
+   "memo": ""
+  },
+  "food": {
+   "memo": ""
+  },
+  "nature": {
+   "memo": ""
+  },
+  "home": {
+   "memo": ""
+  },
+  "to": {
+   "memo": ""
+  },
+  "my": {
+   "memo": ""
+  },
+  "your": {
+   "memo": ""
+  },
+  "power": {
+   "memo": ""
+  },
+  "new": {
+   "memo": ""
+  },
+  "up": {
+   "memo": ""
+  },
+  "plus": {
+   "memo": ""
+  },
+  "green": {
+   "memo": ""
+  },
+  "dream": {
+   "memo": ""
+  },
+  "it": {
+   "memo": ""
+  },
+  "care": {
+   "memo": ""
+  },
+  "super": {
+   "memo": ""
+  },
+  "design": {
+   "memo": ""
+  },
+  "red": {
+   "memo": ""
+  },
+  "star": {
+   "memo": ""
+  },
+  "monster": {
+   "memo": ""
+  },
+  "tv": {
+   "memo": ""
+  },
+  "fresh": {
+   "memo": ""
+  },
+  "chicken": {
+   "memo": ""
+  },
+  "premium": {
+   "memo": ""
+  },
+  "you": {
+   "memo": ""
+  },
+  "natural": {
+   "memo": ""
+  },
+  "com": {
+   "memo": ""
+  },
+  "studio": {
+   "memo": ""
+  },
+  "me": {
+   "memo": ""
+  },
+  "story": {
+   "memo": ""
+  },
+  "www": {
+   "memo": ""
+  },
+  "24": {
+   "memo": ""
+  },
+  "sports": {
+   "memo": ""
+  },
+  "golf": {
+   "memo": ""
+  },
+  "system": {
+   "memo": ""
+  },
+  "le": {
+   "memo": ""
+  },
+  "good": {
+   "memo": ""
+  },
+  "kids": {
+   "memo": ""
+  },
+  "seoul": {
+   "memo": ""
+  },
+  "love": {
+   "memo": ""
+  },
+  "with": {
+   "memo": ""
+  },
+  "health": {
+   "memo": ""
+  },
+  "cloud": {
+   "memo": ""
+  },
+  "clinic": {
+   "memo": ""
+  },
+  "eco": {
+   "memo": ""
+  },
+  "bio": {
+   "memo": ""
+  },
+  "house": {
+   "memo": ""
+  },
+  "time": {
+   "memo": ""
+  },
+  "market": {
+   "memo": ""
+  },
+  "water": {
+   "memo": ""
+  },
+  "bear": {
+   "memo": ""
+  },
+  "pet": {
+   "memo": ""
+  },
+  "clean": {
+   "memo": ""
+  },
+  "restaurant": {
+   "memo": ""
+  },
+  "kr": {
+   "memo": ""
+  },
+  "color": {
+   "memo": ""
+  },
+  "factory": {
+   "memo": ""
+  },
+  "go": {
+   "memo": ""
+  },
+  "technology": {
+   "memo": ""
+  },
+  "day": {
+   "memo": ""
+  },
+  "gold": {
+   "memo": ""
+  },
+  "hair": {
+   "memo": ""
+  },
+  "best": {
+   "memo": ""
+  },
+  "style": {
+   "memo": ""
+  },
+  "tea": {
+   "memo": ""
+  },
+  "magic": {
+   "memo": ""
+  },
+  "paris": {
+   "memo": ""
+  },
+  "line": {
+   "memo": ""
+  },
+  "box": {
+   "memo": ""
+  },
+  "shop": {
+   "memo": ""
+  },
+  "tech": {
+   "memo": ""
+  },
+  "fit": {
+   "memo": ""
+  },
+  "pro": {
+   "memo": ""
+  },
+  "white": {
+   "memo": ""
+  },
+  "light": {
+   "memo": ""
+  },
+  "hotel": {
+   "memo": ""
+  },
+  "be": {
+   "memo": ""
+  },
+  "hi": {
+   "memo": ""
+  },
+  "all": {
+   "memo": ""
+  },
+  "farm": {
+   "memo": ""
+  },
+  "10": {
+   "memo": ""
+  },
+  "energy": {
+   "memo": ""
+  },
+  "전문점": {
+   "memo": ""
+  },
+  "better": {
+   "memo": ""
+  },
+  "body": {
+   "memo": ""
+  },
+  "live": {
+   "memo": ""
+  },
+  "pay": {
+   "memo": ""
+  },
+  "collection": {
+   "memo": ""
+  },
+  "re": {
+   "memo": ""
+  },
+  "100": {
+   "memo": ""
+  },
+  "cell": {
+   "memo": ""
+  },
+  "park": {
+   "memo": ""
+  },
+  "ginseng": {
+   "memo": ""
+  },
+  "balance": {
+   "memo": ""
+  },
+  "pizza": {
+   "memo": ""
+  },
+  "academy": {
+   "memo": ""
+  },
+  "big": {
+   "memo": ""
+  },
+  "golden": {
+   "memo": ""
+  },
+  "science": {
+   "memo": ""
+  },
+  "baby": {
+   "memo": ""
+  },
+  "garden": {
+   "memo": ""
+  },
+  "free": {
+   "memo": ""
+  },
+  "medical": {
+   "memo": ""
+  },
+  "ai": {
+   "memo": ""
+  },
+  "pure": {
+   "memo": ""
+  },
+  "original": {
+   "memo": ""
+  },
+  "play": {
+   "memo": ""
+  },
+  "eye": {
+   "memo": ""
+  },
+  "center": {
+   "memo": ""
+  },
+  "make": {
+   "memo": ""
+  },
+  "space": {
+   "memo": ""
+  },
+  "art": {
+   "memo": ""
+  },
+  "easy": {
+   "memo": ""
+  },
+  "real": {
+   "memo": ""
+  },
+  "school": {
+   "memo": ""
+  },
+  "city": {
+   "memo": ""
+  },
+  "do": {
+   "memo": ""
+  },
+  "happy": {
+   "memo": ""
+  },
+  "more": {
+   "memo": ""
+  },
+  "cream": {
+   "memo": ""
+  },
+  "king": {
+   "memo": ""
+  },
+  "sweet": {
+   "memo": ""
+  },
+  "zone": {
+   "memo": ""
+  },
+  "ace": {
+   "memo": ""
+  },
+  "solution": {
+   "memo": ""
+  },
+  "we": {
+   "memo": ""
+  },
+  "quality": {
+   "memo": ""
+  },
+  "vision": {
+   "memo": ""
+  },
+  "365": {
+   "memo": ""
+  },
+  "royal": {
+   "memo": ""
+  },
+  "spa": {
+   "memo": ""
+  },
+  "touch": {
+   "memo": ""
+  },
+  "made": {
+   "memo": ""
+  },
+  "kitchen": {
+   "memo": ""
+  },
+  "brand": {
+   "memo": ""
+  },
+  "sound": {
+   "memo": ""
+  },
+  "cushion": {
+   "memo": ""
+  },
+  "face": {
+   "memo": ""
+  },
+  "top": {
+   "memo": ""
+  },
+  "닥터": {
+   "memo": ""
+  },
+  "떡볶이": {
+   "memo": ""
+  },
+  "cube": {
+   "memo": ""
+  },
+  "first": {
+   "memo": ""
+  },
+  "is": {
+   "memo": ""
+  },
+  "mom": {
+   "memo": ""
+  },
+  "no": {
+   "memo": ""
+  },
+  "홍삼": {
+   "memo": ""
+  },
+  "lens": {
+   "memo": ""
+  },
+  "supreme": {
+   "memo": ""
+  },
+  "db": {
+   "memo": ""
+  },
+  "bar": {
+   "memo": ""
+  },
+  "little": {
+   "memo": ""
+  },
+  "man": {
+   "memo": ""
+  },
+  "organic": {
+   "memo": ""
+  },
+  "well": {
+   "memo": ""
+  },
+  "pop": {
+   "memo": ""
+  },
+  "university": {
+   "memo": ""
+  },
+  "neo": {
+   "memo": ""
+  },
+  "wash": {
+   "memo": ""
+  },
+  "institute": {
+   "memo": ""
+  },
+  "hello": {
+   "memo": ""
+  },
+  "out": {
+   "memo": ""
+  },
+  "wear": {
+   "memo": ""
+  },
+  "service": {
+   "memo": ""
+  },
+  "store": {
+   "memo": ""
+  },
+  "ice": {
+   "memo": ""
+  },
+  "pink": {
+   "memo": ""
+  },
+  "sky": {
+   "memo": ""
+  },
+  "beer": {
+   "memo": ""
+  },
+  "burger": {
+   "memo": ""
+  },
+  "medi": {
+   "memo": ""
+  },
+  "st": {
+   "memo": ""
+  },
+  "diamond": {
+   "memo": ""
+  },
+  "high": {
+   "memo": ""
+  }
+ }
+}
