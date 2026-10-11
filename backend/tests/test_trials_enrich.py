@@ -68,7 +68,7 @@ FACTS_SCOPE = """특허심판원 심결
 
 
 class FakeGoodsMap:
-    """정확 일치 사전 + 접두 검색 흉내."""
+    """정확 일치 사전 + 접두 검색 흉내 + GoodsMatcher 용 entries(일부 alias·괄호·다중 토큰)."""
 
     def __init__(self) -> None:
         self.table = {
@@ -77,7 +77,18 @@ class FakeGoodsMap:
             ("키보드", 9): ("G390802",), ("컴퓨터프로그래밍업", 42): ("S120602",),
             ("컴퓨터 자문업", 42): ("S120602",), ("신발", 25): ("G270101",),
             ("운동화", 25): ("G270101",), ("샌들", 25): ("G270101",), ("가방", 18): ("G250101",),
+            ("컴퓨터 소프트웨어", 9): ("G390802",), ("점퍼", 25): ("G450101",),
+            ("광학기기(안경 및 사진기기는 제외)", 9): ("G3402",),
+            ("통신기기 임대업", 38): ("S1205",), ("치즈", 29): ("G0704",),
+            ("페이스 및 바디용 메이크업 화장품", 3): ("G1201",),
+            ("고체/액체 또는 기체연료용 난방장치", 11): ("G3901",),
         }
+        self.aliases = {("컴퓨터 자문업", 42): ("컴퓨터 상담업",)}
+        self.entries = [
+            SimpleNamespace(name=name, nice_class=nice_class, similarity_codes=codes,
+                            aliases=self.aliases.get((name, nice_class), ()))
+            for (name, nice_class), codes in self.table.items()
+        ]
 
     def codes_for(self, name, nice_class=None):
         codes = set()
@@ -213,10 +224,47 @@ def test_map_goods_with_fake_map():
                                   goods_map)
     assert codes == {"G390802", "G250101"}
     methods = {d["name"]: d["method"] for d in details}
-    assert methods["컴퓨터"] == "exact" and methods["노트북컴"].startswith("search:노트북컴퓨터")
-    assert methods["가방"] == "exact" and methods["없는것"] == "fail"
-    partial_only, detail = te.map_goods([("퓨터", 9)], goods_map)  # 부분 일치는 채택하지 않는다
-    assert partial_only == set() and detail[0]["method"] == "fail"
+    assert methods["컴퓨터"] == "exact" and methods["가방"] == "exact"
+    # 접두·포함 부분 일치는 채택하지 않는다(2026-10-12: 통신기기 → 통신기기 임대업 같은 과매핑)
+    assert methods["노트북컴"] == "fail" and methods["없는것"] == "fail"
+    partial_only, detail = te.map_goods([("퓨터", 9), ("통신기기", 9)], goods_map)
+    assert partial_only == set() and {d["method"] for d in detail} == {"fail"}
+
+
+def test_map_goods_normalized_synonym_suffix_alias_and_jaccard():
+    goods_map = FakeGoodsMap()
+    names = [
+        ("컴퓨터소프트웨어", 9),  # 공백 없는 PDF 표기
+        ("광학기기{안경과사진기기는제외}", 9),  # 괄호 한정어 차이
+        ("컴퓨터 소프트 웨어", None),  # 줄 넘김 공백, 류 미상
+        ("잠바[점퍼]", 25),  # [동의어]
+        ("신발류", 25), ("치즈제품", 29),  # 접미
+        ("컴퓨터 상담업", 42),  # alias
+        ("페이스 및 바디용 화장품", 3),  # 토큰 자카드 4/5 = 0.8
+        ("고체/액체/기체연료용 난방장치", 11),  # 4/5 = 0.8
+        ("바디용 화장품", 3),  # 2/5 = 0.4 → 미매핑
+        ("광학기기{안경과사진기기는제외}", 25),  # PDF 류 표기가 틀리면 류 무시 폴백
+    ]
+    codes, details = te.map_goods(names, goods_map)
+    methods = {(d["name"], d["class"]): d["method"] for d in details}
+    assert methods[("컴퓨터소프트웨어", 9)] == "exact(정규화)"
+    assert methods[("광학기기{안경과사진기기는제외}", 9)] == "exact(정규화)"
+    assert methods[("컴퓨터 소프트 웨어", None)] == "exact(정규화)"
+    assert methods[("잠바[점퍼]", 25)] == "exact([동의어])"
+    assert methods[("신발류", 25)] == "접미(류)" and methods[("치즈제품", 29)] == "접미(제품)"
+    assert methods[("컴퓨터 상담업", 42)] == "alias"
+    assert methods[("페이스 및 바디용 화장품", 3)] == (
+        "jaccard:페이스 및 바디용 메이크업 화장품(0.80)"
+    )
+    assert methods[("고체/액체/기체연료용 난방장치", 11)].startswith("jaccard:고체/액체")
+    assert methods[("바디용 화장품", 3)] == "fail"
+    assert methods[("광학기기{안경과사진기기는제외}", 25)] == "exact(정규화·류 무시)"
+    assert codes == {"G390802", "G3402", "G450101", "G270101", "G0704", "S120602", "G1201",
+                     "G3901"}
+    assert te.goods_key("컴퓨터 소프트웨어·프로그램(기록된 것)") == "컴퓨터소프트웨어프로그램"
+    assert te.goods_tokens("고체/액체 또는 기체연료용 난방장치") == frozenset(
+        {"고체", "액체", "또는", "기체연료용", "난방장치"}
+    )
 
 
 def test_lookup_one_parses_and_picks_matching_item(tmp_path):
@@ -371,7 +419,7 @@ def test_run_targets_and_goods_end_to_end(tmp_path):
          "상대표장_유형": "확인대상표장", "유사여부_확정": "유사", "llm_b_유사여부": "유사",
          "판단축_확정": "호칭"},
         {"심판번호": "X1", "종류": "무효", "상표B_번호": "", "상대표장_유형": "",
-         "유사여부_확정": "유사", "llm_b_유사여부": "제외"},  # 대상 아님
+         "유사여부_확정": "제외", "llm_b_유사여부": "유사"},  # 대상 아님(유사여부_확정 기준)
     ])
     (base / "text").mkdir()
     (base / "text" / "R1.txt").write_text(FACTS_REFUSAL, encoding="utf-8")

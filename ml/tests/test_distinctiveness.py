@@ -238,6 +238,60 @@ def test_combined_weak_run_requires_same_order():
     assert dx._common_subsequence([], ["a"]) == ()
 
 
+def test_combined_single_match_keeps_joined_pairs():
+    # v0.3: 붙여쓴 결합어 대 띄어쓴 약한 토큰열 — 세 쌍 모두 pair_generic 이 비어 전체로 대비된다
+    model = _model_with_weak("line", "royal", "bee", "cool", "touch", "quick", "pass")
+    # 슬림라인 = 슬림 + 라인(토큰별 읽기 연결) → line 을 넘기지 않는다
+    assert model.weak_tokens("Slim Line") == frozenset({"line"})
+    assert model.combined_single_match("슬림라인", "Slim Line") == frozenset({"line"})
+    assert model.pair_generic("슬림라인", "Slim Line") == frozenset()
+    assert phonetic_similarity("슬림라인", "Slim Line", extra_generic=frozenset()) == 1.0
+    # SLIMLINE: 정규화 철자 동일. QUICKPATH / QUICK PASS: 읽기 ‘퀵패스’ 동일
+    assert model.combined_single_match("SLIMLINE", "Slim Line") == frozenset({"line"})
+    assert model.combined_single_match("QUICKPATH", "퀵패스 QUICK PASS") == frozenset(
+        {"quick", "pass"}
+    )
+    # ROYALEBEE / ROYAL BEE 와 쿨터치 / COOL TOUCH 는 토큰이 모두 약해 v0 규칙(2000후2453)으로 이미
+    # 전체 대비 — v0.3 판정 자체는 편집거리 0.889·읽기 ‘타우치’ 라 임계 0.9 에 못 미친다
+    assert model.combined_single_match("ROYALEBEE", "ROYAL BEE") == frozenset()
+    assert model.pair_generic("ROYALEBEE", "ROYAL BEE") == frozenset()
+    assert model.pair_generic("쿨터치", "COOL TOUCH") == frozenset()
+    assert phonetic_similarity("ROYALEBEE", "ROYAL BEE", extra_generic=frozenset()) == (
+        phonetic_similarity("ROYALEBEE", "ROYAL BEE")
+    )
+    # 결합어가 다른 토큰과 섞여 있어도(요부 있는 이름) 토큰열의 약한 토큰은 넘기지 않는다
+    assert model.pair_generic("퀵패스 QUICKPATH", "Zorbix QUICK PASS") == frozenset()
+    assert model.pair_generic("로얄비 ROYALEBEE", "Zorbix ROYAL BEE") == frozenset(
+        {"royal", "bee"}
+    )  # 0.889 — 임계 미달이면 그대로 넘긴다
+    assert model.pair_generic("혹달린신발", "신광준의 혹 달린 신발") == frozenset()
+    assert model.combined_single_match("혹달린신발", "신광준의 혹 달린 신발") == frozenset(
+        {"혹", "신발"}
+    )
+
+
+def test_combined_single_match_ignores_single_weak_token(model):
+    # 공통 약한 토큰 하나(gate)는 결합이 아니다 — v0·v1.6 과 같이 넘긴다
+    assert model.combined_single_match("Zorbix Gate", "Hello Gate") == frozenset()
+    assert model.pair_generic("Zorbix Gate", "Hello Gate") == frozenset({"gate"})
+    assert model.combined_single_match("Gate Qwzy", "Zorbix Gate") == frozenset()
+    assert model.pair_generic("Gate Qwzy", "Zorbix Gate") == frozenset({"gate"})
+
+
+def test_combined_single_match_ignores_unrelated_pairs():
+    model = _model_with_weak("cool", "touch")
+    # 이어 붙인 ‘cooltouch’ 와 닮은 토큰이 상대 이름에 없으면 그대로 넘긴다
+    assert model.combined_single_match("Cool Touch Zorbix", "Qwzy") == frozenset()
+    assert model.pair_generic("Cool Touch Zorbix", "Qwzy") == frozenset({"cool", "touch"})
+    assert model.combined_single_match("Dream Zorbix", "Gate Qwzy") == frozenset()
+    assert dx._combined_match("zorbixgate", ["zorbix", "gate"])
+    assert not dx._combined_match("gate", ["zorbix", "gate"])
+    assert not dx._combined_match("fire", ["fire", "500", "mp"])  # 토큰 분리관찰로 잡지 않는다
+    assert not dx._combined_match("에어부산", ["busan", "air"])  # 어순이 바뀌면 결합이 아니다
+    assert dx._string_similarity("royalebee", "royalbee") == pytest.approx(1 - 1 / 9)
+    assert dx._string_similarity("슬림라인", "슬림라인") == 1.0
+
+
 def test_overrides_skip_statistics_but_not_legal_zero():
     # v0.2: 사람 검토 제외 토큰은 통계 약화만 건너뛴다 — 3호 상대어(류 일치)는 0, 류 불일치는 1.0,
     # 상품 미상이면 3호 상한 0.5

@@ -1,4 +1,4 @@
-"""식별력·요부 v0.2 — 상표명 토큰마다 식별력 점수(0 약함 ~ 1 강함)를 매기고 요부(식별력 있는
+"""식별력·요부 v0.3 — 상표명 토큰마다 식별력 점수(0 약함 ~ 1 강함)를 매기고 요부(식별력 있는
 부분)를 고른다. X1·X2 문자 외관·X3 가 `extra_generic` 으로 넘겨받을 "식별력 없는 토큰"을 공급하는
 필터다(작업가이드 다빈-3). 축 함수가 아니므로 공통-2 규약(파일 없음)은 적용하지 않고, goods_map
 처럼 집계 파일(`shared/distinctiveness/token_stats.json`)을 적재한다. 학습 없음, KIPRIS 호출 없음.
@@ -18,6 +18,9 @@
       결합을 요부 후보로 보고 `pair_generic` 이 그 토큰들을 넘기지 않는다(`combined_weak_run`;
       Cool Touch / 쿨터치 COOL TOUCH 는 전체로 대비, 단일 토큰·순서가 다르면 미적용). 심결례
       distinct_drop 14건 중 13건이 떼어낸 공통 토큰을 요부·유사 근거로 명시한 데서 왔다.
+      v0.3: 한쪽의 붙여쓴 토큰(SLIMLINE·혹달린신발·QUICKPATH)이 다른 쪽의 연속 토큰열(Slim Line·
+      혹 달린 신발·QUICK PASS)을 이어 붙인 것과 철자·읽기(토큰별 X1 읽기 연결)로 같거나 유사도
+      ≥ 0.9 이면 그 결합도 요부로 본다(`combined_single_match`).
     - 상표법 33조 1항: 1호 보통명칭(goods_codes 가 있으면 그 류·유사군의 고시 명칭과 일치할 때만,
       없으면 전역 고시 단일 명칭 일치), 4호 현저한 지리적 명칭(X1 지명표 34 + 시·군·구 목록),
       5호 흔한 성(상위 30 + "~네/~가네/~씨네"), 6호 간단하고 흔한 표장(영문 2자 이하·숫자 2자 이하·
@@ -38,10 +41,10 @@
         다수 등록 계수 = 1 − min(1, A/θ_A) × min(1, N/θ_N)                  (A·N 둘 다 커야 0)
     요부 후보 = 점수 ≥ θ(0.5) 인 토큰. 하나도 없으면 요부 없음(전체 대비).
 
-알려진 한계(v0.2): 3호는 사람이 승인한 목록(상대어 378·절대어 57)만, 강한 인상·전체 비중·결합으로
-인한 새 관념 미반영(결합 규칙은 양쪽에 같은 순서로 있는 약한 토큰열만 — 붙여쓴 결합어(QUICKPATH)
-대 띄어쓴 토큰열(QUICK PASS)은 미적용), A·N 은 등록원부가 아니라 심판 목록 표본이라 실제보다
-작다, 영문 고시 명칭 미대조, 한자 토큰은 버린다.
+알려진 한계(v0.3): 3호는 사람이 승인한 목록(상대어 378·절대어 57)만, 강한 인상·전체 비중·결합으로
+인한 새 관념 미반영(결합 규칙은 양쪽 토큰열의 공통 부분열과 붙여쓴 결합어 대응만 — 어순이 바뀐
+결합(에어부산 / BUSAN AIR)과 X1 읽기가 다른 영문(touch → 타우치)은 미적용), A·N 은 등록원부가
+아니라 심판 목록 표본이라 실제보다 작다, 영문 고시 명칭 미대조, 한자 토큰은 버린다.
 
     token_score("커피", {"G0301"})     # 0.0 — 커피 유사군이면 1호 보통명칭(화장품 유사군이면 아님)
     salient_tokens("스타벅스 커피")      # [("스타벅스", 1.0)] — 유명 브랜드 예외
@@ -51,6 +54,7 @@
 from __future__ import annotations
 
 import functools
+import itertools
 import json
 import os
 import unicodedata
@@ -59,13 +63,14 @@ from pathlib import Path
 from typing import Iterable
 
 from .korean_brands import KOREAN_BRAND_ROMANIZATION, KOREAN_PLACE_ROMANIZATION
-from .x1_phonetic import normalize_name
+from .x1_phonetic import normalize_name, pronunciation_candidates
+from .x2_ortho import decompose_jamo
 from .x3_semantic import token_zipf
 
 __all__ = [
     "Distinctiveness", "TokenJudgement", "DescriptiveTerm", "load_distinctiveness", "token_score",
     "salient_tokens", "weak_tokens", "has_distinctive_part", "pair_generic", "combined_weak_run",
-    "famous_tokens",
+    "combined_single_match", "famous_tokens",
     "goods_index", "read_descriptive_terms", "validate_descriptive_terms", "unapproved_terms",
     "update_descriptive_approvals", "read_weak_overrides", "update_weak_overrides",
     "DESCRIPTIVE_TERMS", "DESCRIPTIVE_KINDS", "THETA", "THETA_A", "THETA_N",
@@ -97,6 +102,8 @@ ENV_DESCRIPTIVE_PATH = "MARKLENS_DESCRIPTIVE_TERMS"
 DEFAULT_OVERRIDES_PATH = DEFAULT_DIR / "weak_token_overrides.json"
 ENV_OVERRIDES_PATH = "MARKLENS_WEAK_TOKEN_OVERRIDES"
 DESCRIPTIVE_UNKNOWN_SCORE = 0.5  # 상대적 기술 표장인데 지정상품을 모르면(또는 류 미지정) 점수 상한
+COMBINED_SIMILARITY = 0.9  # v0.3 결합어 판정: 붙여쓴 토큰 vs 이어 붙인 토큰열 철자·읽기 유사도 하한
+COMBINED_READINGS_CAP = 64  # 토큰별 읽기 조합 상한(조합 폭발 방지)
 NICE_CLASS_RANGE = range(1, 46)
 
 
@@ -570,19 +577,103 @@ class Distinctiveness:
         run = _common_subsequence(weak_a, weak_b)
         return run if len(run) >= 2 else ()
 
+    def combined_single_match(
+        self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+    ) -> frozenset[str]:
+        """결합 규칙 v0.3(2015후1690 결합상태): 한쪽 이름의 토큰 하나(붙여쓴 결합어 — SLIMLINE·
+        ROYALEBEE·혹달린신발)가 다른 쪽의 연속 토큰 2개 이상(약한 토큰 포함)을 이어 붙인 것과 같으면
+        그 결합을 하나의 요부로 본다. 같음의 기준: 정규화 철자 동일, 또는 토큰별 읽기를 이은 호칭이
+        붙여쓴 토큰의 읽기와 동일(슬림라인 = 슬림+라인), 또는 철자·읽기 편집거리 유사도 ≥
+        COMBINED_SIMILARITY. 돌려주는 값은 넘기지 않을 약한 토큰(토큰열의 약한 토큰 + 결합어가
+        약하면 그것도)."""
+        judged = {name: self.judge_name(name, goods_codes) for name in (name_a, name_b)}
+        withheld: set[str] = set()
+        for spaced, other in ((name_a, name_b), (name_b, name_a)):
+            tokens = [j.token for j in judged[spaced]]
+            weak = {j.token for j in judged[spaced] if j.score < self.theta}
+            if len(tokens) < 2 or not weak:
+                continue
+            for start in range(len(tokens) - 1):
+                for stop in range(start + 2, len(tokens) + 1):
+                    run = tokens[start:stop]
+                    run_weak = [token for token in run if token in weak]
+                    if not run_weak:
+                        continue
+                    for single in judged[other]:
+                        if _combined_match(single.token, run):
+                            withheld.update(run_weak)
+                            if single.score < self.theta:
+                                withheld.add(single.token)
+        return frozenset(withheld)
+
     def pair_generic(
         self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
     ) -> frozenset[str]:
         """축 연결용: 두 이름의 약한 토큰 합집합. 요부가 하나도 없는 이름은 토큰을 넘기지 않는다
         (전부 식별력이 없으면 전체로 대비 — 2000후2453). 양쪽에 같은 순서로 있는 약한 토큰
-        2개 이상의 결합(`combined_weak_run`)은 요부 후보로 보아 넘기지 않는다(v0.2). X1 의 제거
-        전 전체 결합 후보는 X1 이 유지한다."""
+        2개 이상의 결합(`combined_weak_run`, v0.2)과 붙여쓴 결합어에 대응하는 토큰열
+        (`combined_single_match`, v0.3)은 요부 후보로 보아 넘기지 않는다. X1 의 제거 전 전체 결합
+        후보는 X1 이 유지한다."""
         generic: set[str] = set()
         for name in (name_a, name_b):
             if self.has_distinctive_part(name, goods_codes):
                 generic |= self.weak_tokens(name, goods_codes)
         generic -= set(self.combined_weak_run(name_a, name_b, goods_codes))
+        generic -= self.combined_single_match(name_a, name_b, goods_codes)
         return frozenset(generic)
+
+
+def _joined_readings(run: list[str]) -> list[str]:
+    """토큰별 읽기(X1 `pronunciation_candidates`, 없으면 토큰 그대로)를 이어 붙인 호칭 후보."""
+    lists = [pronunciation_candidates(token) or [token] for token in run]
+    out = []
+    for parts in itertools.product(*lists):
+        out.append("".join(parts))
+        if len(out) >= COMBINED_READINGS_CAP:
+            break
+    return out
+
+
+def _edit_distance(left: str, right: str) -> int:
+    previous = list(range(len(right) + 1))
+    for i, a in enumerate(left, 1):
+        current = [i]
+        for j, b in enumerate(right, 1):
+            current.append(min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a != b)))
+        previous = current
+    return previous[-1]
+
+
+def _string_similarity(left: str, right: str) -> float:
+    """문자열 전체의 편집거리 유사도(한글은 자모 단위). 토큰으로 다시 나누지 않는다 — X2 철자 축의
+    분리관찰이 "fire" 대 "fire500mp" 를 1.0 으로 만드는 것을 피한다."""
+    a, b = decompose_jamo(left), decompose_jamo(right)
+    longest = max(len(a), len(b))
+    return 1.0 if longest == 0 else 1.0 - _edit_distance(a, b) / longest
+
+
+def _combined_match(single: str, run: list[str]) -> bool:
+    """붙여쓴 토큰 single 이 토큰열 run 을 이어 붙인 것과 같은가(v0.3 기준): 정규화 철자 동일 ·
+    철자 유사도 ≥ 0.9 · 토큰별 읽기를 이은 호칭이 single 의 읽기와 동일 · 읽기 유사도 ≥ 0.9."""
+    joined = "".join(run)
+    if single == joined:
+        return True
+    if _string_similarity(single, joined) >= COMBINED_SIMILARITY:
+        return True
+    single_readings = pronunciation_candidates(single) or [single]
+    run_readings = _joined_readings(run)
+    if set(single_readings) & set(run_readings):
+        return True
+    return any(
+        _string_similarity(left, right) >= COMBINED_SIMILARITY
+        for left in single_readings for right in run_readings
+    )
+
+
+def combined_single_match(
+    name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+) -> frozenset[str]:
+    return load_distinctiveness().combined_single_match(name_a, name_b, goods_codes)
 
 
 def _common_subsequence(left: list[str], right: list[str]) -> tuple[str, ...]:
