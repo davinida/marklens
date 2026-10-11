@@ -776,7 +776,7 @@ def map_goods(names: list[tuple[str, int | None]], goods_map,
               matcher: GoodsMatcher | None = None) -> tuple[set[str], list[dict]]:
     """codes_for(정확·alias) → 키 정규화 정확(공백·기호·괄호 한정어 무시, 류 무시 포함) →
     [동의어] 괄호 안 명칭 → "~류/~제품/~용품/~용" 접미 제거 → 토큰 자카드 ≥ 0.8 상위 1건.
-    (코드 집합, 상세). 임계 미달은 미매핑(fail)으로 둔다 — 접두 부분 일치는 2026-10-12 부터
+    (코드 집합, 상세). 임계 미달은 미매핑(fail)으로 둔다 — 접두 부분 일치는 2026-10-11 부터
     채택하지 않는다(통신기기 → 통신기기 임대업 같은 과매핑)."""
     if matcher is None:
         matcher = GoodsMatcher(goods_map)
