@@ -1,6 +1,6 @@
-"""통합 모델 v1.2 학습 — 심결례 정답 데이터(`pairs_features.csv`)로 4축 결합 방법을 비교하고 판례
+"""통합 모델 v1.2.1 학습 — 심결례 정답 데이터(`pairs_features.csv`)로 4축 결합 방법을 비교하고 판례
 사전분포 + 단조 제약 로지스틱을 채택한다(통합 모델 설계 §3·§4-3·§7·§7-1·§7-2). KIPRIS 호출 0, 서비스
-코드 미접촉. 산출물은 계수 JSON(`shared/model/risk_model_v1.json`, version risk_model_v1.2)·보고서
+코드 미접촉. 산출물은 계수 JSON(`shared/model/risk_model_v1.json`, version risk_model_v1.2.1)·보고서
 (`ml/data/trials/risk_model_v1_report.md`·`_results.json`)·신뢰도 곡선·EBM 형상 곡선 PNG.
 
 v1.2(§7-2): 절편은 사전분포 없이 자유, 사전분포는 유사도 축·교호작용에만. 요부 플래그 두 개 대신
@@ -73,7 +73,9 @@ KINDS = ("거절결정불복", "무효", "권리범위확인(적극적)", "권�
 METHODS = ("logistic", "prior", "ebm", "gbm")
 DEFAULT_METHODS = ("logistic", "prior")
 C_GRID = (0.1, 0.3, 1.0, 3.0)
-SIGMA_GRID = (0.5, 1.0, 2.0)
+# σ: v1.1·v1.2 의 CV 격자 {0.5, 1, 2} 는 심결 AUC 차이가 0.006 안(CI 겹침)으로 무차별이라 v1.2.1
+# 부터 설계 원칙대로 중간값 1.0 고정(JSON meta.sigma_fixed). 격자를 다시 보려면 run(sigma_grid=…).
+SIGMA_GRID = (1.0,)
 ESTIMATORS_GRID = (50, 100, 200, 400)
 W_EASY = 0.5
 FOLDS = 5
@@ -84,6 +86,9 @@ PRECISION_RISK = 0.8
 RECALL_REVIEW = 0.9
 STANDALONE_PRECISION = 0.7  # ③ 단독 임계값: 축 하나의 정밀도 ≥ 0.7 이면 등급 하한 "검토 권장"
 MIN_SUPPORT = 10
+# 위험 등급의 최소 지지: v1.2 는 10 이라 정밀도 0.8 을 채우는 p 0.899 위에 11쌍(재현율 0.05)만 남아
+# 경고 기능이 없었다(설계 §7-2). v1.2.1 부터 30 — 미달이면 대체값(검토 권장 하한과 1.0 의 중간).
+RISK_MIN_SUPPORT = 30
 FEATURES = [
     "x1_d", "x2_text_d", "x2_whole", "x3_d", "x4",
     "miss_x2img", "miss_x3", "miss_x4",
@@ -651,7 +656,8 @@ def bootstrap_linear(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarr
 # ---- 등급·단독 임계값·부분집합 -----------------------------------------------------------------
 
 def grade_thresholds(prob: np.ndarray, y: np.ndarray, *, precision_risk: float = PRECISION_RISK,
-                     recall_review: float = RECALL_REVIEW, min_support: int = MIN_SUPPORT) -> dict:
+                     recall_review: float = RECALL_REVIEW,
+                     min_support: int = RISK_MIN_SUPPORT) -> dict:
     """위험: 정밀도 ≥ precision_risk 인 최소 p(지지 n ≥ min_support). 검토 권장: 유사 재현율 ≥
     recall_review 인 최대 p. 안전/주의 경계는 [0, 검토 권장) 등분."""
     n_pos = int((y == 1).sum())
@@ -1022,8 +1028,9 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
         "coefficients": {name: round(float(value), 4) for name, value in zip(names, final.coef)},
         "intercept": round(final.intercept, 4),
         "grade_thresholds": grades["심결+cross+db"]["thresholds"],
-        "grade_basis": ("심결+cross+db OOF 확률(위험 정밀도 ≥ 0.8, 검토 권장 재현율 ≥ 0.9, "
-                        "안전/주의 등분)"),
+        "grade_basis": (f"심결+cross+db OOF 확률(위험 정밀도 ≥ {PRECISION_RISK}·최소 지지 "
+                        f"{RISK_MIN_SUPPORT}, 검토 권장 재현율 ≥ {RECALL_REVIEW}, 안전/주의 등분; "
+                        "미달이면 위험 하한은 검토 권장 하한과 1.0 의 중간)"),
         "standalone_thresholds": standalone["thresholds"],
         "standalone_precision": STANDALONE_PRECISION,
         "standalone_reason": standalone["이유"],
@@ -1037,6 +1044,10 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
             "comparison_cv_auc": {name: item["cv"]["심결"]["auc"]
                                   for name, item in results.items()},
             "adoption_notes": adopt_notes, "adoption_pending": pending,
+            "sigma_selection": ("fixed" if len(tuple(sigma_grid)) == 1 else "cv"),
+            "sigma_fixed": ("CV 무차별(심결 AUC 차 0.006 안, CI 겹침) → 설계 원칙에 따라 중간값 1.0"
+                            if len(tuple(sigma_grid)) == 1 else None),
+            "risk_min_support": RISK_MIN_SUPPORT,
             "feature_definitions": (
                 "축 점수 0~1(결측 0 + miss_*=1; x3_d 는 has_meaning_both False 면 결측), "
                 "any_no_distinctive = 1 − has_distinctive_part_a·b, 교호작용 x1_d×문자계(문자·"
@@ -1084,7 +1095,7 @@ def _rate(value) -> str:
 
 def report_text(summary: dict) -> str:
     data = summary["데이터"]
-    lines = [f"# 통합 모델 v1.2 학습 보고 ({summary['기준일']})", ""]
+    lines = [f"# 통합 모델 v1.2.1 학습 보고 ({summary['기준일']})", ""]
     lines.append(f"- 라벨 최종 · 심결 {data['심결_행']}행(유사 {data['유사']}·비유사 "
                  f"{data['비유사']}; 이름 없어 제외 {data['이름_없어_제외']['행']}행) · 쉬운 음성 "
                  f"cross "
