@@ -144,39 +144,48 @@ def test_fit_logistic_matches_sklearn_and_image_offset():
     assert not np.allclose(mixed[[0, 3]], only_trial[[0, 3]])
 
 
-def test_fit_prior_respects_prior_mean_and_monotone_bounds():
+def test_fit_prior_respects_prior_mean_free_intercept_and_monotone_combos():
     rng = np.random.default_rng(7)
-    names = ["x1_d", "x2_whole", "x4", "miss_x4", "x1_d×문자계", "x2_whole×도형계"]
+    names = ["x1_d", "x2_whole", "x4", "miss_x4", "any_no_distinctive", "x1_d×문자계",
+             "x2_whole×도형계", "x1_d×any_no_distinctive"]
     n = 300
     text = rng.random(n) < 0.7
+    no_distinct = (rng.random(n) < 0.15).astype(float)
     x1, x2, x4 = rng.random(n), rng.random(n), rng.random(n)
-    X = np.column_stack([x1, x2, x4, (rng.random(n) < 0.2).astype(float),
-                         np.where(text, x1, 0.0), np.where(~text, x2, 0.0)])
+    X = np.column_stack([x1, x2, x4, (rng.random(n) < 0.2).astype(float), no_distinct,
+                         np.where(text, x1, 0.0), np.where(~text, x2, 0.0), x1 * no_distinct])
     # x4 가 라벨과 반대로 움직이는 자료 — 제약 없는 적합은 x4 계수가 음수
     y = (2.0 * x1 - 1.5 * x4 - 0.2 + rng.normal(0, 0.4, n) > 0).astype(float)
     weight = np.ones(n)
     free, _ = tr.fit_logistic(X, y, weight, 3.0)
     assert free[names.index("x4")] < 0
     coef, intercept = tr.fit_prior(X, y, weight, names, 1.0)
-    assert coef[names.index("x4")] >= -1e-9  # 단조 제약
-    assert coef[names.index("x2_whole")] >= -1e-9
-    assert coef[names.index("x2_whole")] + coef[names.index("x2_whole×도형계")] >= -1e-9
-    assert coef[names.index("x1_d")] + coef[names.index("x1_d×문자계")] >= -1e-9
     assert rm.monotone_violations(dict(zip(names, coef))) == []
-    # σ 가 아주 작으면 계수가 사전평균으로 간다(제약 안에서)
-    tight, _ = tr.fit_prior(X, y, weight, names, 0.02)
-    for name in ("x1_d", "x2_text_d", "x4"):
-        if name in names:
-            assert abs(tight[names.index(name)] - tr.PRIOR_MU.get(name, 0.0)) < 0.1
-    assert abs(tight[names.index("x1_d×문자계")] - tr.PRIOR_MU["x1_d×문자계"]) < 0.1
+    G = tr.monotone_constraints(names)
+    assert G.shape == (7, len(names)) and np.all(G @ coef >= -1e-9)  # 축 3 + x2 합 + x1 조합 3
+    # σ 가 아주 작으면 사전분포 항은 사전평균으로 가고, 절편은 자유라 0 에 묶이지 않는다
+    tight, tight_b = tr.fit_prior(X, y, weight, names, 0.02)
+    for name in ("x1_d", "x4", "x1_d×문자계", "x1_d×any_no_distinctive"):
+        assert abs(tight[names.index(name)] - tr.PRIOR_MU[name]) < 0.1
+    assert abs(tight_b) > 0.3  # 절편은 자료가 정한다(사전분포 없음)
+    assert "miss_x4" not in tr.PRIOR_FEATURES and "any_no_distinctive" not in tr.PRIOR_FEATURES
     # σ 가 크면 사전분포 영향이 작아 자료 쪽(x1 계수가 1.0 에서 멀어진다)
     loose, _ = tr.fit_prior(X, y, weight, names, 5.0)
     assert abs(loose[names.index("x1_d")] - 1.0) > abs(tight[names.index("x1_d")] - 1.0)
-    # 선형 모델의 부분의존 기울기는 계수(합)와 같다
+    # 사전분포 항이 없는 입력(제약만) — 제약이 걸리지 않는 자료면 로지스틱(C 큼)과 거의 같다
+    plain = ["x1_d", "x2_text_d", "miss_x4"]
+    Xp = np.column_stack([x1, x2, X[:, 3]])
+    yp = (2.0 * x1 + 1.0 * x2 - 1.2 + rng.normal(0, 0.4, n) > 0).astype(float)
+    mle, mle_b = tr.fit_logistic(Xp, yp, weight, 1e6)
+    near, near_b = tr.fit_prior(Xp, yp, weight, plain, 1e3)
+    assert np.allclose(mle, near, atol=0.05) and abs(mle_b - near_b) < 0.05
+    # 선형 모델의 부분의존 기울기는 계수(합)와 같다 — 요부 없는 행은 교호작용이 더해진다
     fitted = tr.Fitted("prior", names, coef=coef, intercept=intercept)
     family = np.where(text, "text", "figure")
-    slope = tr.pd_slope(fitted, X, family, "x1_d", text)
+    slope = tr.pd_slope(fitted, X, family, "x1_d", text & (no_distinct == 0))
     assert slope == pytest.approx(coef[names.index("x1_d")] + coef[names.index("x1_d×문자계")])
+    slope_nd = tr.pd_slope(fitted, X, family, "x1_d", text & (no_distinct == 1))
+    assert slope_nd == pytest.approx(slope + coef[names.index("x1_d×any_no_distinctive")])
     assert tr.pd_slope(fitted, X, family, "x4", np.ones(n, dtype=bool)) == pytest.approx(
         coef[names.index("x4")])
     assert tr.pd_slope(fitted, X, family, "x3_d", np.ones(n, dtype=bool)) is None  # 입력에 없음
@@ -219,25 +228,33 @@ def test_run_end_to_end_logistic_and_prior(data, tmp_path):
     for item in summary["방법"].values():
         assert 0.0 <= item["cv"]["심결"]["auc"] <= 1.0
         assert set(item["판례_조건_겹_성립_비율"]) == set(tr.CONDITIONS)
-        assert "x1_d×no_distinctive(보조)" in item["부트스트랩"]["계수"]
+        assert "intercept" in item["부트스트랩"]["계수"]
+        assert "x1_d×any_no_distinctive" in item["부트스트랩"]["계수"]
     assert summary["채택"]["method"] in ("prior", "logistic")
     assert set(summary["단독_임계값"]["thresholds"]) == set(tr.AXES)
     assert summary["단독_임계값"]["목표_정밀도"] == 0.7
-    assert set(summary["요부_교차표"]) == {"has_distinctive_part_a", "has_distinctive_part_b"}
+    assert set(summary["요부_교차표"]) == {"has_distinctive_part_a", "has_distinctive_part_b",
+                                       "any_no_distinctive"}
     assert (out_dir / "risk_model_v1_report.md").exists()
     assert (out_dir / "risk_model_v1_calibration.png").stat().st_size > 0
     report = (out_dir / "risk_model_v1_report.md").read_text(encoding="utf-8")
     assert "## 방법 비교" in report and "## 요부 유무 × 라벨" in report
     model = rm.load_model(model_path)
-    assert model["version"] == "risk_model_v1.1" and model["removed_terms"] == tr.REMOVED_TERMS
+    assert model["version"] == "risk_model_v1.2" and model["removed_terms"] == tr.REMOVED_TERMS
     assert not any(name.startswith("type_") for name in model["features"])
-    assert "miss_x1" not in model["features"] and "miss_x2text" not in model["features"]
+    assert "miss_x1" not in model["features"] and "has_distinctive_part_a" not in model["features"]
+    assert "any_no_distinctive" in model["features"]
+    assert "x1_d×any_no_distinctive" in model["features"]
+    assert model["figure_rule"] == {"threshold": tr.FIGURE_X2_THRESHOLD, "caveat": tr.FIGURE_CAVEAT,
+                                    "validated": False, "basis": model["figure_rule"]["basis"]}
     if model["method"] == "prior_monotone_logistic":
         assert model["prior"]["sigma"] in (0.5, 2.0) and model["monotone"]
+        assert model["prior"]["intercept_prior"] is False
+        assert set(model["prior"]["applies_to"]) <= set(tr.PRIOR_FEATURES)
         assert rm.monotone_violations(model["coefficients"]) == []
-    prob, grade, _ = rm.risk_score({"x1_d": 0.9, "x2_text_d": 0.9, "x4": 1.0,
-                                    "mark_type": "문자"}, model)
-    assert 0.0 <= prob <= 1.0 and grade in rm.GRADES
+    result = rm.risk_score({"x1_d": 0.9, "x2_text_d": 0.9, "x4": 1.0, "mark_type": "문자"}, model)
+    assert 0.0 <= result.prob <= 1.0 and result.grade in rm.GRADES and not result.figure_caveat
+    assert rm.risk_score({"x2_whole": 0.95, "mark_type": "도형"}, model).figure_caveat
     saved = json.loads((out_dir / "risk_model_v1_results.json").read_text(encoding="utf-8"))
     assert saved["채택"]["method"] == summary["채택"]["method"]
 
@@ -280,6 +297,8 @@ def test_groups_row_features_and_perturbation():
     vector = rm.design_vector(features, tr.FEATURES)
     assert vector[tr.FEATURES.index("x2_whole×도형계")] == 0.4
     assert vector[tr.FEATURES.index("miss_x3")] == 1.0
+    assert vector[tr.FEATURES.index("any_no_distinctive")] == 1.0  # b 쪽 요부 없음
+    assert vector[tr.FEATURES.index("x1_d×any_no_distinctive")] == 0.5
     X = np.asarray([vector])
     high = tr.perturbed(X, tr.FEATURES, np.asarray(["figure"]), "x2_whole", 1.0)
     assert high[0, tr.FEATURES.index("x2_whole")] == 1.0
@@ -287,4 +306,7 @@ def test_groups_row_features_and_perturbation():
     assert high[0, tr.FEATURES.index("miss_x2img")] == 0.0
     low = tr.perturbed(X, tr.FEATURES, np.asarray(["text"]), "x1_d", 0.0)
     assert low[0, tr.FEATURES.index("x1_d×문자계")] == 0.0
+    assert low[0, tr.FEATURES.index("x1_d×any_no_distinctive")] == 0.0
+    high1 = tr.perturbed(X, tr.FEATURES, np.asarray(["text"]), "x1_d", 1.0)
+    assert high1[0, tr.FEATURES.index("x1_d×any_no_distinctive")] == 1.0  # 요부 없음 유지
     assert tr.perturbed(X, tr.TREE_FEATURES[:3], np.asarray(["text"]), "x4", 1.0) is None

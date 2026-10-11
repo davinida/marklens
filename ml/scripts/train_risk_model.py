@@ -1,7 +1,13 @@
-"""통합 모델 v1.1 학습 — 심결례 정답 데이터(`pairs_features.csv`)로 4축 결합 방법을 비교하고 판례
-사전분포 + 단조 제약 로지스틱을 채택한다(통합 모델 설계 §3·§4-3·§7·§7-1). KIPRIS 호출 0, 서비스 코드
-미접촉. 산출물은 계수 JSON(`shared/model/risk_model_v1.json`, version risk_model_v1.1)·보고서
+"""통합 모델 v1.2 학습 — 심결례 정답 데이터(`pairs_features.csv`)로 4축 결합 방법을 비교하고 판례
+사전분포 + 단조 제약 로지스틱을 채택한다(통합 모델 설계 §3·§4-3·§7·§7-1·§7-2). KIPRIS 호출 0, 서비스
+코드 미접촉. 산출물은 계수 JSON(`shared/model/risk_model_v1.json`, version risk_model_v1.2)·보고서
 (`ml/data/trials/risk_model_v1_report.md`·`_results.json`)·신뢰도 곡선·EBM 형상 곡선 PNG.
+
+v1.2(§7-2): 절편은 사전분포 없이 자유, 사전분포는 유사도 축·교호작용에만. 요부 플래그 두 개 대신
+`any_no_distinctive`(한쪽이라도 요부 없음) + x1_d×any_no_distinctive(사전평균 −0.5, 2000후2453 —
+요부 없는 쌍은 호칭을 덜 믿음; 판례 (iv) 는 이 계수 < 0). 단조 제약은 x1 효과의 모든 조합(본체·
++문자계·+요부없음·+둘 다) ≥ 0 으로 SLSQP 선형 제약. 도형 규칙(figure_rule: 도형계 입력은 caveat,
+x2_whole ≥ 0.9 면 등급 하한 검토 권장)은 데이터로 검증하지 않은 제품 규칙으로 JSON 에만 기록한다.
 
     ml/venv/bin/python ml/scripts/train_risk_model.py                  # 로지스틱 + 사전분포(기본)
     ml/venv/bin/python ml/scripts/train_risk_model.py --methods logistic,prior,ebm,gbm
@@ -81,21 +87,25 @@ MIN_SUPPORT = 10
 FEATURES = [
     "x1_d", "x2_text_d", "x2_whole", "x3_d", "x4",
     "miss_x2img", "miss_x3", "miss_x4",
-    "has_distinctive_part_a", "has_distinctive_part_b",
-    "x1_d×문자계", "x2_whole×도형계",
+    "any_no_distinctive",
+    "x1_d×문자계", "x2_whole×도형계", "x1_d×any_no_distinctive",
 ]
-REMOVED_TERMS = ["type_도형", "type_결합-문자요부", "type_결합-도형요부", "miss_x1", "miss_x2text"]
+REMOVED_TERMS = ["type_도형", "type_결합-문자요부", "type_결합-도형요부", "miss_x1", "miss_x2text",
+                 "has_distinctive_part_a", "has_distinctive_part_b"]  # 뒤 둘은 v1.2 에서 대체
+FIGURE_X2_THRESHOLD = 0.9  # 도형 규칙: 도형계 입력에서 x2_whole ≥ 이 값이면 하한 검토 권장(미검증)
+FIGURE_CAVEAT = "도형 유사는 검증 데이터가 적어 참고용"
 IMAGE_BLOCK = ("x2_whole", "miss_x2img", "x2_whole×도형계")
 TREE_FEATURES = [name for name in FEATURES if name not in IMAGE_BLOCK]
 AXES = ("x1_d", "x2_text_d", "x2_whole", "x3_d", "x4")
 INTERACTION_OF = {"x1_d": "x1_d×문자계", "x2_whole": "x2_whole×도형계"}
 MISS_OF = {"x2_whole": "miss_x2img", "x3_d": "miss_x3", "x4": "miss_x4"}
 MONOTONE_FEATURES = ("x1_d", "x2_text_d", "x2_whole", "x3_d", "x4", "x1_d×문자계",
-                     "x2_whole×도형계")
+                     "x2_whole×도형계", "x1_d×any_no_distinctive")
 PRIOR_MU = {
     "x1_d": 1.0, "x1_d×문자계": 1.0, "x2_whole": 0.5, "x2_whole×도형계": 1.0,
-    "x2_text_d": 0.5, "x3_d": 0.5, "x4": 1.0,
+    "x2_text_d": 0.5, "x3_d": 0.5, "x4": 1.0, "x1_d×any_no_distinctive": -0.5,
 }
+PRIOR_FEATURES = tuple(PRIOR_MU)  # 사전분포는 유사도 축·교호작용에만(절편·결측·요부 플래그는 자유)
 SETS = (("심결", ("trial",)), ("심결+cross", ("trial", "cross")),
         ("심결+cross+db", ("trial", "cross", "db")))
 SOURCES = ("kipris", "llm", "본문", "ocr", "도형", "")
@@ -302,30 +312,36 @@ def fit_logistic(X: np.ndarray, y: np.ndarray, weight: np.ndarray, C: float, *,
     return result.x[:d], float(result.x[d])
 
 
-def prior_parameterization(
-    names: list[str],
-) -> tuple[np.ndarray, list[tuple[float | None, float | None]]]:
-    """재매개화: coef = A θ. 유사도 축 본체는 θ ≥ 0, 교호작용은 (가족 합 t ≥ 0) − 본체 로 두어
-    본체 ≥ 0 과 본체 + 교호작용 ≥ 0 을 L-BFGS-B 경계로 건다."""
-    d = len(names)
-    A = np.eye(d)
-    bounds: list[tuple[float | None, float | None]] = [(None, None)] * d
+def monotone_constraints(names: list[str]) -> np.ndarray:
+    """단조 제약 G(행마다 G·coef ≥ 0): 유사도 축 본체 ≥ 0, x2_whole 본체 + 도형계 교호작용 ≥ 0,
+    x1 본체 + {문자계, 요부없음} 교호작용의 모든 조합 ≥ 0. 입력에 없는 항은 건너뛴다."""
     index = {name: i for i, name in enumerate(names)}
-    for base, interaction in INTERACTION_OF.items():
-        if base in index and interaction in index:
-            i, j = index[base], index[interaction]
-            A[j, i] = -1.0  # coef_interaction = θ_j(total) − θ_i(base)
-    for name in MONOTONE_FEATURES:
-        if name in index:
-            bounds[index[name]] = (0.0, None)
-    return A, bounds
+    rows: list[np.ndarray] = []
+
+    def row(*terms: str) -> None:
+        vector = np.zeros(len(names))
+        for term in terms:
+            vector[index[term]] = 1.0
+        rows.append(vector)
+
+    for axis in AXES:
+        if axis in index:
+            row(axis)
+    if "x2_whole" in index and "x2_whole×도형계" in index:
+        row("x2_whole", "x2_whole×도형계")
+    if "x1_d" in index:
+        extras = [name for name in ("x1_d×문자계", "x1_d×any_no_distinctive") if name in index]
+        for mask in range(1, 2 ** len(extras)):
+            row("x1_d", *[name for bit, name in enumerate(extras) if mask >> bit & 1])
+    return np.asarray(rows) if rows else np.zeros((0, len(names)))
 
 
 def fit_prior(X: np.ndarray, y: np.ndarray, weight: np.ndarray, names: list[str], sigma: float, *,
               offset: np.ndarray | None = None, mu: dict[str, float] | None = None
               ) -> tuple[np.ndarray, float]:
-    """판례 사전분포 + 단조 제약 로지스틱(MAP): Σ_j (coef_j − μ_j)²/(2σ²) + 절편²/(2σ²) +
-    Σ s_i·logloss_i. 경계가 걸린 θ 로 coef 를 표현한다(prior_parameterization)."""
+    """판례 사전분포 + 단조 제약 로지스틱(MAP): Σ_{j∈사전분포 항} (coef_j − μ_j)²/(2σ²) +
+    Σ s_i·logloss_i. 절편·결측 지시변수·요부 플래그는 사전분포 없이 자유(v1.2). 선형 부등식 제약
+    (monotone_constraints)은 SLSQP 로 푼다."""
     X = np.asarray(X, dtype=np.float64)
     y = np.asarray(y, dtype=np.float64)
     weight = np.asarray(weight, dtype=np.float64)
@@ -333,28 +349,44 @@ def fit_prior(X: np.ndarray, y: np.ndarray, weight: np.ndarray, names: list[str]
     keep = weight > 0
     X, y, weight, offset = X[keep], y[keep], weight[keep], offset[keep]
     d = X.shape[1]
-    mu_vector = np.asarray([(mu or PRIOR_MU).get(name, 0.0) for name in names])
-    A, bounds = prior_parameterization(names)
-    precision = 1.0 / (sigma * sigma)
+    mu_map = mu or PRIOR_MU
+    mu_vector = np.asarray([mu_map.get(name, 0.0) for name in names])
+    precision = np.asarray([1.0 / (sigma * sigma) if name in mu_map else 0.0 for name in names])
+    G = monotone_constraints(names)
+    G_theta = np.column_stack([G, np.zeros(G.shape[0])]) if G.size else np.zeros((0, d + 1))
 
     def objective(theta: np.ndarray) -> tuple[float, np.ndarray]:
-        coef, b = A @ theta[:d], theta[d]
+        coef, b = theta[:d], theta[d]
         z = X @ coef + b + offset
         loss = np.logaddexp(0.0, z) - y * z
         diff = coef - mu_vector
-        value = 0.5 * precision * (float(diff @ diff) + b * b) + float(np.sum(weight * loss))
+        value = 0.5 * float(np.sum(precision * diff * diff)) + float(np.sum(weight * loss))
         residual = weight * (expit(z) - y)
-        grad_coef = precision * diff + X.T @ residual
-        gradient = np.concatenate([A.T @ grad_coef, [precision * b + float(residual.sum())]])
+        gradient = np.concatenate([precision * diff + X.T @ residual, [float(residual.sum())]])
         return value, gradient
 
-    start = np.linalg.solve(A, mu_vector)  # θ 로 옮긴 사전평균에서 출발(경계 안)
-    start = np.concatenate([np.maximum(start, 0.0) * (np.asarray([b[0] is not None
-                                                                   for b in bounds])) +
-                            start * (np.asarray([b[0] is None for b in bounds])), [0.0]])
-    result = minimize(objective, start, jac=True, method="L-BFGS-B", bounds=bounds + [(None, None)],
-                      options={"maxiter": 2000, "gtol": 1e-9, "ftol": 1e-13})
-    return A @ result.x[:d], float(result.x[d])
+    start = np.concatenate([mu_vector, [0.0]])  # 사전평균은 제약을 만족한다(실행 가능 시작점)
+    constraints = ([{"type": "ineq", "fun": lambda t: G_theta @ t, "jac": lambda t: G_theta}]
+                   if G_theta.shape[0] else [])
+    result = minimize(objective, start, jac=True, method="SLSQP", constraints=constraints,
+                      options={"maxiter": 1000, "ftol": 1e-12})
+    coef = result.x[:d]
+    if G.size:
+        coef = _project_feasible(coef, G)
+    return coef, float(result.x[d])
+
+
+def _project_feasible(coef: np.ndarray, G: np.ndarray, tolerance: float = 1e-9) -> np.ndarray:
+    """SLSQP 의 작은 수치 위반(1e-9 수준)을 0 으로 다듬는다 — 런타임 단조 검증과 맞추기 위해."""
+    out = coef.copy()
+    for _ in range(3):
+        slack = G @ out
+        for row, value in zip(G, slack):
+            if value < 0 and value > -1e-6:
+                positive = row > 0
+                out[positive] -= value / positive.sum()
+    out[np.abs(out) < tolerance] = 0.0
+    return out
 
 
 def fit_linear(X: np.ndarray, y: np.ndarray, weight: np.ndarray, names: list[str], easy: np.ndarray,
@@ -528,6 +560,9 @@ def perturbed(X: np.ndarray, names: list[str], family: np.ndarray, axis: str,
     if interaction in index:
         active = family == ("text" if axis == "x1_d" else "figure")
         out[:, index[interaction]] = np.where(active, value, 0.0)
+    if axis == "x1_d" and "x1_d×any_no_distinctive" in index:
+        flag = out[:, index["any_no_distinctive"]] if "any_no_distinctive" in index else 0.0
+        out[:, index["x1_d×any_no_distinctive"]] = value * flag
     miss = MISS_OF.get(axis)
     if miss in index:
         out[:, index[miss]] = 0.0
@@ -580,8 +615,7 @@ def bootstrap_linear(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarr
                      names: list[str], easy: np.ndarray, groups: np.ndarray, family: np.ndarray,
                      distinct: np.ndarray, hyper, *, rounds: int, seed: int) -> dict:
     """심결 사건 복원추출(쉬운 음성 고정) 부트스트랩: 계수 분포 + 판례 조건 성립 비율. (iv) 는
-    보조 항 x1_d×no_distinctive 를 더한 적합의 계수 < 0 으로 잰다(선형 모델은 요부 유무로
-    x1 기울기가 갈리지 않으므로)."""
+    x1_d×any_no_distinctive 계수(요부 없는 쌍의 x1 기울기 차) < 0 으로 condition_checks 가 잰다."""
     rng = np.random.default_rng(seed)
     trial_index = np.flatnonzero(~easy)
     easy_index = np.flatnonzero(easy)
@@ -590,23 +624,16 @@ def bootstrap_linear(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarr
         by_group.setdefault(groups[index], []).append(index)
     group_keys = np.asarray(list(by_group))
     group_rows = {key: np.asarray(value) for key, value in by_group.items()}
-    no_distinct = (~distinct).astype(np.float64)
-    sup_names = names + ["x1_d×no_distinctive"]
-    X_sup = np.column_stack([X, X[:, names.index("x1_d")] * no_distinct])
     samples: list[np.ndarray] = []
-    sup_samples: list[float] = []
+    intercepts: list[float] = []
     checks: list[dict] = []
     for _ in range(rounds):
         chosen = rng.choice(group_keys, group_keys.size, replace=True)
         index = np.concatenate([group_rows[key] for key in chosen] + [easy_index])
         fitted = fit_method(method, X[index], y[index], weight[index], names, easy[index], hyper)
         samples.append(fitted.coef)
-        sup = fit_method(method, X_sup[index], y[index], weight[index], sup_names, easy[index],
-                         hyper)
-        sup_samples.append(float(sup.coef[-1]))
-        check = condition_checks(fitted, X, family, ~easy, distinct)
-        check[CONDITIONS[3]] = sup.coef[-1] < 0
-        checks.append(check)
+        intercepts.append(fitted.intercept)
+        checks.append(condition_checks(fitted, X, family, ~easy, distinct))
     matrix = np.asarray(samples)
     table = {}
     for i, name in enumerate(names):
@@ -614,12 +641,10 @@ def bootstrap_linear(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarr
         table[name] = {"평균": _round(float(column.mean())),
                        "ci95": [_round(float(np.percentile(column, 2.5))),
                                 _round(float(np.percentile(column, 97.5)))]}
-    sup_array = np.asarray(sup_samples)
-    table["x1_d×no_distinctive(보조)"] = {
-        "평균": _round(float(sup_array.mean())),
-        "ci95": [_round(float(np.percentile(sup_array, 2.5))),
-                 _round(float(np.percentile(sup_array, 97.5)))],
-    }
+    b = np.asarray(intercepts)
+    table["intercept"] = {"평균": _round(float(b.mean())),
+                          "ci95": [_round(float(np.percentile(b, 2.5))),
+                                   _round(float(np.percentile(b, 97.5)))]}
     return {"rounds": rounds, "계수": table, "판례_조건_성립_비율": condition_rates(checks)}
 
 
@@ -749,6 +774,15 @@ def distinctive_crosstab(rows: list[dict], y: np.ndarray, trial: np.ndarray) -> 
             block[label] = {"n": n, "유사": int(y[mask].sum()),
                             "유사율": _round(float(y[mask].mean())) if n else None}
         out[f"has_distinctive_part_{side}"] = block
+    both = np.asarray([int(row.get("has_distinctive_part_a") or 0) and
+                       int(row.get("has_distinctive_part_b") or 0) for row in rows])
+    block = {}
+    for value, label in ((1, "둘 다 요부 있음"), (0, "한쪽이라도 요부 없음")):
+        mask = trial & (both == value)
+        n = int(mask.sum())
+        block[label] = {"n": n, "유사": int(y[mask].sum()),
+                        "유사율": _round(float(y[mask].mean())) if n else None}
+    out["any_no_distinctive"] = block
     return out
 
 
@@ -971,11 +1005,19 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
         "method": "prior_monotone_logistic" if adopted_method == "prior" else "logistic_l2",
         "w_easy": w_easy, "hyper": adopted["hyper"],
         "removed_terms": REMOVED_TERMS,
-        "prior": ({"mu": {name: PRIOR_MU.get(name, 0.0) for name in names + ["intercept"]},
-                   "sigma": adopted["hyper"]} if adopted_method == "prior" else None),
+        "prior": ({"mu": {name: PRIOR_MU[name] for name in names if name in PRIOR_MU},
+                   "sigma": adopted["hyper"],
+                   "applies_to": [name for name in names if name in PRIOR_MU],
+                   "intercept_prior": False} if adopted_method == "prior" else None),
         "monotone": {"features": [n for n in MONOTONE_FEATURES if n in names],
-                     "constraint": "유사도 축 본체 계수 ≥ 0, 본체 + 교호작용 ≥ 0"}
+                     "constraint": ("유사도 축 본체 ≥ 0; x2_whole 본체 + 도형계 교호작용 ≥ 0; "
+                                    "x1 본체 + {문자계, 요부없음} 교호작용 모든 조합 ≥ 0")}
         if adopted_method == "prior" else None,
+        "figure_rule": {"threshold": FIGURE_X2_THRESHOLD, "caveat": FIGURE_CAVEAT,
+                        "validated": False,
+                        "basis": ("97후3050 후단(한 축의 유사로 혼동 우려) — 도형계 쌍 17 로 "
+                                  "데이터 검증 불가, 제품 규칙(미검증). 도형계 입력은 "
+                                  "figure_caveat True")},
         "features": names,
         "coefficients": {name: round(float(value), 4) for name, value in zip(names, final.coef)},
         "intercept": round(final.intercept, 4),
@@ -997,9 +1039,10 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
             "adoption_notes": adopt_notes, "adoption_pending": pending,
             "feature_definitions": (
                 "축 점수 0~1(결측 0 + miss_*=1; x3_d 는 has_meaning_both False 면 결측), "
-                "has_distinctive_part_a/b 0/1, 교호작용 x1_d×문자계(문자·결합-문자요부·미상·결합)·"
-                "x2_whole×도형계(도형·결합-도형요부). 유형 주효과·miss_x1·miss_x2text 없음. "
-                "표준화 없음."
+                "any_no_distinctive = 1 − has_distinctive_part_a·b, 교호작용 x1_d×문자계(문자·"
+                "결합-문자요부·미상·결합)·x2_whole×도형계(도형·결합-도형요부)·"
+                "x1_d×any_no_distinctive. "
+                "유형 주효과·miss_x1·miss_x2text·요부 플래그 2개 없음. 표준화 없음."
             ),
         },
     }
@@ -1041,7 +1084,7 @@ def _rate(value) -> str:
 
 def report_text(summary: dict) -> str:
     data = summary["데이터"]
-    lines = [f"# 통합 모델 v1.1 학습 보고 ({summary['기준일']})", ""]
+    lines = [f"# 통합 모델 v1.2 학습 보고 ({summary['기준일']})", ""]
     lines.append(f"- 라벨 최종 · 심결 {data['심결_행']}행(유사 {data['유사']}·비유사 "
                  f"{data['비유사']}; 이름 없어 제외 {data['이름_없어_제외']['행']}행) · 쉬운 음성 "
                  f"cross "
@@ -1082,9 +1125,9 @@ def report_text(summary: dict) -> str:
                 b = boot["계수"][term]
                 lines.append(f"| {term} | {value} | {b['평균']} | {b['ci95'][0]} ~ "
                              f"{b['ci95'][1]} |")
-            sup = boot["계수"]["x1_d×no_distinctive(보조)"]
-            lines.append(f"| x1_d×no_distinctive(보조 적합) | — | {sup['평균']} | "
-                         f"{sup['ci95'][0]} ~ {sup['ci95'][1]} |")
+            b = boot["계수"]["intercept"]
+            lines.append(f"| intercept(부트스트랩) | — | {b['평균']} | {b['ci95'][0]} ~ "
+                         f"{b['ci95'][1]} |")
             lines += ["", "부트스트랩 판례 조건 성립 비율: " + ", ".join(
                 f"{k} {_rate(v)}" for k, v in boot["판례_조건_성립_비율"].items())]
         if "형상_곡선" in item:
@@ -1119,9 +1162,10 @@ def report_text(summary: dict) -> str:
     lines += ["", "## 요부 유무 × 라벨 (심결, 이름 있는 행)", "",
               "| 항 | 요부 있음 n(유사·유사율) | 요부 없음 n(유사·유사율) |", "|---|---|---|"]
     for term, block in summary["요부_교차표"].items():
-        a, b = block["요부 있음"], block["요부 없음"]
-        lines.append(f"| {term} | {a['n']} ({a['유사']}·{a['유사율']}) | {b['n']} "
-                     f"({b['유사']}·{b['유사율']}) |")
+        keys = list(block)
+        a, b = block[keys[0]], block[keys[1]]
+        lines.append(f"| {term} | {keys[0]} {a['n']} ({a['유사']}·{a['유사율']}) | "
+                     f"{keys[1]} {b['n']} ({b['유사']}·{b['유사율']}) |")
     lines += ["", "## 부분집합 (심결, 채택 모델 OOF)", ""]
     for title, block in summary["부분집합"].items():
         lines += [f"### {title}", "", "| 수준 | AUC |", "|---|---|"]
