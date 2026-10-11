@@ -11,10 +11,10 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 | 항목 | 2026-10-11 현재 |
 |---|---|
-| 마지막 갱신 | 2026-10-11 (`main` = `develop` = `2af05f3`, PR #45 까지; 이 브랜치 `chore/model-phase-wrapup` 스테이징 — 모델 단계 마감) |
+| 마지막 갱신 | 2026-10-11 (`main` = `develop` = `627e50e` — PR #46 모델 단계 마감 + Dependabot 9건 병합) |
 | 데이터 | KIPRIS 등록상표 1,100건, generation `20260827T035002Z-25f84a6eeb26` (2026-08-27) |
 | 테스트 | Python `1096 passed, 26 skipped`(가짜 ML 모드, 2026-10-11 v1.2.1 재학습 뒤 재실행 — 식별력 40·통합 모델 17·검토 화면 4·심결례 도구 포함; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `77 passed`(19 파일) · Playwright 스펙 5개 × 뷰포트 3개 = 15 |
-| CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — PR #45 병합(2026-10-11 develop `2af05f3`; #43·#44 도 통과) |
+| CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — Dependabot #32 병합(2026-10-11 develop `627e50e`; actions checkout·setup-python·setup-node·upload-artifact v7) |
 
 ## 현재 범위
 
@@ -840,15 +840,21 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
   `review`·`sample`·`status` 일치율) → #31 `labels.csv` 프로세스 간 잠금·원자적 쓰기(라벨링 에이전트 둘의 동시
   실행 대비). 병합 후 `main` = `develop` = `7e56b0a`. 2026-10-08~11 병합: PR #35 정답 데이터 보강 → #36 4축 벤치마크·X2 철자
   → #37 식별력 v0·명칭 LLM 추출·현실 분포 → #38 X1 v1.6·`review --bundle` → #39 3호 기술적 표장 v0.1 → #40 검토 웹 화면
-  → #41 정답 데이터 단계 마감·식별력 v0.2 → #42 학습 전 입력 정리 → #43 통합 모델 1차 → #44 통합 모델 v1.1 → #45 통합 모델 v1.2(`main` = `develop` =
-  `2af05f3`). 다음은 `chore/model-phase-wrapup`(모델 단계 마감 v1.2.1·문서 현행화).
+  → #41 정답 데이터 단계 마감·식별력 v0.2 → #42 학습 전 입력 정리 → #43 통합 모델 1차 → #44 통합 모델 v1.1 → #45 통합 모델 v1.2 → #46 모델 단계 마감 v1.2.1·문서 현행화 → Dependabot 9건(#10·#16·#12·#8·#11·#3·#5·#6·#32,
+  아래)(`main` = `develop` = `627e50e`).
 - 커밋 메시지는 `유형(범위): 설명` 형식입니다. 예: `feat(ml): X1 호칭 유사도 축`,
   `fix(backend): …`, `docs(readme): …`.
 - `.env`, `ml/data/`(데이터·인덱스·호출 카운터), 인증키는 커밋하지 않습니다.
 - 태그 `v0.1-semester1`(`a4e3f11`, 2026-06-10)이 1학기 종료 기준선입니다.
-- Dependabot(주간, pip·npm·docker·actions)이 열어 둔 PR 14건(#3~#32 사이, 2026-10-11 현재)의
-  처리 방침은 결정 대기(사유: 팀에서 아직 논의하지 않음 — 올릴 때는 `constraints.txt` 고정과 CI 게이트 pip-audit·npm audit 을
-  함께 바꿔야 함)입니다.
+- Dependabot(주간, pip·npm·docker·actions) PR 은 2026-10-11 정리했습니다 — 패치·마이너는 리베이스 뒤 CI 초록 확인 후 한 건씩
+  머지(@testing-library/react 16.3.3, @tailwindcss/postcss·tailwindcss 4.3.3, @playwright/test 1.64.0, fastapi 0.142.4, uvicorn 0.54.0),
+  actions 는 메이저여도 CI 통과로 머지(checkout·setup-python·setup-node·upload-artifact v7), 메이저는 닫고 수동 검토(#7 open-clip-torch
+  2→3). Dependabot 은 리베이스 때 base 를 `main` 으로 되돌리고 그 시점의 최신 버전으로 올리므로(PR 제목보다 높은 버전이 들어옴) 머지
+  직전에 base 를 `develop` 으로 재지정하고 `main` 은 ff 로 맞춥니다. 보류 3건: #13 torch 2.14·#9 torchvision 0.29(CI 의
+  `torch==2.13.0 torchvision==0.28.0` 설치 줄과 충돌 — ci.yml·Dockerfile ARG·README 설치 명령을 함께 바꿔야 함), #14 react 19.3
+  (react-dom 미동반이라 Vitest 전부 실패). `npm audit` 의 eslint-config-next 계열 권고는 Next 16 과 같은 메이저의 최신(16.4.0)도
+  `@next/eslint-plugin-next → fast-glob → micromatch → braces`(전 버전 취약) 를 그대로 가져와 해소되지 않고 유일한 fix 가 14.2.35
+  다운그레이드(메이저)라 보류입니다. CI 게이트(`npm audit --omit=dev --audit-level=high`)에는 걸리지 않습니다.
 
 ## 문서
 
