@@ -240,7 +240,8 @@ def test_run_end_to_end_logistic_and_prior(data, tmp_path):
     report = (out_dir / "risk_model_v1_report.md").read_text(encoding="utf-8")
     assert "## 방법 비교" in report and "## 요부 유무 × 라벨" in report
     model = rm.load_model(model_path)
-    assert model["version"] == "risk_model_v1.2" and model["removed_terms"] == tr.REMOVED_TERMS
+    assert model["version"] == "risk_model_v1.2.1" and model["removed_terms"] == tr.REMOVED_TERMS
+    assert model["meta"]["sigma_selection"] == "cv" and model["meta"]["risk_min_support"] == 30
     assert not any(name.startswith("type_") for name in model["features"])
     assert "miss_x1" not in model["features"] and "has_distinctive_part_a" not in model["features"]
     assert "any_no_distinctive" in model["features"]

@@ -268,7 +268,8 @@ def test_v12_monotone_validation_and_non_decreasing_probability():
 def test_versions_accepted():
     assert _model(version="risk_model_v1")["version"] == "risk_model_v1"
     assert _model(version="risk_model_v1.1")["version"] == "risk_model_v1.1"
-    assert rm.MODEL_VERSION == "risk_model_v1.2"
+    assert _model(version="risk_model_v1.2")["version"] == "risk_model_v1.2"
+    assert rm.MODEL_VERSION == "risk_model_v1.2.1"
     with pytest.raises(ValueError):
         _model(version="risk_model_v2")
 
@@ -289,7 +290,7 @@ def test_shipped_model_file_is_valid():
     if model["version"] in ("risk_model_v1.1", "risk_model_v1.2"):
         assert not any(name.startswith("type_") for name in model["features"])
         assert model["standalone_precision"] == 0.7
-    if model["version"] == "risk_model_v1.2":
+    if model["version"].startswith("risk_model_v1.2"):
         assert "any_no_distinctive" in model["features"]
         assert model["figure_rule"]["validated"] is False
         figure = rm.risk_score({"x1_d": 0.0, "x2_whole": 0.95, "mark_type": "도형"}, model)
