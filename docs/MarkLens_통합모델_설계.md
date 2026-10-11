@@ -1,6 +1,6 @@
 # MarkLens 통합 모델 설계 초안 — 판례가 정한 구조
 
-- 기준일: 2026-10-11 (초안 v0.1 2026-10-01, §4 정답 데이터 현황 2026-10-08, §4-2 재측정 2026-10-09, §4-3 정답 데이터 단계 마감·학습 입력 정의, §4-4 학습 전 입력 정리, §7 1차 학습 결과, **§7-1 v1.1 편향 제거·결합 방법 비교·판례 사전분포 — 모두 2026-10-11**) · 상태: **v1.1 학습 완료(`shared/model/risk_model_v1.json` version risk_model_v1.1, 런타임 `ml/src/model/risk_model.py`) — 서비스 미연결** · 학습: `ml/scripts/train_risk_model.py`(EBM·GBM 비교는 `ml/requirements-experiments.txt`) · 입력 축: X1 `ml/src/axes/x1_phonetic.py`(v1.5) · X2 `ml/src/scoring.py`(CLIP 시각 유사도) + 문자 외관 `ml/src/axes/x2_ortho.py`(철자, 2026-10-08) · X3 `ml/src/axes/x3_semantic.py`(v1.3) · X4 `ml/src/axes/x4_goods.py`(v1) · 정답 데이터: `backend/scripts/trials_collect.py`(PR #29~#31 병합) · 보강 `backend/scripts/trials_enrich.py`(2026-10-08, 브랜치 `feat/trials-enrich`)
+- 기준일: 2026-10-11 (초안 v0.1 2026-10-01, §4 정답 데이터 현황 2026-10-08, §4-2 재측정 2026-10-09, §4-3 정답 데이터 단계 마감·학습 입력 정의, §4-4 학습 전 입력 정리, §7 1차 학습 결과, §7-1 v1.1 편향 제거·결합 방법 비교·판례 사전분포, **§7-2 v1.2 절편 자유·요부 재설계·도형 보류 규칙·쉬운 음성 검토 — 모두 2026-10-11**) · 상태: **v1.2 학습 완료(`shared/model/risk_model_v1.json` version risk_model_v1.2, 런타임 `ml/src/model/risk_model.py`) — 서비스 미연결** · 학습: `ml/scripts/train_risk_model.py`(EBM·GBM 비교는 `ml/requirements-experiments.txt`) · 입력 축: X1 `ml/src/axes/x1_phonetic.py`(v1.5) · X2 `ml/src/scoring.py`(CLIP 시각 유사도) + 문자 외관 `ml/src/axes/x2_ortho.py`(철자, 2026-10-08) · X3 `ml/src/axes/x3_semantic.py`(v1.3) · X4 `ml/src/axes/x4_goods.py`(v1) · 정답 데이터: `backend/scripts/trials_collect.py`(PR #29~#31 병합) · 보강 `backend/scripts/trials_enrich.py`(2026-10-08, 브랜치 `feat/trials-enrich`)
 - 관련 문서: [X1 설계](MarkLens_X1_호칭유사도_설계.md) §8 통합 인터페이스, [X3 설계](MarkLens_X3_관념유사도_설계.md) §7, [X4 설계](MarkLens_X4_상품견련성_설계.md) §2 근사 한계, README "다축 모델과 축 함수".
 
 ## 1. 목적
@@ -214,7 +214,8 @@
 - 정답 데이터 마감 후 남은 사람 결정: 표본 미처리 3행. (사람 확정 2행 731170·28720 과 쌍 오류 의심 2행은 2026-10-11 사람 결정으로 제외 — §7 0.)
 - 현실 분포 평가의 쉬운 음성 구성(교차·DB 비율, 우연 유사 제외 기준 0.8)을 보고서 표준으로 둘지.
 - 1차 학습 뒤(§7): 도형계 조건(ii) 불성립을 어떻게 다룰지(CLIP 축 교체·도형 쌍 표본 확대·도형계는 X2 철자/이미지 벤치마크 §7 유형 게이팅으로 대체), 등급 임계값의 기준 집합(현실 분포 vs 심결만), 이름 없는 쌍(AUC 0.31, n 30)을 서비스에서 어떻게 표시할지, 서비스 연결 시점(engine·API 는 이 PR 에서 손대지 않음).
-- v1.1 뒤(§7-1): "위험" 등급 정밀도 0.8 을 못 채우는 상태로 서비스에 낼지(위험 하한 0.59, 정밀도 0.69), 요부 플래그 2개를 "한쪽이라도 요부 없음" 지시변수 + x1 교호작용으로 바꿀지와 절편 사전분포 제외, 도형계 쌍(AUC 0.14, n 15) 등급 보류 규칙, 현실 분포에서 축 평균(0.925)이 학습 모델보다 높은 점을 어떻게 볼지(쉬운 음성 라벨 재검토).
+- v1.1 뒤(§7-1): 현실 분포에서 축 평균(0.925)이 학습 모델보다 높은 점을 어떻게 볼지. (요부 플래그 재설계·절편 사전분포 제외·도형계 보류 규칙·쉬운 음성 검토는 §7-2 에서 처리.)
+- v1.2 뒤(§7-2): "위험" 등급 규칙 — 정밀도 0.8·최소 지지 10 으로 두면 v1.2 는 위험 하한 0.899·11쌍(재현율 0.05), 최소 지지를 30 으로 올리면 대체값(검토 권장 하한과 1.0 의 중간)으로 간다; 어느 쪽을 서비스에 낼지. 도형 규칙 τ 0.9 는 미검증(심결 도형계 쌍 중 해당 0건) — 도형 쌍 표본을 모은 뒤 검증. σ 가 2.0(약한 사전분포)으로 뽑혀 계수 CI 가 넓다(x1_d 0.56~3.59) — 표본 확대 전까지 σ 1.0 고정을 검토.
 
 ## 7. 1차 학습 결과 (2026-10-11, `feat/risk-model-v1`, `ml/scripts/train_risk_model.py`)
 
@@ -345,3 +346,41 @@ JSON `standalone_thresholds`·`standalone_precision` 0.7, 런타임 `risk_score`
 **⑦ 산출물·의존성**: `ml/scripts/train_risk_model.py --methods logistic,prior,ebm,gbm`(21초), `shared/model/risk_model_v1.json`(version risk_model_v1.1: method·removed_terms·prior·monotone·standalone_precision), 런타임 `risk_model.py`(버전 집합, `monotone_violations` 검증), 보고 `ml/data/trials/risk_model_v1_report.md`·`_results.json`·`_calibration.png`·`_ebm_shapes.png`. 실험 의존성은 `ml/requirements-experiments.txt`(interpret-core 0.7.8·lightgbm 4.7.0·shap 0.49.1·pandas 3.0.6)로 분리 — `pip install -c constraints.txt -r …` 로 설치해야 numpy 1.26.4 가 유지되고, macOS 는 `brew install libomp`, lightgbm 은 torch 와 한 프로세스에서 쓰면 OpenMP 충돌로 SIGSEGV 가 나므로 학습 스크립트는 torch 를 import 하지 않고(평가 도우미를 내장) 테스트는 서브프로세스로 돈다. 테스트 `test_risk_model.py` 8·`test_train_risk_model.py` 7.
 
 **한계**: §7 의 한계(n·경계 사례·LLM 유형 라벨·쉬운 음성 가정)에 더해, 편향 항을 빼자 "위험" 정밀도 0.8 이 사라졌다 — 그 정밀도는 사건 구성이 만든 것이었다. 사전분포의 절편 처리(σ 0.5 로 0 에 당김)가 요부 플래그 해석을 흐린다. EBM·GBM 은 이미지 축 없이 비교했다.
+
+### 7-2. v1.2 — 절편 자유·요부 플래그 재설계·도형 보류 규칙·쉬운 음성 검토 (2026-10-11, `feat/risk-model-v1.2`)
+
+서비스 연결 전 손질 네 가지. 채택 방법(판례 사전분포 + 단조 로지스틱)·CV(사건 단위 5겹 × 3반복)·쉬운 음성 w 0.5 는 §7-1 그대로.
+
+**1. 절편 사전분포 제외**: 사전분포는 유사도 축 5개와 교호작용 3개에만(JSON `prior.applies_to`, `intercept_prior` false), 절편·결측 지시변수·요부 플래그는 자유. 결과 절편 −4.86(부트스트랩 −6.53~−3.78; v1.1 −2.05)이고 요부 플래그 계수는 §7-1 의 −0.65·−0.72 에서 **+0.88(CI −0.50~1.79)** 로 — 0 을 포함하며 교차표(한쪽이라도 요부 없음 34행 유사율 0.59 vs 둘 다 있음 280행 0.60, 차이 0.01)와 맞는다. v1.1 의 음수는 절편 사전분포가 옮겨 간 값이었음이 확인됐다. σ 는 CV 로 2.0(0.5: 0.616·1.0: 0.619·2.0: 0.621)이 뽑혀 사전분포가 약해졌고, 그만큼 계수 CI 가 넓다.
+
+**2. 요부 플래그 재설계**: has_distinctive_part_a·b 두 개 → `any_no_distinctive`(한쪽이라도 요부 없음) + `x1_d×any_no_distinctive`(사전평균 −0.5, 2000후2453 — 요부 없는 쌍은 전체 대비라 호칭 점수를 덜 믿음). 단조 제약은 x1 효과의 네 조합(본체·+문자계·+요부없음·+둘 다) ≥ 0 과 x2_whole 본체·+도형계 ≥ 0, 나머지 축 ≥ 0 을 SLSQP 선형 제약으로 걸고 런타임이 적재 때 같은 조합을 검증한다. 판례 (iv) 는 이 교호작용 계수 < 0 으로 잰다: **−1.10(CI −2.44~1.00), 부트스트랩 성립 0.92** — 문자계 호칭 효과가 요부 있는 쌍 4.23, 없는 쌍 3.13.
+
+**3. 도형계 보류 규칙(제품 규칙, 미검증)**: 입력 유형이 도형·결합-도형요부면 `risk_score` 결과 `figure_caveat` True(화면 문구 "도형 유사는 검증 데이터가 적어 참고용"), x2_whole 이 0.9 이상이면 등급 하한 "검토 권장"(단독 규칙과 같은 구조, τ 0.9, 97후3050 후단). JSON `figure_rule`(threshold·caveat·validated false·basis)에 기록하고 v1.1 JSON 처럼 키가 없으면 적용하지 않는다. 데이터로 검증할 수 없는 이유: 이름 있는 도형계 쌍 17(유사 3)뿐이고 그중 x2_whole ≥ 0.9 는 0건, 전체 314행에서도 x2_whole ≥ 0.9 는 3건(유사 1) — 심결 쌍의 CLIP 점수 95 분위가 0.79, 최대 0.95 다. 도형계 OOF AUC 0.07(n 15)로 모델이 반대 방향이라 caveat 가 필요하다.
+
+**4. 쉬운 음성 표본 검토**: cross·db 700쌍 중 x1_d 또는 x2_text_d 가 0.6~0.8 인 쌍은 **7건**뿐(x1_d 95 분위 0.47·최대 0.78, x2_text_d 최대 0.57)이라 50건을 채우려 0.4~0.6 대역 43건을 seed 0 으로 더했다. 서브에이전트 둘(25건씩)이 97후3050 기준으로 "우연 유사(실제 혼동 가능)" 여부를 판정: **50건 모두 혼동 불가**(0.6~0.8 대역 7건 포함, 경계 사례 1건 MASSIVE / e MASTER Club 도 불가) → 비율 0% ≤ 5% 이므로 제외 임계 0.8 을 유지하고 재학습하지 않았다. 판정 기록 `ml/data/trials/easy_negative_review_v12.json`.
+
+**v1.1 → v1.2 비교(채택 모델, 같은 314행·쉬운 음성 700)**:
+
+| 항목 | v1.1 (σ 0.5, 절편 사전분포) | v1.2 (σ 2.0, 절편 자유) |
+|---|---|---|
+| 심결 CV AUC | 0.618 (0.55~0.68) | 0.621 (0.55~0.68) |
+| 심결+cross+db AUC | 0.901 (0.88~0.92) | 0.895 (0.87~0.92) |
+| Brier 심결 / 현실 | 0.261 / 0.093 | 0.270 / 0.090 |
+| 판례 (i)/(ii)/(iii)/(iv) | 1.00 / 0.01 / 1.00 / 1.00(보조 항) | 1.00 / 0.00 / 1.00 / 0.92(교호작용) |
+| 등급 하한 주의 / 검토 권장 / 위험 | 0.091 / 0.181 / 0.591 | 0.061 / 0.122 / **0.899** |
+| 위험 등급 정밀도(현실 n, 유사) | 0.69 (136, 94) — 0.8 미달 대체값 | **0.82 (11, 9)** — 0.8 충족이나 지지 11·재현율 0.05 |
+| 검토 권장 이상 재현율 / 안전으로 간 유사 | 0.90 / 5 | 0.90 / 6 |
+| x1_d / x1_d×문자계 (문자계 합) | 1.29 / 1.87 (3.16) | 1.86 / 2.37 (4.23) |
+| x2_text_d | 1.05 | 1.08 |
+| x2_whole / ×도형계 (도형계 효과) | 0.05 / 0.40 (0.45) | 0.42 / −0.42 (0.00, 제약 경계) |
+| x3_d / x4 | 0.03 / 1.06 | 0.08 / 1.47 |
+| 요부 | has_a −0.65 · has_b −0.72 | any_no +0.88 · x1×any_no −1.10 |
+| 절편 | −2.05 | −4.86 |
+| 단독 임계값(정밀도 0.7) | x1 0.98·x2_text 0.75·x3 0.77 | 같음(데이터 규칙 변경 없음) |
+| 도형 규칙 | 없음 | τ 0.9·caveat(미검증) |
+
+- 변별력·보정은 CI 안에서 같다. 달라진 것은 해석이다 — 요부 플래그가 자료와 맞고, 절편이 자료 값이며, 호칭·상품 계수는 커졌다(사전분포가 약해진 탓).
+- **"위험" 등급의 역설**: v1.2 는 정밀도 0.8 을 채우는 p 가 생겼지만(0.899) 그 위 쌍이 11(유사 9)뿐이라 재현율 0.05 — 서비스 분포 1,014 중 11 만 "위험"이다. v1.1 의 대체값(0.591, 정밀도 0.69, 136쌍)과 어느 쪽이 쓸모 있는지는 사람 결정(§6): 규칙의 최소 지지 10 을 30 정도로 올리면 v1.2 도 대체값으로 간다.
+- 도형계 x2_whole×도형계 가 제약 경계(본체 + 교호작용 = 0)에 붙었다 — 자료는 도형계에서 CLIP 효과를 음수로 두고 싶어 하고 제약이 0 에서 막는다. 조건 (ii) 불성립은 그대로다.
+
+**산출물**: `ml/src/model/risk_model.py`(RiskResult(prob, grade, contributions, figure_caveat), any_no_distinctive·교호작용, `monotone_violations` 조합 검증, `figure_rule`), `ml/scripts/train_risk_model.py`(SLSQP 제약·사전분포 범위·교차표 any_no_distinctive), `shared/model/risk_model_v1.json`(version risk_model_v1.2), 테스트 `test_risk_model.py` 9·`test_train_risk_model.py` 8(플래그 교호작용·도형 하한·caveat·단조 조합·절편 자유·sklearn 일치·서브프로세스 EBM/GBM).

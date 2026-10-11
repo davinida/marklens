@@ -1,5 +1,6 @@
-"""통합 모델 런타임(v1 → v1.1) — 4축 점수(X1 호칭·X2 외관·X3 관념·X4 상품)를 출처 혼동 위험도
-p(0~1)·등급·기여도로 합치는 순수 함수. 설계는 docs/MarkLens_통합모델_설계.md §3·§4-3·§7·§7-1.
+"""통합 모델 런타임(v1 → v1.1 → v1.2) — 4축 점수(X1 호칭·X2 외관·X3 관념·X4 상품)를 출처 혼동
+위험도 p(0~1)·등급·기여도·도형 주의 표시로 합치는 순수 함수. 설계는 docs/MarkLens_통합모델_설계.md
+§3·§4-3·§7·§7-1·§7-2.
 
 계수는 JSON(`shared/model/risk_model_v1.json`, 학습 스크립트 `ml/scripts/train_risk_model.py` 가
 쓴다)에서 읽는다 — 입력 정의·계수·절편·등급 임계값·단독 임계값·학습 메타. 픽클 없음, numpy 없음,
@@ -8,7 +9,7 @@ p(0~1)·등급·기여도로 합치는 순수 함수. 설계는 docs/MarkLens_�
     risk_score({"x1_d": 0.95, "x2_text_d": 0.8, "x2_whole": 0.6, "x3_d": None, "x4": 1.0,
                 "has_meaning_both": False, "has_distinctive_part_a": True,
                 "has_distinctive_part_b": True, "mark_type": "문자"})
-    → (p, 등급, {항: 계수×값, "intercept": 절편})   # 기여도 합 = 로짓
+    → RiskResult(prob, grade, contributions, figure_caveat)   # 기여도 합 = 로짓
 
 입력 규약(§4-3): 축 점수가 None 이면 결측 — 값 0 + 결측 지시변수 1. X3 는 `has_meaning_both` 가
 False 면 게이트 꺼짐 = 결측. 상표 유형은 문자·도형·결합-문자요부·결합-도형요부, 그 밖(미상·결합)은
@@ -16,6 +17,10 @@ False 면 게이트 꺼짐 = 결측. 상표 유형은 문자·도형·결합-문
 JSON(§7-1)은 유형 주효과·miss_x1·miss_x2text 를 쓰지 않고(유형은 교호작용으로만), `monotone` 이
 있으면 적재 때 단조 제약(유사도 축 본체 ≥ 0, 본체 + 교호작용 ≥ 0)을 검증한다. 단독 임계값
 `standalone_thresholds`(정밀도 ≥ 0.7 지점)는 축 하나가 τ 이상이면 등급 하한을 "검토 권장"으로.
+v1.2(§7-2): 요부 플래그는 `any_no_distinctive`(한쪽이라도 요부 없음) 하나와 교호작용
+x1_d×any_no_distinctive(2000후2453 — 요부 없는 쌍은 호칭을 덜 믿음), 도형계(도형·결합-도형요부)
+입력에는 `figure_caveat` True(검증 데이터 부족 — 참고용)와 `figure_rule`(x2_whole ≥ 0.9 면 등급 하한
+검토 권장, 미검증 제품 규칙)을 적용한다.
 """
 
 from __future__ import annotations
@@ -25,20 +30,22 @@ import json
 import math
 import os
 from pathlib import Path
+from typing import NamedTuple
 
 __all__ = [
-    "risk_score", "design_values", "design_vector", "load_model", "validate_model", "grade_for",
-    "axis_contributions", "mark_type_level", "monotone_violations", "GRADES", "TYPE_LEVELS",
-    "AXIS_INPUTS", "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH",
+    "risk_score", "RiskResult", "design_values", "design_vector", "load_model", "validate_model",
+    "grade_for", "axis_contributions", "mark_type_level", "monotone_violations", "GRADES",
+    "TYPE_LEVELS", "AXIS_INPUTS", "FIGURE_FAMILY", "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1.1"
-SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1")
+MODEL_VERSION = "risk_model_v1.2"
+SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2")
 INTERACTION_OF = {"x1_d": "x1_d×문자계", "x2_whole": "x2_whole×도형계"}
 MONOTONE_AXES = ("x1_d", "x2_text_d", "x2_whole", "x3_d", "x4")
+X1_EXTRA_INTERACTIONS = ("x1_d×any_no_distinctive",)  # x1 효과에 더해지는 교호작용(요부 없음)
 
 AXIS_INPUTS = (
     ("x1_d", "miss_x1"), ("x2_text_d", "miss_x2text"), ("x2_whole", "miss_x2img"),
@@ -58,9 +65,19 @@ TERM_AXIS = {
     "x3_d": "X3", "miss_x3": "X3", "has_meaning_both": "X3", "x3_d×has_meaning_both": "X3",
     "x4": "X4", "miss_x4": "X4",
     "has_distinctive_part_a": "요부", "has_distinctive_part_b": "요부",
+    "any_no_distinctive": "요부",
     "type_도형": "유형", "type_결합-문자요부": "유형", "type_결합-도형요부": "유형",
-    "x1_d×no_distinctive": "X1",
+    "x1_d×no_distinctive": "X1", "x1_d×any_no_distinctive": "X1",
 }
+
+
+class RiskResult(NamedTuple):
+    """risk_score 결과: 위험도 p, 등급, 항별 기여도(합 = 로짓), 도형 주의 표시(v1.2)."""
+
+    prob: float
+    grade: str
+    contributions: dict[str, float]
+    figure_caveat: bool
 
 
 def mark_type_level(value: object) -> str:
@@ -117,7 +134,9 @@ def design_values(features: dict) -> dict[str, float]:
     values["x2_whole×도형계"] = values["x2_whole"] if level in FIGURE_FAMILY else 0.0
     values["x3_d×has_meaning_both"] = values["x3_d"] * values["has_meaning_both"]
     no_distinctive = 1.0 - values["has_distinctive_part_a"] * values["has_distinctive_part_b"]
-    values["x1_d×no_distinctive"] = values["x1_d"] * no_distinctive
+    values["any_no_distinctive"] = no_distinctive
+    values["x1_d×any_no_distinctive"] = values["x1_d"] * no_distinctive
+    values["x1_d×no_distinctive"] = values["x1_d×any_no_distinctive"]  # v1.1 보조 항 이름
     return values
 
 
@@ -169,19 +188,41 @@ def validate_model(data: dict) -> dict:
     if data.get("monotone"):
         for violation in monotone_violations(coefficients):
             raise ValueError(f"risk_model: 단조 제약 위반 — {violation}")
+    rule = data.get("figure_rule")
+    if rule is not None:
+        if not isinstance(rule, dict) or not isinstance(rule.get("caveat"), str):
+            raise ValueError("risk_model: figure_rule 은 caveat 문구를 가진 객체여야 합니다")
+        threshold = rule.get("threshold")
+        if threshold is not None and not (isinstance(threshold, (int, float))
+                                          and 0.0 <= float(threshold) <= 1.0):
+            raise ValueError("risk_model: figure_rule.threshold 는 null 또는 0~1")
     return data
 
 
 def monotone_violations(coefficients: dict, tolerance: float = 1e-9) -> list[str]:
-    """v1.1 단조 제약(유사도 축 본체 ≥ 0, 본체 + 교호작용 ≥ 0)을 어기는 항 설명 목록."""
+    """단조 제약을 어기는 항 설명 목록 — 유사도 축 본체 ≥ 0, 본체 + 교호작용 ≥ 0. x1 은 문자계·요부
+    없음 교호작용의 모든 조합(v1.2: 본체, +문자계, +요부없음, +둘 다)에서 ≥ 0."""
     out = []
     for axis in MONOTONE_AXES:
         base = float(coefficients.get(axis, 0.0))
         if base < -tolerance:
             out.append(f"{axis} {base}")
         interaction = INTERACTION_OF.get(axis)
-        if interaction in coefficients and base + float(coefficients[interaction]) < -tolerance:
-            out.append(f"{axis} + {interaction} {base + float(coefficients[interaction])}")
+        extras = [float(coefficients[name]) for name in X1_EXTRA_INTERACTIONS
+                  if axis == "x1_d" and name in coefficients]
+        combos = [[]]
+        if interaction in coefficients:
+            combos = combos + [combo + [interaction] for combo in combos]
+        for name in (X1_EXTRA_INTERACTIONS if axis == "x1_d" else ()):
+            if name in coefficients:
+                combos = combos + [combo + [name] for combo in combos]
+        for combo in combos:
+            if not combo:
+                continue
+            total = base + sum(float(coefficients[name]) for name in combo)
+            if total < -tolerance:
+                out.append(f"{axis} + {' + '.join(combo)} {round(total, 4)}")
+        del extras
     return out
 
 
@@ -212,11 +253,15 @@ def grade_for(prob: float, thresholds: dict) -> str:
     return grade
 
 
-def risk_score(features: dict, model: dict | None = None) -> tuple[float, str, dict[str, float]]:
-    """(위험도 p, 등급, 기여도). 기여도는 항별 계수×값 + "intercept"(합이 로짓).
+def risk_score(features: dict, model: dict | None = None) -> RiskResult:
+    """RiskResult(위험도 p, 등급, 기여도, figure_caveat). 기여도는 항별 계수×값 + "intercept"(합이
+    로짓).
 
     단독 임계값(97후3050 후단): 어느 한 축의 점수가 그 축의 τ 이상이면 등급을 최소 "검토 권장"으로
-    올린다(자동 "위험"은 아니다). τ 가 null 인 축은 비활성.
+    올린다(자동 "위험"은 아니다). τ 가 null 인 축은 비활성. 도형 규칙(v1.2, `figure_rule`): 입력
+    유형이 도형계면 figure_caveat True(화면 문구는 JSON `caveat`), x2_whole 이 있고 threshold
+    이상이면 등급 하한 "검토 권장" — 도형계 쌍이 적어 데이터로 검증하지 못한 제품 규칙(`validated`
+    false).
     """
     model = model or load_model()
     values = design_values(features)
@@ -236,7 +281,18 @@ def risk_score(features: dict, model: dict | None = None) -> tuple[float, str, d
         if values[miss] == 0.0 and values[axis] >= float(tau):
             if GRADES.index(grade) < GRADES.index(REVIEW_GRADE):
                 grade = REVIEW_GRADE
-    return prob, grade, contributions
+    figure_caveat = False
+    rule = model.get("figure_rule")
+    if rule:
+        level = mark_type_level(features.get("mark_type", features.get("상표유형")))
+        if level in FIGURE_FAMILY:
+            figure_caveat = True
+            threshold = rule.get("threshold")
+            if threshold is not None and values["miss_x2img"] == 0.0 and (
+                values["x2_whole"] >= float(threshold)
+            ) and GRADES.index(grade) < GRADES.index(REVIEW_GRADE):
+                grade = REVIEW_GRADE
+    return RiskResult(prob, grade, contributions, figure_caveat)
 
 
 def axis_contributions(contributions: dict[str, float]) -> dict[str, float]:
