@@ -225,7 +225,7 @@ def test_map_goods_with_fake_map():
     assert codes == {"G390802", "G250101"}
     methods = {d["name"]: d["method"] for d in details}
     assert methods["컴퓨터"] == "exact" and methods["가방"] == "exact"
-    # 접두·포함 부분 일치는 채택하지 않는다(2026-10-12: 통신기기 → 통신기기 임대업 같은 과매핑)
+    # 접두·포함 부분 일치는 채택하지 않는다(2026-10-11: 통신기기 → 통신기기 임대업 같은 과매핑)
     assert methods["노트북컴"] == "fail" and methods["없는것"] == "fail"
     partial_only, detail = te.map_goods([("퓨터", 9), ("통신기기", 9)], goods_map)
     assert partial_only == set() and {d["method"] for d in detail} == {"fail"}

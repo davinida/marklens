@@ -1,0 +1,105 @@
+{
+ "version": "risk_model_v1",
+ "trained_at": "2026-10-11",
+ "label": "최종",
+ "variant": "B",
+ "w_easy": 0.5,
+ "C": 0.3,
+ "features": [
+  "x1_d",
+  "x2_text_d",
+  "x2_whole",
+  "x3_d",
+  "x4",
+  "miss_x1",
+  "miss_x2text",
+  "miss_x2img",
+  "miss_x3",
+  "miss_x4",
+  "has_distinctive_part_a",
+  "has_distinctive_part_b",
+  "type_도형",
+  "type_결합-문자요부",
+  "type_결합-도형요부",
+  "x1_d×문자계",
+  "x2_whole×도형계"
+ ],
+ "coefficients": {
+  "x1_d": 1.3204,
+  "x2_text_d": 0.9521,
+  "x2_whole": 0.0699,
+  "x3_d": 0.2026,
+  "x4": 0.743,
+  "miss_x1": 1.2921,
+  "miss_x2text": 1.2921,
+  "miss_x2img": 0.2211,
+  "miss_x3": 0.292,
+  "miss_x4": 0.0966,
+  "has_distinctive_part_a": 0.05,
+  "has_distinctive_part_b": -0.556,
+  "type_도형": 0.2544,
+  "type_결합-문자요부": 1.2641,
+  "type_결합-도형요부": -0.1161,
+  "x1_d×문자계": 1.5393,
+  "x2_whole×도형계": -0.3071
+ },
+ "intercept": -3.1291,
+ "grade_thresholds": {
+  "주의": 0.0933,
+  "검토 권장": 0.1866,
+  "위험": 0.7402
+ },
+ "grade_basis": "심결+cross+db OOF 확률(위험 정밀도 ≥ 0.8, 검토 권장 재현율 ≥ 0.9, 안전/주의 등분)",
+ "standalone_thresholds": {
+  "x1_d": null,
+  "x2_text_d": null,
+  "x2_whole": null,
+  "x3_d": null,
+  "x4": null
+ },
+ "standalone_reason": {
+  "x1_d": "비활성 — 지지 10 이상에서 최대 정밀도 0.7132 (t ≥ 1.0, n 129) < 0.9",
+  "x2_text_d": "비활성 — 지지 10 이상에서 최대 정밀도 0.7333 (t ≥ 0.8889, n 105) < 0.9",
+  "x2_whole": "비활성 — 지지 10 이상에서 최대 정밀도 0.633 (t ≥ 0.3777, n 218) < 0.9",
+  "x3_d": "비활성 — 지지 10 이상에서 최대 정밀도 0.7 (t ≥ 0.7707, n 30) < 0.9",
+  "x4": "비활성 — 지지 10 이상에서 최대 정밀도 0.663 (t ≥ 0.3333, n 92) < 0.9"
+ },
+ "meta": {
+  "n_trial": 351,
+  "n_pos": 210,
+  "n_neg": 141,
+  "n_easy": 700,
+  "folds": 5,
+  "repeats": 3,
+  "bootstrap": 500,
+  "cv_auc": {
+   "심결": 0.6248,
+   "심결+cross": 0.8684,
+   "심결+cross+db": 0.9076
+  },
+  "cv_auc_ci95": {
+   "심결": [
+    0.5669,
+    0.6842
+   ],
+   "심결+cross": [
+    0.8411,
+    0.8943
+   ],
+   "심결+cross+db": [
+    0.8873,
+    0.9295
+   ]
+  },
+  "brier": {
+   "심결": 0.2558,
+   "심결+cross+db": 0.094
+  },
+  "adopt_notes": [
+   "심결 OOF AUC 최고 0.625, 그 0.01 안의 후보 4/6",
+   "판례 구조(변형 B, 교호작용) 후보가 있어 B 로 한정",
+   "현실 분포 Brier 최소 → B/w0.5"
+  ],
+  "feature_definitions": "축 점수 0~1(결측 0 + miss_*=1; x3_d 는 has_meaning_both False 면 결측), has_distinctive_part_a/b 0/1, 유형 지시변수(기준 문자), 교호작용 x1_d×문자계(문자·결합-문자요부)·x2_whole×도형계(도형·결합-도형요부). 표준화 없음."
+ }
+}
