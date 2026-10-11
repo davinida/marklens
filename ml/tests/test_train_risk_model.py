@@ -1,43 +1,57 @@
-"""통합 모델 학습 스크립트 테스트 — 합성 특징 CSV 로 끝까지(모델 다운로드·실데이터 없음)."""
+"""통합 모델 학습 스크립트(v1.1) 테스트 — 합성 특징 CSV 로 끝까지(모델 다운로드·실데이터 없음).
+EBM·GBM 은 실험 의존성이 있을 때만, 그리고 서브프로세스로(torch 가 적재된 pytest 프로세스에서
+lightgbm 을 부르면 macOS 에서 OpenMP 충돌로 SIGSEGV)."""
 
 from __future__ import annotations
 
 import csv
 import json
+import subprocess
+import sys
 
 import numpy as np
 import pytest
 from src.model import risk_model as rm
 
-from scripts import pairs_features as pf
 from scripts import train_risk_model as tr
 
 KINDS = ("거절결정불복", "무효", "권리범위확인(적극적)", "권리범위확인(소극적)")
 TYPES = ("문자", "도형", "결합-문자요부", "결합-도형요부", "미상")
-EASY_COLUMNS = [c for c in pf.COLUMNS if c not in ("weak_a", "weak_b")]
+META_COLUMNS = ["심판번호", "종류", "상대번호", "최종라벨", "표장라벨", "판단축", "판단축_출처",
+                "상표유형", "상표유형_출처", "이름A", "이름B", "이름B_출처", "메모", "pair_source"]
+AXIS_COLUMNS = ["x1", "x2_text", "x2_fig", "x2_whole", "x3", "x3_raw", "x4", "x1_d", "x2_text_d",
+                "x3_d"]
+FLAG_COLUMNS = ["has_names", "has_pron_a", "has_pron_b", "has_meaning_a", "has_meaning_b",
+                "has_spelling_a", "has_spelling_b", "has_goods", "has_image", "has_fig",
+                "has_distinctive_part_a", "has_distinctive_part_b", "weak_a", "weak_b"]
+COLUMNS = META_COLUMNS + AXIS_COLUMNS + FLAG_COLUMNS
+EASY_COLUMNS = [c for c in COLUMNS if c not in ("weak_a", "weak_b")]
 
 
 def _trial_rows(n: int = 120, seed: int = 0) -> list[dict]:
-    """x1·x2_text 가 라벨과 함께 움직이고 x4 도 약하게 움직이는 합성 행(일부 결측·게이트 꺼짐)."""
+    """x1·x2_text 가 라벨과 함께 움직이고 x4 도 약하게 움직이는 합성 행(일부 결측·게이트 꺼짐·이름
+    없음)."""
     rng = np.random.default_rng(seed)
     rows = []
     for i in range(n):
         similar = i % 5 != 0 and i % 3 != 1
         base = 0.65 if similar else 0.3
-        row = {column: "" for column in pf.COLUMNS}
+        row = {column: "" for column in COLUMNS}
         x1 = float(np.clip(base + rng.normal(0, 0.15), 0, 1))
         x2 = float(np.clip(base + rng.normal(0, 0.2), 0, 1))
+        named = i % 11 != 0
         row.update({
             "심판번호": f"T{i // 2}", "상대번호": str(i % 2), "종류": KINDS[i % 4],
             "최종라벨": "유사" if similar else "비유사",
             "표장라벨": ("유사" if similar else "비유사") if i % 9 else "",
-            "상표유형": TYPES[i % 5], "상표유형_출처": "확정", "이름A": "a", "이름B": "b",
-            "이름B_출처": ("kipris", "llm")[i % 2], "pair_source": "trial",
-            "x1_d": f"{x1:.4f}" if i % 11 else "", "x2_text_d": f"{x2:.4f}" if i % 11 else "",
+            "상표유형": TYPES[i % 5], "상표유형_출처": "확정", "이름A": "a",
+            "이름B": "b" if named else "",
+            "이름B_출처": ("kipris", "llm")[i % 2] if named else "", "pair_source": "trial",
+            "x1_d": f"{x1:.4f}" if named else "", "x2_text_d": f"{x2:.4f}" if named else "",
             "x2_whole": f"{float(np.clip(0.5 + rng.normal(0, 0.1), 0, 1)):.4f}" if i % 7 else "",
-            "x3_d": f"{float(np.clip(base + rng.normal(0, 0.3), 0, 1)):.4f}" if i % 11 else "",
+            "x3_d": f"{float(np.clip(base + rng.normal(0, 0.3), 0, 1)):.4f}" if named else "",
             "x4": f"{float(np.clip(base + rng.normal(0, 0.3), 0, 1)):.4f}" if i % 4 else "",
-            "has_names": 1 if i % 11 else 0, "has_pron_a": 1, "has_pron_b": 1,
+            "has_names": int(named), "has_pron_a": 1, "has_pron_b": 1,
             "has_meaning_a": 1 if i % 6 else 0, "has_meaning_b": 1,
             "has_spelling_a": 1, "has_spelling_b": 1, "has_goods": 1 if i % 4 else 0,
             "has_image": 1 if i % 7 else 0, "has_fig": 0,
@@ -79,12 +93,26 @@ def _write(path, rows, columns):
 def data(tmp_path):
     features = tmp_path / "pairs_features.csv"
     easy = tmp_path / "pairs_features_easy.csv"
-    _write(features, _trial_rows(), pf.COLUMNS)
+    _write(features, _trial_rows(), COLUMNS)
     _write(easy, _easy_rows(), EASY_COLUMNS)
     return features, easy
 
 
-def test_fit_logistic_matches_sklearn_and_two_stage_offset():
+def test_metric_helpers_match_x2_benchmark():
+    from scripts import x2_benchmark as x2b
+
+    rng = np.random.default_rng(5)
+    scores = rng.random(80)
+    labels = (scores + rng.normal(0, 0.3, 80) > 0.5).astype(int)
+    assert tr.roc_auc(scores, labels) == pytest.approx(x2b.roc_auc(scores, labels))
+    assert tr.bootstrap_auc(scores, labels, rounds=50, seed=1) == x2b.bootstrap_auc(
+        scores, labels, rounds=50, seed=1)
+    assert tr.roc_auc(scores, np.ones(80, dtype=int)) is None
+    point = tr.precision_threshold(scores, labels, target=0.7, min_support=10)
+    assert point["threshold"] is None or point["precision"] >= 0.7
+
+
+def test_fit_logistic_matches_sklearn_and_image_offset():
     pytest.importorskip("sklearn")
     from sklearn.linear_model import LogisticRegression
 
@@ -97,11 +125,7 @@ def test_fit_logistic_matches_sklearn_and_two_stage_offset():
         reference = LogisticRegression(C=C, solver="lbfgs", tol=1e-10, max_iter=5000).fit(X, y)
         assert np.allclose(coef, reference.coef_[0], atol=2e-3)
         assert abs(intercept - reference.intercept_[0]) < 2e-3
-    # 오프셋 0 이면 그냥 적합과 같다
-    coef0, b0 = tr.fit_logistic(X, y, weight, 1.0)
-    coef1, b1 = tr.fit_logistic(X, y, weight, 1.0, offset=np.zeros(200))
-    assert np.allclose(coef0, coef1) and b0 == pytest.approx(b1)
-    # 2단계 적합: 쉬운 음성 가중치 0 이면 1단계 해 그대로, 양수면 이미지 블록만 고정된다
+    # 2단계 적합: 쉬운 음성 가중치 0 이면 심결 행만의 적합, 양수면 이미지 블록만 고정된다
     names = ["x1_d", "x2_whole", "miss_x2img", "x4"]
     easy = np.zeros(200, dtype=bool)
     easy[150:] = True
@@ -111,67 +135,137 @@ def test_fit_logistic_matches_sklearn_and_two_stage_offset():
     y2 = y.copy()
     y2[easy] = 0.0
     direct, _ = tr.fit_logistic(X2[~easy], y2[~easy], np.ones(int((~easy).sum())), 1.0)
-    only_trial, _ = tr.fit_model(X2, y2, np.where(easy, 0.0, 1.0), names, 1.0, easy)
+    only_trial, _ = tr.fit_linear(X2, y2, np.where(easy, 0.0, 1.0), names, easy,
+                                  method="logistic", hyper=1.0)
     assert np.allclose(direct, only_trial)
-    mixed, _ = tr.fit_model(X2, y2, np.where(easy, 0.5, 1.0), names, 1.0, easy)
+    mixed, _ = tr.fit_linear(X2, y2, np.where(easy, 0.5, 1.0), names, easy, method="logistic",
+                             hyper=1.0)
     assert mixed[1] == pytest.approx(only_trial[1]) and mixed[2] == pytest.approx(only_trial[2])
     assert not np.allclose(mixed[[0, 3]], only_trial[[0, 3]])
 
 
-def test_grade_thresholds_and_calibration():
+def test_fit_prior_respects_prior_mean_and_monotone_bounds():
+    rng = np.random.default_rng(7)
+    names = ["x1_d", "x2_whole", "x4", "miss_x4", "x1_d×문자계", "x2_whole×도형계"]
+    n = 300
+    text = rng.random(n) < 0.7
+    x1, x2, x4 = rng.random(n), rng.random(n), rng.random(n)
+    X = np.column_stack([x1, x2, x4, (rng.random(n) < 0.2).astype(float),
+                         np.where(text, x1, 0.0), np.where(~text, x2, 0.0)])
+    # x4 가 라벨과 반대로 움직이는 자료 — 제약 없는 적합은 x4 계수가 음수
+    y = (2.0 * x1 - 1.5 * x4 - 0.2 + rng.normal(0, 0.4, n) > 0).astype(float)
+    weight = np.ones(n)
+    free, _ = tr.fit_logistic(X, y, weight, 3.0)
+    assert free[names.index("x4")] < 0
+    coef, intercept = tr.fit_prior(X, y, weight, names, 1.0)
+    assert coef[names.index("x4")] >= -1e-9  # 단조 제약
+    assert coef[names.index("x2_whole")] >= -1e-9
+    assert coef[names.index("x2_whole")] + coef[names.index("x2_whole×도형계")] >= -1e-9
+    assert coef[names.index("x1_d")] + coef[names.index("x1_d×문자계")] >= -1e-9
+    assert rm.monotone_violations(dict(zip(names, coef))) == []
+    # σ 가 아주 작으면 계수가 사전평균으로 간다(제약 안에서)
+    tight, _ = tr.fit_prior(X, y, weight, names, 0.02)
+    for name in ("x1_d", "x2_text_d", "x4"):
+        if name in names:
+            assert abs(tight[names.index(name)] - tr.PRIOR_MU.get(name, 0.0)) < 0.1
+    assert abs(tight[names.index("x1_d×문자계")] - tr.PRIOR_MU["x1_d×문자계"]) < 0.1
+    # σ 가 크면 사전분포 영향이 작아 자료 쪽(x1 계수가 1.0 에서 멀어진다)
+    loose, _ = tr.fit_prior(X, y, weight, names, 5.0)
+    assert abs(loose[names.index("x1_d")] - 1.0) > abs(tight[names.index("x1_d")] - 1.0)
+    # 선형 모델의 부분의존 기울기는 계수(합)와 같다
+    fitted = tr.Fitted("prior", names, coef=coef, intercept=intercept)
+    family = np.where(text, "text", "figure")
+    slope = tr.pd_slope(fitted, X, family, "x1_d", text)
+    assert slope == pytest.approx(coef[names.index("x1_d")] + coef[names.index("x1_d×문자계")])
+    assert tr.pd_slope(fitted, X, family, "x4", np.ones(n, dtype=bool)) == pytest.approx(
+        coef[names.index("x4")])
+    assert tr.pd_slope(fitted, X, family, "x3_d", np.ones(n, dtype=bool)) is None  # 입력에 없음
+
+
+def test_grade_thresholds_calibration_and_adopt_rule():
     prob = np.linspace(0.01, 0.99, 50)
     y = (prob > 0.45).astype(float)
-    y[48] = 0.0  # 높은 쪽에 비유사 하나
+    y[48] = 0.0
     result = tr.grade_thresholds(prob, y)
     cuts = result["thresholds"]
     assert cuts["주의"] < cuts["검토 권장"] < cuts["위험"] <= 1.0
-    assert cuts["주의"] == pytest.approx(cuts["검토 권장"] / 2, abs=1e-3)
     stats = {g["등급"]: g for g in result["등급별"]}
     assert stats["위험"]["정밀도(등급 안 유사율)"] >= 0.8
     assert stats["검토 권장"]["재현율(이 등급 이상이 잡는 유사)"] >= 0.9
-    # 정밀도 0.8 에 못 미치면 위험 하한은 검토 권장과 1.0 의 중간 + 기준 메모
-    noisy = tr.grade_thresholds(np.linspace(0.3, 0.7, 40), np.tile([1.0, 0.0], 20))
-    assert noisy["기준"] and noisy["thresholds"]["위험"] > noisy["thresholds"]["검토 권장"]
     calib = tr.calibration(prob, y, bins=5)
     assert len(calib["곡선"]) == 5 and sum(c["n"] for c in calib["곡선"]) == 50
-    assert 0.0 <= calib["brier"] <= 1.0
+    # 채택 규칙: 기준 CI 상한을 넘는 방법이 없으면 prior, 있으면 사람 결정 대기
+    results = {"logistic": {"cv": {"심결": {"auc": 0.60, "auc_ci95": [0.55, 0.65]}}},
+               "prior": {"cv": {"심결": {"auc": 0.61, "auc_ci95": [0.56, 0.66]}}},
+               "gbm": {"cv": {"심결": {"auc": 0.64, "auc_ci95": [0.58, 0.70]}}}}
+    assert tr.adopt(results) == ("prior", False, tr.adopt(results)[2])
+    results["gbm"]["cv"]["심결"]["auc"] = 0.66
+    method, pending, notes = tr.adopt(results)
+    assert method == "prior" and pending and "gbm" in notes[1]
 
 
-def test_run_end_to_end_writes_model_report_and_png(data, tmp_path):
+def test_run_end_to_end_logistic_and_prior(data, tmp_path):
     features, easy = data
     out_dir = tmp_path / "out"
     model_path = tmp_path / "model" / "risk_model_v1.json"
-    summary = tr.run(features, easy, out_dir=out_dir, model_path=model_path, c_grid=(0.3, 1.0),
-                     w_easy_grid=(0.0, 0.5), folds=3, repeats=1, bootstrap=8, seed=0)
-    assert summary["데이터"]["심결_행"] == 120
-    assert summary["데이터"]["쉬운_음성"] == {"cross": 30, "db": 30}
-    assert set(summary["변형"]) == {"A/w0", "A/w0.5", "B/w0", "B/w0.5"}
-    for item in summary["변형"].values():
-        assert 0.0 <= item["cv"]["심결"]["auc"] <= 1.0 and item["cv"]["심결+cross+db"]["n"] == 180
-    adopted = summary["채택"]
-    assert adopted["key"] in summary["변형"] and adopted["C"] in (0.3, 1.0)
-    assert set(summary["부트스트랩"]["판례_조건_성립_비율"]) == {
-        "(i) 문자계: x1 > x2_whole", "(ii) 도형계: x2_whole > x1", "(iii) x4 > 0",
-        "(iv) 요부 없음 → x1 효과 감소"}
-    assert all(0.0 <= v <= 1.0 for v in summary["부트스트랩"]["판례_조건_성립_비율"].values())
-    assert (out_dir / "risk_model_v1_report.md").exists()
-    assert (out_dir / "risk_model_v1_results.json").exists()
-    assert (out_dir / "risk_model_v1_calibration.png").stat().st_size > 0
-    assert "## 판례 검증" in (out_dir / "risk_model_v1_report.md").read_text(encoding="utf-8")
-    # 계수 JSON 은 런타임 검증을 통과하고 risk_score 가 돌아간다
-    model = rm.load_model(model_path)
-    assert model["variant"] == adopted["variant"] and model["w_easy"] == adopted["w_easy"]
-    assert set(model["coefficients"]) == set(tr.VARIANTS[model["variant"]])
-    prob, grade, contributions = rm.risk_score({"x1_d": 0.9, "x2_text_d": 0.9, "x4": 1.0,
-                                                "mark_type": "문자"}, model)
-    assert 0.0 <= prob <= 1.0 and grade in rm.GRADES
+    summary = tr.run(features, easy, out_dir=out_dir, model_path=model_path,
+                     methods=("logistic", "prior"), c_grid=(0.3, 1.0), sigma_grid=(0.5, 2.0),
+                     folds=3, repeats=1, bootstrap=8, seed=0)
+    data_summary = summary["데이터"]
+    assert data_summary["심결_행"] == 120 - data_summary["이름_없어_제외"]["행"]
+    assert data_summary["이름_없어_제외"]["행"] == 11
+    assert data_summary["제거_항"] == tr.REMOVED_TERMS
+    assert set(summary["방법"]) == {"logistic", "prior"}
+    for item in summary["방법"].values():
+        assert 0.0 <= item["cv"]["심결"]["auc"] <= 1.0
+        assert set(item["판례_조건_겹_성립_비율"]) == set(tr.CONDITIONS)
+        assert "x1_d×no_distinctive(보조)" in item["부트스트랩"]["계수"]
+    assert summary["채택"]["method"] in ("prior", "logistic")
     assert set(summary["단독_임계값"]["thresholds"]) == set(tr.AXES)
-    assert summary["표장_라벨_보조실험"]["심결"]["n"] > 0
+    assert summary["단독_임계값"]["목표_정밀도"] == 0.7
+    assert set(summary["요부_교차표"]) == {"has_distinctive_part_a", "has_distinctive_part_b"}
+    assert (out_dir / "risk_model_v1_report.md").exists()
+    assert (out_dir / "risk_model_v1_calibration.png").stat().st_size > 0
+    report = (out_dir / "risk_model_v1_report.md").read_text(encoding="utf-8")
+    assert "## 방법 비교" in report and "## 요부 유무 × 라벨" in report
+    model = rm.load_model(model_path)
+    assert model["version"] == "risk_model_v1.1" and model["removed_terms"] == tr.REMOVED_TERMS
+    assert not any(name.startswith("type_") for name in model["features"])
+    assert "miss_x1" not in model["features"] and "miss_x2text" not in model["features"]
+    if model["method"] == "prior_monotone_logistic":
+        assert model["prior"]["sigma"] in (0.5, 2.0) and model["monotone"]
+        assert rm.monotone_violations(model["coefficients"]) == []
+    prob, grade, _ = rm.risk_score({"x1_d": 0.9, "x2_text_d": 0.9, "x4": 1.0,
+                                    "mark_type": "문자"}, model)
+    assert 0.0 <= prob <= 1.0 and grade in rm.GRADES
     saved = json.loads((out_dir / "risk_model_v1_results.json").read_text(encoding="utf-8"))
-    assert saved["채택"]["key"] == adopted["key"]
+    assert saved["채택"]["method"] == summary["채택"]["method"]
 
 
-def test_groups_and_row_features():
+def test_run_ebm_and_gbm_in_subprocess(data, tmp_path):
+    pytest.importorskip("interpret")
+    pytest.importorskip("lightgbm")
+    pytest.importorskip("shap")
+    features, easy = data
+    out_dir = tmp_path / "out"
+    model_path = tmp_path / "model" / "risk_model_v1.json"
+    command = [sys.executable, str(tr.ML_ROOT / "scripts" / "train_risk_model.py"),
+               "--methods", "logistic,prior,ebm,gbm", "--features", str(features),
+               "--easy", str(easy), "--out-dir", str(out_dir), "--model", str(model_path),
+               "--folds", "3", "--repeats", "1", "--bootstrap", "5"]
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=600)
+    assert completed.returncode == 0, completed.stderr[-2000:]
+    saved = json.loads((out_dir / "risk_model_v1_results.json").read_text(encoding="utf-8"))
+    assert set(saved["방법"]) == {"logistic", "prior", "ebm", "gbm"}
+    assert saved["방법"]["ebm"]["features"] == tr.TREE_FEATURES
+    assert saved["방법"]["gbm"]["shap_평균절대값"]
+    assert (out_dir / "risk_model_v1_ebm_shapes.png").exists()
+    rates = saved["방법"]["ebm"]["판례_조건_겹_성립_비율"]
+    assert rates["(i) 문자계: x1 > x2_whole"] is None  # 트리 입력에 이미지 축이 없다
+    assert rm.load_model(model_path)["method"] in ("prior_monotone_logistic", "logistic_l2")
+
+
+def test_groups_row_features_and_perturbation():
     trial = {"심판번호": "2020100000001", "pair_source": "trial"}
     cross = {"심판번호": "cross:2020100000001|2021100000002", "pair_source": "cross"}
     db = {"심판번호": "db:3|7", "pair_source": "db"}
@@ -183,6 +277,14 @@ def test_groups_and_row_features():
     features = tr.row_features(row)
     assert features["x2_text_d"] is None and features["x4"] is None
     assert features["has_meaning_both"] is False and features["has_distinctive_part_b"] is False
-    vector = rm.design_vector(features, tr.VARIANTS["B"])
-    assert vector[tr.VARIANTS["B"].index("x2_whole×도형계")] == 0.4
-    assert vector[tr.VARIANTS["B"].index("miss_x3")] == 1.0
+    vector = rm.design_vector(features, tr.FEATURES)
+    assert vector[tr.FEATURES.index("x2_whole×도형계")] == 0.4
+    assert vector[tr.FEATURES.index("miss_x3")] == 1.0
+    X = np.asarray([vector])
+    high = tr.perturbed(X, tr.FEATURES, np.asarray(["figure"]), "x2_whole", 1.0)
+    assert high[0, tr.FEATURES.index("x2_whole")] == 1.0
+    assert high[0, tr.FEATURES.index("x2_whole×도형계")] == 1.0
+    assert high[0, tr.FEATURES.index("miss_x2img")] == 0.0
+    low = tr.perturbed(X, tr.FEATURES, np.asarray(["text"]), "x1_d", 0.0)
+    assert low[0, tr.FEATURES.index("x1_d×문자계")] == 0.0
+    assert tr.perturbed(X, tr.TREE_FEATURES[:3], np.asarray(["text"]), "x4", 1.0) is None

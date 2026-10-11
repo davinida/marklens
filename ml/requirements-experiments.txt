@@ -1,0 +1,10 @@
+# 통합 모델 v1.1 결합 방법 비교 실험 전용 — ml/scripts/train_risk_model.py --methods ebm,gbm (설계 §7-1).
+# 서비스 런타임(ml/src/model/risk_model.py 는 표준 라이브러리만)·CI 에는 설치하지 않는다.
+# 설치(프로젝트 루트): ml/venv/bin/pip install -c constraints.txt -r ml/requirements-experiments.txt
+#   -c constraints.txt 를 빼면 numpy 가 2.x 로 올라간다(2026-10-11 실측). lightgbm 은 macOS 에서
+#   `brew install libomp` 가 필요하고, torch 를 적재한 프로세스 안에서 쓰면 OpenMP 충돌로 SIGSEGV 가 나므로
+#   학습 스크립트는 torch 를 import 하지 않는다(테스트는 서브프로세스로 돈다).
+interpret-core==0.7.8
+lightgbm==4.7.0
+shap==0.49.1
+pandas==3.0.6
