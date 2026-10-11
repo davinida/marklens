@@ -97,8 +97,16 @@
    "프리미엄",
    "플러스"
   ],
-  "항목": 447,
-  "승인": 0
+  "항목": 449,
+  "승인": 437,
+  "해제": 12,
+  "추가": {
+   "2026-10-11": [
+    "teddy",
+    "테디"
+   ]
+  },
+  "상대어_일괄승인": "2026-10-11 미승인 상대어 전부 approved true(상품 류 일치 때만 0점이라 위험 작음); 절대어는 사람 결정 그대로"
  },
  "terms": {
   "1994": {
@@ -111,7 +119,7 @@
     "The PREMIUM Pizza Mall QUALIFIED Co. ALL THAT PIZZA & SALAD SINCE 1994",
     "바람성형외과 For your beautiful Breast & Body BR SINCE 1994"
    ],
-   "approved": false
+   "approved": true
   },
   "2000": {
    "kind": "시기",
@@ -123,7 +131,7 @@
     "월드콜 515-2000 TMKC",
     "아니극과자공방 depuis 2000 YANNICK"
    ],
-   "approved": false
+   "approved": true
   },
   "2012": {
    "kind": "시기",
@@ -135,7 +143,7 @@
     "까사 메르시 CASA MERCI EST.2012",
     "UNIQRO BEANS CLASSIC TASTE DAAWON BEAN BRODERS 2012"
    ],
-   "approved": false
+   "approved": true
   },
   "2013": {
    "kind": "시기",
@@ -147,7 +155,7 @@
     "삼환 N2013",
     "희망과 기쁨을 찾아 주는 명가 인생 제2막 since2013"
    ],
-   "approved": false
+   "approved": true
   },
   "2015": {
    "kind": "시기",
@@ -159,7 +167,7 @@
     "레인보우 소프트 아이스크림 Rainbow Soft Ice Since 2015 Bless Ice Dessert Cafe",
     "오성통닭 OSEONG CHICKEN SINCE 2015"
    ],
-   "approved": false
+   "approved": true
   },
   "aaa": {
    "kind": "품질",
@@ -169,7 +177,7 @@
    "examples": [
     "에이레벨 칼리지 AAA COLLEGE A-LEVEL COLLEGE"
    ],
-   "approved": false
+   "approved": true
   },
   "academy": {
    "kind": "용도",
@@ -183,7 +191,7 @@
     "박무웅 무술사관 MOOSOOL MILITARY ACADEMY",
     "하이퍼수학 HYPER ACADEMY SINCE 2010"
    ],
-   "approved": false
+   "approved": true
   },
   "ai": {
    "kind": "품질",
@@ -199,7 +207,7 @@
     "AI 수학",
     "LG AI.CONN"
    ],
-   "approved": false
+   "approved": true
   },
   "almond": {
    "kind": "원재료",
@@ -219,7 +227,7 @@
     "머거본 허니버터아몬드 Murgerbon HONEY BUTTER ALMOND",
     "머거본 와사비맛아몬드 Murgerbon WASABI ALMOND"
    ],
-   "approved": false
+   "approved": true
   },
   "american": {
    "kind": "산지",
@@ -231,7 +239,7 @@
     "ORIGINAL POHANG AMERICAN FRIED",
     "AMERICAN UNIVERSITY"
    ],
-   "approved": false
+   "approved": true
   },
   "apple": {
    "kind": "원재료",
@@ -251,7 +259,7 @@
     "Midnight Apple",
     "애플 APPLE"
    ],
-   "approved": false
+   "approved": true
   },
   "aqua": {
    "kind": "형상",
@@ -269,7 +277,7 @@
     "Aqua Guard",
     "O HUI Aqua Healing HA booster"
    ],
-   "approved": false
+   "approved": true
   },
   "auto": {
    "kind": "용도",
@@ -284,7 +292,7 @@
     "webOS Auto",
     "BABi CELL Needle RF+Auto MTS+Meso Gun"
    ],
-   "approved": false
+   "approved": true
   },
   "automotive": {
    "kind": "용도",
@@ -299,7 +307,7 @@
     "한국오토모티브컬리지 HANKOOK AUTOMOTIVE COLLEGE",
     "ASK Automotive Industries Group zendar SIPE"
    ],
-   "approved": false
+   "approved": true
   },
   "baby": {
    "kind": "용도",
@@ -325,7 +333,7 @@
     "BABY MONET",
     "Daiz BABY"
    ],
-   "approved": false
+   "approved": true
   },
   "bakery": {
    "kind": "용도",
@@ -340,7 +348,7 @@
     "SAMSONG BAKERY & CAFE Since 1957",
     "삼송 BNC BAKERY AND CAFE"
    ],
-   "approved": false
+   "approved": true
   },
   "ball": {
    "kind": "형상",
@@ -354,7 +362,7 @@
     "mirror ball",
     "The Unseen Ball"
    ],
-   "approved": false
+   "approved": true
   },
   "bank": {
    "kind": "용도",
@@ -370,7 +378,7 @@
     "피노키오론 W bank",
     "오렌지뱅크 Orange Bank"
    ],
-   "approved": false
+   "approved": true
   },
   "bar": {
    "kind": "용도",
@@ -385,7 +393,7 @@
     "aroma espresso bar",
     "LUKE'S OYSTER BAR CHOP HOUSE TRAVIS MASIERO RESTAURANT GROUP"
    ],
-   "approved": false
+   "approved": true
   },
   "barbecue": {
    "kind": "용도",
@@ -400,7 +408,7 @@
     "프리미엄 생소고기 전문점 반값+소 \\/2 CHARCOL BARBECUE RESTARANT",
     "온누리 ONNURI KOREA BARBECUE HOUSE"
    ],
-   "approved": false
+   "approved": true
   },
   "bbq": {
    "kind": "용도",
@@ -415,7 +423,7 @@
     "구슬김밥 BBQ",
     "군족 오븐 정성껏 구운 바베큐 족발 OVEN & BBQ JOKBAL"
    ],
-   "approved": false
+   "approved": true
   },
   "bean": {
    "kind": "원재료",
@@ -435,7 +443,7 @@
     "BEYOND THE BEAN",
     "MONSTER BEAN"
    ],
-   "approved": false
+   "approved": true
   },
   "beauty": {
    "kind": "용도",
@@ -452,7 +460,7 @@
     "Cloud 9 BLANC DE WHITE Im;BEAUTY",
     "ARELIA THE SECRET OF BEAUTY"
    ],
-   "approved": false
+   "approved": true
   },
   "beer": {
    "kind": "용도",
@@ -469,7 +477,7 @@
     "생 SNOW BEER BULLOMAN classic 1994",
     "beer @ works CONVICTION TO THE BEER"
    ],
-   "approved": false
+   "approved": true
   },
   "berry": {
    "kind": "원재료",
@@ -489,7 +497,7 @@
     "네이처 리퍼블릭 베리 베이비 NATURE REPUBLIC Berry Baby",
     "닥터베리 Doctor berry"
    ],
-   "approved": false
+   "approved": true
   },
   "best": {
    "kind": "품질",
@@ -501,7 +509,7 @@
     "Best Brand Exchange shoespa",
     "shoespa Best Brand Exchange"
    ],
-   "approved": false
+   "approved": true
   },
   "bistro": {
    "kind": "용도",
@@ -516,7 +524,7 @@
     "심슨 더 스파이스 Casual Asian Bistro Simpson The Spice",
     "LUCIE Chicken Bistro Lucie Chicken Bistro"
    ],
-   "approved": false
+   "approved": true
   },
   "block": {
    "kind": "형상",
@@ -531,7 +539,7 @@
     "울트라매직 블럭 UltraMagic Block",
     "5BLOCK COFFEE & BRUNCH"
    ],
-   "approved": false
+   "approved": true
   },
   "body": {
    "kind": "용도",
@@ -550,7 +558,7 @@
     "온:더바디 스파클링 모공 톡스 ON: THE BODY",
     "MAKE A BODY"
    ],
-   "approved": false
+   "approved": true
   },
   "box": {
    "kind": "형상",
@@ -566,7 +574,7 @@
     "TiKi Box",
     "Smart Share Box"
    ],
-   "approved": false
+   "approved": true
   },
   "bread": {
    "kind": "용도",
@@ -582,7 +590,7 @@
     "BREAD LAB.",
     "bread garden"
    ],
-   "approved": false
+   "approved": true
   },
   "burger": {
    "kind": "용도",
@@ -602,7 +610,7 @@
     "Tony TONY BURGER",
     "길버트 버거 앤 프라이즈 GILBERT'S BURGER&FRIES"
    ],
-   "approved": false
+   "approved": true
   },
   "butter": {
    "kind": "원재료",
@@ -622,7 +630,7 @@
     "the bread and butter",
     "버터플라이 BUTTER FLY"
    ],
-   "approved": false
+   "approved": true
   },
   "cafe": {
    "kind": "용도",
@@ -637,7 +645,7 @@
     "CAFE SPAZiO coffee & gelato",
     "MARTELLO Cafe"
    ],
-   "approved": false
+   "approved": true
   },
   "cake": {
    "kind": "용도",
@@ -652,7 +660,7 @@
     "FRANK's THE GOURMET SPECIALITY CAKE SHOP",
     "Greek Cake"
    ],
-   "approved": false
+   "approved": true
   },
   "camp": {
    "kind": "용도",
@@ -670,7 +678,7 @@
     "노르딕캠프 NORDICAMP Camp for Backpackers, Trekers and Campers by ANYGEAR",
     "NEPA CAMP"
    ],
-   "approved": false
+   "approved": true
   },
   "camping": {
    "kind": "용도",
@@ -688,7 +696,7 @@
     "Camping Trunk",
     "캠핑크루 camping crew"
    ],
-   "approved": false
+   "approved": true
   },
   "candy": {
    "kind": "용도",
@@ -704,7 +712,7 @@
     "SPORTS CANDY HIMALAYA SALT EXTRA COOL Mint Candy Lemon Flavour",
     "르주르 코튼 캔디 향 Le Jour Cotton candy scent"
    ],
-   "approved": false
+   "approved": true
   },
   "capital": {
    "kind": "용도",
@@ -720,7 +728,7 @@
     "LIBRA Capital Management",
     "WB우리캐피탈 WB WOORI CAPITAL"
    ],
-   "approved": false
+   "approved": true
   },
   "car": {
    "kind": "용도",
@@ -735,7 +743,7 @@
     "황종연 CP CAR PRO",
     "CAR 24"
    ],
-   "approved": false
+   "approved": true
   },
   "carbon": {
    "kind": "원재료",
@@ -761,7 +769,7 @@
     "CARBON",
     "CARBON ZAPP"
    ],
-   "approved": false
+   "approved": true
   },
   "card": {
    "kind": "용도",
@@ -777,7 +785,7 @@
     "d POINT CARD",
     "NM Card"
    ],
-   "approved": false
+   "approved": true
   },
   "care": {
    "kind": "용도",
@@ -793,7 +801,7 @@
     "에어케어시스템 Air Care System",
     "에코생활건강 Earth Care Object"
    ],
-   "approved": false
+   "approved": true
   },
   "cd": {
    "kind": "용도",
@@ -810,7 +818,7 @@
     "CD",
     "CD Chalmers Dale"
    ],
-   "approved": false
+   "approved": true
   },
   "center": {
    "kind": "용도",
@@ -827,7 +835,7 @@
     "힐링 메디컬 센터 Healing Medical Center",
     "농어촌국제교육교류센터 RC-IEEC International Education and Exchange Center"
    ],
-   "approved": false
+   "approved": true
   },
   "cheese": {
    "kind": "원재료",
@@ -847,7 +855,7 @@
     "say... cheese!",
     "PABLO mini THE CHEESE TART"
    ],
-   "approved": false
+   "approved": true
   },
   "cherry": {
    "kind": "원재료",
@@ -867,7 +875,7 @@
     "CHERRY BLOSSOM",
     "채리CHERRY"
    ],
-   "approved": false
+   "approved": true
   },
   "chicken": {
    "kind": "용도",
@@ -887,7 +895,7 @@
     "둘마니치킨 Two Korean Style Two Chicken",
     "초대마왕 CHODAEMAWANG CHICKEN"
    ],
-   "approved": false
+   "approved": true
   },
   "chinese": {
    "kind": "용도",
@@ -901,7 +909,7 @@
     "LEEGARDEN CHINESE CUISINE Smooth Jazz",
     "차룽 Express Chinese to go"
    ],
-   "approved": false
+   "approved": true
   },
   "chocolate": {
    "kind": "용도",
@@ -917,7 +925,7 @@
     "초콜릿 Chocolate",
     "Ballerina chocolate"
    ],
-   "approved": false
+   "approved": true
   },
   "clean": {
    "kind": "효능",
@@ -933,7 +941,7 @@
     "클린빈 CLEAN VIN",
     "EVER CLEAN"
    ],
-   "approved": false
+   "approved": true
   },
   "clinic": {
    "kind": "용도",
@@ -948,7 +956,7 @@
     "공:감 GONG:GAM DENTAL CLINIC",
     "INSOLUTION AQUARINGER SKIN CLINIC MASK"
    ],
-   "approved": false
+   "approved": true
   },
   "club": {
    "kind": "용도",
@@ -965,7 +973,7 @@
     "FH FORESTHILL COUNTRY CLUB",
     "BEACH CLUB COFFEE"
    ],
-   "approved": false
+   "approved": true
   },
   "coffee": {
    "kind": "원재료",
@@ -981,7 +989,7 @@
     "Amitie COFFEE ESPRESSO",
     "Dream coffee"
    ],
-   "approved": false
+   "approved": true
   },
   "construction": {
    "kind": "용도",
@@ -995,7 +1003,7 @@
     "EG건설 EG Construction",
     "CETEC Construction Equipment Trading & Engineering Company"
    ],
-   "approved": false
+   "approved": true
   },
   "consulting": {
    "kind": "용도",
@@ -1009,7 +1017,7 @@
     "하하하컨설팅그룹(주) HAHAHA CONSULTING GROUP",
     "아름CNA C Consulting & Asset Management"
    ],
-   "approved": false
+   "approved": true
   },
   "cookie": {
    "kind": "용도",
@@ -1025,7 +1033,7 @@
     "포춘 쿠키 FORTUNE COOKIE",
     "크라운 몬트 쿠키 CROWN MONT COOKIE"
    ],
-   "approved": false
+   "approved": true
   },
   "cool": {
    "kind": "품질",
@@ -1042,7 +1050,7 @@
     "COCO Cool Collection",
     "COOL BELL"
    ],
-   "approved": false
+   "approved": true
   },
   "cosmetic": {
    "kind": "용도",
@@ -1059,7 +1067,7 @@
     "VELLA COSMETIC",
     "storico Beautiful Story Cosmetic"
    ],
-   "approved": false
+   "approved": true
   },
   "cosmetics": {
    "kind": "용도",
@@ -1076,7 +1084,7 @@
     "Dr. MINERAL COSMETICS",
     "MD MIRACULOUS goodmorning cosmetics GOOD MORNING COSMETIC"
    ],
-   "approved": false
+   "approved": true
   },
   "cotton": {
    "kind": "원재료",
@@ -1102,7 +1110,7 @@
     "CLEAN WARM COTTON",
     "DRY COTTON COOLING QUICK DRY COMFORTABLE"
    ],
-   "approved": false
+   "approved": true
   },
   "cream": {
    "kind": "형상",
@@ -1120,7 +1128,7 @@
     "Madeca Cream",
     "cream monster"
    ],
-   "approved": false
+   "approved": true
   },
   "crystal": {
    "kind": "원재료",
@@ -1129,13 +1137,13 @@
     14,
     21
    ],
-   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침). 2026-10-11 사람 결정: 3호 상대어 승인(14·21류), 약한 토큰 overrides 해제 상태 유지",
    "examples": [
     "CRYSTAL-X",
     "CRYSTAL CLEAN",
     "crystal"
    ],
-   "approved": false
+   "approved": true
   },
   "cube": {
    "kind": "형상",
@@ -1150,7 +1158,7 @@
     "CUBE",
     "BLACK CUBE"
    ],
-   "approved": false
+   "approved": true
   },
   "cup": {
    "kind": "형상",
@@ -1166,7 +1174,7 @@
     "KOREA GOLF TEACHERS CUP USGTF-KOREA",
     "EVE Cup"
    ],
-   "approved": false
+   "approved": true
   },
   "cure": {
    "kind": "효능",
@@ -1183,7 +1191,7 @@
     "TerraSeal Cure Lithium",
     "PUTTO CURE"
    ],
-   "approved": false
+   "approved": true
   },
   "cushion": {
    "kind": "형상",
@@ -1199,7 +1207,7 @@
     "MAGIC ANY CUSHION ETUDEHOUSE",
     "Magic Cushion"
    ],
-   "approved": false
+   "approved": true
   },
   "daily": {
    "kind": "사용방법",
@@ -1216,7 +1224,7 @@
     "Daily",
     "데일리 daily INTERNET CAFE"
    ],
-   "approved": false
+   "approved": true
   },
   "data": {
    "kind": "용도",
@@ -1233,7 +1241,7 @@
     "일공일공데이타 1010DATA",
     "TREASURE DATA"
    ],
-   "approved": false
+   "approved": true
   },
   "delicious": {
    "kind": "품질",
@@ -1250,7 +1258,7 @@
     "광장 맛있는 광장갈비 DELICIOUS GWANGJANG GALBI",
     "맛있닭 LIFE is DELICIOUS"
    ],
-   "approved": false
+   "approved": true
   },
   "deluxe": {
    "kind": "품질",
@@ -1261,7 +1269,7 @@
     "GOLDEN GOOSE DELUXE BRAND",
     "A CHINO DELUXE ICE CREAM THE MOST FAVORITE CHOICE"
    ],
-   "approved": false
+   "approved": true
   },
   "dental": {
    "kind": "용도",
@@ -1276,7 +1284,7 @@
     "공:감 GONG:GAM DENTAL CLINIC",
     "탑플란트치과 TOPPLANT DENTAL CLINIC"
    ],
-   "approved": false
+   "approved": true
   },
   "design": {
    "kind": "용도",
@@ -1290,7 +1298,7 @@
     "PARKLAND DESIGN & MANUFACTURING",
     "PARKLAND DESIGN AND MANUFACTURING"
    ],
-   "approved": false
+   "approved": true
   },
   "designer": {
    "kind": "용도",
@@ -1304,7 +1312,7 @@
     "i Doll Story I'm a designer",
     "EYE FRAME DESIGNER"
    ],
-   "approved": false
+   "approved": true
   },
   "dessert": {
    "kind": "용도",
@@ -1320,7 +1328,7 @@
     "HOTEL DESSERT",
     "레인보우 소프트 아이스크림 Rainbow Soft Ice Since 2015 Bless Ice Dessert Cafe"
    ],
-   "approved": false
+   "approved": true
   },
   "development": {
    "kind": "용도",
@@ -1335,7 +1343,7 @@
     "EUNSUNG 그룹 Innovation Development Leader",
     "한국성공인재개발원 Korea Success Human Resource Development Center"
    ],
-   "approved": false
+   "approved": true
   },
   "diamond": {
    "kind": "원재료",
@@ -1350,7 +1358,7 @@
     "people diamond",
     "POLAR BEAR DIAMOND"
    ],
-   "approved": false
+   "approved": true
   },
   "diet": {
    "kind": "효능",
@@ -1371,7 +1379,7 @@
     "VB DIET LAB",
     "악마다이어트 devil diet"
    ],
-   "approved": false
+   "approved": true
   },
   "digital": {
    "kind": "용도",
@@ -1388,7 +1396,7 @@
     "DIGITAL CROWN",
     "FINE DIGITAL FINE Vu"
    ],
-   "approved": false
+   "approved": true
   },
   "dining": {
    "kind": "용도",
@@ -1403,7 +1411,7 @@
     "MR.KKONG casual dining restaurant",
     "미스터꽁 casual dining restaurant"
    ],
-   "approved": false
+   "approved": true
   },
   "dry": {
    "kind": "품질",
@@ -1419,7 +1427,7 @@
     "EX-DRY",
     "DM Dry Man"
    ],
-   "approved": false
+   "approved": true
   },
   "easy": {
    "kind": "사용방법",
@@ -1431,7 +1439,7 @@
     "TI EASY CONNECT",
     "이지토크 Easy Talk"
    ],
-   "approved": false
+   "approved": true
   },
   "eau": {
    "kind": "형상",
@@ -1449,7 +1457,7 @@
     "BIOTHERM EAU RELAX",
     "L'EAU CLAIRE"
    ],
-   "approved": false
+   "approved": true
   },
   "education": {
    "kind": "용도",
@@ -1463,7 +1471,7 @@
     "EDUCATION UTOPIA",
     "PIE Photo In Education"
    ],
-   "approved": false
+   "approved": true
   },
   "egg": {
    "kind": "원재료",
@@ -1483,7 +1491,7 @@
     "3G Egg",
     "Easter Egg"
    ],
-   "approved": false
+   "approved": true
   },
   "electric": {
    "kind": "품질",
@@ -1500,7 +1508,7 @@
     "신진계전주식회사 SHIN JIN INSTRUMENT & ELECTRIC CO.,LTD",
     "AVALANCHE ELECTRIC WEAR by Parsons"
    ],
-   "approved": false
+   "approved": true
   },
   "energy": {
    "kind": "효능",
@@ -1515,7 +1523,7 @@
     "XTREME ENERGY",
     "SEP Solar Energy Platform"
    ],
-   "approved": false
+   "approved": true
   },
   "engineering": {
    "kind": "용도",
@@ -1532,7 +1540,7 @@
     "KOREA INSTITUTE of CIVIL ENGINEERING and BUILDING TECHNOLOGY",
     "this is_engineering;"
    ],
-   "approved": false
+   "approved": true
   },
   "english": {
    "kind": "용도",
@@ -1546,7 +1554,7 @@
     "BOOKLISH CLT ENGLISH",
     "잉글리쉬PaL iBT English Pal"
    ],
-   "approved": false
+   "approved": true
   },
   "espresso": {
    "kind": "원재료",
@@ -1562,7 +1570,7 @@
     "Amitie COFFEE ESPRESSO",
     "THE MOUNTAIN OF SEATTLE Mt.RAINIER ESPRESSO & MILK"
    ],
-   "approved": false
+   "approved": true
   },
   "essence": {
    "kind": "형상",
@@ -1580,7 +1588,7 @@
     "젠틀러 올인원 에센스 GENTLER ALL IN ONE ESSENCE",
     "Essence of Argan"
    ],
-   "approved": false
+   "approved": true
   },
   "est": {
    "kind": "시기",
@@ -1592,7 +1600,8 @@
     "EST",
     "NUMBER TWENTY-ONE EST.2011"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "ev": {
    "kind": "품질",
@@ -1609,7 +1618,7 @@
     "나누EV",
     "IMK-EV"
    ],
-   "approved": false
+   "approved": true
   },
   "everyday": {
    "kind": "사용방법",
@@ -1626,7 +1635,7 @@
     "건강기능식품 트리플러스 멀티비타민+미네랄+오메가-3 CENOVIS Health Functional Food Triplus EVERYDAY HEALTH 92 Capsules(120.5g)",
     "YOON'S EVERYDAY PHONICS"
    ],
-   "approved": false
+   "approved": true
   },
   "excellent": {
    "kind": "품질",
@@ -1637,7 +1646,7 @@
     "eXe EXE excellent excitement",
     "Elyes Your excellent stay"
    ],
-   "approved": false
+   "approved": true
   },
   "express": {
    "kind": "품질",
@@ -1653,7 +1662,7 @@
     "ASCO EXPRESS",
     "Johnny EXPRESS"
    ],
-   "approved": false
+   "approved": true
   },
   "eye": {
    "kind": "용도",
@@ -1672,7 +1681,7 @@
     "eye Born",
     "아이러브안과 eye love i love.com"
    ],
-   "approved": false
+   "approved": true
   },
   "eyes": {
    "kind": "용도",
@@ -1691,7 +1700,7 @@
     "e.l.f. eyes.lips.face",
     "VISUAL EYES"
    ],
-   "approved": false
+   "approved": true
   },
   "face": {
    "kind": "용도",
@@ -1710,7 +1719,7 @@
     "VOLTE FACE",
     "뉴페이스 NEW FACE"
    ],
-   "approved": false
+   "approved": true
   },
   "famous": {
    "kind": "품질",
@@ -1718,7 +1727,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "fast": {
    "kind": "품질",
@@ -1734,7 +1743,7 @@
     "onbap fresh fast food bibimbap",
     "FAST RETAILING"
    ],
-   "approved": false
+   "approved": true
   },
   "filter": {
    "kind": "용도",
@@ -1749,7 +1758,7 @@
     "AIR+ BAMBOO CHARCOAL FILTER",
     "FUJI FILTER"
    ],
-   "approved": false
+   "approved": true
   },
   "fine": {
    "kind": "품질",
@@ -1761,7 +1770,7 @@
     "피죤 화인 데오 후레쉬 Fine Deo Fresh",
     "FINE DIGITAL FINE Vu"
    ],
-   "approved": false
+   "approved": true
   },
   "first": {
    "kind": "품질",
@@ -1773,7 +1782,7 @@
     "My First Fine Dining Babi 술술 Good Food, Good Feelings",
     "퍼스트 레이디 가구 FL First lady Time to come cenoville"
    ],
-   "approved": false
+   "approved": true
   },
   "fish": {
    "kind": "원재료",
@@ -1793,7 +1802,7 @@
     "Fish and Chips",
     "더 피쉬 THE FISH"
    ],
-   "approved": false
+   "approved": true
   },
   "fitness": {
    "kind": "용도",
@@ -1810,7 +1819,7 @@
     "Fitness First",
     "JAMESGYM FITNESS CENTER"
    ],
-   "approved": false
+   "approved": true
   },
   "foam": {
    "kind": "형상",
@@ -1828,7 +1837,7 @@
     "[주]광성테크 이액형 폴리우레탄폼 ez FOAM",
     "Micro foam cushion"
    ],
-   "approved": false
+   "approved": true
   },
   "food": {
    "kind": "용도",
@@ -1848,7 +1857,7 @@
     "My First Fine Dining Babi 술술 Good Food, Good Feelings",
     "노아식품 Noah Food"
    ],
-   "approved": false
+   "approved": true
   },
   "foods": {
    "kind": "용도",
@@ -1868,7 +1877,7 @@
     "SWEET EARTH NATURAL FOODS",
     "WHOLE FOODS MARKET"
    ],
-   "approved": false
+   "approved": true
   },
   "foot": {
    "kind": "용도",
@@ -1887,7 +1896,7 @@
     "기 Chi Foot Patches",
     "FOOT LOCKER"
    ],
-   "approved": false
+   "approved": true
   },
   "fresh": {
    "kind": "품질",
@@ -1906,7 +1915,7 @@
     "FRESH LIGHT",
     "FRESH! e"
    ],
-   "approved": false
+   "approved": true
   },
   "fruit": {
    "kind": "원재료",
@@ -1926,7 +1935,7 @@
     "지노 sweet fruit drip",
     "10 STRAWBERRY Pureut fruit The taste of 10"
    ],
-   "approved": false
+   "approved": true
   },
   "fruits": {
    "kind": "원재료",
@@ -1946,7 +1955,7 @@
     "YOUNG&NEW IDEA OF FRUITS YOUNG FARMERS",
     "탐'스팜 Tom's Farm PREMIUM DRIED NUTS AND FRUITS"
    ],
-   "approved": false
+   "approved": true
   },
   "gallery": {
    "kind": "용도",
@@ -1963,7 +1972,7 @@
     "RISING GALLERY",
     "[in] Gallery"
    ],
-   "approved": false
+   "approved": true
   },
   "game": {
    "kind": "용도",
@@ -1979,7 +1988,7 @@
     "GAME",
     "10분 교과서 game"
    ],
-   "approved": false
+   "approved": true
   },
   "games": {
    "kind": "용도",
@@ -1995,7 +2004,7 @@
     "CROWN GAMES",
     "RUNIC GAMES"
    ],
-   "approved": false
+   "approved": true
   },
   "gel": {
    "kind": "형상",
@@ -2013,7 +2022,7 @@
     "purifee Patch & Sports Gel",
     "SANG A DIO GEL"
    ],
-   "approved": false
+   "approved": true
   },
   "glass": {
    "kind": "원재료",
@@ -2039,7 +2048,7 @@
     "2.5D Edge Glass",
     "2.5D Rounded Glass"
    ],
-   "approved": false
+   "approved": true
   },
   "glow": {
    "kind": "효능",
@@ -2054,7 +2063,7 @@
     "UNICORN GLOW",
     "4gf glow factor"
    ],
-   "approved": false
+   "approved": true
   },
   "gold": {
    "kind": "원재료",
@@ -2069,7 +2078,7 @@
     "Teal Gold",
     "Gold Diamond"
    ],
-   "approved": false
+   "approved": true
   },
   "golf": {
    "kind": "용도",
@@ -2086,7 +2095,7 @@
     "GAME GOLF",
     "SEOSAN GOLF&RESORT"
    ],
-   "approved": false
+   "approved": true
   },
   "good": {
    "kind": "품질",
@@ -2098,7 +2107,7 @@
     "My First Fine Dining Babi 술술 Good Food, Good Feelings",
     "FUNCTIONAL PILLOW GOLD LABEL Good잠"
    ],
-   "approved": false
+   "approved": true
   },
   "great": {
    "kind": "품질",
@@ -2110,7 +2119,7 @@
     "ASPIRE LIFESTYLES MAKING GREAT BRANDS BETTER",
     "M ZERO SUGaR HYDRO GREAT WHITE"
    ],
-   "approved": false
+   "approved": true
   },
   "grill": {
    "kind": "용도",
@@ -2125,7 +2134,7 @@
     "한남돼지 GRILL HOUSE",
     "자연의 맛을 품고있는 맛의 정상 미소마루 미소마루인 NATURE FOOD & GRILL"
    ],
-   "approved": false
+   "approved": true
   },
   "gym": {
    "kind": "용도",
@@ -2142,7 +2151,7 @@
     "GYM LVFT",
     "English GYM"
    ],
-   "approved": false
+   "approved": true
   },
   "hair": {
    "kind": "용도",
@@ -2161,7 +2170,7 @@
     "헤어 락 Hair Rak RAK",
     "감이조아 Hair color Gamijoa"
    ],
-   "approved": false
+   "approved": true
   },
   "hand": {
    "kind": "용도",
@@ -2180,7 +2189,7 @@
     "Hand-Ray",
     "H HANTTAM since 2016 HAND MADE IN KOREA"
    ],
-   "approved": false
+   "approved": true
   },
   "handmade": {
    "kind": "생산방법",
@@ -2192,7 +2201,7 @@
     "AIRELOOM CALIFORNIA DESIGN HANDMADE",
     "AROMA ROSEE Candle & Diffuser Handmade"
    ],
-   "approved": false
+   "approved": true
   },
   "hands": {
    "kind": "용도",
@@ -2211,7 +2220,7 @@
     "FORTE HANDS COFFEE",
     "GOOD & FRESH BROWN HANDS"
    ],
-   "approved": false
+   "approved": true
   },
   "hd": {
    "kind": "품질",
@@ -2227,7 +2236,7 @@
     "호간보 HD-2GOLD",
     "HD"
    ],
-   "approved": false
+   "approved": true
   },
   "heal": {
    "kind": "효능",
@@ -2244,7 +2253,7 @@
     "아쿠아힐 AQUA HEAL",
     "Medi heal"
    ],
-   "approved": false
+   "approved": true
   },
   "healing": {
    "kind": "효능",
@@ -2261,7 +2270,7 @@
     "힐링 메디컬 센터 Healing Medical Center",
     "힐링의원 Healing Medical Center 365"
    ],
-   "approved": false
+   "approved": true
   },
   "health": {
    "kind": "효능",
@@ -2280,7 +2289,7 @@
     "Health Up ABC Mix System",
     "IMS HEALTH NEXXUS"
    ],
-   "approved": false
+   "approved": true
   },
   "healthcare": {
    "kind": "용도",
@@ -2296,7 +2305,7 @@
     "헬스케어타운 힐링힐즈 HEALING HILLS HEALTHCARE TOWN",
     "E&S Healthcare"
    ],
-   "approved": false
+   "approved": true
   },
   "healthy": {
    "kind": "효능",
@@ -2315,7 +2324,7 @@
     "[윌리브] wIllive your healthy life partner",
     "Healthy Fry"
    ],
-   "approved": false
+   "approved": true
   },
   "honey": {
    "kind": "원재료",
@@ -2335,7 +2344,7 @@
     "허니버터아몬드 HONEY BUTTER ALMOND",
     "머거본 허니버터아몬드 Murgerbon HONEY BUTTER ALMOND"
    ],
-   "approved": false
+   "approved": true
   },
   "hospital": {
    "kind": "용도",
@@ -2350,7 +2359,7 @@
     "GS안과 Good Sight Eye Hospital",
     "L.Hospital"
    ],
-   "approved": false
+   "approved": true
   },
   "hot": {
    "kind": "품질",
@@ -2366,7 +2375,7 @@
     "신전떡볶이 HOT TEMPLE caution ! VERY VERY HOT",
     "HOT STAR Never Ending Fantastic"
    ],
-   "approved": false
+   "approved": true
   },
   "hotel": {
    "kind": "용도",
@@ -2381,7 +2390,7 @@
     "LQ HOTEL",
     "Hard Rock HOTEL & CASINO"
    ],
-   "approved": false
+   "approved": true
   },
   "hotels": {
    "kind": "용도",
@@ -2396,7 +2405,7 @@
     "DELTA HOTELS",
     "W HOTELS"
    ],
-   "approved": false
+   "approved": true
   },
   "house": {
    "kind": "용도",
@@ -2411,7 +2420,7 @@
     "REGATTA HOUSE",
     "벽창호 BCH House Make Up"
    ],
-   "approved": false
+   "approved": true
   },
   "hybrid": {
    "kind": "품질",
@@ -2428,7 +2437,7 @@
     "HYBRID",
     "하이브리드 HYBRID"
    ],
-   "approved": false
+   "approved": true
   },
   "institute": {
    "kind": "용도",
@@ -2442,7 +2451,7 @@
     "감정노동연구소 ELi Emotional Labor institute",
     "링구아어학원 LANGUAGE INSTITUTE LINGUA THE REAL iBT LANGUAGE INSTITUTE"
    ],
-   "approved": false
+   "approved": true
   },
   "internet": {
    "kind": "용도",
@@ -2459,7 +2468,7 @@
     "데일리 daily INTERNET CAFE",
     "IOP INTERNET OF PESTS"
    ],
-   "approved": false
+   "approved": true
   },
   "investment": {
    "kind": "용도",
@@ -2475,7 +2484,7 @@
     "AskVERITAS financial INVESTMENT",
     "위브 플래닝 Investment & Development"
    ],
-   "approved": false
+   "approved": true
   },
   "jelly": {
    "kind": "용도",
@@ -2491,7 +2500,7 @@
     "HEAVENLY JELLY",
     "멜티젤리 MELTY JELLY"
    ],
-   "approved": false
+   "approved": true
   },
   "juice": {
    "kind": "용도",
@@ -2508,7 +2517,7 @@
     "Cafe MAMAS cafe mamas Enjoy!!! Coffee,sandwich,fresh juice home made salad",
     "GO JUICE"
    ],
-   "approved": false
+   "approved": true
   },
   "junior": {
    "kind": "용도",
@@ -2534,7 +2543,7 @@
     "NOTON JUNIOR",
     "뽀빠이 POPEYE JUNIOR"
    ],
-   "approved": false
+   "approved": true
   },
   "kids": {
    "kind": "용도",
@@ -2560,7 +2569,7 @@
     "KIDS HYUNDAI",
     "Teddy Bear kids"
    ],
-   "approved": false
+   "approved": true
   },
   "kitchen": {
    "kind": "용도",
@@ -2575,7 +2584,7 @@
     "KITCHEN FIT",
     "P LOUISIANA KITCHEN"
    ],
-   "approved": false
+   "approved": true
   },
   "korean": {
    "kind": "산지",
@@ -2587,7 +2596,7 @@
     "둘마니치킨 Two Korean Style Two Chicken",
     "고고기 GOGO-GI! KOREAN BBQ TO-GO"
    ],
-   "approved": false
+   "approved": true
   },
   "lab": {
    "kind": "용도",
@@ -2602,7 +2611,7 @@
     "DL Dr.LAB SINCE 1984",
     "FORHAIR FORMULA DREAM BIOMEDICAL LAB"
    ],
-   "approved": false
+   "approved": true
   },
   "laboratory": {
    "kind": "용도",
@@ -2617,7 +2626,7 @@
     "HUMAN BIO SCIENCE LABORATORY HUBISLAB HUMAN BIO SCIENCE LAB",
     "THE SOOP LANDSCAPE LABORATORY"
    ],
-   "approved": false
+   "approved": true
   },
   "labs": {
    "kind": "용도",
@@ -2632,7 +2641,7 @@
     "AIVE LABS",
     "IMINE Labs"
    ],
-   "approved": false
+   "approved": true
   },
   "leather": {
    "kind": "원재료",
@@ -2658,7 +2667,7 @@
     "Cordovan Leather",
     "Genuine Red Leather"
    ],
-   "approved": false
+   "approved": true
   },
   "led": {
    "kind": "품질",
@@ -2674,7 +2683,7 @@
     "OSRAM LED SUPERSTAR",
     "이모션 LED"
    ],
-   "approved": false
+   "approved": true
   },
   "lemon": {
    "kind": "원재료",
@@ -2694,7 +2703,7 @@
     "SPORTS CANDY HIMALAYA SALT EXTRA COOL Mint Candy Lemon Flavour",
     "BLUE LEMON"
    ],
-   "approved": false
+   "approved": true
   },
   "lift": {
    "kind": "효능",
@@ -2709,7 +2718,7 @@
     "THE DOGGIE LIFT",
     "EASY LIFT"
    ],
-   "approved": false
+   "approved": true
   },
   "light": {
    "kind": "품질",
@@ -2728,7 +2737,7 @@
     "magnic light",
     "Candle light"
    ],
-   "approved": false
+   "approved": true
   },
   "lip": {
    "kind": "용도",
@@ -2747,7 +2756,7 @@
     "TONYMOLY LIP LUX",
     "TONYMOLY KISS LOVER LIP LUX"
    ],
-   "approved": false
+   "approved": true
   },
   "lite": {
    "kind": "품질",
@@ -2766,7 +2775,7 @@
     "MID-LITE",
     "Q-LITE"
    ],
-   "approved": false
+   "approved": true
   },
   "lock": {
    "kind": "용도",
@@ -2781,7 +2790,7 @@
     "아토락 Ato Lock",
     "브랜드 마케팅 비용을 소비자께 돌려드리겠습니다. NO Brand LOCK STAR"
    ],
-   "approved": false
+   "approved": true
   },
   "logistics": {
    "kind": "용도",
@@ -2795,7 +2804,7 @@
     "중통국제 International Logistics",
     "Samyang Logistics"
    ],
-   "approved": false
+   "approved": true
   },
   "lounge": {
    "kind": "용도",
@@ -2810,7 +2819,7 @@
     "AMORE BEAUTY LOUNGE",
     "lounge 보름"
    ],
-   "approved": false
+   "approved": true
   },
   "makeup": {
    "kind": "용도",
@@ -2827,7 +2836,7 @@
     "Milk MAKEUP",
     "MAKEUP BY MARIO PRO"
    ],
-   "approved": false
+   "approved": true
   },
   "mall": {
    "kind": "용도",
@@ -2841,7 +2850,7 @@
     "Gotcha! mall",
     "The PREMIUM Pizza Mall QUALIFIED Co. ALL THAT PIZZA & SALAD SINCE 1994"
    ],
-   "approved": false
+   "approved": true
   },
   "management": {
    "kind": "용도",
@@ -2855,7 +2864,7 @@
     "해양환경관리공단 KOEM Korea Marine Environment Management Corporation",
     "WOORI Global Asset Management"
    ],
-   "approved": false
+   "approved": true
   },
   "mango": {
    "kind": "원재료",
@@ -2875,7 +2884,7 @@
     "M MANGO",
     "Mango"
    ],
-   "approved": false
+   "approved": true
   },
   "market": {
    "kind": "용도",
@@ -2889,7 +2898,7 @@
     "베스처 파머스 마켓 Besture Farmer's Market",
     "SSAMZIE MARKET"
    ],
-   "approved": false
+   "approved": true
   },
   "mart": {
    "kind": "용도",
@@ -2903,7 +2912,7 @@
     "다농 L mart",
     "NC Mart"
    ],
-   "approved": false
+   "approved": true
   },
   "mask": {
    "kind": "용도",
@@ -2919,7 +2928,7 @@
     "DUO MASK",
     "러버마스크 Rubber Mask"
    ],
-   "approved": false
+   "approved": true
   },
   "max": {
    "kind": "품질",
@@ -2931,7 +2940,8 @@
     "GEORGIA MAX COFFEE",
     "idea MAX FOR A BETTER VALUE"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "meal": {
    "kind": "용도",
@@ -2951,7 +2961,7 @@
     "우리곡물 올바른한끼 곡물 건강을 위해 가족을 위해 어머니의 따뜻한 마음으로 정성을 다해 채웠습니다 a Healthy Meal",
     "어니스트밀 HONEST MEAL"
    ],
-   "approved": false
+   "approved": true
   },
   "meat": {
    "kind": "원재료",
@@ -2971,7 +2981,7 @@
     "Hello! NICE TO MEAT",
     "음메닷컴 UMME Urban Meat Market Express"
    ],
-   "approved": false
+   "approved": true
   },
   "media": {
    "kind": "용도",
@@ -2987,7 +2997,7 @@
     "yello Shopping Media",
     "MEDIA MACHINE"
    ],
-   "approved": false
+   "approved": true
   },
   "medical": {
    "kind": "용도",
@@ -3003,7 +3013,7 @@
     "힐링 메디컬 센터 Healing Medical Center",
     "Medical Sportainment"
    ],
-   "approved": false
+   "approved": true
   },
   "medicine": {
    "kind": "용도",
@@ -3019,7 +3029,7 @@
     "SCIENCE TO MEDICINE",
     "생체활성의학 BAM Bio-Active Medicine"
    ],
-   "approved": false
+   "approved": true
   },
   "mega": {
    "kind": "품질",
@@ -3031,7 +3041,8 @@
     "Mega Value Innovator",
     "XERA-MEGA"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "men": {
    "kind": "용도",
@@ -3057,7 +3068,7 @@
     "B.A Men",
     "모베러맨 Mo' better men"
    ],
-   "approved": false
+   "approved": true
   },
   "metal": {
    "kind": "원재료",
@@ -3083,7 +3094,7 @@
     "METAL",
     "스카이 테크노 메탈 SKY Techno Metal"
    ],
-   "approved": false
+   "approved": true
   },
   "micro": {
    "kind": "형상",
@@ -3099,7 +3110,7 @@
     "MICRO TRAINING CLAIM THE LIFE YOU DESERVE",
     "MICRO"
    ],
-   "approved": false
+   "approved": true
   },
   "milk": {
    "kind": "원재료",
@@ -3119,7 +3130,7 @@
     "THE MOUNTAIN OF SEATTLE Mt.RAINIER ESPRESSO & MILK",
     "백미당 백미당 LAUREL TOP BAEKMIDANG 1964 Organic Milk"
    ],
-   "approved": false
+   "approved": true
   },
   "mini": {
    "kind": "형상",
@@ -3131,7 +3142,7 @@
     "LINEAR MINI",
     "mini chichi"
    ],
-   "approved": false
+   "approved": true
   },
   "mist": {
    "kind": "형상",
@@ -3149,7 +3160,7 @@
     "조성아 투웬티투 스노우 볼 미스트 chosungah ver. 22 Snow Ball Mist",
     "그린 미스트 Green Mist"
    ],
-   "approved": false
+   "approved": true
   },
   "mobile": {
    "kind": "용도",
@@ -3166,7 +3177,7 @@
     "해피모바일 HAPPY mobile",
     "yello mobile"
    ],
-   "approved": false
+   "approved": true
   },
   "morning": {
    "kind": "시기",
@@ -3183,7 +3194,7 @@
     "모닝스쿨 Morning School",
     "모닝글로리 MORNING GLORY"
    ],
-   "approved": false
+   "approved": true
   },
   "motors": {
    "kind": "용도",
@@ -3198,7 +3209,7 @@
     "EDISON MOTORS",
     "STAR motors"
    ],
-   "approved": false
+   "approved": true
   },
   "museum": {
    "kind": "용도",
@@ -3215,7 +3226,7 @@
     "teddy bear museum",
     "CURLYBROWN TEDDY BEAR MUSEUM"
    ],
-   "approved": false
+   "approved": true
   },
   "music": {
    "kind": "용도",
@@ -3231,7 +3242,7 @@
     "BRANDNEW MUSIC",
     "뮤직시티 MUSIC CITY"
    ],
-   "approved": false
+   "approved": true
   },
   "nail": {
    "kind": "용도",
@@ -3250,7 +3261,7 @@
     "NAIL EXPO",
     "banila NAIL & BEAUTY"
    ],
-   "approved": false
+   "approved": true
   },
   "natural": {
    "kind": "원재료",
@@ -3270,7 +3281,7 @@
     "NATURAL HEALTH KEEPER JUNAM BERRY KING ARONIA FARM",
     "신선원 Super natural"
    ],
-   "approved": false
+   "approved": true
   },
   "naturally": {
    "kind": "원재료",
@@ -3290,7 +3301,7 @@
     "WIREPAS Things connected - Naturally",
     "NATURALLY JOJO"
    ],
-   "approved": false
+   "approved": true
   },
   "network": {
    "kind": "용도",
@@ -3307,7 +3318,7 @@
     "S.N.O.W SOOKMYUNG NETWORK FOR OPEN WORLD",
     "ZIO Millennium Network Frontier"
    ],
-   "approved": false
+   "approved": true
   },
   "networks": {
    "kind": "용도",
@@ -3324,7 +3335,7 @@
     "GOLFZON NETWORKS",
     "DIVA NETWORKS"
    ],
-   "approved": false
+   "approved": true
   },
   "new": {
    "kind": "시기",
@@ -3336,7 +3347,7 @@
     "NEW MILLENNIUM",
     "NEW SCIENCE VENTURES"
    ],
-   "approved": false
+   "approved": true
   },
   "nice": {
    "kind": "품질",
@@ -3348,7 +3359,7 @@
     "Hello! NICE TO MEAT",
     "Nice and Slow"
    ],
-   "approved": false
+   "approved": true
   },
   "night": {
    "kind": "시기",
@@ -3365,7 +3376,7 @@
     "SUPER NIGHT VISION",
     "다크나이트 DARK NIGHT"
    ],
-   "approved": false
+   "approved": true
   },
   "oil": {
    "kind": "형상",
@@ -3383,7 +3394,7 @@
     "REC-OIL",
     "닥터스랩 블루마린 드라이 오일 dR doctorslab Bluemarine Dry Oil"
    ],
-   "approved": false
+   "approved": true
   },
   "online": {
    "kind": "용도",
@@ -3400,7 +3411,7 @@
     "불멸 ONLINE",
     "서유기 전 Online"
    ],
-   "approved": false
+   "approved": true
   },
   "organic": {
    "kind": "생산방법",
@@ -3419,7 +3430,7 @@
     "Organic Honesty",
     "ECO HENNA DETOX HEALTHY BENEFIT ORGANIC"
    ],
-   "approved": false
+   "approved": true
   },
   "oriental": {
    "kind": "원재료",
@@ -3438,7 +3449,7 @@
     "궁중비책 내추럴 한방에센스 성분 Natural Oriental-Rx",
     "궁중비책 Oriental Formula for Babies"
    ],
-   "approved": false
+   "approved": true
   },
   "original": {
    "kind": "품질",
@@ -3450,7 +3461,7 @@
     "더페이스샵 오리지널 소스 100 THEFACESHOP Original Source 100",
     "Original 어린이 캣's"
    ],
-   "approved": false
+   "approved": true
   },
   "outdoor": {
    "kind": "용도",
@@ -3468,7 +3479,7 @@
     "OUTDOOR PRODUCTS",
     "VISTA OUTDOOR"
    ],
-   "approved": false
+   "approved": true
   },
   "pack": {
    "kind": "형상",
@@ -3484,7 +3495,7 @@
     "i-Pack",
     "YEOSIN PROTEIN BOMB PERFUME SHAMPOO PACK"
    ],
-   "approved": false
+   "approved": true
   },
   "paper": {
    "kind": "원재료",
@@ -3510,7 +3521,7 @@
     "PAPER DOLL",
     "idea WORK SUPER PREMIUM PAPER FOR BETTER QUALITY"
    ],
-   "approved": false
+   "approved": true
   },
   "pasta": {
    "kind": "용도",
@@ -3530,7 +3541,7 @@
     "I Love PASTA",
     "pasta ZARA"
    ],
-   "approved": false
+   "approved": true
   },
   "patch": {
    "kind": "형상",
@@ -3546,7 +3557,7 @@
     "ALOE SOOTHING MARINE EYE PATCH MiSKIN",
     "S Patch"
    ],
-   "approved": false
+   "approved": true
   },
   "pay": {
    "kind": "용도",
@@ -3562,7 +3573,7 @@
     "COZY PAY",
     "L.pay"
    ],
-   "approved": false
+   "approved": true
   },
   "pc": {
    "kind": "용도",
@@ -3579,7 +3590,7 @@
     "SHOW TIME PC&CAFE",
     "Pc Kinder Coding"
    ],
-   "approved": false
+   "approved": true
   },
   "perfect": {
    "kind": "품질",
@@ -3591,7 +3602,7 @@
     "THE PERFECT POTION",
     "Perfect U"
    ],
-   "approved": false
+   "approved": true
   },
   "pet": {
    "kind": "용도",
@@ -3608,7 +3619,7 @@
     "Pet Rescue Saga",
     "PetStory For your lovely pet"
    ],
-   "approved": false
+   "approved": true
   },
   "pharma": {
    "kind": "용도",
@@ -3624,7 +3635,7 @@
     "Forward Pharma",
     "Horizon Pharma"
    ],
-   "approved": false
+   "approved": true
   },
   "pilates": {
    "kind": "용도",
@@ -3641,7 +3652,7 @@
     "INTERNATIONAL MIU PILATES",
     "피크필라테스 한국 에듀케이션 센터 PEAK PILATES KOREA EDUCATION CENTER"
    ],
-   "approved": false
+   "approved": true
   },
   "pizza": {
    "kind": "용도",
@@ -3661,7 +3672,7 @@
     "1905 GIANT MONSTER PIZZA",
     "울엄마 피자&스파게티 Wool Umma Pizza & Spaghetti"
    ],
-   "approved": false
+   "approved": true
   },
   "plastic": {
    "kind": "원재료",
@@ -3679,7 +3690,7 @@
     "글로벌성형외과 피부과 항노화센터 GLOBAL PLASTIC SURGERY",
     "라비앙 성형외과 LAVIAN PLASTIC SURGERY"
    ],
-   "approved": false
+   "approved": true
   },
   "platinum": {
    "kind": "원재료",
@@ -3694,7 +3705,7 @@
     "Platinum",
     "PLATINUM VILLE"
    ],
-   "approved": false
+   "approved": true
   },
   "plus": {
    "kind": "품질",
@@ -3706,7 +3717,7 @@
     "VIEW PLUS",
     "맵시플러스 Mab-C PLUS"
    ],
-   "approved": false
+   "approved": true
   },
   "pork": {
    "kind": "원재료",
@@ -3726,7 +3737,7 @@
     "서경 양돈 청PORK 청-포크",
     "황금돈까스 PORK CUTLET . PASTA . PIZZA . BEER"
    ],
-   "approved": false
+   "approved": true
   },
   "powder": {
    "kind": "형상",
@@ -3744,7 +3755,7 @@
     "기름에 튀기지 않는 웰빙치킨가루 초간편 마법의 치킨가루 닭고기에 가루만 묻혀 전자레인지로 5분, 전기오븐으로 30분이면 OK!! Well being Chicken Powder",
     "Sophie powder rooms"
    ],
-   "approved": false
+   "approved": true
   },
   "premium": {
    "kind": "품질",
@@ -3756,7 +3767,7 @@
     "Sumifru NATURE'S CHOICE Premium Brand by Sumifru",
     "PREMIUM SIGNATURE ANGUS"
    ],
-   "approved": false
+   "approved": true
   },
   "prime": {
    "kind": "품질",
@@ -3768,7 +3779,7 @@
     "PRIME UHD TV",
     "Prime"
    ],
-   "approved": false
+   "approved": true
   },
   "pro": {
    "kind": "용도",
@@ -3780,7 +3791,8 @@
     "IONIC PRO TURBO",
     "ELACTION PRO"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "professional": {
    "kind": "용도",
@@ -3792,7 +3804,8 @@
     "DLUX PROFESSIONAL",
     "LINUX PROFESSIONAL INSTITUTE"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "protein": {
    "kind": "원재료",
@@ -3811,7 +3824,7 @@
     "Premier Protein",
     "PROTEIN MONSTER"
    ],
-   "approved": false
+   "approved": true
   },
   "pub": {
    "kind": "용도",
@@ -3826,7 +3839,7 @@
     "날라리 MISS 츄 spanish churros pub",
     "우 Tomo JAPANESE DINNING & PUB"
    ],
-   "approved": false
+   "approved": true
   },
   "pure": {
    "kind": "품질",
@@ -3847,7 +3860,7 @@
     "PURE CALI",
     "ORLANE PURE JEUNESSE"
    ],
-   "approved": false
+   "approved": true
   },
   "quality": {
    "kind": "품질",
@@ -3859,7 +3872,7 @@
     "Taylor QUALITY GUITARS",
     "AONE World Best Design & Quality"
    ],
-   "approved": false
+   "approved": true
   },
   "quick": {
    "kind": "품질",
@@ -3875,7 +3888,7 @@
     "Quick Help",
     "QUICK PAY"
    ],
-   "approved": false
+   "approved": true
   },
   "real": {
    "kind": "품질",
@@ -3887,7 +3900,7 @@
     "F.C.Real Bristol",
     "REAL MONSTER YAP!"
    ],
-   "approved": false
+   "approved": true
   },
   "research": {
    "kind": "용도",
@@ -3902,7 +3915,7 @@
     "페더리서치웍스 Feather Research Works",
     "한국항공우주연구원 KARI KOREA AEROSPACE ReSEARCH INSTITUTE 1989"
    ],
-   "approved": false
+   "approved": true
   },
   "resort": {
    "kind": "용도",
@@ -3917,7 +3930,7 @@
     "아일랜드 캐슬 Metro WaterPark Resort ISLAND CASTLE",
     "The Ocean RESORT"
    ],
-   "approved": false
+   "approved": true
   },
   "restaurant": {
    "kind": "용도",
@@ -3932,7 +3945,7 @@
     "한국전통음식점 우미관 KOREAN RESTAURANT",
     "PALETTE RESTAURANT"
    ],
-   "approved": false
+   "approved": true
   },
   "rice": {
    "kind": "원재료",
@@ -3952,7 +3965,7 @@
     "MEDI RICE",
     "RICE & CHICKEN JOY CUPS"
    ],
-   "approved": false
+   "approved": true
   },
   "ring": {
    "kind": "형상",
@@ -3966,7 +3979,7 @@
     "STYLE RING",
     "엔젤 링 ANGEL RING"
    ],
-   "approved": false
+   "approved": true
   },
   "robot": {
    "kind": "용도",
@@ -3982,7 +3995,7 @@
     "HELLO ROBOT",
     "TOYO FA&ROBOT"
    ],
-   "approved": false
+   "approved": true
   },
   "rubber": {
    "kind": "원재료",
@@ -4008,7 +4021,7 @@
     "동일고무벨트주식회사 DONGIL DONGIL RUBBER BELT CO, LTD",
     "동일고무벨트주식회사 DONGIL DONGIL RUBBER BELT CO,LTD"
    ],
-   "approved": false
+   "approved": true
   },
   "ruby": {
    "kind": "원재료",
@@ -4023,7 +4036,7 @@
     "Ruby-Cell",
     "BASIS RUBY"
    ],
-   "approved": false
+   "approved": true
   },
   "safe": {
    "kind": "품질",
@@ -4041,7 +4054,7 @@
     "SAFE LOCK LEO",
     "SAFE H DECK by marine aluminium"
    ],
-   "approved": false
+   "approved": true
   },
   "safety": {
    "kind": "품질",
@@ -4059,7 +4072,7 @@
     "SAFETY TOTAL SOLUTION UNILINE",
     "KASK safety concept 100% made in Italy"
    ],
-   "approved": false
+   "approved": true
   },
   "salon": {
    "kind": "용도",
@@ -4074,7 +4087,7 @@
     "VANILLA BOUQUET Premium Nail Salon",
     "VIDAL SASSOON SALON SCIENCE"
    ],
-   "approved": false
+   "approved": true
   },
   "salt": {
    "kind": "원재료",
@@ -4094,7 +4107,7 @@
     "SPORTS CANDY HIMALAYA SALT EXTRA COOL Mint Candy Lemon Flavour",
     "히말라야 크리스탈마운틴 salt"
    ],
-   "approved": false
+   "approved": true
   },
   "sapphire": {
    "kind": "원재료",
@@ -4109,7 +4122,7 @@
     "BLACK SAPPHIRE",
     "SWEET SAPPHIRE"
    ],
-   "approved": false
+   "approved": true
   },
   "school": {
    "kind": "용도",
@@ -4123,7 +4136,7 @@
     "링컨하우스스쿨 위쎈 LINCOLN HOUSE SCHOOL LH",
     "BTS BACK TO SCHOOL"
    ],
-   "approved": false
+   "approved": true
   },
   "science": {
    "kind": "용도",
@@ -4138,7 +4151,7 @@
     "NEW SCIENCE VENTURES",
     "SMART NATURE SCIENCE"
    ],
-   "approved": false
+   "approved": true
   },
   "seafood": {
    "kind": "원재료",
@@ -4158,7 +4171,7 @@
     "SANFORD BEAUTIFUL NEW ZEALAND SEAFOOD",
     "SEAFOOD FROM NORWAY"
    ],
-   "approved": false
+   "approved": true
   },
   "series": {
    "kind": "형상",
@@ -4170,7 +4183,7 @@
     "Q Series",
     "S Series"
    ],
-   "approved": false
+   "approved": true
   },
   "service": {
    "kind": "용도",
@@ -4187,7 +4200,7 @@
     "아쉬 콜렉션 ASH&ASH ALL SERVICE HIGH",
     "NIT SERVICE"
    ],
-   "approved": false
+   "approved": true
   },
   "set": {
    "kind": "수량",
@@ -4198,7 +4211,7 @@
     "MAGFORMERS SUPER S.T.E.A.M SET",
     "UP SET"
    ],
-   "approved": false
+   "approved": true
   },
   "shine": {
    "kind": "효능",
@@ -4213,7 +4226,7 @@
     "INFINITE SHINE",
     "샤인미 Shine 미"
    ],
-   "approved": false
+   "approved": true
   },
   "shop": {
    "kind": "용도",
@@ -4227,7 +4240,7 @@
     "FRANK's THE GOURMET SPECIALITY CAKE SHOP",
     "메모리숍 Memory Shop"
    ],
-   "approved": false
+   "approved": true
   },
   "shopping": {
    "kind": "용도",
@@ -4241,7 +4254,7 @@
     "plein 해외쇼핑 by GSeshop Global Shopping",
     "OTM Shopping"
    ],
-   "approved": false
+   "approved": true
   },
   "silver": {
    "kind": "원재료",
@@ -4256,7 +4269,7 @@
     "CENTIREX SILVER",
     "SILVER REED"
    ],
-   "approved": false
+   "approved": true
   },
   "since": {
    "kind": "시기",
@@ -4268,7 +4281,8 @@
     "바다명가 since1998",
     "아딸 한국인의 평생별미 튀김 떡볶이 아딸 플러스 since 1972"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "skin": {
    "kind": "용도",
@@ -4287,7 +4301,7 @@
     "SKIN O2",
     "INSOLUTION AQUARINGER SKIN CLINIC MASK"
    ],
-   "approved": false
+   "approved": true
   },
   "skincare": {
    "kind": "용도",
@@ -4304,7 +4318,7 @@
     "Princess SKINCARE",
     "RODAN + FIELDS LIFE-CHANGING SKINCARE"
    ],
-   "approved": false
+   "approved": true
   },
   "sleep": {
    "kind": "용도",
@@ -4321,7 +4335,7 @@
     "굿슬립 Good sleep",
     "SLEEP SPA"
    ],
-   "approved": false
+   "approved": true
   },
   "slim": {
    "kind": "효능",
@@ -4342,7 +4356,7 @@
     "RAZOR SLIM",
     "광기가Slim"
    ],
-   "approved": false
+   "approved": true
   },
   "smart": {
    "kind": "품질",
@@ -4359,7 +4373,7 @@
     "SMART LINEAR",
     "Smart suggestion"
    ],
-   "approved": false
+   "approved": true
   },
   "soap": {
    "kind": "형상",
@@ -4377,7 +4391,7 @@
     "Soap",
     "Clean Soap Basol"
    ],
-   "approved": false
+   "approved": true
   },
   "soda": {
    "kind": "용도",
@@ -4394,7 +4408,7 @@
     "OSAKA SODA",
     "SCOTCH & SODA"
    ],
-   "approved": false
+   "approved": true
   },
   "soft": {
    "kind": "품질",
@@ -4411,7 +4425,7 @@
     "Living SOFT TISSUE",
     "레인보우 소프트 아이스크림 Rainbow Soft Ice Since 2015 Bless Ice Dessert Cafe"
    ],
-   "approved": false
+   "approved": true
   },
   "solar": {
    "kind": "품질",
@@ -4428,7 +4442,7 @@
     "BODY SOLAR",
     "SOLAR"
    ],
-   "approved": false
+   "approved": true
   },
   "solution": {
    "kind": "용도",
@@ -4445,7 +4459,7 @@
     "M3 Solution Center",
     "SAFETY TOTAL SOLUTION UNILINE"
    ],
-   "approved": false
+   "approved": true
   },
   "solutions": {
    "kind": "용도",
@@ -4462,7 +4476,7 @@
     "TACO COMFORT SOLUTIONS",
     "NEO-Solutions"
    ],
-   "approved": false
+   "approved": true
   },
   "spa": {
    "kind": "용도",
@@ -4477,7 +4491,7 @@
     "O'SPA",
     "후 SPA PALACE"
    ],
-   "approved": false
+   "approved": true
   },
   "special": {
    "kind": "품질",
@@ -4489,7 +4503,7 @@
     "다이아스페샬 DIA +special",
     "EMIS Every Moment Is Special"
    ],
-   "approved": false
+   "approved": true
   },
   "sport": {
    "kind": "용도",
@@ -4506,7 +4520,7 @@
     "SIROP Sport L'ENERGIE AU COEUR DU FRUIT",
     "DRAGON SPORT"
    ],
-   "approved": false
+   "approved": true
   },
   "sports": {
    "kind": "용도",
@@ -4523,7 +4537,7 @@
     "PARADISE SPORTS",
     "BEIN SPORTS"
    ],
-   "approved": false
+   "approved": true
   },
   "steak": {
    "kind": "용도",
@@ -4538,7 +4552,7 @@
     "Premium Steak Restaurant THEre STEAKki-PLUS by factory",
     "헤비 스테이크 HEAVY STEAK"
    ],
-   "approved": false
+   "approved": true
   },
   "stone": {
    "kind": "원재료",
@@ -4564,7 +4578,7 @@
     "MILE STONE",
     "BLACK STONE EXCLUSIVE GOLF CLUB"
    ],
-   "approved": false
+   "approved": true
   },
   "store": {
    "kind": "용도",
@@ -4578,7 +4592,7 @@
     "the ARRIVAL STORE.com",
     "APP STORE"
    ],
-   "approved": false
+   "approved": true
   },
   "studio": {
    "kind": "용도",
@@ -4595,7 +4609,7 @@
     "Silicon Studio",
     "NEWFACE Studio Et Creative"
    ],
-   "approved": false
+   "approved": true
   },
   "super": {
    "kind": "품질",
@@ -4607,7 +4621,7 @@
     "신선원 Super natural",
     "SUPER WHITE 377 Extra Deeper Formula"
    ],
-   "approved": false
+   "approved": true
   },
   "supreme": {
    "kind": "품질",
@@ -4619,7 +4633,7 @@
     "SUPREME",
     "Real SUPREME STAR"
    ],
-   "approved": false
+   "approved": true
   },
   "surgery": {
    "kind": "용도",
@@ -4634,7 +4648,7 @@
     "글로벌성형외과 피부과 항노화센터 GLOBAL PLASTIC SURGERY",
     "라비앙 성형외과 LAVIAN PLASTIC SURGERY"
    ],
-   "approved": false
+   "approved": true
   },
   "surgical": {
    "kind": "용도",
@@ -4649,7 +4663,7 @@
     "VERB SURGICAL",
     "THINK SURGICAL"
    ],
-   "approved": false
+   "approved": true
   },
   "sushi": {
    "kind": "용도",
@@ -4664,7 +4678,7 @@
     "스시조 Sushi-Joe",
     "생활스시 Sushi せいかつすし"
    ],
-   "approved": false
+   "approved": true
   },
   "sweet": {
    "kind": "품질",
@@ -4680,7 +4694,7 @@
     "SWEET MONSTER",
     "Sweet MONSTER Monster Popcorn"
    ],
-   "approved": false
+   "approved": true
   },
   "system": {
    "kind": "용도",
@@ -4697,7 +4711,7 @@
     "ESST SYSTEM",
     "Health Up ABC Mix System"
    ],
-   "approved": false
+   "approved": true
   },
   "systems": {
    "kind": "용도",
@@ -4714,7 +4728,7 @@
     "Jacobs Vehicle Systems",
     "ECOWATER SYSTEMS"
    ],
-   "approved": false
+   "approved": true
   },
   "tea": {
    "kind": "원재료",
@@ -4730,7 +4744,7 @@
     "천년의 Tea-um",
     "Tea-um"
    ],
-   "approved": false
+   "approved": true
   },
   "tech": {
    "kind": "용도",
@@ -4747,7 +4761,7 @@
     "동양이지텍 DONG YANG EASY TECH",
     "ALPINE METAL TECH"
    ],
-   "approved": false
+   "approved": true
   },
   "technical": {
    "kind": "용도",
@@ -4764,7 +4778,7 @@
     "TECHNICAL LUXURY",
     "TECHNICAL EDITION"
    ],
-   "approved": false
+   "approved": true
   },
   "technologies": {
    "kind": "용도",
@@ -4781,7 +4795,7 @@
     "PHOENIX TECHNOLOGIES",
     "AUTOMOTIVE DYTECH DYNAMIC FLUID TECHNOLOGIES"
    ],
-   "approved": false
+   "approved": true
   },
   "technology": {
    "kind": "용도",
@@ -4798,7 +4812,21 @@
     "ZEN TECH TECHNOLOGY",
     "SMART NATURAL TECHNOLOGY"
    ],
-   "approved": false
+   "approved": true
+  },
+  "teddy": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    28
+   ],
+   "note": "테디베어 — 28류 완구에서 보통명칭 성격(곰 인형의 원재료·형상 표시). 2026-10-11 사람 결정으로 추가(약한 토큰 overrides 해제 상태 유지)",
+   "examples": [
+    "Teddy Bear kids",
+    "테디 베어",
+    "테디베어 사파리 테지움"
+   ],
+   "approved": true
   },
   "therapeutics": {
    "kind": "용도",
@@ -4814,7 +4842,7 @@
     "NUON THERAPEUTICS",
     "ENTASIS THERAPEUTICS"
    ],
-   "approved": false
+   "approved": true
   },
   "therapy": {
    "kind": "용도",
@@ -4830,7 +4858,7 @@
     "IMPACT IMmune Personalized And Creative Therapy",
     "Essay Therapy"
    ],
-   "approved": false
+   "approved": true
   },
   "tomato": {
    "kind": "원재료",
@@ -4850,7 +4878,7 @@
     "토마토 TOMATO",
     "단마토 danmato Highly Sweet Tomato"
    ],
-   "approved": false
+   "approved": true
   },
   "top": {
    "kind": "품질",
@@ -4862,7 +4890,7 @@
     "THINK FORWARD 2018 GLOBAL TOP 20",
     "TOP SE7EN 7"
    ],
-   "approved": false
+   "approved": true
   },
   "tour": {
    "kind": "용도",
@@ -4877,7 +4905,7 @@
     "에어서울투어닷컴 AIR SEOUL TOUR.COM",
     "에어서울투어 AIR SEOUL TOUR"
    ],
-   "approved": false
+   "approved": true
   },
   "traditional": {
    "kind": "생산방법",
@@ -4895,7 +4923,7 @@
     "백년갈비 MANHOMEAT BAEKNYOUN GALBI Korea Traditional Restaurant",
     "신응수가 통뼈본가 신응수가 TONG BBYEO BON GA KOREAN TRADITIONAL RESTAURANT TONG BBYEO BON GA"
    ],
-   "approved": false
+   "approved": true
   },
   "travel": {
    "kind": "용도",
@@ -4910,7 +4938,7 @@
     "24HRS travel",
     "TRASURE TRAVEL + LEISURE"
    ],
-   "approved": false
+   "approved": true
   },
   "tv": {
    "kind": "용도",
@@ -4927,7 +4955,7 @@
     "u DIF 거울TV",
     "SUPER TV"
    ],
-   "approved": false
+   "approved": true
   },
   "ultra": {
    "kind": "품질",
@@ -4939,7 +4967,8 @@
     "Ultra Vera",
     "ULTRA MUSIC FESTIVAL"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "uv": {
    "kind": "품질",
@@ -4955,7 +4984,7 @@
     "UV365",
     "UV CHECKER"
    ],
-   "approved": false
+   "approved": true
   },
   "velvet": {
    "kind": "원재료",
@@ -4981,7 +5010,7 @@
     "BLACK VELVET",
     "VELVET"
    ],
-   "approved": false
+   "approved": true
   },
   "vintage": {
    "kind": "시기",
@@ -4997,7 +5026,7 @@
     "VINTAGE CASUAL",
     "Vintage rose"
    ],
-   "approved": false
+   "approved": true
   },
   "vr": {
    "kind": "품질",
@@ -5013,7 +5042,7 @@
     "VR GLASS",
     "VR Tour"
    ],
-   "approved": false
+   "approved": true
   },
   "water": {
    "kind": "형상",
@@ -5031,7 +5060,7 @@
     "오투웰 O2 Well LIVE WATER",
     "워터 샤인 WATER SHINE"
    ],
-   "approved": false
+   "approved": true
   },
   "wedding": {
    "kind": "용도",
@@ -5047,7 +5076,7 @@
     "더블유웨딩 W WEDDING W - wedding",
     "웨딩 쿨 Wedding CooL"
    ],
-   "approved": false
+   "approved": true
   },
   "white": {
    "kind": "효능",
@@ -5063,7 +5092,7 @@
     "Cloud 9 BLANC DE WHITE Im;BEAUTY",
     "DAZZLING WHITE"
    ],
-   "approved": false
+   "approved": true
   },
   "woman": {
    "kind": "용도",
@@ -5089,7 +5118,7 @@
     "THE PIONEER WOMAN",
     "TOURISM SOUVENIR w Ander woman FOR WOMEN"
    ],
-   "approved": false
+   "approved": true
   },
   "women": {
    "kind": "용도",
@@ -5115,7 +5144,7 @@
     "TOURISM SOUVENIR wAnder woman FOR WOMEN",
     "닥터퍼틸에이더 맨&우먼 Dr. FERTILAIDER MEN&WOMEN"
    ],
-   "approved": false
+   "approved": true
   },
   "yogurt": {
    "kind": "원재료",
@@ -5135,7 +5164,7 @@
     "sweetFrog premium frozen yogurt",
     "HEY YOGURT"
    ],
-   "approved": false
+   "approved": true
   },
   "zero": {
    "kind": "품질",
@@ -5152,7 +5181,7 @@
     "ZERO SECOND",
     "NOX ZERO"
    ],
-   "approved": false
+   "approved": true
   },
   "가구": {
    "kind": "용도",
@@ -5180,7 +5209,7 @@
     "에이스 가구 ACE FURNITURE",
     "사랑이 꽃피는 가구 iloom"
    ],
-   "approved": false
+   "approved": true
   },
   "갈비찜": {
    "kind": "용도",
@@ -5199,7 +5228,7 @@
     "대웅 미트코리아 덤앤덤 5단계 매운맛 매운 갈비찜 신",
     "킹왕 갈비찜&찜닭"
    ],
-   "approved": false
+   "approved": true
   },
   "감자탕": {
    "kind": "용도",
@@ -5219,7 +5248,7 @@
     "아낌없이 퍼 준다. 제1탄 청춘 감자탕",
     "청춘 뼈다귀 감자탕 청춘"
    ],
-   "approved": false
+   "approved": true
   },
   "건강한": {
    "kind": "효능",
@@ -5238,7 +5267,7 @@
     "건강한 맛, 우리 시래기 따봉 시래기",
     "건강한 약속 바른"
    ],
-   "approved": false
+   "approved": true
   },
   "고급": {
    "kind": "품질",
@@ -5248,7 +5277,7 @@
    "examples": [
     "동원코팅 고급 동"
    ],
-   "approved": false
+   "approved": true
   },
   "골드": {
    "kind": "원재료",
@@ -5263,7 +5292,7 @@
     "개로나민 골드",
     "블루아이 루테인 골드 BLUEEYE LUTEIN Gold"
    ],
-   "approved": false
+   "approved": true
   },
   "곱창": {
    "kind": "용도",
@@ -5283,7 +5312,7 @@
     "군자 그녀가 선택한 곱창 대한곱창 대한",
     "재경이네 곱창"
    ],
-   "approved": false
+   "approved": true
   },
   "국수": {
    "kind": "용도",
@@ -5303,7 +5332,7 @@
     "신의 국수",
     "국수.모듬전 한식 전문 이자까야 셰프의국수전 국수전인"
    ],
-   "approved": false
+   "approved": true
   },
   "굿": {
    "kind": "품질",
@@ -5313,7 +5342,7 @@
    "examples": [
     "굿 라이프"
    ],
-   "approved": false
+   "approved": true
   },
   "김밥": {
    "kind": "용도",
@@ -5333,7 +5362,7 @@
     "땡초 동대문 김밥 DONGDAEMOON SINCE 2013",
     "사나이 김밥"
    ],
-   "approved": false
+   "approved": true
   },
   "나이스": {
    "kind": "품질",
@@ -5341,7 +5370,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "넘버원": {
    "kind": "품질",
@@ -5349,7 +5378,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "누룽지": {
    "kind": "용도",
@@ -5368,7 +5397,7 @@
     "아빠닭 참나무 누룽지 장작구이",
     "햇반 가마솥 누룽지를 담은 누룽지 숭늉"
    ],
-   "approved": false
+   "approved": true
   },
   "뉴": {
    "kind": "시기",
@@ -5378,7 +5407,7 @@
    "examples": [
     "힌스 뉴 뎁스 아이섀도우"
    ],
-   "approved": false
+   "approved": true
   },
   "다이아몬드": {
    "kind": "원재료",
@@ -5393,7 +5422,7 @@
     "다이아몬드",
     "다이아몬드 스마일라식"
    ],
-   "approved": false
+   "approved": true
   },
   "다이어트": {
    "kind": "효능",
@@ -5414,7 +5443,7 @@
     "챔피온 다이어트 워킹슈즈",
     "그린 몬스터 다이어트"
    ],
-   "approved": false
+   "approved": true
   },
   "닭갈비": {
    "kind": "용도",
@@ -5434,7 +5463,7 @@
     "강촌식당 닭갈비 & 꼬막요리 전문점 강촌식당 닭갈비 꼬막비빔밥",
     "숯불에 구운 닭갈비 여우골숯닭"
    ],
-   "approved": false
+   "approved": true
   },
   "닭강정": {
    "kind": "용도",
@@ -5454,7 +5483,7 @@
     "월 월이 메밀 닭강정",
     "육림 닭강정"
    ],
-   "approved": false
+   "approved": true
   },
   "데일리": {
    "kind": "사용방법",
@@ -5471,7 +5500,7 @@
     "데일리 휴 PHOTOTHERAPY 휴",
     "데일리"
    ],
-   "approved": false
+   "approved": true
   },
   "동이": {
    "kind": "용도",
@@ -5498,7 +5527,7 @@
     "땡초랑 같이 먹는 동이 왕 돈까스",
     "동이"
    ],
-   "approved": false
+   "approved": true
   },
   "디럭스": {
    "kind": "품질",
@@ -5506,7 +5535,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "떡볶이": {
    "kind": "용도",
@@ -5526,7 +5555,7 @@
     "한국인의 평생별미 튀김 떡볶이 아딸 since 1972",
     "킹콩 떡볶이 킹콩떡볶이와 즐거운 만남!"
    ],
-   "approved": false
+   "approved": true
   },
   "뚝배기": {
    "kind": "용도",
@@ -5553,7 +5582,7 @@
     "경성 뚝배기 탕",
     "숯불구이의 명가 도산 도산 뚝배기 장대살 돈안창살 소국밥 불고기"
    ],
-   "approved": false
+   "approved": true
   },
   "리얼": {
    "kind": "품질",
@@ -5564,7 +5593,8 @@
     "디딤돌 진 수능기출 씨&리얼",
     "쇼 리얼 베리어 마데카 앰플 마스크 SHO Special Homecare Origin Skin calming + Skin protection MADECASSOSIDE"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "마카롱": {
    "kind": "용도",
@@ -5580,7 +5610,7 @@
     "마카롱",
     "마카롱 MACARON"
    ],
-   "approved": false
+   "approved": true
   },
   "마트": {
    "kind": "용도",
@@ -5594,7 +5624,7 @@
     "NC 마트",
     "다농 마트 Danong Mart"
    ],
-   "approved": false
+   "approved": true
   },
   "막걸리": {
    "kind": "용도",
@@ -5610,7 +5640,7 @@
     "금정산성 고담봉 막걸리",
     "청양 푸른맑은 빛 막걸리"
    ],
-   "approved": false
+   "approved": true
   },
   "막국수": {
    "kind": "용도",
@@ -5629,7 +5659,7 @@
     "삼교리 동치미 막국수",
     "뱅뱅 막국수"
    ],
-   "approved": false
+   "approved": true
   },
   "만두": {
    "kind": "용도",
@@ -5648,7 +5678,7 @@
     "맛있는 만두 전문점 장수손만두 1976",
     "맛있는 만두 전문점 1976 인천 굴림만두의 원조 장수 손 만두 원조"
    ],
-   "approved": false
+   "approved": true
   },
   "맛있는": {
    "kind": "품질",
@@ -5665,7 +5695,7 @@
     "맛있는 고집 영진어묵",
     "새우표 맛있는 고집 영진어묵 since1966"
    ],
-   "approved": false
+   "approved": true
   },
   "매트": {
    "kind": "용도",
@@ -5693,7 +5723,7 @@
     "알앤비 매트",
     "유한 매트"
    ],
-   "approved": false
+   "approved": true
   },
   "맥반석": {
    "kind": "용도",
@@ -5720,7 +5750,7 @@
     "맥반석",
     "맥반석 면역농 면역농 Sangguk immune agriculture"
    ],
-   "approved": false
+   "approved": true
   },
   "맥스": {
    "kind": "품질",
@@ -5732,7 +5762,8 @@
     "에이-맥스 A-MAX",
     "미니:맥스"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "맥주": {
    "kind": "용도",
@@ -5748,7 +5779,7 @@
     "난리피자 화덕피자와 맥주 Nanli Pizza",
     "오리온 맥주"
    ],
-   "approved": false
+   "approved": true
   },
   "명품": {
    "kind": "품질",
@@ -5760,7 +5791,7 @@
     "명가 Chinese 명품 중국어 명가차이니즈",
     "부뚜막 명품 찜 보리굴비"
    ],
-   "approved": false
+   "approved": true
   },
   "물티슈": {
    "kind": "용도",
@@ -5788,7 +5819,7 @@
     "100 C 고온살균정제 물티슈 네모난물",
     "100 C 고온살균 물티슈 네모난물"
    ],
-   "approved": false
+   "approved": true
   },
   "밥상": {
    "kind": "용도",
@@ -5808,7 +5839,7 @@
     "바다 밥상 돌잠미역국",
     "풍경이 있는 밥상 어울림 수풀림 갈비"
    ],
-   "approved": false
+   "approved": true
   },
   "베스트": {
    "kind": "품질",
@@ -5816,7 +5847,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "부대찌개": {
    "kind": "용도",
@@ -5836,7 +5867,7 @@
     "허기숙할머니 원조 오뎅식당 오뎅집인 대한민국 최초 부대찌개 1호점 since1960",
     "의정부 보영 의정부 부대찌개 보영식당 BOYOUNG KOREAN RESTAURANT SINCE 2005 BOYOUNG Korean Restaurant www.boyoung1129.co.kr"
    ],
-   "approved": false
+   "approved": true
   },
   "불고기": {
    "kind": "용도",
@@ -5856,7 +5887,7 @@
     "숯불구이의 명가 도산 도산 뚝배기 장대살 돈안창살 소국밥 불고기",
     "언양 기와집 불고기 Eonyang Giwhajip Bulgogi"
    ],
-   "approved": false
+   "approved": true
   },
   "뷰티": {
    "kind": "용도",
@@ -5873,7 +5904,7 @@
     "상아 뷰티 SANGA Beauty",
     "아이오스 뷰티"
    ],
-   "approved": false
+   "approved": true
   },
   "비스킷": {
    "kind": "용도",
@@ -5889,7 +5920,7 @@
     "비스킷",
     "비스킷 탭"
    ],
-   "approved": false
+   "approved": true
   },
   "사이다": {
    "kind": "용도",
@@ -5904,7 +5935,7 @@
    "examples": [
     "사이다"
    ],
-   "approved": false
+   "approved": true
   },
   "삼겹살": {
    "kind": "용도",
@@ -5924,7 +5955,7 @@
     "삼겹살도시락 집으로 삼겹살 돼지 GOLD&FOOD",
     "뚱뚜루 삼겹살"
    ],
-   "approved": false
+   "approved": true
   },
   "성형외과": {
    "kind": "용도",
@@ -5939,7 +5970,7 @@
     "포시즌 성형외과 O+fs",
     "라비앙 성형외과 LAVIAN PLASTIC SURGERY"
    ],
-   "approved": false
+   "approved": true
   },
   "세트": {
    "kind": "수량",
@@ -5949,7 +5980,7 @@
    "examples": [
     "더페이스샵 비 마이 원 러브 수지향수 스페셜 세트"
    ],
-   "approved": false
+   "approved": true
   },
   "소스": {
    "kind": "원재료",
@@ -5968,7 +5999,7 @@
     "더페이스샵 오리지널 소스 100 THEFACESHOP Original Source 100",
     "응급실 떡볶이 소스"
    ],
-   "approved": false
+   "approved": true
   },
   "수제": {
    "kind": "생산방법",
@@ -5976,7 +6007,7 @@
    "classes": null,
    "note": "수제·핸드메이드 생산방법 표시(류 불문이나 절대어는 아님 → 류 미지정)",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "순대": {
    "kind": "용도",
@@ -5996,7 +6027,7 @@
     "호동 순대",
     "정미자 신림동 또순이 순대"
    ],
-   "approved": false
+   "approved": true
   },
   "순수": {
    "kind": "품질",
@@ -6016,7 +6047,7 @@
     "3겹 DECO Soft & Strong CIP New 땡큐 100% 순수 천연펄프 30롤",
     "순수 순수백과"
    ],
-   "approved": false
+   "approved": true
   },
   "슈퍼": {
    "kind": "품질",
@@ -6027,7 +6058,7 @@
     "슈퍼 하보끼",
     "알록달록 콩콩이 슈퍼R콩"
    ],
-   "approved": false
+   "approved": true
   },
   "스마트": {
    "kind": "품질",
@@ -6044,7 +6075,7 @@
     "하츠 스마트 클린 시스템 Haatz Smart Clean System",
     "하츠 스마트 후드 Haatz Smart Hood"
    ],
-   "approved": false
+   "approved": true
   },
   "스킨": {
    "kind": "용도",
@@ -6063,7 +6094,7 @@
     "스킨79 커버스트 SKIN79 Coverst",
     "sound바디 sound스킨"
    ],
-   "approved": false
+   "approved": true
   },
   "스파게티": {
    "kind": "용도",
@@ -6082,7 +6113,7 @@
     "울엄마 피자&스파게티 Wool Umma Pizza & Spaghetti",
     "베티 스파게티 Betty SPAGhetty"
    ],
-   "approved": false
+   "approved": true
   },
   "스페셜": {
    "kind": "품질",
@@ -6092,7 +6123,7 @@
    "examples": [
     "더페이스샵 비 마이 원 러브 수지향수 스페셜 세트"
    ],
-   "approved": false
+   "approved": true
   },
   "슬림": {
    "kind": "효능",
@@ -6113,7 +6144,7 @@
     "무풍에어컨 슬림",
     "무풍 슬림"
    ],
-   "approved": false
+   "approved": true
   },
   "시리즈": {
    "kind": "형상",
@@ -6121,7 +6152,7 @@
    "classes": null,
    "note": "제품군(시리즈) 표시 — 류 미지정",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "식탁": {
    "kind": "용도",
@@ -6149,7 +6180,7 @@
     "오늘의 식탁 today table",
     "오늘의 식탁"
    ],
-   "approved": false
+   "approved": true
   },
   "신발": {
    "kind": "용도",
@@ -6176,7 +6207,7 @@
     "신발 위생관리기 슈스타일러",
     "신광준의 혹 달린 신발"
    ],
-   "approved": false
+   "approved": true
   },
   "신상": {
    "kind": "시기",
@@ -6184,7 +6215,7 @@
    "classes": null,
    "note": "신제품·신규를 뜻하는 시기·품질 표시(NEW 접두 관행)",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "신선": {
    "kind": "품질",
@@ -6201,7 +6232,7 @@
    "examples": [
     "The 신선 연구소"
    ],
-   "approved": false
+   "approved": true
   },
   "아이스크림": {
    "kind": "용도",
@@ -6217,7 +6248,7 @@
     "아이스크림 가게 ICECREAM",
     "아이스크림 베스킨 샵 IceCreamShop"
    ],
-   "approved": false
+   "approved": true
   },
   "아카데미": {
    "kind": "용도",
@@ -6231,7 +6262,7 @@
     "내일배움 아카데미",
     "킥복싱을 통한 자존감의 회복! 리스펙트 킥복싱 아카데미 RK ACADEMY RESPECT KICKBOXING ACADEMY RKA"
    ],
-   "approved": false
+   "approved": true
   },
   "안경": {
    "kind": "용도",
@@ -6258,7 +6289,7 @@
     "369안경",
     "010 안경"
    ],
-   "approved": false
+   "approved": true
   },
   "양말": {
    "kind": "용도",
@@ -6285,7 +6316,7 @@
     "금강 양말",
     "상상 양말"
    ],
-   "approved": false
+   "approved": true
   },
   "에너지": {
    "kind": "효능",
@@ -6300,7 +6331,7 @@
     "긍정의 에너지 플라잉베어 회오리핫도그 FLYING BEAR",
     "엘마르 바이칼 코어 에너지 세럼 EL MAR BAIKAL CORE ENERGY SERUM"
    ],
-   "approved": false
+   "approved": true
   },
   "에스프레소": {
    "kind": "원재료",
@@ -6312,7 +6343,7 @@
    ],
    "note": "커피·커피 음료의 원재료, 카페업(43)·판매업(35)의 취급품 표시",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "오리지널": {
    "kind": "품질",
@@ -6324,7 +6355,7 @@
     "바삭하고 고소한 꾸이중에 꾸이! 미니 꾸잉꾸잉 오리지널 Seasoned Grilled Fishmeat",
     "백세인 파벽발효 흑홍삼 더쑥쑥앙팡 오리지널"
    ],
-   "approved": false
+   "approved": true
   },
   "요요": {
    "kind": "용도",
@@ -6352,7 +6383,7 @@
     "요요",
     "요요 YOYO"
    ],
-   "approved": false
+   "approved": true
   },
   "우유": {
    "kind": "원재료",
@@ -6372,7 +6403,7 @@
     "a2 우유",
     "소화가 잘되는 우유"
    ],
-   "approved": false
+   "approved": true
   },
   "울트라": {
    "kind": "품질",
@@ -6383,7 +6414,8 @@
     "Super 울트라 HDTV",
     "울트라 샷 ultra shot"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "워터": {
    "kind": "형상",
@@ -6401,7 +6433,7 @@
     "워터 샤인 WATER SHINE",
     "크리스탈 워터 クリスタルウォ-タ- Crystal Water"
    ],
-   "approved": false
+   "approved": true
   },
   "원조": {
    "kind": "품질",
@@ -6413,7 +6445,7 @@
     "원조 팥 요리 전문점 콩지팥찌 KONGZI PATZZI",
     "정순옥 세계제일 원조 의정부부대찌개 볶음 친구네집 SINCE 1977 Friend's House"
    ],
-   "approved": false
+   "approved": true
   },
   "유기농": {
    "kind": "생산방법",
@@ -6428,7 +6460,7 @@
    ],
    "note": "유기농 생산방법 표시",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "유명": {
    "kind": "품질",
@@ -6436,7 +6468,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "으뜸": {
    "kind": "품질",
@@ -6444,7 +6476,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "이지": {
    "kind": "사용방법",
@@ -6456,7 +6488,7 @@
     "이지 Izzy",
     "이지 izzi"
    ],
-   "approved": false
+   "approved": true
   },
   "일등": {
    "kind": "품질",
@@ -6464,7 +6496,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "일류": {
    "kind": "품질",
@@ -6472,7 +6504,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "전문점": {
    "kind": "용도",
@@ -6487,7 +6519,7 @@
     "컬러 디멘션 헤어 살롱 헤어 컬러 두피관리 전문점 Korea Beauty Edutainment Hair Salon Color Dimension",
     "닭똥집 불고기 전문점 똥꼬집"
    ],
-   "approved": false
+   "approved": true
   },
   "전통": {
    "kind": "생산방법",
@@ -6505,7 +6537,7 @@
     "천년마루 전통 고가구",
     "영하당 전통 감자탕 뼈찜전문점"
    ],
-   "approved": false
+   "approved": true
   },
   "정상": {
    "kind": "품질",
@@ -6516,7 +6548,7 @@
     "자연의 맛을 품고있는 맛의 정상 미소마루 미소마루인 NATURE FOOD & GRILL",
     "정상 JLS"
    ],
-   "approved": false
+   "approved": true
   },
   "정품": {
    "kind": "품질",
@@ -6526,7 +6558,7 @@
    "examples": [
     "우리몸에 KOG콕 정품"
    ],
-   "approved": false
+   "approved": true
   },
   "제일": {
    "kind": "품질",
@@ -6534,7 +6566,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "젤": {
    "kind": "형상",
@@ -6550,7 +6582,7 @@
    "examples": [
     "질경이 데일리 에코아 워시 젤"
    ],
-   "approved": false
+   "approved": true
   },
   "젤라또": {
    "kind": "용도",
@@ -6565,7 +6597,7 @@
     "젤라또",
     "더페이스샵 젤라또"
    ],
-   "approved": false
+   "approved": true
   },
   "족발": {
    "kind": "용도",
@@ -6585,7 +6617,7 @@
     "군족 오븐 정성껏 구운 바베큐 족발 OVEN & BBQ JOKBAL",
     "훈이네 통구이 족발"
    ],
-   "approved": false
+   "approved": true
   },
   "좋은": {
    "kind": "품질",
@@ -6597,7 +6629,7 @@
     "느낌이 좋은",
     "좋은 기분 Feel So Good"
    ],
-   "approved": false
+   "approved": true
   },
   "진짜": {
    "kind": "품질",
@@ -6605,7 +6637,7 @@
    "classes": null,
    "note": "진품·원조·진짜임을 뜻하는 품질 표시(ORIGINAL·정품·원조 관행)",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "진품": {
    "kind": "품질",
@@ -6615,7 +6647,7 @@
    "examples": [
     "오리온 오징어 땅콩 30년 진품' 진[진]"
    ],
-   "approved": false
+   "approved": true
   },
   "찜닭": {
    "kind": "용도",
@@ -6635,7 +6667,7 @@
     "킹왕 갈비찜&찜닭",
     "복닭방 치킨 찜닭 닭밝 야식 매매"
    ],
-   "approved": false
+   "approved": true
   },
   "참": {
    "kind": "품질",
@@ -6645,7 +6677,7 @@
    "examples": [
     "참 참다운"
    ],
-   "approved": false
+   "approved": true
   },
   "천연": {
    "kind": "원재료",
@@ -6664,7 +6696,7 @@
     "가야산 천년수 내 몸을 위한 천연 미네랄 밸런스",
     "청청' 무화과 천연 파우더 Natural Green fig Powder"
    ],
-   "approved": false
+   "approved": true
   },
   "초콜릿": {
    "kind": "용도",
@@ -6679,7 +6711,7 @@
     "초콜릿 Chocolate",
     "발레리나 초콜릿"
    ],
-   "approved": false
+   "approved": true
   },
   "최고": {
    "kind": "품질",
@@ -6687,7 +6719,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "최상": {
    "kind": "품질",
@@ -6695,7 +6727,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "최우수": {
    "kind": "품질",
@@ -6703,7 +6735,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "치과": {
    "kind": "용도",
@@ -6718,7 +6750,7 @@
     "아름다운차이 치과",
     "인텔리지 치과 iT GDN INTELLEGE DENTAL CLINIC"
    ],
-   "approved": false
+   "approved": true
   },
   "치아": {
    "kind": "용도",
@@ -6745,7 +6777,7 @@
     "치아, 구강엔 치탄 구탄",
     "의약외품 이제는 99세까지 28개의 건강한 치아를! 치아 마모방지 PROFESSIONAL TEETH DENTISTRY by 페리오"
    ],
-   "approved": false
+   "approved": true
   },
   "치즈": {
    "kind": "원재료",
@@ -6764,7 +6796,7 @@
     "치즈 Cheez",
     "치즈 Ch_z"
    ],
-   "approved": false
+   "approved": true
   },
   "치킨": {
    "kind": "용도",
@@ -6784,7 +6816,7 @@
     "텃밭 두마리 치킨 TEOT BAT two chicken",
     "부어 치킨 Bauer chicken"
    ],
-   "approved": false
+   "approved": true
   },
   "침대": {
    "kind": "용도",
@@ -6812,7 +6844,7 @@
     "S.O.K 백년희 흙 침대",
     "침대072"
    ],
-   "approved": false
+   "approved": true
   },
   "카드": {
    "kind": "용도",
@@ -6828,7 +6860,7 @@
     "KB Galaxy 카드",
     "KB국민 Galaxy 카드"
    ],
-   "approved": false
+   "approved": true
   },
   "카페": {
    "kind": "용도",
@@ -6843,7 +6875,7 @@
     "베티 카페 티룸 Bettys Cafe Tearoom",
     "오롯 카페.오롯"
    ],
-   "approved": false
+   "approved": true
   },
   "칼국수": {
    "kind": "용도",
@@ -6863,7 +6895,7 @@
     "얼크니 손 칼국수",
     "한림 칼국수"
    ],
-   "approved": false
+   "approved": true
   },
   "캔디바": {
    "kind": "용도",
@@ -6878,7 +6910,7 @@
     "캔디바 CANDY BAR",
     "캔디바"
    ],
-   "approved": false
+   "approved": true
   },
   "커피": {
    "kind": "원재료",
@@ -6894,7 +6926,7 @@
     "커피하우스 에버그린 에버그린과 함께... 커피, 그 이상을 즐기세요 Enjoy more than coffee with Evergreen Beans EVERGREEN BEANS",
     "앤드류스 에그타르트 앤 커피 Andrew's Eggtart & Coffee"
    ],
-   "approved": false
+   "approved": true
   },
   "케어": {
    "kind": "용도",
@@ -6910,7 +6942,7 @@
     "인사이드 뷰티 케어 INSIDE BEAUTY CARE",
     "드림 케어 DREAM MEDICAL GROUP"
    ],
-   "approved": false
+   "approved": true
   },
   "콜라": {
    "kind": "용도",
@@ -6926,7 +6958,7 @@
     "우주에서 온 콜라",
     "제주 크래프트 콜라 JEJU CRAFT COLA SINCE 2023"
    ],
-   "approved": false
+   "approved": true
   },
   "쿠션": {
    "kind": "형상",
@@ -6942,7 +6974,7 @@
     "쿠션 펌프 CUSHION PUMP",
     "백설기 쿠션"
    ],
-   "approved": false
+   "approved": true
   },
   "쿠키": {
    "kind": "용도",
@@ -6957,7 +6989,7 @@
     "포춘 쿠키 FORTUNE COOKIE",
     "크라운 몬트 쿠키 CROWN MONT COOKIE"
    ],
-   "approved": false
+   "approved": true
   },
   "퀄리티": {
    "kind": "품질",
@@ -6965,7 +6997,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "큐브": {
    "kind": "형상",
@@ -6979,7 +7011,7 @@
     "파워 큐브 POWER CUBE",
     "큐브 스트라이커"
    ],
-   "approved": false
+   "approved": true
   },
   "크리스탈": {
    "kind": "원재료",
@@ -6988,13 +7020,13 @@
     14,
     21
    ],
-   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침)",
+   "note": "귀금속·보석·크리스탈 원재료 표시(그 밖 상품에서는 품질 암시에 그침). 2026-10-11 사람 결정: 3호 상대어 승인(14·21류), 약한 토큰 overrides 해제 상태 유지",
    "examples": [
     "셀럽 크리스탈 살롱컬러 벨지움 다크 쇼콜라",
     "크리스탈",
     "크리스탈 워터 クリスタルウォ-タ- Crystal Water"
    ],
-   "approved": false
+   "approved": true
   },
   "크림": {
    "kind": "형상",
@@ -7012,7 +7044,7 @@
     "닥터스랩 블루마린 크림 dR doctorslab Bluemarine Cream",
     "살리실 크림"
    ],
-   "approved": false
+   "approved": true
   },
   "클럽": {
    "kind": "용도",
@@ -7029,7 +7061,7 @@
     "에머슨내셔널 컨트리 클럽",
     "애머슨내셔널 컨트리 클럽"
    ],
-   "approved": false
+   "approved": true
   },
   "클린": {
    "kind": "효능",
@@ -7044,7 +7076,7 @@
     "하츠 스마트 클린 시스템 Haatz Smart Clean System",
     "디 클린 D-CLEAN"
    ],
-   "approved": false
+   "approved": true
   },
   "타코": {
    "kind": "용도",
@@ -7063,7 +7095,7 @@
     "타코",
     "멕시칸 요녀석 타코 잘 만드는 녀석"
    ],
-   "approved": false
+   "approved": true
   },
   "탑": {
    "kind": "품질",
@@ -7073,7 +7105,21 @@
    "examples": [
     "구미호 유혹의 탑"
    ],
-   "approved": false
+   "approved": true
+  },
+  "테디": {
+   "kind": "형상",
+   "absolute": false,
+   "classes": [
+    28
+   ],
+   "note": "테디베어 — 28류 완구에서 보통명칭 성격(곰 인형의 원재료·형상 표시). 2026-10-11 사람 결정으로 추가(약한 토큰 overrides 해제 상태 유지)",
+   "examples": [
+    "Teddy Bear kids",
+    "테디 베어",
+    "테디베어 사파리 테지움"
+   ],
+   "approved": true
   },
   "톱": {
    "kind": "품질",
@@ -7083,7 +7129,7 @@
    "examples": [
     "KS 톱 10 KS TOP 10"
    ],
-   "approved": false
+   "approved": true
   },
   "특급": {
    "kind": "품질",
@@ -7091,7 +7137,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "특선": {
    "kind": "품질",
@@ -7099,7 +7145,7 @@
    "classes": null,
    "note": "판례 예시(Best·No1·Nice·Super·최고·정상·제일)와 같은 품질 우수성 표시 — 지정상품 불문",
    "examples": [],
-   "approved": false
+   "approved": true
   },
   "파르페": {
    "kind": "용도",
@@ -7115,7 +7161,7 @@
     "파르페 스테이션",
     "해태 아이리스 파르페"
    ],
-   "approved": false
+   "approved": true
   },
   "파운데이션": {
    "kind": "용도",
@@ -7142,7 +7188,7 @@
     "메이뉴욕 포어 킬 커버 파운데이션 MAYNEWYORK PORE KILL COVER FOUNDATION",
     "에블리 더퍼스트 파운데이션 볼륨업 리모델링"
    ],
-   "approved": false
+   "approved": true
   },
   "퍼펙트": {
    "kind": "품질",
@@ -7152,7 +7198,7 @@
    "examples": [
     "퍼펙트 케이오"
    ],
-   "approved": false
+   "approved": true
   },
   "프라임": {
    "kind": "품질",
@@ -7163,7 +7209,7 @@
     "프라임 맥 Prime Mac",
     "프라임 드마리스"
    ],
-   "approved": false
+   "approved": true
   },
   "프로": {
    "kind": "용도",
@@ -7175,7 +7221,8 @@
     "바노바기 울쎄라 프로 pro",
     "프로 락티움 PRO LACTIUM"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "프리미엄": {
    "kind": "품질",
@@ -7187,7 +7234,7 @@
     "프리미엄 휴나 99 Premium HUNA 99",
     "프리미엄 맥주전문점 비플 Beer&Restaurant beeple"
    ],
-   "approved": false
+   "approved": true
   },
   "프리즘": {
    "kind": "용도",
@@ -7215,7 +7262,7 @@
     "프리즘 PRISM",
     "프리즘 Frism"
    ],
-   "approved": false
+   "approved": true
   },
   "플러스": {
    "kind": "품질",
@@ -7227,7 +7274,8 @@
     "하이-C100 플러스",
     "단골+ 단골 플러스"
    ],
-   "approved": false
+   "approved": false,
+   "rejected": true
   },
   "피부과": {
    "kind": "용도",
@@ -7242,7 +7290,7 @@
     "HB HB피부과 HEALTH & BEAUTY",
     "소유 피부과 SOYOO DERMATOLOGY"
    ],
-   "approved": false
+   "approved": true
   },
   "피자": {
    "kind": "용도",
@@ -7262,7 +7310,7 @@
     "울엄마 피자&스파게티 Wool Umma Pizza & Spaghetti",
     "피자 파조 Pizza Pazzo"
    ],
-   "approved": false
+   "approved": true
   },
   "하우스": {
    "kind": "용도",
@@ -7277,7 +7325,7 @@
     "로드 하우스",
     "에이븐 하우스"
    ],
-   "approved": false
+   "approved": true
   },
   "한방": {
    "kind": "원재료",
@@ -7296,7 +7344,7 @@
     "한방 옥수꼬",
     "한방 피부를 다스리는 천상의 기운 더궁"
    ],
-   "approved": false
+   "approved": true
   },
   "한복": {
    "kind": "용도",
@@ -7323,7 +7371,7 @@
     "박우근 한복 아씨 Park woo keun's Hanbok The ASSI",
     "김영미 한복 테이블 램프 YoungMi Hansok Table Lamp"
    ],
-   "approved": false
+   "approved": true
   },
   "한의원": {
    "kind": "용도",
@@ -7338,7 +7386,7 @@
     "해봄 한의원 Korean Medical Clinic",
     "사임당 한의원"
    ],
-   "approved": false
+   "approved": true
   },
   "헤어": {
    "kind": "용도",
@@ -7357,7 +7405,7 @@
     "컬러 디멘션 헤어 살롱 헤어 컬러 두피관리 전문점 Korea Beauty Edutainment Hair Salon Color Dimension",
     "이지영 헤어 컬러 틴트"
    ],
-   "approved": false
+   "approved": true
   },
   "헬스": {
    "kind": "효능",
@@ -7375,7 +7423,7 @@
     "상아 헬스 SANGA Health",
     "헬스 메이트"
    ],
-   "approved": false
+   "approved": true
   },
   "홀로그램": {
    "kind": "용도",
@@ -7402,7 +7450,7 @@
     "홀로그램 HOLOGRAM",
     "홀로그램 렌즈 HOLOGRAM LENS"
    ],
-   "approved": false
+   "approved": true
   },
   "홍삼": {
    "kind": "원재료",
@@ -7421,7 +7469,7 @@
     "홍삼나라 홍삼",
     "고려인삼 홍삼 파낙스 골드 KOREAN RED GINSENG"
    ],
-   "approved": false
+   "approved": true
   },
   "화이트": {
    "kind": "효능",
@@ -7437,7 +7485,7 @@
     "화이트 서지",
     "피죤 화이트 밸런스 Pigeon White Balance"
    ],
-   "approved": false
+   "approved": true
   },
   "후드": {
    "kind": "용도",
@@ -7464,7 +7512,7 @@
     "하츠 스마트 후드 Haatz Smart Hood",
     "하츠 스마트 후드 퓨어 Haatz Smart Hood Pure"
    ],
-   "approved": false
+   "approved": true
   }
  }
 }

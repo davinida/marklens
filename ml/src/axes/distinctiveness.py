@@ -1,7 +1,7 @@
-"""식별력·요부 v0 — 상표명 토큰마다 식별력 점수(0 약함 ~ 1 강함)를 매기고 요부(식별력 있는 부분)를
-고른다. X1·X2 문자 외관·X3 가 `extra_generic` 으로 넘겨받을 "식별력 없는 토큰"을 공급하는 필터다
-(작업가이드 다빈-3). 축 함수가 아니므로 공통-2 규약(파일 없음)은 적용하지 않고, goods_map 처럼
-집계 파일(`shared/distinctiveness/token_stats.json`)을 적재한다. 학습 없음, KIPRIS 호출 없음.
+"""식별력·요부 v0.2 — 상표명 토큰마다 식별력 점수(0 약함 ~ 1 강함)를 매기고 요부(식별력 있는
+부분)를 고른다. X1·X2 문자 외관·X3 가 `extra_generic` 으로 넘겨받을 "식별력 없는 토큰"을 공급하는
+필터다(작업가이드 다빈-3). 축 함수가 아니므로 공통-2 규약(파일 없음)은 적용하지 않고, goods_map
+처럼 집계 파일(`shared/distinctiveness/token_stats.json`)을 적재한다. 학습 없음, KIPRIS 호출 없음.
 
 판례 근거 → v0 반영
     - 요부 판단 요소(대법원 2015후1690): 표장의 일부가 수요자에게 강한 인상을 주거나 전체에서 높은
@@ -13,6 +13,11 @@
       wordfreq 빈도(본질적 식별력), 지정상품 유사군(1호 판정의 상품 상대성)을 점수에 넣는다.
     - 전부 식별력이 없으면 전체로 대비(대법원 2000후2453) → `has_distinctive_part` False 인 이름은
       토큰을 제거하지 않고 전체 문자열로 대비한다(`pair_generic` 이 그 이름의 토큰을 넘기지 않는다).
+    - 결합상태(대법원 2015후1690): 식별력 없는 부분들도 결합된 상태로 수요자에게 인식되면 그 결합이
+      요부가 될 수 있다 → v0.2 결합 규칙: 약한 토큰 2개 이상이 같은 순서로 양쪽 이름에 있으면 그
+      결합을 요부 후보로 보고 `pair_generic` 이 그 토큰들을 넘기지 않는다(`combined_weak_run`;
+      Cool Touch / 쿨터치 COOL TOUCH 는 전체로 대비, 단일 토큰·순서가 다르면 미적용). 심결례
+      distinct_drop 14건 중 13건이 떼어낸 공통 토큰을 요부·유사 근거로 명시한 데서 왔다.
     - 상표법 33조 1항: 1호 보통명칭(goods_codes 가 있으면 그 류·유사군의 고시 명칭과 일치할 때만,
       없으면 전역 고시 단일 명칭 일치), 4호 현저한 지리적 명칭(X1 지명표 34 + 시·군·구 목록),
       5호 흔한 성(상위 30 + "~네/~가네/~씨네"), 6호 간단하고 흔한 표장(영문 2자 이하·숫자 2자 이하·
@@ -24,16 +29,19 @@
       절차는 docs/MarkLens_식별력_설계.md §3-3.
 
 점수 구성(토큰 하나)
-    유명 브랜드(브랜드표 101 + famous_brands.txt) → 1.0 고정.
+    유명 브랜드(브랜드표 101 + famous_brands.txt 의 출원인 핵심 토큰·브랜드 토큰) → 1.0 고정.
     33조 1항 유형(1·3·4·5·6호)에 해당 → 0.0.
+    사람 검토 제외(weak_token_overrides.json 의 excluded) → 통계 약화 없이 1.0(3호 상품 미상 상한은
+    적용 — v0.2 부터 법정 사유가 overrides 보다 앞선다).
     그 외 → 본질적 식별력 × 다수 등록 계수.
         본질적 식별력 = 1 − 0.5 × clamp((zipf − 3.0) / (5.5 − 3.0), 0, 1)  (일반어 0.5 하한, 조어 1)
         다수 등록 계수 = 1 − min(1, A/θ_A) × min(1, N/θ_N)                  (A·N 둘 다 커야 0)
     요부 후보 = 점수 ≥ θ(0.5) 인 토큰. 하나도 없으면 요부 없음(전체 대비).
 
-알려진 한계(v0): 3호 기술적 표장 미반영(후속), 강한 인상·전체 비중·결합으로 인한 새 관념 미반영,
-A·N 은 등록원부가 아니라 심판 목록 표본이라 실제보다 작다, 영문 고시 명칭 미대조, 한자 토큰은
-버린다.
+알려진 한계(v0.2): 3호는 사람이 승인한 목록(상대어 378·절대어 57)만, 강한 인상·전체 비중·결합으로
+인한 새 관념 미반영(결합 규칙은 양쪽에 같은 순서로 있는 약한 토큰열만 — 붙여쓴 결합어(QUICKPATH)
+대 띄어쓴 토큰열(QUICK PASS)은 미적용), A·N 은 등록원부가 아니라 심판 목록 표본이라 실제보다
+작다, 영문 고시 명칭 미대조, 한자 토큰은 버린다.
 
     token_score("커피", {"G0301"})     # 0.0 — 커피 유사군이면 1호 보통명칭(화장품 유사군이면 아님)
     salient_tokens("스타벅스 커피")      # [("스타벅스", 1.0)] — 유명 브랜드 예외
@@ -56,7 +64,8 @@ from .x3_semantic import token_zipf
 
 __all__ = [
     "Distinctiveness", "TokenJudgement", "DescriptiveTerm", "load_distinctiveness", "token_score",
-    "salient_tokens", "weak_tokens", "has_distinctive_part", "pair_generic", "famous_tokens",
+    "salient_tokens", "weak_tokens", "has_distinctive_part", "pair_generic", "combined_weak_run",
+    "famous_tokens",
     "goods_index", "read_descriptive_terms", "validate_descriptive_terms", "unapproved_terms",
     "update_descriptive_approvals", "read_weak_overrides", "update_weak_overrides",
     "DESCRIPTIVE_TERMS", "DESCRIPTIVE_KINDS", "THETA", "THETA_A", "THETA_N",
@@ -473,8 +482,6 @@ class Distinctiveness:
         goods = frozenset(c.strip().upper() for c in (goods_codes or ()) if c and c.strip())
         if token in self.famous:
             return TokenJudgement(token, 1.0, ("유명 브랜드",))
-        if token in self.overrides:
-            return TokenJudgement(token, 1.0, ("사람 검토 제외(weak_token_overrides)",))
         reasons: list[str] = []
         descriptive = DESCRIPTIVE_TERMS if self.descriptive is None else self.descriptive
         cap: float | None = None
@@ -504,14 +511,22 @@ class Distinctiveness:
             reasons.append("6호 간단 표장")
         if reasons:
             return TokenJudgement(token, 0.0, tuple(reasons))
-        intrinsic, zipf = intrinsic_score(token)
-        applicants, marks = self.stats.get(token, (0, 0))
-        factor = registration_factor(applicants, marks, theta_a=self.theta_a, theta_n=self.theta_n)
-        if intrinsic < 1.0:
-            reasons.append(f"일반어(zipf {zipf:.1f})")
-        if factor < 1.0:
-            reasons.append(f"다수 등록(A={applicants}, N={marks})")
-        score = intrinsic * factor
+        if token in self.overrides:
+            # v0.2: 사람이 "약하지 않다"고 뺀 토큰은 통계 약화(일반어·다수 등록)만 건너뛴다.
+            # 33조 1항 사유(위)와 3호 상품 미상 상한(아래)은 그대로 적용된다.
+            score = 1.0
+            reasons.append("사람 검토 제외(weak_token_overrides)")
+        else:
+            intrinsic, zipf = intrinsic_score(token)
+            applicants, marks = self.stats.get(token, (0, 0))
+            factor = registration_factor(
+                applicants, marks, theta_a=self.theta_a, theta_n=self.theta_n
+            )
+            if intrinsic < 1.0:
+                reasons.append(f"일반어(zipf {zipf:.1f})")
+            if factor < 1.0:
+                reasons.append(f"다수 등록(A={applicants}, N={marks})")
+            score = intrinsic * factor
         if cap is not None and score > cap:
             score = cap
             reasons.append(cap_reason)
@@ -544,17 +559,56 @@ class Distinctiveness:
     def has_distinctive_part(self, name: str, goods_codes: Iterable[str] | None = None) -> bool:
         return bool(self.salient_tokens(name, goods_codes))
 
+    def combined_weak_run(
+        self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+    ) -> tuple[str, ...]:
+        """결합 규칙 v0.2(2015후1690 결합상태): 약한 토큰 2개 이상이 같은 순서로 양쪽 이름에
+        있으면 그 결합을 하나의 요부 후보로 본다. 양쪽 약한 토큰열(이름 순서)의 가장 긴 공통
+        부분열을 돌려주고, 2개 미만이면 ()."""
+        weak_a = [j.token for j in self.judge_name(name_a, goods_codes) if j.score < self.theta]
+        weak_b = [j.token for j in self.judge_name(name_b, goods_codes) if j.score < self.theta]
+        run = _common_subsequence(weak_a, weak_b)
+        return run if len(run) >= 2 else ()
+
     def pair_generic(
         self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
     ) -> frozenset[str]:
         """축 연결용: 두 이름의 약한 토큰 합집합. 요부가 하나도 없는 이름은 토큰을 넘기지 않는다
-        (전부 식별력이 없으면 전체로 대비 — 2000후2453). X1 의 제거 전 전체 결합 후보는 X1 이
-        유지한다."""
+        (전부 식별력이 없으면 전체로 대비 — 2000후2453). 양쪽에 같은 순서로 있는 약한 토큰
+        2개 이상의 결합(`combined_weak_run`)은 요부 후보로 보아 넘기지 않는다(v0.2). X1 의 제거
+        전 전체 결합 후보는 X1 이 유지한다."""
         generic: set[str] = set()
         for name in (name_a, name_b):
             if self.has_distinctive_part(name, goods_codes):
                 generic |= self.weak_tokens(name, goods_codes)
+        generic -= set(self.combined_weak_run(name_a, name_b, goods_codes))
         return frozenset(generic)
+
+
+def _common_subsequence(left: list[str], right: list[str]) -> tuple[str, ...]:
+    """두 토큰열의 가장 긴 공통 부분열(순서 유지, 인접 불요). 길이가 같은 후보가 여럿이면 앞쪽
+    토큰을 우선한다(결정적)."""
+    if not left or not right:
+        return ()
+    table = [[0] * (len(right) + 1) for _ in range(len(left) + 1)]
+    for i in range(len(left) - 1, -1, -1):
+        for j in range(len(right) - 1, -1, -1):
+            if left[i] == right[j]:
+                table[i][j] = table[i + 1][j + 1] + 1
+            else:
+                table[i][j] = max(table[i + 1][j], table[i][j + 1])
+    out: list[str] = []
+    i = j = 0
+    while i < len(left) and j < len(right):
+        if left[i] == right[j]:
+            out.append(left[i])
+            i += 1
+            j += 1
+        elif table[i + 1][j] >= table[i][j + 1]:
+            i += 1
+        else:
+            j += 1
+    return tuple(out)
 
 
 # ---- 적재 ------------------------------------------------------------------------------------
@@ -628,3 +682,9 @@ def pair_generic(
     name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
 ) -> frozenset[str]:
     return load_distinctiveness().pair_generic(name_a, name_b, goods_codes)
+
+
+def combined_weak_run(
+    name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+) -> tuple[str, ...]:
+    return load_distinctiveness().combined_weak_run(name_a, name_b, goods_codes)

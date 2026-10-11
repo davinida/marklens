@@ -41,10 +41,10 @@ LABELS = [
         llm_b_유사여부="비유사", llm_b_판단축="상품", 상표유형_추정="문자",
         상대표장_명칭_본문="커피빈", 상대표장_명칭_ocr="ocr이름",
     ),
-    # 3: pass a·b 불일치 → 대상 아님
+    # 3: pass a·b 불일치 — 2026-10-11 부터 유사여부_확정 우선(대상). 이름 B 없음
     _label(
         심판번호="R3", 종류="거절결정불복", 상표A_명칭="A", 상표B_번호="333",
-        유사여부_확정="유사", llm_b_유사여부="비유사",
+        유사여부_확정="유사", 판단축_확정="호칭", llm_b_유사여부="비유사",
     ),
     # 4: 이름 B 없음(조회 결과 상표명 빈 도형) → 이름 축 결측, 이미지 쌍은 사건에 하나뿐이라 연결
     _label(
@@ -94,7 +94,8 @@ def paths(tmp_path):
 
 def test_target_rows_and_name_priority():
     rows = pf.target_rows(LABELS)
-    assert [r["심판번호"] for r in rows] == ["R1", "R2", "R4", "R5"]
+    assert [r["심판번호"] for r in rows] == ["R1", "R2", "R3", "R4", "R5"]
+    assert pf.target_rows([_label(유사여부_확정="제외", llm_b_유사여부="유사")]) == []
     assert pf.name_b(LABELS[0]) == ("스타박스", "kipris")
     assert pf.name_b(LABELS[1]) == ("커피빈", "본문")
     assert pf.name_b(LABELS[4]) == ("ZYQRT", "ocr")
@@ -106,7 +107,7 @@ def test_target_rows_and_name_priority():
 
 def test_build_features_scores_flags_and_image_join():
     features = {f["심판번호"]: f for f in pf.build_features(LABELS, IMAGE_PAIRS)}
-    assert set(features) == {"R1", "R2", "R4", "R5"}
+    assert set(features) == {"R1", "R2", "R3", "R4", "R5"}
     assert list(features["R1"]) == pf.COLUMNS
     r1 = features["R1"]
     assert r1["이름B"] == "스타박스" and r1["이름B_출처"] == "kipris" and r1["표장라벨"] == "유사"
@@ -139,19 +140,19 @@ def test_run_writes_csv_and_report(paths):
     labels, pairs, out = paths
     report = pf.run(labels, pairs, out)
     rows = pf.read_csv(out)
-    assert len(rows) == 4 and list(rows[0]) == pf.COLUMNS
-    assert report["대상_행"] == 4
-    assert report["이름B_출처"] == {"kipris": 1, "본문": 1, "ocr": 1, "(없음)": 1}
+    assert len(rows) == 5 and list(rows[0]) == pf.COLUMNS
+    assert report["대상_행"] == 5
+    assert report["이름B_출처"] == {"kipris": 1, "본문": 1, "ocr": 1, "(없음)": 2}
     assert report["축별_결측"] == {
-        "x1": 1, "x2_text": 1, "x2_fig": 3, "x2_whole": 2, "x3": 1, "x3_raw": 1, "x4": 3,
-        "x1_d": 1, "x2_text_d": 1, "x3_d": 1,
+        "x1": 2, "x2_text": 2, "x2_fig": 4, "x2_whole": 3, "x3": 2, "x3_raw": 2, "x4": 4,
+        "x1_d": 2, "x2_text_d": 2, "x3_d": 2,
     }
     # 스타벅스(조어)·커피빈(붙여쓴 합성어 폴백 실패)·Zyqrt 가 has_meaning False → R1·R2·R5
     assert report["게이트_꺼짐"]["x3(has_meaning 한쪽 False)"] == 3
-    assert report["표장라벨"] == {"유사": 2, "(없음)": 1, "비유사": 1}
+    assert report["표장라벨"] == {"유사": 3, "(없음)": 1, "비유사": 1}
     assert report["x3_모델"] == "fake"
     saved = json.loads(out.with_name("pairs_features_report.json").read_text(encoding="utf-8"))
-    assert saved["대상_행"] == 4
+    assert saved["대상_행"] == 5
 
 
 # ---- 식별력 v0·LLM 명칭·쉬운 음성 ------------------------------------------------------------
