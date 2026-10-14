@@ -1,8 +1,11 @@
 """KIPRIS 클라이언트 단위 테스트 — 전부 네트워크 없이 동작한다."""
 
 import json
+from io import BytesIO
 
+import httpx
 import pytest
+from PIL import Image
 
 from backend.src.core import kipris_client as kc
 from backend.src.core.kipris_client import (
@@ -181,9 +184,11 @@ def test_get_applies_per_request_timeout(monkeypatch):
 
 def test_download_upgrades_official_legacy_http_url(monkeypatch, tmp_path):
     calls = []
+    image_bytes = _image_bytes()
 
     class FakeResponse:
-        content = b"image-bytes"
+        content = image_bytes
+        headers = {"content-type": "image/png"}
 
         def raise_for_status(self):
             return None
@@ -198,11 +203,136 @@ def test_download_upgrades_official_legacy_http_url(monkeypatch, tmp_path):
     kc.download_file_now(
         "http://plus.kipris.or.kr/fileToss.jsp?token=temporary",
         dest,
+        validate_image=True,
     )
 
     assert calls == ["https://plus.kipris.or.kr/fileToss.jsp?token=temporary"]
-    assert dest.read_bytes() == b"image-bytes"
+    assert dest.read_bytes() == image_bytes
     assert not (tmp_path / "mark.png.part").exists()
+
+
+def _image_bytes(image_format="PNG"):
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), "red").save(buffer, format=image_format)
+    return buffer.getvalue()
+
+
+@pytest.mark.parametrize("image_format", ["PNG", "JPEG", "WEBP", "GIF", "TIFF", "BMP"])
+@pytest.mark.parametrize("content_type", ["image/png", "application/octet-stream", None])
+def test_download_accepts_decodable_images(
+    monkeypatch, tmp_path, image_format, content_type
+):
+    body = _image_bytes(image_format)
+    headers = {"content-type": content_type} if content_type else {}
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, content=body, headers=headers)
+    )) as client:
+        monkeypatch.setattr(kc, "_get_client", lambda: client)
+        dest = tmp_path / "mark.png"
+        assert kc.download_file_now(
+            "https://plus.kipris.or.kr/fileToss.jsp", dest, validate_image=True
+        ) == dest
+    assert dest.read_bytes() == body
+    assert not dest.with_suffix(".png.part").exists()
+
+
+@pytest.mark.parametrize("body,content_type", [
+    (b"", "image/png"),
+    (b"<html>expired</html>", "text/html"),
+    (b"<response><error>expired</error></response>", "application/xml"),
+    (b"{\"error\":\"expired\"}", "application/json"),
+    (b"<html>expired</html>", "image/png"),
+    (b"\x89PNG\r\n\x1a\ninvalid", "image/png"),
+    (_image_bytes("JPEG")[:100], "image/jpeg"),
+    (_image_bytes(), "text/html; charset=utf-8"),
+])
+@pytest.mark.parametrize("existing", [False, True])
+def test_download_rejects_invalid_content_without_publishing(
+    monkeypatch, tmp_path, body, content_type, existing
+):
+    dest = tmp_path / "mark.png"
+    original = _image_bytes()
+    if existing:
+        dest.write_bytes(original)
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(
+            200, content=body, headers={"content-type": content_type}
+        )
+    )) as client:
+        monkeypatch.setattr(kc, "_get_client", lambda: client)
+        with pytest.raises(kc.KiprisProtocolError):
+            kc.download_file_now(
+                "https://plus.kipris.or.kr/fileToss.jsp?token=secret", dest, validate_image=True
+            )
+    if existing:
+        assert dest.read_bytes() == original
+    else:
+        assert not dest.exists()
+    assert not dest.with_suffix(".png.part").exists()
+
+
+def test_download_decode_error_does_not_expose_url(monkeypatch, tmp_path):
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, content=b"expired")
+    )) as client:
+        monkeypatch.setattr(kc, "_get_client", lambda: client)
+        with pytest.raises(kc.KiprisProtocolError) as exc:
+            kc.download_file_now(
+                "https://plus.kipris.or.kr/fileToss.jsp?token=secret", tmp_path / "mark.png",
+                validate_image=True,
+            )
+    assert "secret" not in str(exc.value)
+    assert exc.value.__cause__ is None
+
+
+@pytest.mark.parametrize("max_pixels", [20, 40])
+def test_download_rejects_decompression_bomb(monkeypatch, tmp_path, max_pixels):
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", max_pixels)
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, content=_image_bytes())
+    )) as client:
+        monkeypatch.setattr(kc, "_get_client", lambda: client)
+        dest = tmp_path / "mark.png"
+        with pytest.raises(kc.KiprisProtocolError):
+            kc.download_file_now(
+                "https://plus.kipris.or.kr/fileToss.jsp", dest, validate_image=True
+            )
+    assert not dest.exists()
+    assert not dest.with_suffix(".png.part").exists()
+
+
+def test_download_publish_failure_cleans_partial_file(monkeypatch, tmp_path):
+    dest = tmp_path / "mark.png"
+    original = _image_bytes("JPEG")
+    dest.write_bytes(original)
+
+    def deny_replace(*args):
+        raise OSError("disk error")
+
+    monkeypatch.setattr(kc.os, "replace", deny_replace)
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(200, content=_image_bytes())
+    )) as client:
+        monkeypatch.setattr(kc, "_get_client", lambda: client)
+        with pytest.raises(OSError, match="disk error"):
+            kc.download_file_now(
+                "https://plus.kipris.or.kr/fileToss.jsp", dest, validate_image=True
+            )
+    assert dest.read_bytes() == original
+    assert not dest.with_suffix(".png.part").exists()
+
+
+def test_generic_download_preserves_trial_pdf_contract(monkeypatch, tmp_path):
+    body = b"%PDF-1.7\ntrial-document"
+    with httpx.Client(transport=httpx.MockTransport(
+        lambda request: httpx.Response(
+            200, content=body, headers={"content-type": "application/pdf"}
+        )
+    )) as client:
+        monkeypatch.setattr(kc, "_get_client", lambda: client)
+        dest = tmp_path / "trial.pdf"
+        assert kc.download_file_now("https://plus.kipris.or.kr/fileToss.jsp", dest) == dest
+    assert dest.read_bytes() == body
 
 
 def test_filter_registered_only():
