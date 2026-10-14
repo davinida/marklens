@@ -18,9 +18,13 @@ main() 은 항상 --dry-run + config.DATABASE_URL="" 로 이중 차단한다(실
 import json
 import os
 import subprocess
+import sys
+from io import BytesIO
 from pathlib import Path
 
+import httpx
 import pytest
+from PIL import Image
 
 from backend.scripts import collect_pipeline as cp
 from backend.src.core import kipris_client as kc
@@ -84,6 +88,125 @@ XML_APPLICANT = """<?xml version="1.0" encoding="UTF-8"?>
   </items></body>
 </response>
 """
+
+
+@pytest.mark.parametrize("payload", [
+    b"{", b"\xff", b"[]", b"null", b"{}",
+    b'{"schema_version": 3}', b'{"cursors": {}}',
+    b'{"collected": "4020210000001"}',
+    b'{"collected": null}',
+    b'{"collected": [null]}',
+    b'{"collected": [""]}',
+    b'{"cursors": []}',
+    b'{"cursors": {"source": null}}',
+    b'{"cursors": {"source": {"page": 0, "offset": 0}}}',
+    b'{"cursors": {"source": {"page": true, "offset": 0}}}',
+    b'{"cursors": {"source": {"page": 1, "offset": -1}}}',
+    b'{"cursors": {"source": {"page": "two", "offset": 0}}}',
+    b'{"cursors": {"source": {"page": 1}}}',
+    b'{"cursors": {"source": {"page": 1, "offset": 0, "rows_per_page": 0}}}',
+    b'{"schema_version": 4}', b'{"schema_version": true}',
+])
+def test_corrupt_checkpoint_fails_closed_and_is_preserved(tmp_path, payload):
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_bytes(payload)
+    actions = [
+        lambda: cp.load_checkpoint(checkpoint),
+        lambda: cp.load_cursor("source", checkpoint),
+        lambda: cp.update_checkpoint(["4020210000002"], path=checkpoint),
+    ]
+    for action in actions:
+        with pytest.raises(ValueError, match="체크포인트"):
+            action()
+        assert checkpoint.read_bytes() == payload
+        assert not checkpoint.with_suffix(".json.tmp").exists()
+
+
+def test_unreadable_checkpoint_fails_closed(tmp_path, monkeypatch):
+    checkpoint = tmp_path / "checkpoint.json"
+    checkpoint.write_text("{}", encoding="utf-8")
+    original_read = Path.read_text
+
+    def deny_read(path, *args, **kwargs):
+        if path == checkpoint:
+            raise PermissionError("denied")
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", deny_read)
+    with pytest.raises(ValueError, match="체크포인트"):
+        cp.update_checkpoint(["4020210000002"], path=checkpoint)
+    assert checkpoint.read_bytes() == b"{}"
+
+
+@pytest.mark.parametrize("version", [None, 1, 2, 3])
+def test_valid_legacy_checkpoint_retains_progress(tmp_path, version):
+    checkpoint = tmp_path / "checkpoint.json"
+    payload = {
+        "collected": ["4020210000001"],
+        "cursors": {"source": {"page": 2, "offset": 17}},
+    }
+    if version is not None:
+        payload["schema_version"] = version
+    checkpoint.write_text(json.dumps(payload), encoding="utf-8")
+    assert cp.load_checkpoint(checkpoint) == {"4020210000001"}
+    assert cp.load_cursor("source", checkpoint, rows_per_page=500) == (2, 17)
+    cp.update_checkpoint(["4020210000002"], path=checkpoint)
+    assert cp.load_checkpoint(checkpoint) == {"4020210000001", "4020210000002"}
+    assert cp.load_cursor("source", checkpoint, rows_per_page=500) == (2, 17)
+
+
+def test_missing_checkpoint_starts_fresh(tmp_path):
+    checkpoint = tmp_path / "checkpoint.json"
+    assert cp.load_checkpoint(checkpoint) == set()
+    assert cp.load_cursor("source", checkpoint) == (1, 0)
+    cp.update_checkpoint(["4020210000001"], path=checkpoint)
+    assert cp.load_checkpoint(checkpoint) == {"4020210000001"}
+
+
+def test_main_stops_before_api_or_db_on_corrupt_checkpoint(sandbox, monkeypatch, capsys):
+    payload = b"{invalid"
+    cp.CHECKPOINT_PATH.write_bytes(payload)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A corrupt checkpoint must stop before collection side effects")
+
+    monkeypatch.setattr(cp, "load_db_app_numbers", forbidden)
+    monkeypatch.setattr(cp, "iter_search_pages", forbidden)
+    monkeypatch.setattr(kc, "download_file_now", forbidden)
+    monkeypatch.setattr(cp, "upsert_rows", forbidden)
+    monkeypatch.setattr(sys, "argv", ["collect_pipeline", "--applicant", "source", "--skip-index"])
+    assert cp.main() == 1
+    assert "체크포인트" in capsys.readouterr().err
+    assert cp.CHECKPOINT_PATH.read_bytes() == payload
+    assert not cp.COLLECT_RAW_XML_DIR.exists()
+    assert not cp.INDEX_DIRTY_PATH.exists()
+
+
+def test_invalid_download_keeps_retry_cursor_and_is_not_upserted(sandbox, monkeypatch):
+    items = [kc.normalize_advanced_item(it) for it in kc.parse_items(XML_APPLICANT)]
+    items[1]["ImagePath"] = "https://plus.kipris.or.kr/fileToss.jsp?a=2"
+    monkeypatch.setattr(cp, "iter_search_pages", lambda *a, **kw: iter([
+        cp.SearchPage("source", 1, items[:2], 2, False)
+    ]))
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), "red").save(buffer, format="PNG")
+
+    def response(request):
+        body = buffer.getvalue() if request.url.params["a"] == "1" else b"<html>expired</html>"
+        return httpx.Response(200, content=body, headers={"content-type": "image/png"})
+
+    with httpx.Client(transport=httpx.MockTransport(response)) as client:
+        monkeypatch.setattr(kc, "_get_client", lambda: client)
+        monkeypatch.setattr(
+            sys, "argv", ["collect_pipeline", "--applicant", "source", "--skip-index"]
+        )
+        assert cp.main() == 0
+    assert [row[0] for row in sandbox["captured"]["rows"]] == [
+        "4020210000001"
+    ]
+    assert cp.load_checkpoint() == {"4020210000001"}
+    assert cp.load_cursor("source", rows_per_page=100) == (1, 1)
+    assert not (sandbox["images"] / "4020210000002.png").exists()
 
 
 def _fresh_report() -> dict:
@@ -756,7 +879,8 @@ def sandbox(tmp_path, monkeypatch):
 def _counting_download(calls, *, raise_on=None):
     """실 다운로드 대체 mock — 호출을 세고 tmp 에 더미 PNG 를 쓴다.
     raise_on(1-기반)번째 호출에서 KeyboardInterrupt 를 던져 사용자 중단을 시뮬레이션."""
-    def _dl(url, dest):
+    def _dl(url, dest, *, validate_image=False):
+        assert validate_image is True
         calls.append(url)
         if raise_on is not None and len(calls) == raise_on:
             raise KeyboardInterrupt("사용자 중단 시뮬레이션")
