@@ -34,10 +34,12 @@ import re
 import threading
 import time
 import unicodedata
+import warnings
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from io import BytesIO
 from pathlib import Path
 from typing import Iterator, Optional
 from urllib.parse import urlsplit, urlunsplit
@@ -51,6 +53,7 @@ else:
     import fcntl
 
 import httpx
+from PIL import Image
 
 from . import paths
 
@@ -1043,11 +1046,37 @@ def bibliography_detail(application_number: str) -> dict:
     return parse_bibliography_detail(bibliography_detail_raw(application_number))
 
 
-def download_file_now(url: str, dest: Path) -> Path:
+def _validate_downloaded_image(content: bytes, content_type: str) -> None:
+    """HTTP 200 오류 문서와 손상된 이미지를 저장 전에 차단한다."""
+    mime_type = content_type.split(";", 1)[0].strip().lower()
+    if mime_type and not (
+        mime_type.startswith("image/")
+        or mime_type in {"application/octet-stream", "binary/octet-stream"}
+    ):
+        raise KiprisProtocolError("KIPRIS 이미지 서버가 이미지가 아닌 응답을 반환했습니다.")
+    if not content:
+        raise KiprisProtocolError("KIPRIS 이미지 응답이 비어 있습니다.")
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(BytesIO(content)) as image:
+                image.verify()
+            # verify만으로는 일부 잘린 파일의 픽셀 데이터 오류를 검출하지 못한다.
+            with Image.open(BytesIO(content)) as image:
+                image.load()
+    except (OSError, ValueError, SyntaxError,
+            Image.DecompressionBombWarning, Image.DecompressionBombError):
+        # 서버 본문·일회성 URL을 예외 메시지에 포함하지 않는다.
+        raise KiprisProtocolError("KIPRIS 이미지 응답이 손상되었거나 유효하지 않습니다.") from None
+
+
+def download_file_now(url: str, dest: Path, *, validate_image: bool = False) -> Path:
     """
     fileToss.jsp 류의 일회성 링크를 즉시 다운로드한다.
 
     주의: 이 링크는 시한부다 — 응답에서 받자마자 호출할 것 (모아뒀다 열면 만료).
+    상표 이미지 수집은 validate_image=True로 본문을 검증한다.
+    심판문 PDF도 사용하는 공용 함수라 기본값은 기존 바이너리 다운로드 계약을 유지한다.
     """
     url = _secure_kipris_download_url(url)
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -1061,7 +1090,12 @@ def download_file_now(url: str, dest: Path) -> Path:
         raise KiprisNetworkError("KIPRIS 이미지 서버가 HTTP 오류를 반환했습니다.") from None
     except httpx.RequestError:
         raise KiprisNetworkError("KIPRIS 이미지를 다운로드하지 못했습니다.") from None
+    if validate_image:
+        _validate_downloaded_image(resp.content, resp.headers.get("content-type", ""))
     tmp = dest.with_suffix(dest.suffix + ".part")
-    tmp.write_bytes(resp.content)
-    os.replace(tmp, dest)
+    try:
+        tmp.write_bytes(resp.content)
+        os.replace(tmp, dest)
+    finally:
+        tmp.unlink(missing_ok=True)
     return dest
