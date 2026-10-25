@@ -1,6 +1,6 @@
 # MarkLens 통합 모델 설계 초안 — 판례가 정한 구조
 
-- 기준일: 2026-10-11 (초안 v0.1 2026-10-01, §4 정답 데이터 현황 2026-10-08, §4-2 재측정 2026-10-09, §4-3 정답 데이터 단계 마감·학습 입력 정의, §4-4 학습 전 입력 정리, §7 1차 학습 결과, §7-1 v1.1 편향 제거·결합 방법 비교·판례 사전분포, §7-2 v1.2 절편 자유·요부 재설계·도형 보류 규칙·쉬운 음성 검토, **§7-2 끝 v1.2.1 모델 단계 마감(위험 등급 최소 지지 30·σ 1.0 고정) — 모두 2026-10-11**, §8 서비스 연결 엔진 E-1~E-6 2026-10-24) · 상태: **v1.2.1 학습 완료(`shared/model/risk_model_v1.json` version risk_model_v1.2.1, 런타임 `ml/src/model/risk_model.py`) — 모델 단계 마감, 서비스 미연결(다음 단계는 README "다음 단계")** · 학습: `ml/scripts/train_risk_model.py`(EBM·GBM 비교는 `ml/requirements-experiments.txt`) · 입력 축: X1 `ml/src/axes/x1_phonetic.py`(v1.5) · X2 `ml/src/scoring.py`(CLIP 시각 유사도) + 문자 외관 `ml/src/axes/x2_ortho.py`(철자, 2026-10-08) · X3 `ml/src/axes/x3_semantic.py`(v1.3) · X4 `ml/src/axes/x4_goods.py`(v1) · 정답 데이터: `backend/scripts/trials_collect.py`(PR #29~#31 병합) · 보강 `backend/scripts/trials_enrich.py`(2026-10-08, 브랜치 `feat/trials-enrich`)
+- 기준일: 2026-10-11 (초안 v0.1 2026-10-01, §4 정답 데이터 현황 2026-10-08, §4-2 재측정 2026-10-09, §4-3 정답 데이터 단계 마감·학습 입력 정의, §4-4 학습 전 입력 정리, §7 1차 학습 결과, §7-1 v1.1 편향 제거·결합 방법 비교·판례 사전분포, §7-2 v1.2 절편 자유·요부 재설계·도형 보류 규칙·쉬운 음성 검토, **§7-2 끝 v1.2.1 모델 단계 마감(위험 등급 최소 지지 30·σ 1.0 고정) — 모두 2026-10-11**, §8 서비스 연결 엔진 E-1~E-6 2026-10-24, §8 유형 규칙 개정 2026-10-25) · 상태: **v1.2.1 학습 완료(`shared/model/risk_model_v1.json` version risk_model_v1.2.1, 런타임 `ml/src/model/risk_model.py`) — 모델 단계 마감, 서비스 미연결(다음 단계는 README "다음 단계")** · 학습: `ml/scripts/train_risk_model.py`(EBM·GBM 비교는 `ml/requirements-experiments.txt`) · 입력 축: X1 `ml/src/axes/x1_phonetic.py`(v1.5) · X2 `ml/src/scoring.py`(CLIP 시각 유사도) + 문자 외관 `ml/src/axes/x2_ortho.py`(철자, 2026-10-08) · X3 `ml/src/axes/x3_semantic.py`(v1.3) · X4 `ml/src/axes/x4_goods.py`(v1) · 정답 데이터: `backend/scripts/trials_collect.py`(PR #29~#31 병합) · 보강 `backend/scripts/trials_enrich.py`(2026-10-08, 브랜치 `feat/trials-enrich`)
 - 관련 문서: [X1 설계](MarkLens_X1_호칭유사도_설계.md) §8 통합 인터페이스, [X3 설계](MarkLens_X3_관념유사도_설계.md) §7, [X4 설계](MarkLens_X4_상품견련성_설계.md) §2 근사 한계, README "다축 모델과 축 함수".
 
 ## 1. 목적
@@ -419,7 +419,7 @@ JSON `standalone_thresholds`·`standalone_precision` 0.7, 런타임 `risk_score`
 - **유형(E-4)**: easyocr(ko·en, CPU, 지연 로드, `MARKLENS_OCR_ENABLED` 기본 1, `MARKLENS_OCR_TIMEOUT` 2초, 모델 디렉터리
   `EASYOCR_MODULE_PATH`) → 글자 면적·나머지 면적으로 `auto_type` 규칙 0.05/0.08(x2_split 과 같은 코드 `ml/src/mark_type.py`). 실패·
   시간 초과·비활성이면 fallback(이름 있으면 문자, 없으면 도형) + caveat. DB 1,100건 유형 사전 계산(`ml/scripts/precompute_types.py`):
-  결합 993·도형 107 — 근거 상표구분 100·비엔나코드 1,000, OCR 폴백 0(모든 건에 비엔나코드가 있어 규칙만으로 끝난다).
+  결합 993·도형 107 — 근거 상표구분 100·비엔나코드 1,000, OCR 폴백 0(모든 건에 비엔나코드가 있어 규칙만으로 끝난다). → **2026-10-25 개정**: 아래 "유형 규칙 개정".
 - **위험도·정렬·overall(E-5)**: `risk_score` 기여도를 X1(x1·×문자계·×요부없음)·X2(x2_text·x2_img·×도형계)·X3·X4·요부로 묶고 `miss_*`
   는 `missing_adjustment` 로 따로(절편 + Σ기여도 + 결측 = 로짓, 테스트가 모든 후보에서 ±0.001 검산). `rule_triggers` 는 단독 임계
   (x1 ≥ 0.98·x2_text ≥ 0.75·x3 ≥ 0.7707)와 도형 규칙(도형계 ∧ x2_img ≥ 0.9). 정렬은 p 내림차순 → x2_img 내림차순 → 출원번호.
@@ -436,5 +436,20 @@ JSON `standalone_thresholds`·`standalone_precision` 0.7, 런타임 `risk_score`
   크게 바꾸는 것이 보인다(화면의 "유형 고치기"가 필요한 이유). 목표 300ms(OCR 제외) 안.
 - **테스트**: 63건 추가(전체 1,159 passed·26 skipped) — 입력 조합 7가지·caveat 문구 == 계약 표·§3 예시와 키 집합 동일·로짓 검산·
   규칙 트리거·정렬·예외 3종·FAKE_ML 동작·로그에 검색어 없음. FAKE_ML 에서는 가짜 CLIP·X3·OCR 로 돌고 계수 JSON 은 실제.
+- **유형 규칙 개정(2026-10-25, `feat/query-type-rule`, 계약 §2-4 5항)**: OCR 을 유형의 최종 결정자에서 "이름이 없을 때 글자를
+  찾아 주는 도우미"로 바꿨다. 이름이 있으면 **항상 문자계**(이미지 없음·OCR fig_ratio < 0.08 → 문자, 그 외 → 결합-문자요부, OCR
+  실패도 문자 + `OCR_FALLBACK`), 도형계는 이름 없는 이미지 질의(글자 영역 ≥ 0.05 면 결합-도형요부)와 `type_override` 두 경우만.
+  이름 없는 이미지 질의에서 OCR 이 읽은 글자(확신도 ≥ 0.5 박스, 읽기 순서, 60자 — `ocr.suggested_text`)는
+  `overall.query_type.suggested_name` + caveat `NAME_SUGGESTED` 로 돌려주고 이 요청에서 이름 축은 계산하지 않는다(사용자 확인 뒤
+  재요청). 이유: OCR 오판(X2 설계 §7 유형 일치 76%)이 이름 있는 질의의 `x1×문자계`(+2.27 로짓)를 지웠다.
+  **전후 실측(실제 엔진, 이 Mac, 2026-10-25)**: 셋 다(블루커피 + 카페 세트 + 도형상표 이미지) 1위 BLU hands **p 0.08 → 0.474(검토
+  권장)**, 유형 도형 → 결합-문자요부(fig_ratio 0.717), 191ms(풀 74). 위험(하한 0.563)으로는 돌아오지 않는다 — 같은 쌍(x1 1.0·
+  x2_text 0.0·x3 0.92·x4 결측)을 유형 × x2_img 로 분해하면 문자계 ∧ 이미지 없음 0.579(위험), 문자계 ∧ x2_img 0.36 0.474, 문자계 ∧
+  x2_img 1.0 0.507, 도형계 ∧ x2_img 0.36 0.080. 남은 차이는 유형이 아니라 이미지 결측 보정 `miss_x2img` +0.50 로짓이 x2_whole
+  계수(1.0 이어도 +0.21)보다 큰 v1.2.1 모델 성질이다(이름만 넣는 편이 이미지를 더한 것보다 p 가 높다). 모델 몫이라 이 개정에서는
+  손대지 않았다 — 11월 재학습 때 볼 항목. 이미지만(BLU hands 결합상표, 글자 영역 0.099·도형 0.100): 결합-도형요부 +
+  `suggested_name` "BLUhands"(easyocr 이 한 박스로 읽어 띄어쓰기 없음) + NAME_SUGGESTED, 250ms, 후보 p 0.016(도형계 CLIP 효과 0
+  그대로); 도형상표 이미지만: 도형·suggested_name null, 107ms. OCR 호출 4·시간 초과 0. 테스트 +5(규칙 5경우·suggested_text
+  확신도·순서·60자; 전체 1,164 passed·26 skipped).
 - **남은 것**: `POST /search/v2`·BFF·zod·캐시·gateway(B-1~B-5), 화면(F-1~F-5), Dockerfile 에 easyocr 모델 사전 다운로드, 특징
   재생성·재학습(접미 분리 15쌍 반영, 11월).

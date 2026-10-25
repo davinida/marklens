@@ -61,10 +61,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 | 입력 | 계산되는 축 | 후보 풀(합집합, 출원번호로 중복 제거) | `query_type.source` |
 |---|---|---|---|
-| 이미지만 | `x2_img` | CLIP 코사인 상위 20(v1 `scoring_k`) | `ocr`(OCR 실패 시 `fallback` → 도형) |
+| 이미지만 | `x2_img` | CLIP 코사인 상위 20(v1 `scoring_k`) | `ocr`(도형계: 글자 영역 ≥ 0.05 면 결합-도형요부, 읽은 글자는 `suggested_name`; 실패 시 `fallback` → 도형) |
 | 이름만 | `x1`·`x2_text`·`x3`(게이트) | 발음 상위 20 ∪ 철자 상위 20 ∪ 관념 상위 5(하한 0.55) | `fallback` → 문자 |
 | 이름 + 지정상품 | 위 + `x4` | 위 ∪ 유사군이 겹치는 DB 상표 상위 20(자카드 순) | `fallback` → 문자 |
-| 이미지 + 이름(+ 지정상품) | 전부 | 위 전부 | `ocr`(실패 시 `fallback` → 이름이 있으므로 문자) |
+| 이미지 + 이름(+ 지정상품) | 전부 | 위 전부 | `ocr`(fig_ratio 로 문자/결합-문자요부 — 이름이 있으면 항상 문자계; 실패 시 `fallback` → 문자) |
 | 지정상품만 | `x4` | 유사군이 겹치는 DB 상표 상위 20 | `fallback` → 문자 (caveat `GOODS_ONLY`) |
 
 후보 풀의 크기는 `meta.pool` 로 돌려준다. 풀을 합친 뒤 후보마다 축을 계산하고(§2-2 `axes`), `risk_score` 로 위험도를 낸 다음
@@ -94,7 +94,8 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `grade` | `"안전"` \| `"주의"` \| `"검토 권장"` \| `"위험"` | 후보 0건이면 null | 후보 중 **가장 높은 등급**(규칙 하한 적용 뒤). 등급 순서는 안전 < 주의 < 검토 권장 < 위험 |
 | `prob` | 0~1 | 후보 0건이면 null | 후보 `risk.prob` 의 최댓값(소수 3자리) |
 | `caveats` | string[] | 아니오(빈 배열 가능) | 사용자에게 **그대로** 보여 줄 주의 문구. 문구는 §2-5 표의 것만 쓴다(프론트가 문자열 비교로 아이콘을 고를 수 있게) |
-| `query_type.type` | `"문자"` \| `"도형"` \| `"결합-문자요부"` \| `"결합-도형요부"` | 아니오 | 모델이 쓴 유형(교호작용 `x1×문자계`·`x2_img×도형계` 와 도형 규칙의 기준). `결합-*` 의 요부는 §2-4 |
+| `query_type.type` | `"문자"` \| `"도형"` \| `"결합-문자요부"` \| `"결합-도형요부"` | 아니오 | 모델이 쓴 유형(교호작용 `x1×문자계`·`x2_img×도형계` 와 도형 규칙의 기준). **이름이 있으면 항상 문자계**, 도형계는 이름 없는 이미지 질의·사용자 선택만(§2-4 5항) |
+| `query_type.suggested_name` | string | 읽은 글자가 없으면 null(이름이 있거나 이미지가 없으면 항상 null) | 이름 없는 이미지 질의에서 OCR 이 읽은 글자(확신도 ≥ 0.5 박스만, 읽기 순서, 최대 60자). 화면이 "상표명으로 넣기"를 제안하고 사용자 확인 뒤 `name` 으로 재요청한다(이 요청에서 이름 축은 계산하지 않음 — 토큰 1회용) |
 | `query_type.source` | `"ocr"` \| `"fallback"` \| `"user"` | 아니오 | `ocr` 이미지 글자 면적으로 판정, `fallback` OCR 없음·실패라 입력 구성으로 정함, `user` `type_override` |
 | `query_type.detail` | `{ "text_ratio": 0~1, "fig_ratio": 0~1 }` | `ocr` 가 아니면 null | OCR 글자 박스 면적 비율·글자를 지운 뒤 남은 면적 비율(판정 근거, 디버그·툴팁용) |
 | `visual_status` | v1 `status_code`(`STRONG_MATCH`…`NO_CLOSE_MATCH`) | 이미지가 없으면 null | **제안(선택)**: 이미지 입력에 대한 v1 시각 4상태(임계 0.75/0.55/0.45). 모델이 도형계에서 CLIP 효과를 0 으로 학습해(§3-2) 이미지만 넣으면 `prob` 가 0.02 안팎이므로, 화면이 시각 유사 자체를 계속 보여 주기 위해 둔다. 받아들이지 않으면 필드를 뺀다 |
@@ -148,9 +149,24 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 2. `grade` 는 `meta.thresholds.grade` 의 하한으로 — 0.563 이상 위험, 0.126 이상 검토 권장, 0.063 이상 주의, 그 아래 안전.
 3. **단독 규칙**(97후3050 후단): 어느 축이든 τ 이상이면 등급 하한 "검토 권장"(자동 "위험" 아님) → `rule_triggers`.
 4. **도형 규칙**(미검증 제품 규칙): 도형계 유형이면 `figure_caveat = true` + `caveats` 에 도형 문구, `x2_img ≥ 0.9` 면 등급 하한 "검토 권장".
-5. `결합-*` 의 요부: `ocr` 이면 글자 면적(`text_ratio`)과 나머지 면적(`fig_ratio`) 중 큰 쪽(`x2_split.auto_type` 과 같은 규칙:
-   `text_ratio < 0.05` → 도형, `fig_ratio < 0.08` → 문자, 그 외 결합·큰 쪽이 요부). `user` 가 `결합` 을 고르면 이름이 있을 때
-   `결합-문자요부`, 없을 때 `결합-도형요부`.
+5. 유형 규칙(2026-10-24 개정 — OCR 은 유형의 최종 결정자가 아니라 이름이 없을 때 글자를 찾아 주는 도우미):
+   - `type_override` 가 있으면 그대로(`source: user`; `결합` 은 이름이 있을 때 결합-문자요부, 없을 때 결합-도형요부).
+   - **`name` 이 있으면 유형은 항상 문자계**: 이미지가 없거나 OCR `fig_ratio < 0.08` → 문자, 그 외(이미지에 뚜렷한 도형
+     영역) → 결합-문자요부. OCR 이 글자를 못 읽어도(실패·시간 초과·비활성) 도형계로 가지 않고 문자(`source: fallback`,
+     caveat `OCR_FALLBACK`). 근거: 사용자가 이름을 입력했다 = 상표에 문자 부분이 있다, 판례상 문자가 있는 결합상표는 호칭이
+     중요(97후3050). `source` 는 비율을 썼으면 `ocr`, 아니면 `fallback`.
+   - **도형계(도형·결합-도형요부)는 두 경우만**: (a) `name` 없는 이미지 질의 — OCR 글자 영역 `text_ratio ≥ 0.05` 면
+     결합-도형요부, 그 외·OCR 실패면 도형 (b) `type_override` 로 사용자가 직접 선택.
+   - `name` 없는 이미지 질의에서 OCR 이 글자를 읽으면 `query_type.suggested_name`(확신도 ≥ 0.5 박스, 최대 60자)과
+     caveat `NAME_SUGGESTED` 를 돌려준다. 못 읽으면 기존대로 도형 + `FIGURE_LOW_DATA`. 이 요청에서 이름 축을 자동
+     계산하지는 않는다(사용자 확인 뒤 재요청 — Turnstile 토큰 1회용 규약).
+   - 비고(개정 이유): 이전 규칙은 OCR 자동 유형(`auto_type`)이 최종 결정자여서, 글자가 작은 결합상표를 도형으로 오판하면
+     (X2 설계 §7 유형 일치 76% — 오판 24%) 이름이 있어도 `x1×문자계` 교호작용(계수 2.26)이 빠져 호칭 가중치가 깎였다.
+     셋 다 입력 실측(2026-10-24): 같은 "블루커피" / BLU hands 쌍이 이름만 넣으면 p 0.58(위험), 도형 이미지를 더하면 OCR 이
+     도형으로 판정해 p 0.08(검토 권장)로 떨어졌다 → 이름이 있으면 문자계로 고정.
+     개정 후 실측(2026-10-25): 같은 셋 다 입력이 결합-문자요부(OCR `fig_ratio` 0.717)로 판정돼 **p 0.47(검토 권장)** —
+     `x1×문자계` 는 돌아왔고, 이름만(0.58 위험)과의 남은 차이는 유형이 아니라 이미지 결측 보정(`miss_x2img` +0.50 로짓)이
+     실제 x2_img 0.36 의 기여(+0.08, 1.0 이어도 +0.21)보다 큰 v1.2.1 모델 성질이다(이 개정 범위 밖 — 통합 모델 설계 §8).
 
 ### 2-5. `caveats` 문구 표(응답은 문구 문자열만 싣는다)
 
@@ -166,6 +182,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `GOODS_ONLY` | 지정상품만으로는 유사군이 겹치는 상표를 나열할 뿐 표장 유사는 비교하지 않았습니다 | 지정상품만 입력 |
 | `OCR_FALLBACK` | 이미지에서 글자를 읽지 못해 유형을 {도형\|문자}(으)로 두었습니다. 아니면 유형을 고쳐 주세요 | `image` 있고 `source = fallback` |
 | `NO_CANDIDATES` | 비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다 | `candidates` 0건 |
+| `NAME_SUGGESTED` | 이미지에서 '{텍스트}'를 읽었습니다 — 상표명으로 넣으면 호칭·철자·관념도 비교합니다 | `name` 없는 이미지 질의에서 OCR 이 글자를 읽음(`query_type.suggested_name` 과 같은 문자열) |
 | `X3_DISABLED` | 관념 축이 꺼져 있어(MARKLENS_X3_ENABLED=0) 관념 유사도는 비교하지 않았습니다 | `name` 은 있으나 X3 비활성(`MARKLENS_X3_ENABLED=0`) 또는 관념 캐시·모델 실패 — `x3` 는 null, `pool.semantic` 0 |
 
 ## 3. 예시 JSON
@@ -194,7 +211,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
       "비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다"
     ],
-    "query_type": { "type": "문자", "source": "fallback", "detail": null },
+    "query_type": { "type": "문자", "source": "fallback", "detail": null, "suggested_name": null },
     "visual_status": null
   },
   "candidates": [
@@ -348,7 +365,9 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다",
       "지정상품이 없어 상품 견련성은 비교하지 않았습니다"
     ],
-    "query_type": { "type": "도형", "source": "ocr", "detail": { "text_ratio": 0.01, "fig_ratio": 0.62 } },
+    "query_type": {
+      "type": "도형", "source": "ocr", "detail": { "text_ratio": 0.01, "fig_ratio": 0.62 }, "suggested_name": null
+    },
     "visual_status": "STRONG_MATCH"
   },
   "candidates": [
@@ -501,6 +520,8 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
   위험도(0.02 안팎)만 보여 주면 사용자가 "안전"으로 오독한다(§3-2).
 - `query_type` 은 1층에 "유형: 도형(이미지에서 판정)" 식으로 보여 주고 "유형 고치기" 버튼 → `type_override` 로 재요청(토큰 새로 발급).
   `source: fallback` 이면 caveat 의 `OCR_FALLBACK` 문구를 버튼 옆에 둔다.
+- `query_type.suggested_name` 이 있으면(이름 없는 이미지 질의) 1층에 "이미지에서 '…'를 읽었습니다" + **"상표명으로 넣기"**
+  버튼 → 사용자가 확인·수정하면 `name` 을 채워 **재요청**(새 Turnstile 토큰). 자동으로 다시 검색하지 않는다.
 
 ## 5. 오류·경계
 
@@ -562,7 +583,7 @@ OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아�
 | E-1 | 엔진(다빈) | 후보 풀 합치기 — CLIP 상위 20 ∪ 발음 상위 20 ∪ 철자 상위 20 ∪ 관념 상위 5 ∪ 유사군 겹침 상위 20, 출원번호로 중복 제거 | `candidates[].id`·`title`·`type`·`applicant`·`nice_classes`·`goods.codes`, `meta.pool` | 발음·관념 캐시는 기동 시 것 재사용. 철자 캐시(정규화 토큰)는 새로 |
 | E-2 | 엔진 | 쌍별 축 계산 — `pair_generic` 으로 제외 토큰을 구해 `x1_d`·`x2_text_d`·`x3_d`, CLIP 코사인 `x2_whole`, 자카드 `x4`; 게이트(`has_pronunciation`·`has_spelling`·`has_meaning`·`has_goods`)로 null | `axes.*`, `salient.*`, `goods.jaccard` | 학습 `ml/scripts/pairs_features.py::name_axes` 와 같은 식 |
 | E-3 | 엔진 | **고시 명칭 접미 분리** — 붙여쓴 한글 이름(블루커피)에서 끝이 고시 단일 명칭(커피)이면 토큰을 나눠 판정. 2026-10-24 현재 `normalize_name("블루커피")` 은 한 토큰이라 `커피` 가 제외되지 않는다(X1 설계 §4 한계 5). §3-1 예시는 이 규칙이 있는 상태의 값 | `salient.removed` 의 `커피` 행, `x1`·`x2_text`·`x3` 값 | 규칙은 식별력 `Distinctiveness` 에 넣고 X1·X2 철자·X3 가 같은 토큰을 받게 한다 |
-| E-4 | 엔진 | 유형 판정 — OCR 글자 면적(`x2_split.auto_type` 규칙 0.05/0.08)으로 문자·도형·결합(+요부), 실패·미설치면 fallback, `type_override` 우선 | `overall.query_type` | **결정 대기**: OCR 라이브러리(벤치마크는 easyocr)를 서비스 의존성에 넣을지(`constraints.txt`·Dockerfile·CI 설치 시간). 안 넣으면 `source` 는 항상 `fallback`/`user` |
+| E-4 | 엔진 | 유형 판정 — OCR 글자 면적(`x2_split.auto_type` 규칙 0.05/0.08)으로 문자·도형·결합(+요부), 실패·미설치면 fallback, `type_override` 우선 → 2026-10-25 개정(§2-4 5항): 이름이 있으면 항상 문자계, OCR 은 이름 없는 질의의 글자 제안 `suggested_name` | `overall.query_type` | **결정 대기**: OCR 라이브러리(벤치마크는 easyocr)를 서비스 의존성에 넣을지(`constraints.txt`·Dockerfile·CI 설치 시간). 안 넣으면 `source` 는 항상 `fallback`/`user` |
 | E-5 | 엔진 | `risk_score` 호출, 기여도를 축별로 묶되 `miss_*` 는 `missing_adjustment` 로 분리, 단독·도형 규칙 판정을 `rule_triggers` 로, 위험도 내림차순 정렬, `overall` 집계(최대 등급·최대 p·caveat 합집합) | `risk.*`, `overall.grade`·`prob`·`caveats` | 테스트: `intercept + Σcontributions + missing_adjustment = logit(prob)`, 예시 3-1·3-2 와 같은 값 |
 | E-6 | 엔진 | 학습 스크립트가 `meta.grade_precision`(위험 등급 OOF 정밀도)을 계수 JSON 에 쓰도록 한 줄 추가 → 재학습 없이 JSON 만 갱신(값 0.6855) | `meta.grade_precision` | 그 전까지 엔진 상수 0.69 |
 | B-1 | 백엔드(현수) | `POST /search/v2` — multipart 파싱(`image`·`name`·`goods_codes` 반복 필드·`type_override`), 검증 400/413/415/422, 한도 버킷 공유, `X-Request-ID`·로깅(검색어·이미지 미기록) | 요청 전체, 오류 응답 | pydantic 응답 모델 `SearchV2Response` 를 `backend/src/schemas/search_v2.py` 에 — §2 표가 필드 정의 |

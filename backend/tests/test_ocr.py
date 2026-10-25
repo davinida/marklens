@@ -80,3 +80,22 @@ def test_particle_for_fallback_caveat():
     assert multi_search.CAVEAT_OCR_FALLBACK.format(type="도형", ro="으로").startswith(
         "이미지에서 글자를 읽지 못해 유형을 도형으로 두었습니다"
     )
+
+
+def test_suggested_text_filters_by_confidence_and_order():
+    from src.mark_type import TextBox
+
+    from backend.src.core.ocr import SUGGEST_MAX_CHARS, _detection, suggested_text
+
+    boxes = [
+        TextBox((0, 40, 50, 60), "hands", 0.91),
+        TextBox((0, 0, 40, 20), "BLU", 0.88),
+        TextBox((60, 0, 90, 20), "x", 0.3),  # 확신도 < 0.5 — 제외
+        TextBox((0, 70, 50, 90), "  ", 0.99),  # 빈 글자 — 제외
+    ]
+    assert suggested_text(boxes) == "BLU hands"
+    assert len(suggested_text([TextBox((0, 0, 1, 1), "가" * 100, 0.9)])) == SUGGEST_MAX_CHARS
+    assert suggested_text([]) == ""
+    detection = _detection(Image.new("RGB", (100, 100), "white"), boxes, time.perf_counter())
+    assert detection.text == "BLU hands" and detection.boxes == 3  # 면적 하한 0.2 는 x 도 셈
+

@@ -1,17 +1,14 @@
 """3입력 통합 검색 엔진 — API 계약 v2(docs/MarkLens_API계약_v2.md) §2 의 overall·candidates·meta 를
-만든다.
-엔진 몫 E-1~E-6 의 구현이며 `engine.multi_search()` 가 여기로 위임한다. 엔드포인트·BFF·화면은 다른
-사람 몫.
+만든다. 엔진 몫 E-1~E-6 의 구현이며 `engine.multi_search()` 가 여기로 위임한다.
+엔드포인트·BFF·화면은 다른 사람 몫.
 
 흐름(계약 §1-3·§2-4)
-    1. 입력 정리: name 은 NFKC·공백 정리(pair_axes.clean_name), goods_codes 는 대문자·중복 제거. 셋
-    다
-       없으면 EmptyQueryError.
-    2. 유형: type_override(source "user") → 이미지 OCR(ocr.detect, source "ocr") → fallback(이름
-    있으면
-       문자, 없으면 도형, 이미지가 있는데 OCR 이 실패했으면 caveat OCR_FALLBACK). 모델에는 이 한
-       유형을
-       쌍 전체에 쓴다(학습이 이 사건 표장의 유형으로 했으므로, §2-4 1항).
+    1. 입력 정리: name 은 NFKC·공백 정리(pair_axes.clean_name), goods_codes 는 대문자·중복 제거.
+       셋 다 없으면 EmptyQueryError.
+    2. 유형(2026-10-24 개정): type_override(user) → 이름이 있으면 항상 문자계(OCR fig_ratio 로
+       문자 또는 결합-문자요부, OCR 실패도 문자) → 이름 없는 이미지는 도형계(글자 영역 ≥ 0.05 면
+       결합-도형요부) + OCR 이 읽은 글자를 suggested_name 으로 제안(이 요청에서 이름 축은 계산하지
+       않음) → OCR 실패는 fallback + caveat. 모델에는 이 한 유형을 쌍 전체에 쓴다(§2-4 1항).
     3. 후보 풀(E-1): CLIP 상위 20 ∪ 발음 상위 20 ∪ 철자 상위 20 ∪ 관념 상위 5(하한 X3_MIN_SCORE) ∪
     유사군
        겹침 상위 20(자카드 순). 출원번호로 중복 제거 → meta.pool.
@@ -102,6 +99,8 @@ CAVEAT_OCR_FALLBACK = ("이미지에서 글자를 읽지 못해 유형을 {type}
                        "아니면 유형을 고쳐 주세요")
 CAVEAT_NO_CANDIDATES = "비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다"
 CAVEAT_X3_DISABLED = "관념 축이 꺼져 있어(MARKLENS_X3_ENABLED=0) 관념 유사도는 비교하지 않았습니다"
+CAVEAT_NAME_SUGGESTED = ("이미지에서 '{text}'를 읽었습니다 — 상표명으로 넣으면 호칭·철자·관념도 "
+                         "비교합니다")
 
 
 class EmptyQueryError(ValueError):
@@ -167,9 +166,13 @@ class QueryType:
     type: str  # 문자 | 도형 | 결합-문자요부 | 결합-도형요부
     source: str  # ocr | fallback | user
     detail: dict | None  # {"text_ratio", "fig_ratio"} — ocr 일 때만
+    suggested_name: str | None = None  # 이름 없는 이미지 질의에서 OCR 이 읽은 글자(계약 §2-4 5항)
 
     def to_dict(self) -> dict:
-        return {"type": self.type, "source": self.source, "detail": self.detail}
+        return {
+            "type": self.type, "source": self.source, "detail": self.detail,
+            "suggested_name": self.suggested_name,
+        }
 
 
 @dataclass(frozen=True)
@@ -444,18 +447,30 @@ def _particle_ro(word: str) -> str:
 
 
 def _resolve_query_type(image, name: str | None, override: str | None) -> tuple[QueryType, bool]:
-    """(query_type, OCR fallback 여부). type_override → OCR → fallback(계약 §2-4 5항·§5-2)."""
+    """(query_type, OCR fallback 여부) — 계약 §2-4 5항(2026-10-24 개정).
+
+    type_override 가 있으면 그대로(user). 이름이 있으면 **항상 문자계**: 이미지가 없거나 OCR
+    fig_ratio < 0.08 이면 문자, 이미지에 뚜렷한 도형 영역이 있으면 결합-문자요부 — OCR 이 글자를 못
+    읽어도 도형계로 가지 않는다(이름을 입력했다 = 문자 부분이 있다, 문자 있는 결합상표는 호칭이
+    중요). 도형계(도형·결합-도형요부)는 이름 없는 이미지 질의와 사용자 선택 두 경우만: OCR 글자
+    영역 ≥ 0.05 면 결합-도형요부, 그 외·실패면 도형. 이름 없는 질의에서 OCR 이 읽은 글자는
+    suggested_name 으로 돌려주고 이 요청에서 이름 축을 계산하지는 않는다(사용자 확인 뒤 재요청). OCR
+    은 유형의 최종 결정자가 아니라 글자를 찾아 주는 도우미다.
+    """
     has_name = bool(name)
     if override:
         return QueryType(mt.model_type(override, "", has_name=has_name), "user", None), False
-    if image is not None:
-        detection = ocr.detect(image)
-        if detection is not None:
-            level = mt.model_type(detection.kind, detection.dominant, has_name=has_name)
-            detail = {"text_ratio": detection.text_ratio, "fig_ratio": detection.fig_ratio}
-            return QueryType(level, "ocr", detail), False
+    if image is None:
+        return QueryType("문자", "fallback", None), False
+    detection = ocr.detect(image)
+    if detection is None:
         return QueryType("문자" if has_name else "도형", "fallback", None), True
-    return QueryType("문자", "fallback", None), False
+    detail = {"text_ratio": detection.text_ratio, "fig_ratio": detection.fig_ratio}
+    if has_name:
+        level = "문자" if detection.fig_ratio < mt.FIG_RATIO_TEXT else "결합-문자요부"
+        return QueryType(level, "ocr", detail), False
+    level = "결합-도형요부" if detection.text_ratio >= mt.TEXT_RATIO_FIGURE else "도형"
+    return QueryType(level, "ocr", detail, suggested_name=detection.text or None), False
 
 
 def _group_contributions(term_contributions: dict[str, float]) -> tuple[dict[str, float], float]:
@@ -686,6 +701,8 @@ def multi_search(
     caveats: list[str] = []
     if query_type.type in rm.FIGURE_FAMILY:
         caveats.append((model.get("figure_rule") or {}).get("caveat") or CAVEAT_FIGURE_LOW_DATA)
+    if query_type.suggested_name:
+        caveats.append(CAVEAT_NAME_SUGGESTED.format(text=query_type.suggested_name))
     if ocr_fallback:
         label = mt.display_type(query_type.type)
         caveats.append(CAVEAT_OCR_FALLBACK.format(type=label, ro=_particle_ro(label)))

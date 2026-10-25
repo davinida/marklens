@@ -46,6 +46,11 @@ logger = logging.getLogger(__name__)
 
 LANGUAGES = ("ko", "en")
 ENV_FAKE = "MARKLENS_FAKE_ML"
+# 이름 없는 이미지 질의에서 "읽은 글자"를 제안할 때(계약 §2-4 5항·§2-5 NAME_SUGGESTED): 확신도 ≥
+# 0.5 인 박스만 읽기 순서(위→아래, 왼→오른)로 이어 붙이고 60자에서 자른다. 면적 비율의
+# 하한(MIN_TEXT_CONF 0.2)보다 엄격하다.
+SUGGEST_MIN_CONF = 0.5
+SUGGEST_MAX_CHARS = 60
 
 
 @dataclass(frozen=True)
@@ -57,6 +62,7 @@ class TypeDetection:
     kind: str  # 문자 | 도형 | 결합
     dominant: str  # 결합의 요부(문자 | 도형), 문자·도형은 유형과 같음
     boxes: int  # 확신도 하한을 넘은 글자 박스 수
+    text: str  # 확신도 ≥ SUGGEST_MIN_CONF 박스의 글자(읽기 순서, 최대 60자) — 없으면 ""
     elapsed_ms: float = field(compare=False)  # 결정성 비교(테스트)에서 제외
 
 
@@ -134,11 +140,20 @@ def _easyocr_boxes(image) -> list[mt.TextBox]:
     return boxes
 
 
+def suggested_text(boxes: list[mt.TextBox]) -> str:
+    """읽은 글자 제안 — 확신도 ≥ SUGGEST_MIN_CONF 박스를 읽기 순서(y → x)로 이어 붙여 최대
+    SUGGEST_MAX_CHARS 자."""
+    kept = [box for box in boxes if box.conf >= SUGGEST_MIN_CONF and box.text.strip()]
+    kept.sort(key=lambda box: (box.bbox[1], box.bbox[0]))
+    text = " ".join(" ".join(box.text.split()) for box in kept)
+    return text[:SUGGEST_MAX_CHARS].rstrip()
+
+
 def _detection(image, boxes: list[mt.TextBox], started: float) -> TypeDetection:
     text_ratio, fig_ratio = mt.area_ratios(image, boxes)
     kind, dominant = mt.auto_type(text_ratio, fig_ratio)
     kept = sum(1 for box in boxes if box.conf >= mt.MIN_TEXT_CONF and box.text.strip())
-    return TypeDetection(text_ratio, fig_ratio, kind, dominant, kept,
+    return TypeDetection(text_ratio, fig_ratio, kind, dominant, kept, suggested_text(boxes),
                          round((time.perf_counter() - started) * 1000, 1))
 
 
