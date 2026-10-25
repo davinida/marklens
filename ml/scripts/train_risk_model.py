@@ -698,6 +698,16 @@ def grade_thresholds(prob: np.ndarray, y: np.ndarray, *, precision_risk: float =
     return {"thresholds": thresholds, "기준": notes, "등급별": grade_stats(prob, y, thresholds)}
 
 
+def risk_grade_precision(grade_block: dict) -> float | None:
+    """"위험" 등급의 정밀도(등급 안 유사율, OOF) — 계수 JSON `meta.grade_precision`. 서비스가 화면
+    문구
+    "검증 데이터 기준 10건 중 N건"(API 계약 v2 §4-3)에 쓰며 상수로 두지 않는다(E-6)."""
+    for row in grade_block.get("등급별", []):
+        if row.get("등급") == "위험":
+            return row.get("정밀도(등급 안 유사율)")
+    return None
+
+
 def _monotone(thresholds: dict) -> dict:
     cuts = [thresholds[key] for key in rm.GRADE_THRESHOLD_KEYS]
     for i in range(1, len(cuts)):
@@ -1048,6 +1058,10 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
             "sigma_fixed": ("CV 무차별(심결 AUC 차 0.006 안, CI 겹침) → 설계 원칙에 따라 중간값 1.0"
                             if len(tuple(sigma_grid)) == 1 else None),
             "risk_min_support": RISK_MIN_SUPPORT,
+            # 계약 v2 meta.grade_precision — "위험" 등급의 OOF 정밀도(심결+cross+db). 서비스 화면
+            # 문구
+            # "검증 데이터 기준 10건 중 N건"의 출처(E-6).
+            "grade_precision": risk_grade_precision(grades["심결+cross+db"]),
             "feature_definitions": (
                 "축 점수 0~1(결측 0 + miss_*=1; x3_d 는 has_meaning_both False 면 결측), "
                 "any_no_distinctive = 1 − has_distinctive_part_a·b, 교호작용 x1_d×문자계(문자·"

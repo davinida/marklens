@@ -57,6 +57,7 @@ import functools
 import itertools
 import json
 import os
+import re
 import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
@@ -70,7 +71,7 @@ from .x3_semantic import token_zipf
 __all__ = [
     "Distinctiveness", "TokenJudgement", "DescriptiveTerm", "load_distinctiveness", "token_score",
     "salient_tokens", "weak_tokens", "has_distinctive_part", "pair_generic", "combined_weak_run",
-    "combined_single_match", "famous_tokens",
+    "combined_single_match", "split_goods_suffix", "famous_tokens",
     "goods_index", "read_descriptive_terms", "validate_descriptive_terms", "unapproved_terms",
     "update_descriptive_approvals", "read_weak_overrides", "update_weak_overrides",
     "DESCRIPTIVE_TERMS", "DESCRIPTIVE_KINDS", "THETA", "THETA_A", "THETA_N",
@@ -104,6 +105,10 @@ ENV_OVERRIDES_PATH = "MARKLENS_WEAK_TOKEN_OVERRIDES"
 DESCRIPTIVE_UNKNOWN_SCORE = 0.5  # 상대적 기술 표장인데 지정상품을 모르면(또는 류 미지정) 점수 상한
 COMBINED_SIMILARITY = 0.9  # v0.3 결합어 판정: 붙여쓴 토큰 vs 이어 붙인 토큰열 철자·읽기 유사도 하한
 COMBINED_READINGS_CAP = 64  # 토큰별 읽기 조합 상한(조합 폭발 방지)
+SUFFIX_MIN_SYLLABLES = 2  # 접미 분리(E-3): 고시 단일 명칭 접미는 2음절 이상
+SUFFIX_MIN_PREFIX = 2  # 접미 분리: 앞부분도 2음절 이상(1음절 앞부분은 오분리가 많아 나누지 않는다)
+JUDGE_CACHE_SIZE = 200_000  # 토큰 판정 캐시 상한(넘으면 비운다)
+_HANGUL_RUN = re.compile(r"[가-힣]{4,}")  # 접미 분리 대상: 붙여쓴 한글 4음절 이상(앞 2 + 접미 2)
 NICE_CLASS_RANGE = range(1, 46)
 
 
@@ -468,6 +473,7 @@ class Distinctiveness:
         self.code_classes = code_classes or {}
         self.theta, self.theta_a, self.theta_n = theta, theta_a, theta_n
         self.descriptive = descriptive  # None 이면 모듈 상수 DESCRIPTIVE_TERMS 를 본다
+        self._judge_cache: dict[tuple[str, frozenset[str]], TokenJudgement] = {}
 
     # ---- 1호 ----
     def is_generic_name(self, token: str, goods_codes: frozenset[str] | None) -> bool:
@@ -483,10 +489,24 @@ class Distinctiveness:
 
     # ---- 토큰 ----
     def judge(self, token: str, goods_codes: Iterable[str] | None = None) -> TokenJudgement:
+        """토큰 하나의 식별력 판정. (토큰, 유사군) 키로 캐시한다 — 서비스(E-2)가 후보 수십 건마다
+        같은
+        질의 토큰을 반복 판정하므로. 판정은 적재된 통계·목록만 보는 순수 계산이라 캐시가
+        안전하다."""
         token = unicodedata.normalize("NFKC", str(token or "")).casefold().strip()
+        goods = frozenset(c.strip().upper() for c in (goods_codes or ()) if c and c.strip())
+        key = (token, goods)
+        cached = self._judge_cache.get(key)
+        if cached is None:
+            if len(self._judge_cache) >= JUDGE_CACHE_SIZE:
+                self._judge_cache.clear()
+            cached = self._judge_uncached(token, goods)
+            self._judge_cache[key] = cached
+        return cached
+
+    def _judge_uncached(self, token: str, goods: frozenset[str]) -> TokenJudgement:
         if not token:
             return TokenJudgement(token, 0.0, ("빈 토큰",))
-        goods = frozenset(c.strip().upper() for c in (goods_codes or ()) if c and c.strip())
         if token in self.famous:
             return TokenJudgement(token, 1.0, ("유명 브랜드",))
         reasons: list[str] = []
@@ -544,11 +564,43 @@ class Distinctiveness:
     def token_score(self, token: str, goods_codes: Iterable[str] | None = None) -> float:
         return self.judge(token, goods_codes).score
 
+    # ---- 접미 분리(서비스 연결 E-3, 2026-10-24 결정: 고시 단일 명칭만) ----
+    def split_goods_suffix(self, name: str) -> str:
+        """붙여쓴 한글 토큰(3음절 이상)의 끝이 고시 단일 명칭(SUFFIX_MIN_SYLLABLES 음절 이상)과
+        같으면
+        그 앞에 공백을 넣는다 — 블루커피 → 블루 커피, 스타벅스커피 → 스타벅스 커피. 토큰 전체가
+        고시 명칭(커피·아이스크림)이거나 접미가 1음절(블루밍)이면 그대로. 여러 접미가 맞으면 가장
+        긴 것. 영문·숫자·혼합 토큰은 건드리지 않고, 변환표 없이 적재됐으면(goods_names 비어 있음)
+        원문을 돌려준다. X1·X2 철자·X3 가 같은 분리 토큰을 받도록 축 함수를 부르기 전에 이름에 한 번
+        적용한다(pair_axes.compute_pair_axes·pairs_features.name_axes). X1 설계 §4 한계 5 의 접미
+        분리 — 약한 토큰 일반이 아니라 고시 단일 명칭만 본다."""
+        if not name or not self.goods_names:
+            return name
+
+        def _split(match: re.Match) -> str:
+            run = match.group(0)
+            if run in self.goods_names:
+                return run
+            # 앞부분 SUFFIX_MIN_PREFIX 음절 이상, 접미 SUFFIX_MIN_SYLLABLES 음절 이상 — 가장 긴
+            # 접미부터.
+            # 앞부분 1음절은 나누지 않는다(처가방 → 처 가방, 스피치 → 스 피치 같은 오분리 실측).
+            for cut in range(SUFFIX_MIN_PREFIX, len(run) - SUFFIX_MIN_SYLLABLES + 1):
+                suffix = run[cut:]
+                if suffix in self.goods_names:
+                    return f"{run[:cut]} {suffix}"
+            return run
+
+        return _HANGUL_RUN.sub(_split, name)
+
     # ---- 이름 ----
     def judge_name(
-        self, name: str, goods_codes: Iterable[str] | None = None
+        self, name: str, goods_codes: Iterable[str] | None = None, *, split: bool = True
     ) -> list[TokenJudgement]:
-        return [self.judge(token, goods_codes) for token in normalize_name(name or "")]
+        """이름의 토큰별 판정. 기본은 접미 분리(E-3) 뒤의 토큰; split=False 면 분리 전 토큰(결합
+        규칙
+        v0.3 이 붙여쓴 결합어를 원형으로도 보기 위해)."""
+        text = self.split_goods_suffix(name or "") if split else (name or "")
+        return [self.judge(token, goods_codes) for token in normalize_name(text)]
 
     def salient_tokens(
         self, name: str, goods_codes: Iterable[str] | None = None
@@ -586,24 +638,31 @@ class Distinctiveness:
         붙여쓴 토큰의 읽기와 동일(슬림라인 = 슬림+라인), 또는 철자·읽기 편집거리 유사도 ≥
         COMBINED_SIMILARITY. 돌려주는 값은 넘기지 않을 약한 토큰(토큰열의 약한 토큰 + 결합어가
         약하면 그것도)."""
-        judged = {name: self.judge_name(name, goods_codes) for name in (name_a, name_b)}
         withheld: set[str] = set()
-        for spaced, other in ((name_a, name_b), (name_b, name_a)):
-            tokens = [j.token for j in judged[spaced]]
-            weak = {j.token for j in judged[spaced] if j.score < self.theta}
-            if len(tokens) < 2 or not weak:
-                continue
-            for start in range(len(tokens) - 1):
-                for stop in range(start + 2, len(tokens) + 1):
-                    run = tokens[start:stop]
-                    run_weak = [token for token in run if token in weak]
-                    if not run_weak:
-                        continue
-                    for single in judged[other]:
-                        if _combined_match(single.token, run):
-                            withheld.update(run_weak)
-                            if single.score < self.theta:
-                                withheld.add(single.token)
+        # 접미 분리(E-3) 뒤 토큰과 분리 전 토큰 양쪽으로 본다 — 혹달린신발 / 혹 달린 신발 처럼
+        # 붙여쓴
+        # 결합어가 분리되면(혹달린 신발) 원형으로 맞춰야 토큰열 전체(혹·달린·신발)가 결합으로
+        # 잡힌다.
+        for split in (True, False):
+            judged = {
+                name: self.judge_name(name, goods_codes, split=split) for name in (name_a, name_b)
+            }
+            for spaced, other in ((name_a, name_b), (name_b, name_a)):
+                tokens = [j.token for j in judged[spaced]]
+                weak = {j.token for j in judged[spaced] if j.score < self.theta}
+                if len(tokens) < 2 or not weak:
+                    continue
+                for start in range(len(tokens) - 1):
+                    for stop in range(start + 2, len(tokens) + 1):
+                        run = tokens[start:stop]
+                        run_weak = [token for token in run if token in weak]
+                        if not run_weak:
+                            continue
+                        for single in judged[other]:
+                            if _combined_match(single.token, run):
+                                withheld.update(run_weak)
+                                if single.score < self.theta:
+                                    withheld.add(single.token)
         return frozenset(withheld)
 
     def pair_generic(
@@ -779,3 +838,8 @@ def combined_weak_run(
     name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
 ) -> tuple[str, ...]:
     return load_distinctiveness().combined_weak_run(name_a, name_b, goods_codes)
+
+
+def split_goods_suffix(name: str) -> str:
+    """고시 단일 명칭 접미 분리(블루커피 → 블루 커피). 기본 모델 사용."""
+    return load_distinctiveness().split_goods_suffix(name)

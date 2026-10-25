@@ -49,16 +49,29 @@ if str(ML_ROOT) not in sys.path:
     sys.path.insert(0, str(ML_ROOT))
 
 from src.axes.x1_phonetic import normalize_name  # noqa: E402
+from src.mark_type import (  # noqa: E402
+    ERASE_DIFF,
+    FIG_RATIO_TEXT,
+    MIN_TEXT_CONF,
+    TEXT_RATIO_FIGURE,
+    UPSCALE_MIN_SIDE,
+    TextBox,
+    auto_type,
+    background_color,
+    content_bbox,
+)
 
 from scripts import trials_extract_images as tei  # noqa: E402
 from scripts import x2_benchmark as x2b  # noqa: E402  (torch 가 faiss 보다 먼저 import 된다)
 
 DEFAULT_BASE = tei.DEFAULT_BASE
-TEXT_RATIO_FIGURE = 0.05  # 글자 박스 면적이 이보다 작으면 도형
-FIG_RATIO_TEXT = 0.08  # 글자를 지운 뒤 남은 내용이 이보다 작으면 문자
-MIN_TEXT_CONF = 0.2  # 인식 확신도 하한 — 도형의 거짓 박스(0.02) 제거
-ERASE_DIFF = 24  # 배경 중앙값과 채널 차이가 이보다 크면 내용
-UPSCALE_MIN_SIDE = 160  # OCR 입력의 짧은 변 하한(px)
+# 유형 규칙(auto_type 0.05/0.08)·면적 비율 상수·TextBox 는 서비스와 공유하는 src/mark_type.py 에
+# 있다
+# (서비스 연결 E-4, 2026-10-24). 이 모듈은 같은 이름으로 다시 노출한다(테스트·기존 호출 유지).
+__all__ = [
+    "TEXT_RATIO_FIGURE", "FIG_RATIO_TEXT", "MIN_TEXT_CONF", "ERASE_DIFF", "UPSCALE_MIN_SIDE",
+    "TextBox", "auto_type", "background_color", "content_bbox",
+]
 FIG_PAD = 2
 QA_ROWS = 20
 PARTS_COLUMNS = [
@@ -74,13 +87,6 @@ LLM_TYPE_MAP = {
     "결합-도형요부": "결합",
 }
 TYPES = ("문자", "도형", "결합")
-
-
-@dataclass(frozen=True)
-class TextBox:
-    bbox: tuple[int, int, int, int]  # x0, y0, x1, y1 (원본 픽셀)
-    text: str
-    conf: float
 
 
 class TextDetector(Protocol):
@@ -125,35 +131,6 @@ class SplitResult:
     boxes: int
     text_boxes: int
     figure: Image.Image | None
-
-
-def background_color(arr: np.ndarray) -> np.ndarray:
-    """테두리 2px 띠의 채널별 중앙값."""
-    height, width = arr.shape[:2]
-    k = 2 if min(height, width) > 8 else 1
-    ring = np.concatenate([
-        arr[:k].reshape(-1, 3), arr[-k:].reshape(-1, 3),
-        arr[:, :k].reshape(-1, 3), arr[:, -k:].reshape(-1, 3),
-    ])
-    return np.median(ring, axis=0)
-
-
-def content_bbox(arr: np.ndarray, background: np.ndarray, *,
-                 diff: int = ERASE_DIFF) -> tuple[int, int, int, int] | None:
-    mask = np.abs(arr.astype(np.int16) - background.astype(np.int16)).max(axis=2) > diff
-    ys, xs = np.nonzero(mask)
-    if ys.size == 0:
-        return None
-    return int(xs.min()), int(ys.min()), int(xs.max()) + 1, int(ys.max()) + 1
-
-
-def auto_type(text_ratio: float, fig_ratio: float) -> tuple[str, str]:
-    """(자동 유형, 요부). 문자·도형은 요부가 곧 유형, 결합은 둘 중 큰 쪽."""
-    if text_ratio < TEXT_RATIO_FIGURE:
-        return "도형", "도형"
-    if fig_ratio < FIG_RATIO_TEXT:
-        return "문자", "문자"
-    return "결합", ("도형" if fig_ratio >= text_ratio else "문자")
 
 
 def split_image(image: Image.Image, boxes: list[TextBox], *,

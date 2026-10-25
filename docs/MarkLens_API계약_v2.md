@@ -1,7 +1,8 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
-- 기준일: 2026-10-24 · 상태: **초안(구현 전) — 서비스 연결의 기준 문서**. 백엔드(엔드포인트·BFF·zod)와 프론트(결과 화면)는 이
-  문서의 §3 예시 JSON 만으로 스텁과 목업을 만들어 병렬로 구현한다.
+- 기준일: 2026-10-24 · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1~E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), 엔드포인트·BFF·zod·화면은 구현 전**. 백엔드와
+  프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현한다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
   §3(입력)·§7-2(v1.2.1 등급·단독·도형 규칙), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
   README "다음 단계"(서비스 연결 범위).
@@ -67,7 +68,8 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | 지정상품만 | `x4` | 유사군이 겹치는 DB 상표 상위 20 | `fallback` → 문자 (caveat `GOODS_ONLY`) |
 
 후보 풀의 크기는 `meta.pool` 로 돌려준다. 풀을 합친 뒤 후보마다 축을 계산하고(§2-2 `axes`), `risk_score` 로 위험도를 낸 다음
-**위험도 내림차순**(동점은 출원번호 오름차순)으로 정렬해 `top_k` 개를 돌려준다. 정렬 기준은 CLIP 유사도가 아니라 `risk.prob` 다.
+**위험도 내림차순**(동점은 `x2_img` 내림차순 → 출원번호 오름차순 — 이미지만 넣으면 p 가 모두 같아 시각 유사가 순서를 정한다)으로
+정렬해 `top_k` 개를 돌려준다. 정렬 기준은 CLIP 유사도가 아니라 `risk.prob` 다. 발음·철자 풀은 유사도 0 인 후보를 넣지 않는다.
 
 ## 2. 응답 스키마
 
@@ -103,7 +105,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 |---|---|---|---|
 | `id` | string | 아니오 | 출원번호(v1 `trademark.출원번호`, 13자리) |
 | `title` | string | 상표명이 없으면(순수 도형) null | `상표한글명`, 없으면 `상표영문명` |
-| `image_url` | string | 이미지 비공개(`MARKLENS_PUBLIC_RESULT_IMAGES=false`)·없음이면 null | `/api/images/<key>` — v1 과 같은 규칙(BFF 가 내부 `/images/` 로 전달) |
+| `image_url` | string | 이미지 비공개(`MARKLENS_PUBLIC_RESULT_IMAGES=false`)·없음이면 null | 엔진·내부 API 는 v1 과 같이 `/images/<key>` 를 내고(`storage.public_url`), 브라우저 표시는 프론트의 v1 `imageUrl()` 이 `/api/images/<key>` 로 바꾼다. 예시 JSON 은 브라우저 측 값 |
 | `type` | `"문자"` \| `"도형"` \| `"결합"` \| null | 알 수 없으면 null | **표시용** 후보 유형. DB `상표구분` → `도형상표`=도형, `도형복합`=결합, 비어 있으면 비엔나코드 + 상표명 있음=결합, 비엔나코드만=도형, 비엔나코드 없음=문자. 모델은 이 값이 아니라 `overall.query_type.type` 을 쓴다 |
 | `applicant` | string | 없으면 null | **제안(선택)**: 출원인(v1 `출원인`) — 현재 화면이 보여 주는 값이라 재조회를 피하려 둔다 |
 | `nice_classes` | int[] | 아니오(빈 배열 가능) | **제안(선택)**: 류(v1 `류`) |
@@ -164,6 +166,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `GOODS_ONLY` | 지정상품만으로는 유사군이 겹치는 상표를 나열할 뿐 표장 유사는 비교하지 않았습니다 | 지정상품만 입력 |
 | `OCR_FALLBACK` | 이미지에서 글자를 읽지 못해 유형을 {도형\|문자}(으)로 두었습니다. 아니면 유형을 고쳐 주세요 | `image` 있고 `source = fallback` |
 | `NO_CANDIDATES` | 비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다 | `candidates` 0건 |
+| `X3_DISABLED` | 관념 축이 꺼져 있어(MARKLENS_X3_ENABLED=0) 관념 유사도는 비교하지 않았습니다 | `name` 은 있으나 X3 비활성(`MARKLENS_X3_ENABLED=0`) 또는 관념 캐시·모델 실패 — `x3` 는 null, `pool.semantic` 0 |
 
 ## 3. 예시 JSON
 
@@ -510,7 +513,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | 413 / 415 | 이미지 크기·형식 | v1 과 같음 |
 | 422 | `top_k` 범위, `name` 100자 초과, `goods_codes` 형식(`^[GS][0-9]{4,6}$`)·60개 초과, `type_override` 열거값 밖 | 필드별 메시지 |
 | 429 | 한도(v1 `/search` 와 같은 버킷) | — |
-| 503 | 엔진·인덱스 미준비, 모델 JSON 적재 실패(`risk_model` ValueError), X3 비활성(`MARKLENS_X3_ENABLED=0`)이면 **503 이 아니라** `x3` 를 null 로 두고 caveat `NO_MEANING` 대신 "관념 축 비활성" 문구로 진행 | — |
+| 503 | 엔진·인덱스 미준비(`RuntimeError`), 계수 JSON·식별력 모델 적재 실패(`ModelNotReadyError`). X3 비활성(`MARKLENS_X3_ENABLED=0`)은 **503 이 아니라** `x3` null + caveat `X3_DISABLED` 로 진행 | — |
 
 ### 5-2. OCR 실패·유형
 
@@ -537,6 +540,21 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 패널의 발음·관념 섹션은 v1 두 엔드포인트를 그대로 쓴다(검색과 별개 흐름). 제거는 발표 뒤 별도 PR 로 하며 v1 문서의 deprecated 필드
 (`grade_code`·`grade_name`)도 그때 함께 지운다.
 
+### 5-6. 엔진 예외 ↔ HTTP (B-1 매핑 기준, 2026-10-24 구현)
+
+`engine.multi_search(image=None, name=None, goods_codes=None, type_override=None, top_k=5)` 는 동기 함수이고
+`SearchV2Result`(`to_dict()` 가 §2 키 그대로)를 돌려준다. 예외 이름은 `backend/src/core/multi_search.py`.
+
+| 예외 | 언제 | 메시지(그대로 `detail` 로) | HTTP |
+|---|---|---|---:|
+| `multi_search.EmptyQueryError`(ValueError) | `image`·`name`(공백만 포함)·`goods_codes`(빈 값만 포함)가 모두 없음 | `image, name, goods_codes 중 하나는 있어야 합니다.` | 400 |
+| `ValueError` | `top_k` 가 1~20 밖, `type_override` 가 문자·도형·결합 밖 | `top_k 는 1~20 정수여야 합니다 (받은 값: …).` / `type_override 는 문자·도형·결합 중 하나여야 합니다.` | 422 |
+| `multi_search.ModelNotReadyError`(RuntimeError) | 계수 JSON(`shared/model/risk_model_v1.json`, `meta.grade_precision` 포함) 또는 식별력 모델을 기동 때 못 읽음 — 서버는 떠 있고 이 기능만 | `multi_search.state.error`(원인 목록) | 503 |
+| `RuntimeError` | 엔진(인덱스·CLIP) 미준비 — v1 `run_search` 와 같은 메시지 | `Engine 이 아직 초기화되지 않았습니다.` | 503 |
+| (이미지 디코딩 `ValueError`) | v1 과 같이 API 의 `validation.validate_and_decode` 단계에서 — 엔진은 검증된 PIL 이미지를 받는다 | v1 과 같음 | 400 |
+
+OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아니라 `query_type.source = "fallback"` + caveat 로 진행한다(§5-2).
+
 ## 6. 구현 분담표
 
 | 번호 | 담당 | 할 일 | 만드는 필드 | 비고 |
@@ -558,6 +576,9 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | F-4 | 프론트 | "검증 데이터 기준 10건 중 7건" 문구(§4-3), 도형 caveat 배지(§4-5) | — | 값은 응답에서 |
 | F-5 | 프론트 | Vitest 픽스처 = §3-1·§3-2 JSON, 오류·빈 상태(400·후보 0건·`OCR_FALLBACK`) 화면 | — | zod 통과 확인 |
 
-결정 대기(사유): ① OCR 라이브러리 채택(E-4 — 의존성 크기·CI 시간) ② `visual_status`·`applicant`·`nice_classes` 제안 필드 채택 여부
-(이 문서의 제안, 빼도 다른 필드에 영향 없음) ③ v1 제거 일정(최종 발표 뒤) ④ 접미 분리 규칙(E-3)의 적용 범위(고시 단일 명칭만 할지,
-약한 토큰 전체로 넓힐지 — 식별력 설계 §4 효과 측정 뒤).
+결정됨(2026-10-24): ① OCR 은 **easyocr 채택**(ko·en, CPU, 지연 로드; `MARKLENS_OCR_ENABLED` 기본 1, 실패·`MARKLENS_OCR_TIMEOUT`
+2초 초과면 fallback; 모델 디렉터리 `EASYOCR_MODULE_PATH` — 컨테이너는 빌드 때 모델을 미리 내려받아야 한다) ② 제안 필드
+`visual_status`·`applicant`·`nice_classes` **포함** ③ v1 엔드포인트는 최종 발표(2026-12-20)까지 유지 뒤 별도 PR 로 제거(§5-5) ④ 접미
+분리(E-3)는 **고시 단일 명칭만**(2음절 이상 접미·2음절 이상 앞부분, 1음절 앞부분은 오분리가 많아 제외 — `Distinctiveness.
+split_goods_suffix`). 엔진 몫 E-1~E-6 은 `feat/engine-multiaxis` 에 구현됐고(`backend/src/core/multi_search.py`·`ocr.py`,
+`ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`), B-1~B-5·F-1~F-5 가 남았다.

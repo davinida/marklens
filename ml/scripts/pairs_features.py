@@ -183,7 +183,16 @@ def _codes(value: str | None) -> frozenset[str]:
 
 
 def name_axes(name_a: str, name_b_: str, goods: frozenset[str], model: Distinctiveness) -> dict:
-    """이름 축 5종 + 식별력 적용판 3종 + 요부 플래그. 이름이 하나라도 비면 빈 칸."""
+    """이름 축 5종 + 식별력 적용판 3종 + 요부 플래그. 이름이 하나라도 비면 빈 칸.
+
+    서비스(ml/src/axes/pair_axes.py::compute_pair_axes, 계약 v2 E-2)와 같은 식이어야 한다 — 고시
+    단일
+    명칭 접미 분리(E-3, 블루커피 → 블루 커피)를 양쪽 이름에 먼저 적용한 뒤 X1·X2 철자·X3·요부 판정이
+    같은
+    토큰을 받는다(회귀 테스트 ml/tests/test_pair_axes.py).
+    """
+    name_a = model.split_goods_suffix(name_a or "")
+    name_b_ = model.split_goods_suffix(name_b_ or "")
     out = {"x1": "", "x2_text": "", "x3": "", "x3_raw": "", "x1_d": "", "x2_text_d": "", "x3_d": "",
            "has_distinctive_part_a": int(model.has_distinctive_part(name_a, goods or None)),
            "has_distinctive_part_b": int(model.has_distinctive_part(name_b_, goods or None)),
