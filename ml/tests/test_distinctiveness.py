@@ -393,3 +393,31 @@ def test_build_stats_owner_mapping_and_outputs(tmp_path):
     assert "## 상위 5" in report and "임계 민감도" in report and "| 5 / 10 |" in report
     assert summary["약한_토큰"] == len(weak["tokens"]) and len(summary["민감도"]) == 9
     assert summary["제목_소유자_쌍"] == 5
+
+
+def test_split_goods_suffix_rules(model):
+    """E-3 접미 분리(2026-10-24 결정): 붙여쓴 한글 토큰 끝의 고시 단일 명칭(2음절 이상)만, 앞부분도
+    2음절 이상."""
+    assert model.split_goods_suffix("블루커피") == "블루 커피"
+    assert model.split_goods_suffix("스타벅스커피") == "스타벅스 커피"
+    assert model.split_goods_suffix("블루밍") == "블루밍"  # 접미가 1음절 — 그대로
+    assert model.split_goods_suffix("커피") == "커피"  # 토큰 전체가 고시 명칭 — 그대로
+    assert model.split_goods_suffix("왕커피") == "왕커피"  # 앞부분 1음절은 그대로(오분리 방지)
+    assert model.split_goods_suffix("BLUE COFFEE 블루커피") == "BLUE COFFEE 블루 커피"  # 영문 유지
+    assert model.split_goods_suffix("") == ""
+    assert model.split_goods_suffix("블루 커피") == "블루 커피"
+    assert [j.token for j in model.judge_name("블루커피")] == ["블루", "커피"]
+    assert [j.token for j in model.judge_name("블루커피", split=False)] == ["블루커피"]
+    assert model.pair_generic("블루커피", "레드커피", {"G0301"}) == frozenset({"커피"})
+    assert model.salient_tokens("스타벅스커피") == [("스타벅스", 1.0)]  # 유명 브랜드 + 1호 제외
+    assert phonetic_similarity("블루 커피", "레드 커피", extra_generic=frozenset({"커피"})) < 0.6
+    no_goods = dx.Distinctiveness(STATS, famous=set())
+    assert no_goods.split_goods_suffix("블루커피") == "블루커피"  # 변환표 없이 적재되면 원문
+
+
+def test_judge_cache_returns_same_result(model):
+    first = model.judge("커피", {"G0301"})
+    assert model.judge("커피", ["g0301 "]) is first  # 정규화된 키로 캐시
+    assert model.judge("커피", None) is not first
+    assert model.judge("커피").reasons == ("1호 보통명칭(전역)",)
+

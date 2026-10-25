@@ -285,6 +285,7 @@ def test_shipped_model_file_is_valid():
     assert 0.0 <= prob <= 1.0 and grade in rm.GRADES and caveat is False
     assert sum(contributions.values()) == pytest.approx(math.log(prob / (1 - prob)))
     assert model["meta"]["n_trial"] > 0
+    assert 0.0 < model["meta"]["grade_precision"] <= 1.0  # 계약 v2 meta.grade_precision(E-6)
     if model.get("monotone"):
         assert rm.monotone_violations(model["coefficients"]) == []
     if model["version"] in ("risk_model_v1.1", "risk_model_v1.2"):

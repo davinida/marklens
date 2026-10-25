@@ -1,6 +1,6 @@
 # MarkLens 통합 모델 설계 초안 — 판례가 정한 구조
 
-- 기준일: 2026-10-11 (초안 v0.1 2026-10-01, §4 정답 데이터 현황 2026-10-08, §4-2 재측정 2026-10-09, §4-3 정답 데이터 단계 마감·학습 입력 정의, §4-4 학습 전 입력 정리, §7 1차 학습 결과, §7-1 v1.1 편향 제거·결합 방법 비교·판례 사전분포, §7-2 v1.2 절편 자유·요부 재설계·도형 보류 규칙·쉬운 음성 검토, **§7-2 끝 v1.2.1 모델 단계 마감(위험 등급 최소 지지 30·σ 1.0 고정) — 모두 2026-10-11**) · 상태: **v1.2.1 학습 완료(`shared/model/risk_model_v1.json` version risk_model_v1.2.1, 런타임 `ml/src/model/risk_model.py`) — 모델 단계 마감, 서비스 미연결(다음 단계는 README "다음 단계")** · 학습: `ml/scripts/train_risk_model.py`(EBM·GBM 비교는 `ml/requirements-experiments.txt`) · 입력 축: X1 `ml/src/axes/x1_phonetic.py`(v1.5) · X2 `ml/src/scoring.py`(CLIP 시각 유사도) + 문자 외관 `ml/src/axes/x2_ortho.py`(철자, 2026-10-08) · X3 `ml/src/axes/x3_semantic.py`(v1.3) · X4 `ml/src/axes/x4_goods.py`(v1) · 정답 데이터: `backend/scripts/trials_collect.py`(PR #29~#31 병합) · 보강 `backend/scripts/trials_enrich.py`(2026-10-08, 브랜치 `feat/trials-enrich`)
+- 기준일: 2026-10-11 (초안 v0.1 2026-10-01, §4 정답 데이터 현황 2026-10-08, §4-2 재측정 2026-10-09, §4-3 정답 데이터 단계 마감·학습 입력 정의, §4-4 학습 전 입력 정리, §7 1차 학습 결과, §7-1 v1.1 편향 제거·결합 방법 비교·판례 사전분포, §7-2 v1.2 절편 자유·요부 재설계·도형 보류 규칙·쉬운 음성 검토, **§7-2 끝 v1.2.1 모델 단계 마감(위험 등급 최소 지지 30·σ 1.0 고정) — 모두 2026-10-11**, §8 서비스 연결 엔진 E-1~E-6 2026-10-24) · 상태: **v1.2.1 학습 완료(`shared/model/risk_model_v1.json` version risk_model_v1.2.1, 런타임 `ml/src/model/risk_model.py`) — 모델 단계 마감, 서비스 미연결(다음 단계는 README "다음 단계")** · 학습: `ml/scripts/train_risk_model.py`(EBM·GBM 비교는 `ml/requirements-experiments.txt`) · 입력 축: X1 `ml/src/axes/x1_phonetic.py`(v1.5) · X2 `ml/src/scoring.py`(CLIP 시각 유사도) + 문자 외관 `ml/src/axes/x2_ortho.py`(철자, 2026-10-08) · X3 `ml/src/axes/x3_semantic.py`(v1.3) · X4 `ml/src/axes/x4_goods.py`(v1) · 정답 데이터: `backend/scripts/trials_collect.py`(PR #29~#31 병합) · 보강 `backend/scripts/trials_enrich.py`(2026-10-08, 브랜치 `feat/trials-enrich`)
 - 관련 문서: [X1 설계](MarkLens_X1_호칭유사도_설계.md) §8 통합 인터페이스, [X3 설계](MarkLens_X3_관념유사도_설계.md) §7, [X4 설계](MarkLens_X4_상품견련성_설계.md) §2 근사 한계, README "다축 모델과 축 함수".
 
 ## 1. 목적
@@ -392,3 +392,49 @@ JSON `standalone_thresholds`·`standalone_precision` 0.7, 런타임 `risk_score`
 - **v1.2 → v1.2.1 한 줄**: 심결 CV AUC 0.621 (0.55~0.68) → **0.619 (0.55~0.67)**, 현실 분포 0.895 (0.87~0.92) → **0.897 (0.87~0.92)**, Brier 0.270/0.090 → 0.268/0.090(모두 CI 안) · 등급 하한 주의/검토 권장/위험 0.061/0.122/**0.899** → 0.063/0.126/**0.563**(지지 30 이상에서 정밀도 0.8 에 이르는 p 가 없어(최대 0.74) 대체값) · 위험 등급 정밀도 0.82(11쌍, 유사 9) → **0.69(159쌍, 유사 109)**, 위험 재현율 0.05 → **0.58**, 검토 권장 이상 재현율 0.90 → 0.90, 안전으로 간 유사 6 → 5 · 판례 (i)/(ii)/(iii)/(iv) 1.00/0.00/1.00/0.92 → 1.00/0.00/1.00/**0.96** · 계수 CI 폭(부트스트랩 95%): x1_d 3.03(0.56~3.59) → **1.70(1.01~2.71)**, x1_d×문자계 2.68 → 1.57, x4 2.53 → 2.07, x1_d×any_no_distinctive 3.44 → 2.11, 12항 평균 2.06 → **1.52** · 계수 자체는 x1_d 1.86 → 1.81, x1_d×문자계 2.37 → 2.26(문자계 합 4.23 → 4.07), x2_text_d 1.08 → 1.09, x2_whole 0.42 → 0.21(×도형계 −0.21, 제약 경계 그대로), x3_d 0.08 → 0.17, x4 1.47 → 1.43, any_no +0.88 → +0.72, x1×any_no −1.10 → −0.84, 절편 −4.86 → −4.69 · 단독 임계값·도형 규칙(τ 0.9 미검증) 변화 없음.
 - 읽는 법: 변별력·보정은 그대로이고 바뀐 것은 등급의 쓸모(위험 등급이 11쌍에서 159쌍으로 — 정밀도 0.69 는 v1.1 대체값(0.591, 0.69)과 같은 수준)와 계수 추정의 안정성(σ 1.0 으로 CI 폭이 약 ¼ 줄었다)이다. "위험" 정밀도 0.8 을 지지 30 에서 채우려면 표본 확대가 필요하다(11월).
 - 산출물: `shared/model/risk_model_v1.json`(version **risk_model_v1.2.1**, `hyper` 1.0, `meta.sigma_selection` "fixed"·`meta.sigma_fixed`·`meta.risk_min_support` 30), 런타임 `MODEL_VERSION` risk_model_v1.2.1(v1~v1.2 JSON 도 적재 허용), 보고 `ml/data/trials/risk_model_v1_report.md`. 테스트 17(10 + 7, 실측) 통과.
+
+## 8. 서비스 연결 — 엔진 몫 E-1~E-6 (2026-10-24, `feat/engine-multiaxis`, API 계약 v2 §6)
+
+`engine.multi_search(image, name, goods_codes, type_override, top_k)` 가 계약 v2 §2 의 overall·candidates·meta 를 만든다
+(`backend/src/core/multi_search.py`, `SearchV2Result.to_dict()` 가 키 그대로). 엔드포인트·BFF·화면은 손대지 않았다.
+
+- **입력 → 모델 입력(§3·§4-3 그대로)**: 축 점수는 `ml/src/axes/pair_axes.py::compute_pair_axes` 가 내며 학습 특징
+  `pairs_features.name_axes` 와 같은 식이다(회귀 테스트 10쌍 `ml/tests/test_pair_axes.py` — x1_d·x2_text_d·x3_d·요부 플래그 소수
+  4자리 일치). 제외 토큰은 `pair_generic(a, b, 질의 유사군 ∪ 후보 유사군)`, 게이트(호칭·철자·관념·상품)가 꺼진 축은 None 으로
+  보이되 모델에는 학습 CSV 와 같은 수치(x1·x2_text 는 함수 값 0.0, x3 는 has_meaning_both 플래그로 결측, x4·x2_whole 은 None →
+  miss_*)가 들어간다. 유형은 질의 하나의 유형(type_override → OCR → fallback)을 쌍 전체에 쓴다. 입력 키는 계수 JSON 입력 정의와
+  1:1(`model_features`).
+- **접미 분리(E-3, 식별력 v0.3 → 서비스)**: 붙여쓴 한글 토큰(4음절 이상)의 끝이 고시 단일 명칭(2음절 이상)이고 앞부분이 2음절
+  이상이면 나눈다(`Distinctiveness.split_goods_suffix`: 블루커피 → 블루 커피, 스타벅스커피 → 스타벅스 커피; 블루밍·왕커피·커피는
+  그대로). X1·X2 철자·X3·요부 판정이 같은 분리 토큰을 받고, 결합 규칙 v0.3 은 분리 전 토큰도 같이 봐서 혹달린신발 / 혹 달린 신발이
+  그대로 결합으로 잡힌다. 1음절 앞부분을 뺀 이유: 처가방 → 처 가방, 스피치 → 스 피치 같은 오분리가 정답 데이터에서 실측됐다. 정답
+  데이터 314쌍(이름 둘 다 있음) 중 이 규칙에 걸리는 쌍은 **15쌍**(메가커피·캡슐커피·야콘냉면·조청한과·입체한지·시래밥상·청담족발·
+  칠우불고기·강릉초당두부·바타타식탁 …)이고 특징 파일은
+  재생성하지 않았다 — 재생성·재학습은 11월 도형상표 수집 뒤 한 번에(`pairs_features.name_axes` 에도 같은 분리가 들어가 있어 그때
+  학습·서비스가 같은 식으로 맞는다).
+- **후보 풀(E-1)**: CLIP 상위 20 ∪ 발음 상위 20(유사도 > 0) ∪ 철자 상위 20(> 0) ∪ 관념 상위 5(하한 0.55) ∪ 유사군 겹침 상위 20(자카드
+  순). 풀의 모든 후보에 질의 임베딩 vs 후보 임베딩 코사인을 x2_img 로 붙인다(기동 때 `index.reconstruct_n` 으로 임베딩 행렬 보관).
+  기동 때 철자 캐시(글자 토큰 있는 상표명 993건 — 한글명 없으면 영문명), 유사군 역색인(195코드/100건, 백필 뒤 자동 확대), 유형
+  사전(`ml/data/types.json` 1,100건)도 올린다.
+- **유형(E-4)**: easyocr(ko·en, CPU, 지연 로드, `MARKLENS_OCR_ENABLED` 기본 1, `MARKLENS_OCR_TIMEOUT` 2초, 모델 디렉터리
+  `EASYOCR_MODULE_PATH`) → 글자 면적·나머지 면적으로 `auto_type` 규칙 0.05/0.08(x2_split 과 같은 코드 `ml/src/mark_type.py`). 실패·
+  시간 초과·비활성이면 fallback(이름 있으면 문자, 없으면 도형) + caveat. DB 1,100건 유형 사전 계산(`ml/scripts/precompute_types.py`):
+  결합 993·도형 107 — 근거 상표구분 100·비엔나코드 1,000, OCR 폴백 0(모든 건에 비엔나코드가 있어 규칙만으로 끝난다).
+- **위험도·정렬·overall(E-5)**: `risk_score` 기여도를 X1(x1·×문자계·×요부없음)·X2(x2_text·x2_img·×도형계)·X3·X4·요부로 묶고 `miss_*`
+  는 `missing_adjustment` 로 따로(절편 + Σ기여도 + 결측 = 로짓, 테스트가 모든 후보에서 ±0.001 검산). `rule_triggers` 는 단독 임계
+  (x1 ≥ 0.98·x2_text ≥ 0.75·x3 ≥ 0.7707)와 도형 규칙(도형계 ∧ x2_img ≥ 0.9). 정렬은 p 내림차순 → x2_img 내림차순 → 출원번호.
+  overall 은 반환 후보의 최대 등급·최대 p·caveat 합집합(계약 §2-5 문구 그대로, `X3_DISABLED` 추가), 이미지 입력이면 기존 시각
+  4상태를 `visual_status` 로.
+- **grade_precision(E-6)**: 학습 스크립트가 "위험" 등급 OOF 정밀도를 `meta.grade_precision` 으로 쓰고, 현재 JSON 에는 재학습 없이
+  0.6855 를 넣었다. 엔진은 JSON 에서 읽고 없으면 `ModelNotReadyError`.
+- **실측(실제 엔진, 이 Mac, 2026-10-24)**: 기동 +2.6초(철자 캐시·역색인·임베딩 행렬·유형 사전·식별력 모델·계수 JSON). 이름 "블루커피" + 카페 세트
+  (G0301·G0502·S120602·S2005): 풀 55(발음 20·철자 20·관념 2·유사군 16), **96ms**(첫 호출 230ms) — overall 위험 0.579, 1위 "BLU hands"
+  (x1 1.0·x3 0.92, 단독 규칙 x1·x3), 3위 "트루스 yh" 0.28 검토 권장, 제외 토큰 커피(질의)·hands(후보). 도형상표 이미지만: 첫 호출
+  **1.8초**(easyocr 로드 1.5초, 2초 상한 안), 이후 **128ms**; 유형 도형(text_ratio 0.0·fig_ratio 0.717), 1위 자기 자신 x2_img 1.0 →
+  도형 규칙으로 검토 권장, 나머지 p 0.016 안전(§7-2 의 도형계 CLIP 효과 0 그대로), visual_status STRONG_MATCH. 셋 다: 풀 74,
+  **209~242ms**, OCR 이 도형으로 판정해 같은 "BLU hands" 가 문자계 교호작용을 잃고 p 0.08(검토 권장, 단독 규칙) — 유형이 등급을
+  크게 바꾸는 것이 보인다(화면의 "유형 고치기"가 필요한 이유). 목표 300ms(OCR 제외) 안.
+- **테스트**: 63건 추가(전체 1,159 passed·26 skipped) — 입력 조합 7가지·caveat 문구 == 계약 표·§3 예시와 키 집합 동일·로짓 검산·
+  규칙 트리거·정렬·예외 3종·FAKE_ML 동작·로그에 검색어 없음. FAKE_ML 에서는 가짜 CLIP·X3·OCR 로 돌고 계수 JSON 은 실제.
+- **남은 것**: `POST /search/v2`·BFF·zod·캐시·gateway(B-1~B-5), 화면(F-1~F-5), Dockerfile 에 easyocr 모델 사전 다운로드, 특징
+  재생성·재학습(접미 분리 15쌍 반영, 11월).

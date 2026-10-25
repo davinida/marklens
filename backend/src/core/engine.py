@@ -391,6 +391,13 @@ def load_all() -> None:
         state.storage_mode,
     )
 
+    # ---- 3입력 통합 검색(API 계약 v2) 캐시 — 철자 캐시·유사군 역색인·임베딩 행렬·유형 사전·계수
+    # JSON ----
+    # 실패해도 기동은 막지 않는다(상태만 남기고 multi_search 가 ModelNotReadyError 를 낸다).
+    from . import multi_search as _multi_search
+
+    _multi_search.load_all()
+
 
 def shutdown() -> None:
     """서버 shutdown 시 외부 자원 정리 (main.py lifespan 이 호출)."""
@@ -522,3 +529,21 @@ def run_search(image_input, top_k: int) -> dict:
         "top_k_returned": int(len(matches)),
         "scoring_k": int(len(scoring_distances)),
     }
+
+
+def multi_search(image=None, name=None, goods_codes=None, type_override=None, top_k: int = 5):
+    """3입력(이미지·상표명·지정상품 유사군) 통합 검색 — API 계약 v2 §2 의 overall·candidates·meta 를
+    `SearchV2Result`(to_dict() 가 계약 키 그대로)로 돌려준다. 구현은 core/multi_search.py.
+
+    동기 함수다 — CPU 작업(OCR·임베딩·축 계산)은 run_search 와 같이 API 가 스레드 풀에서 부른다.
+    예외: 세 입력이 모두 없으면 multi_search.EmptyQueryError(→ 400), 계수 JSON·식별력 모델이
+    준비되지
+    않았으면 multi_search.ModelNotReadyError(→ 503), 엔진 미준비는 run_search 와 같은 RuntimeError(→
+    503),
+    top_k·type_override 범위 밖은 ValueError(→ 422).
+    """
+    from . import multi_search as _multi_search
+
+    return _multi_search.multi_search(
+        image=image, name=name, goods_codes=goods_codes, type_override=type_override, top_k=top_k
+    )

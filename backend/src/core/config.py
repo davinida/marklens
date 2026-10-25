@@ -126,6 +126,9 @@ _FIELD_TO_ENV: dict[str, str] = {
     "x3_enabled": "MARKLENS_X3_ENABLED",
     "x3_rate_limit": "MARKLENS_X3_RATELIMIT",
     "x3_min_score": "MARKLENS_X3_MIN_SCORE",
+    "ocr_enabled": "MARKLENS_OCR_ENABLED",
+    "ocr_timeout_seconds": "MARKLENS_OCR_TIMEOUT",
+    "easyocr_module_path": "EASYOCR_MODULE_PATH",
     "goods_rate_limit": "MARKLENS_GOODS_RATELIMIT",
     "goods_map_path": "MARKLENS_GOODS_MAP_PATH",
     "goods_presets_path": "MARKLENS_GOODS_PRESETS_PATH",
@@ -205,6 +208,18 @@ class Settings(BaseSettings):
     # 0.696 급)를 걸러
     # 내려고 0.5 에서 올린 값(2026-09-30). 정답 데이터(다빈-1)로 재조정 예정. 반환 상한은 5건 고정.
     x3_min_score: float = Field(default=0.55, validation_alias="MARKLENS_X3_MIN_SCORE")
+
+    # 3입력 통합 검색(API 계약 v2 §2-4, 엔진 E-4)의 표장 유형 판정 OCR(easyocr, 지연 로드). 0 이면
+    # OCR 을
+    # 돌리지 않고 입력 구성으로 유형을 정한다(이름 있으면 문자, 없으면 도형 — source "fallback").
+    # 모델
+    # 로드·인식이 시간 상한(초)을 넘으면 그 요청은 fallback 으로 가고 로드는 뒤에서 이어진다. 모델
+    # 파일
+    # 디렉터리는 EASYOCR_MODULE_PATH(비우면 easyocr 기본 ~/.EasyOCR — 컨테이너는 빌드 때 미리 받아
+    # 둔다).
+    ocr_enabled: bool = Field(default=True, validation_alias="MARKLENS_OCR_ENABLED")
+    ocr_timeout_seconds: float = Field(default=2.0, validation_alias="MARKLENS_OCR_TIMEOUT")
+    easyocr_module_path: str = Field(default="", validation_alias="EASYOCR_MODULE_PATH")
 
     # /goods/search·/goods/classes (상품↔유사군 변환표, 프론트-6): KIPRIS·CPU 모델과 무관한
     # 로컬 메모리 조회(수 ms)지만 자동완성이 키 입력마다 부르므로 무제한은 피한다 —
@@ -386,6 +401,12 @@ PHONETIC_MIN_SIMILARITY: float = settings.phonetic_min_similarity
 X3_ENABLED: bool = settings.x3_enabled
 X3_RATE_LIMIT: str = settings.x3_rate_limit
 X3_MIN_SCORE: float = settings.x3_min_score
+
+# 3입력 통합 검색 유형 판정 OCR (env: MARKLENS_OCR_ENABLED / MARKLENS_OCR_TIMEOUT /
+# EASYOCR_MODULE_PATH)
+OCR_ENABLED: bool = settings.ocr_enabled
+OCR_TIMEOUT: float = settings.ocr_timeout_seconds
+EASYOCR_MODULE_PATH: str = settings.easyocr_module_path.strip()
 
 # 상품↔유사군 변환표 /goods/* (env: MARKLENS_GOODS_RATELIMIT / MARKLENS_GOODS_MAP_PATH)
 GOODS_RATE_LIMIT: str = settings.goods_rate_limit

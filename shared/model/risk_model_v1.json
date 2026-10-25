@@ -151,6 +151,7 @@
   "sigma_selection": "fixed",
   "sigma_fixed": "CV 무차별(심결 AUC 차 0.006 안, CI 겹침) → 설계 원칙에 따라 중간값 1.0",
   "risk_min_support": 30,
+  "grade_precision": 0.6855,
   "feature_definitions": "축 점수 0~1(결측 0 + miss_*=1; x3_d 는 has_meaning_both False 면 결측), any_no_distinctive = 1 − has_distinctive_part_a·b, 교호작용 x1_d×문자계(문자·결합-문자요부·미상·결합)·x2_whole×도형계(도형·결합-도형요부)·x1_d×any_no_distinctive. 유형 주효과·miss_x1·miss_x2text·요부 플래그 2개 없음. 표준화 없음."
  }
 }

@@ -242,6 +242,7 @@ def test_run_end_to_end_logistic_and_prior(data, tmp_path):
     model = rm.load_model(model_path)
     assert model["version"] == "risk_model_v1.2.1" and model["removed_terms"] == tr.REMOVED_TERMS
     assert model["meta"]["sigma_selection"] == "cv" and model["meta"]["risk_min_support"] == 30
+    assert "grade_precision" in model["meta"]
     assert not any(name.startswith("type_") for name in model["features"])
     assert "miss_x1" not in model["features"] and "has_distinctive_part_a" not in model["features"]
     assert "any_no_distinctive" in model["features"]
