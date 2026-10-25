@@ -152,7 +152,7 @@ py -3.11 -m venv ml\venv
 ml\venv\Scripts\python.exe -m pip install `
   torch==2.13.0 torchvision==0.28.0 `
   --index-url https://download.pytorch.org/whl/cpu
-ml\venv\Scripts\python.exe -m pip install setuptools==83.0.0
+ml\venv\Scripts\python.exe -m pip install setuptools==84.1.0
 ml\venv\Scripts\python.exe -m pip install -c constraints.txt `
   -r ml\requirements.txt `
   -r backend\requirements.txt `
@@ -166,14 +166,14 @@ python3.11 -m venv ml/venv
 ml/venv/bin/python -m pip install \
   torch==2.13.0 torchvision==0.28.0 \
   --index-url https://download.pytorch.org/whl/cpu
-ml/venv/bin/python -m pip install setuptools==83.0.0
+ml/venv/bin/python -m pip install setuptools==84.1.0
 ml/venv/bin/python -m pip install -c constraints.txt \
   -r ml/requirements.txt \
   -r backend/requirements.txt \
   -r backend/requirements-dev.txt
 ```
 
-`setuptools==83.0.0` 단계는 CI(`.github/workflows/ci.yml`)·컨테이너 빌드
+`setuptools==84.1.0` 단계는 CI(`.github/workflows/ci.yml`)·컨테이너 빌드
 (`deploy/backend.Dockerfile`)와 동일한 순서입니다. 고정 버전은 `constraints.txt`에
 있습니다(torch 2.13.0, faiss-cpu 1.14.3, open_clip_torch 2.32.0, sentence-transformers 6.1.0,
 wordfreq 3.1.1, httpx2 2.13.0). 새 의존성은 `constraints.txt`에 정확한 버전으로 고정한 뒤

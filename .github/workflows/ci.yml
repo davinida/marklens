@@ -41,7 +41,7 @@ jobs:
       - name: Install CPU inference runtime
         run: |
           pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
-          pip install setuptools==83.0.0
+          pip install setuptools==84.1.0
 
       - name: Install dependencies
         run: >-
