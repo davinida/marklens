@@ -16,7 +16,11 @@
       has_distinctive_part_a/b·weak_a/b(요부 없는 이름은 토큰을 넘기지 않고 전체 대비 — 2000후2453).
 쉬운 음성(--easy-negatives, seed 0): 다른 심결 사건끼리 교차 쌍 350 + DB 1,100 무작위 쌍 350 을
       비유사로 가정해 pairs_features_easy.csv 에 쓴다(x1·x2_text ≥ 0.8 은 우연 유사로 제외·수 보고,
-      pair_source = cross | db; 이미지 축은 없다).
+      pair_source = cross | db). 2026-10-25(통합 모델 v1.3)부터 이미지 축 x2_whole 도 채운다 —
+      cross 는 심결 추출 이미지(이름 A 쪽 사건의 이 사건 표장 `이미지A`, 이름 B 쪽 사건에서 그
+      이름을 가진 상대 표장의 `이미지B`, x2_cache_v0 임베딩), db 는 서비스 FAISS 색인
+      벡터(reconstruct). 코사인, 음수는 0. `--fill-easy-images` 는 기존 pairs_features_easy.csv 에
+      x2_whole·has_image 만 채운다(재생성 없음 — 표본·이름 축은 그대로).
 축:   x1       phonetic_similarity(X1 호칭) — 발음 후보 없으면 함수가 0.0 을 돌려준다(게이트 꺼짐)
       x2_text  orthographic_similarity(X2 문자 외관) — 글자 토큰 없으면 0.0
       x2_fig   image_pairs_v1.csv 의 도형 크롭 CLIP 코사인(양쪽 크롭이 있을 때, x2_cache_v0 임베딩)
@@ -60,6 +64,9 @@ DEFAULT_LABELS = DEFAULT_BASE / "labels.csv"
 DEFAULT_IMAGE_PAIRS = DEFAULT_BASE / "image_pairs_v1.csv"
 DEFAULT_OUT = DEFAULT_BASE / "pairs_features.csv"
 DEFAULT_METADATA = ML_ROOT / "data" / "kipris_metadata.json"
+DEFAULT_X2_CACHE = DEFAULT_BASE / "x2_cache_v0.npz"  # 심결 추출 이미지 CLIP 임베딩(sha256 키)
+DEFAULT_INDEX = ML_ROOT / "data" / "index" / "kipris.faiss"  # 서비스 색인 — DB 이미지 임베딩
+DEFAULT_INDEX_META = ML_ROOT / "data" / "index" / "kipris_metadata.json"
 EASY_CROSS = 350
 EASY_DB = 350
 EASY_MAX_SCORE = 0.8  # x1·x2_text 가 이 이상이면 우연 유사 — 쉬운 음성에서 제외
@@ -277,18 +284,20 @@ def _easy_row(source: str, key: str, name_a: str, name_b_: str, goods_a: frozens
     return out
 
 
-def read_db_names(path: Path) -> list[tuple[str, frozenset[str]]]:
-    """DB(kipris_metadata.json) 상표명(한글명 > 영문명)과 유사군."""
+def read_db_records(path: Path) -> list[dict]:
+    """DB(kipris_metadata.json) 레코드 중 상표명(한글명 > 영문명)이 있는 것. 쉬운 음성
+    `db:{i}|{j}` 의 i·j 는 이 목록의 색인이다(read_db_names 와 같은 순서)."""
     if not Path(path).exists():
         return []
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     records = data.get("trademarks", data) if isinstance(data, dict) else data
-    out = []
-    for record in records:
-        name = (record.get("상표한글명") or record.get("상표영문명") or "").strip()
-        if name:
-            out.append((name, frozenset(record.get("유사군") or ())))
-    return out
+    return [r for r in records if (r.get("상표한글명") or r.get("상표영문명") or "").strip()]
+
+
+def read_db_names(path: Path) -> list[tuple[str, frozenset[str]]]:
+    """DB(kipris_metadata.json) 상표명(한글명 > 영문명)과 유사군."""
+    return [((r.get("상표한글명") or r.get("상표영문명") or "").strip(),
+             frozenset(r.get("유사군") or ())) for r in read_db_records(path)]
 
 
 def easy_negatives(features: list[dict], label_rows: list[dict],
@@ -347,6 +356,152 @@ def easy_negatives(features: list[dict], label_rows: list[dict],
     return rows, report
 
 
+# ---- 쉬운 음성 이미지 축(통합 모델 v1.3) -------------------------------------------------------
+
+EASY_IMAGE_REASONS = (
+    "A 이미지 없음", "B 이미지 없음", "B 모호(상대번호 순 첫 이미지)", "DB 이미지 없음",
+    "임베딩 없음",
+)
+
+
+def easy_image_sides(easy_rows: list[dict], features: list[dict], image_rows: list[dict],
+                     db_records: list[dict]) -> tuple[list[tuple[str, str] | None], dict[str, int]]:
+    """쉬운 음성 행마다 (이미지 A, 이미지 B) 식별자. cross 는 심결 추출 이미지의 상대 경로 —
+    이름 A 쪽 사건의 이 사건 표장 `이미지A`, 이름 B 쪽 사건에서 그 이름을 가진 상대 표장의
+    `이미지B`(같은 이름의 상대 표장이 둘 이상이면 상대번호 순 첫 이미지). db 는 DB 이미지
+    파일명(`db:{i}|{j}` 의 색인은 read_db_records 순서). 못 찾으면 None 과 사유 집계."""
+    by_key, by_case = image_index(image_rows)
+    image_a = {case: (rows[0].get("이미지A") or "") for case, rows in by_case.items()}
+    trial_by_case: dict[str, list[dict]] = {}
+    for feature in features:
+        trial_by_case.setdefault(feature["심판번호"], []).append(feature)
+    sides: list[tuple[str, str] | None] = []
+    reasons = {reason: 0 for reason in EASY_IMAGE_REASONS}
+    for row in easy_rows:
+        source, _, pair = row["심판번호"].partition(":")
+        if source == "cross":
+            case_a, _, case_b = pair.partition("|")
+            image_a_path = image_a.get(case_a, "")
+            numbers = sorted({(f.get("상대번호") or "") for f in trial_by_case.get(case_b, [])
+                              if f.get("이름B") == row["이름B"]})
+            images_b: list[str] = []
+            for number in numbers:
+                image_row = by_key.get((case_b, number))
+                path = (image_row or {}).get("이미지B") or ""
+                if path and path not in images_b:
+                    images_b.append(path)
+            if not image_a_path:
+                reasons["A 이미지 없음"] += 1
+                sides.append(None)
+            elif not images_b:
+                reasons["B 이미지 없음"] += 1
+                sides.append(None)
+            else:
+                if len(images_b) > 1:
+                    reasons["B 모호(상대번호 순 첫 이미지)"] += 1
+                sides.append((image_a_path, images_b[0]))
+        elif source == "db":
+            i, _, j = pair.partition("|")
+            try:
+                file_a = db_records[int(i)].get("이미지파일") or ""
+                file_b = db_records[int(j)].get("이미지파일") or ""
+            except (IndexError, ValueError):
+                file_a = file_b = ""
+            if file_a and file_b:
+                sides.append((file_a, file_b))
+            else:
+                reasons["DB 이미지 없음"] += 1
+                sides.append(None)
+        else:
+            sides.append(None)
+    return sides, reasons
+
+
+def easy_image_scores(easy_rows: list[dict], features: list[dict], image_rows: list[dict],
+                      db_records: list[dict], *, trial_embeddings, db_embeddings) -> dict:
+    """쉬운 음성 행에 x2_whole(전체 이미지 CLIP 코사인, 음수는 0)·has_image 를 제자리에서 채운다.
+    trial_embeddings(상대 경로 목록) → {경로: 벡터}, db_embeddings(파일명 목록) → {파일명: 벡터}.
+    채운 수·사유·평균을 담은 보고 사전을 돌려준다."""
+    sides, reasons = easy_image_sides(easy_rows, features, image_rows, db_records)
+    wanted: dict[str, set[str]] = {"cross": set(), "db": set()}
+    for row, side in zip(easy_rows, sides):
+        if side and row["pair_source"] in wanted:
+            wanted[row["pair_source"]].update(side)
+    vectors = {
+        "cross": trial_embeddings(sorted(wanted["cross"])) if wanted["cross"] else {},
+        "db": db_embeddings(sorted(wanted["db"])) if wanted["db"] else {},
+    }
+    filled: dict[str, list[float]] = {"cross": [], "db": []}
+    for row, side in zip(easy_rows, sides):
+        if side is None or row["pair_source"] not in vectors:
+            continue
+        table = vectors[row["pair_source"]]
+        if side[0] not in table or side[1] not in table:
+            reasons["임베딩 없음"] += 1
+            continue
+        score = max(0.0, float(np.dot(table[side[0]], table[side[1]])))
+        row["x2_whole"] = _fmt(score)
+        row["has_image"] = 1
+        filled[row["pair_source"]].append(score)
+    return {
+        "cross": len(filled["cross"]), "db": len(filled["db"]), "없음": reasons,
+        "x2_whole_평균": {source: (round(float(np.mean(values)), 4) if values else None)
+                       for source, values in filled.items()},
+    }
+
+
+def trial_embedding_provider(base: Path = DEFAULT_BASE, cache_path: Path = DEFAULT_X2_CACHE):
+    """심결 추출 이미지(상대 경로) → CLIP 임베딩. x2_benchmark 캐시(sha256)에 없는 파일만 encode."""
+    from scripts.x2_benchmark import FAILURES_KEY, embed_paths
+
+    def provider(relative_paths: list[str]) -> dict[str, np.ndarray]:
+        absolute = [Path(base) / path for path in relative_paths]
+        result = embed_paths(absolute, cache_path)
+        result.pop(FAILURES_KEY, None)
+        return {rel: result[str(path)] for rel, path in zip(relative_paths, absolute)
+                if str(path) in result}
+
+    return provider
+
+
+def db_embedding_provider(index_path: Path = DEFAULT_INDEX, meta_path: Path = DEFAULT_INDEX_META):
+    """DB 이미지 파일명 → 서비스 FAISS 색인 벡터(reconstruct) — 서비스가 쓰는 임베딩 그대로."""
+    from src.search import load_index  # torch 뒤에 faiss(위 import 순서 주석)
+
+    index = load_index(index_path)
+    names = json.loads(Path(meta_path).read_text(encoding="utf-8"))["image_paths"]
+    position = {name: i for i, name in enumerate(names)}
+
+    def provider(filenames: list[str]) -> dict[str, np.ndarray]:
+        return {name: np.asarray(index.reconstruct(position[name]), dtype=np.float32)
+                for name in filenames if name in position}
+
+    return provider
+
+
+def default_easy_image_providers(*, base: Path = DEFAULT_BASE, cache_path: Path = DEFAULT_X2_CACHE,
+                                 index_path: Path = DEFAULT_INDEX,
+                                 meta_path: Path = DEFAULT_INDEX_META) -> tuple | None:
+    """(trial_embeddings, db_embeddings) — 색인·메타가 없으면 None(이미지 축 없이 진행)."""
+    if not (Path(index_path).exists() and Path(meta_path).exists()):
+        return None
+    return trial_embedding_provider(base, cache_path), db_embedding_provider(index_path, meta_path)
+
+
+def fill_easy_images(easy_path: Path, features_path: Path, image_pairs_path: Path,
+                     metadata_path: Path, *, providers) -> dict:
+    """기존 pairs_features_easy.csv 에 x2_whole·has_image 만 채워 다시 쓴다(표본·이름 축 불변)."""
+    easy_rows = read_csv(easy_path)
+    features = read_csv(features_path)
+    image_rows = read_csv(image_pairs_path) if Path(image_pairs_path).exists() else []
+    trial_embeddings, db_embeddings = providers
+    report = easy_image_scores(easy_rows, features, image_rows, read_db_records(metadata_path),
+                               trial_embeddings=trial_embeddings, db_embeddings=db_embeddings)
+    write_csv(easy_path, easy_rows)
+    report["출력"] = str(easy_path)
+    return report
+
+
 def _count(rows: list[dict], key: str) -> dict:
     counts: dict[str, int] = {}
     for row in rows:
@@ -402,7 +557,7 @@ def write_csv(path: Path, features: list[dict]) -> None:
 
 def run(labels_path: Path, image_pairs_path: Path, out_path: Path, *,
         model: Distinctiveness | None = None, easy: bool = False,
-        metadata_path: Path = DEFAULT_METADATA, seed: int = 0) -> dict:
+        metadata_path: Path = DEFAULT_METADATA, seed: int = 0, easy_images=None) -> dict:
     model = model or load_distinctiveness()
     label_rows = read_csv(labels_path)
     image_rows = read_csv(image_pairs_path) if Path(image_pairs_path).exists() else []
@@ -415,6 +570,12 @@ def run(labels_path: Path, image_pairs_path: Path, out_path: Path, *,
         easy_rows, easy_report = easy_negatives(
             features, label_rows, read_db_names(metadata_path), model=model, seed=seed
         )
+        if easy_images is not None:  # (trial_embeddings, db_embeddings) — 이미지 축 x2_whole
+            trial_embeddings, db_embeddings = easy_images
+            easy_report["이미지"] = easy_image_scores(
+                easy_rows, features, image_rows, read_db_records(metadata_path),
+                trial_embeddings=trial_embeddings, db_embeddings=db_embeddings,
+            )
         easy_path = out_path.with_name(out_path.stem + "_easy.csv")
         write_csv(easy_path, easy_rows)
         report["쉬운_음성"] = {**easy_report, "출력": str(easy_path)}
@@ -432,11 +593,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--easy-negatives", action="store_true",
                         help="쉬운 음성(교차 350 + DB 350) → pairs_features_easy.csv")
+    parser.add_argument("--fill-easy-images", action="store_true",
+                        help="기존 pairs_features_easy.csv 에 x2_whole·has_image 만 채운다"
+                             "(재생성 없음)")
     parser.add_argument("--metadata", type=Path, default=DEFAULT_METADATA)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args(argv)
+    providers = default_easy_image_providers(base=args.image_pairs.parent)
+    if args.fill_easy_images:
+        if providers is None:
+            parser.error("서비스 색인(ml/data/index)이 없어 DB 이미지 임베딩을 읽을 수 없습니다")
+        report = fill_easy_images(args.out.with_name(args.out.stem + "_easy.csv"), args.out,
+                                  args.image_pairs, args.metadata, providers=providers)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
     report = run(args.labels, args.image_pairs, args.out, easy=args.easy_negatives,
-                 metadata_path=args.metadata, seed=args.seed)
+                 metadata_path=args.metadata, seed=args.seed, easy_images=providers)
     print(json.dumps(report, ensure_ascii=False, indent=2))
     return 0
 

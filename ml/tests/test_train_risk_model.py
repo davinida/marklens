@@ -219,46 +219,99 @@ def test_run_end_to_end_logistic_and_prior(data, tmp_path):
     model_path = tmp_path / "model" / "risk_model_v1.json"
     summary = tr.run(features, easy, out_dir=out_dir, model_path=model_path,
                      methods=("logistic", "prior"), c_grid=(0.3, 1.0), sigma_grid=(0.5, 2.0),
-                     folds=3, repeats=1, bootstrap=8, seed=0)
+                     folds=3, repeats=1, bootstrap=8, seed=0, min_pattern_minority=5)
     data_summary = summary["데이터"]
     assert data_summary["심결_행"] == 120 - data_summary["이름_없어_제외"]["행"]
     assert data_summary["이름_없어_제외"]["행"] == 11
-    assert data_summary["제거_항"] == tr.REMOVED_TERMS
+    assert data_summary["패턴_축"] == ["x2_whole", "x4"]
+    assert data_summary["제거_항"] == tr.REMOVED_TERMS + ["miss_x2img", "miss_x4", "miss_x3"]
+    assert data_summary["쉬운_음성_이미지_있음"] == 0  # 합성 쉬운 음성에는 이미지가 없다
+    assert data_summary["결합_하한"]["x2_whole"]["근거"].startswith("심결 비유사 평균")
+    assert data_summary["결합_하한"]["x4"]["근거"] == "쉬운 음성 비유사 평균"
+    assert set(data_summary["입력(패턴별)"]) == {"base", "x2_whole", "x4", "x2_whole+x4"}
     assert set(summary["방법"]) == {"logistic", "prior"}
     for item in summary["방법"].values():
         assert 0.0 <= item["cv"]["심결"]["auc"] <= 1.0
         assert set(item["판례_조건_겹_성립_비율"]) == set(tr.CONDITIONS)
         assert "intercept" in item["부트스트랩"]["계수"]
+        assert set(item["부트스트랩"]["패턴"]) == set(data_summary["입력(패턴별)"])
         assert "x1_d×any_no_distinctive" in item["부트스트랩"]["계수"]
+        assert set(item["패턴"]) == set(data_summary["입력(패턴별)"])
+        assert item["패턴"]["base"]["n"] >= item["패턴"]["x2_whole+x4"]["n"]
+        assert set(item["단조성"]) == {"base → x2_whole (x2_whole)", "base → x4 (x4)",
+                                      "x4 → x2_whole+x4 (x2_whole)", "x2_whole → x2_whole+x4 (x4)"}
+    for block in summary["방법"]["prior"]["단조성"].values():  # 결합 제약 → 하한 이상 위반 0
+        assert block["하한_이상"]["위반(p 내려감)"] == 0
+        assert block["하한값_대입_로짓차_최소"] >= -1e-6
     assert summary["채택"]["method"] in ("prior", "logistic")
     assert set(summary["단독_임계값"]["thresholds"]) == set(tr.AXES)
     assert summary["단독_임계값"]["목표_정밀도"] == 0.7
     assert set(summary["요부_교차표"]) == {"has_distinctive_part_a", "has_distinctive_part_b",
                                        "any_no_distinctive"}
+    assert "miss_x2img" in summary["참고_지시변수_모델"]["계수"]
     assert (out_dir / "risk_model_v1_report.md").exists()
     assert (out_dir / "risk_model_v1_calibration.png").stat().st_size > 0
     report = (out_dir / "risk_model_v1_report.md").read_text(encoding="utf-8")
     assert "## 방법 비교" in report and "## 요부 유무 × 라벨" in report
+    assert "### 결측 패턴별 계수 집합" in report and "### 단조성(결합 제약) 검사" in report
+    assert "## 참고 — 지시변수 모델" in report
     model = rm.load_model(model_path)
-    assert model["version"] == "risk_model_v1.2.1" and model["removed_terms"] == tr.REMOVED_TERMS
+    assert model["version"] == "risk_model_v1.3"
+    assert model["removed_terms"] == data_summary["제거_항"]
     assert model["meta"]["sigma_selection"] == "cv" and model["meta"]["risk_min_support"] == 30
-    assert "grade_precision" in model["meta"]
-    assert not any(name.startswith("type_") for name in model["features"])
-    assert "miss_x1" not in model["features"] and "has_distinctive_part_a" not in model["features"]
-    assert "any_no_distinctive" in model["features"]
-    assert "x1_d×any_no_distinctive" in model["features"]
+    assert "grade_precision" in model["meta"] and "monotonicity" in model["meta"]
+    assert model["meta"]["indicator_reference"]["계수"]["miss_x2img"] is not None
+    assert model["pattern_axes"] == ["x2_whole", "x4"]
+    assert model["reference_pattern"] == "x2_whole+x4"
+    assert sorted(model["patterns"]) == sorted(rm.pattern_keys(["x2_whole", "x4"]))
+    reference = model["patterns"]["x2_whole+x4"]
+    assert model["features"] == reference["features"]
+    assert model["intercept"] == reference["intercept"]
+    assert reference["requires"] == ["x2_whole", "x4"]
+    assert model["patterns"]["base"]["requires"] == []
+    for key, block in model["patterns"].items():
+        assert not any(name.startswith("type_") or name.startswith("miss_")
+                       for name in block["features"])
+        assert "any_no_distinctive" in block["features"]
+        assert "x1_d×any_no_distinctive" in block["features"]
+        assert ("x2_whole" in block["features"]) == ("x2_whole" in key)
+        assert ("x4" in block["features"]) == ("x4" in key)
+        assert block["meta"]["n"] > 0 and "cv_auc" in block["meta"]
     assert model["figure_rule"] == {"threshold": tr.FIGURE_X2_THRESHOLD, "caveat": tr.FIGURE_CAVEAT,
                                     "validated": False, "basis": model["figure_rule"]["basis"]}
     if model["method"] == "prior_monotone_logistic":
         assert model["prior"]["sigma"] in (0.5, 2.0) and model["monotone"]
         assert model["prior"]["intercept_prior"] is False
         assert set(model["prior"]["applies_to"]) <= set(tr.PRIOR_FEATURES)
-        assert rm.monotone_violations(model["coefficients"]) == []
+        assert model["coupling"]["floors"] == {
+            axis: data_summary["결합_하한"][axis]["하한"] for axis in ("x2_whole", "x4")}
+        for block in model["patterns"].values():
+            assert rm.monotone_violations(block["coefficients"]) == []
+        assert rm.coupling_violations(model) == []
+    else:
+        assert model["coupling"] is None
     result = rm.risk_score({"x1_d": 0.9, "x2_text_d": 0.9, "x4": 1.0, "mark_type": "문자"}, model)
     assert 0.0 <= result.prob <= 1.0 and result.grade in rm.GRADES and not result.figure_caveat
+    assert result.pattern == "x4"
     assert rm.risk_score({"x2_whole": 0.95, "mark_type": "도형"}, model).figure_caveat
+    assert rm.risk_score({"x2_whole": 0.95, "mark_type": "도형"}, model).pattern == "x2_whole"
     saved = json.loads((out_dir / "risk_model_v1_results.json").read_text(encoding="utf-8"))
     assert saved["채택"]["method"] == summary["채택"]["method"]
+
+
+def test_run_falls_back_to_fewer_patterns_when_minority_small(data, tmp_path):
+    """패턴마다 소수 클래스가 기준 미만이면 이미지만 → 패턴 없음(지시변수 구조)으로 내려간다."""
+    features, easy = data
+    summary = tr.run(features, easy, out_dir=tmp_path / "out", model_path=tmp_path / "m.json",
+                     methods=("prior",), sigma_grid=(1.0,), folds=3, repeats=1, bootstrap=2,
+                     seed=0, min_pattern_minority=10_000)
+    assert summary["데이터"]["패턴_축"] == [] and len(summary["데이터"]["패턴_결정"]["시도"]) == 3
+    model = rm.load_model(tmp_path / "m.json")
+    assert model["pattern_axes"] == [] and list(model["patterns"]) == ["base"]
+    assert model["reference_pattern"] == "base" and model["coupling"] is None
+    assert {"x2_whole", "miss_x2img", "x4", "miss_x4"} <= set(model["features"])
+    assert "miss_x3" not in model["features"]
+    assert rm.risk_score({"x1_d": 0.5, "mark_type": "문자"}, model).pattern == "base"
 
 
 def test_run_ebm_and_gbm_in_subprocess(data, tmp_path):
@@ -312,3 +365,110 @@ def test_groups_row_features_and_perturbation():
     high1 = tr.perturbed(X, tr.FEATURES, np.asarray(["text"]), "x1_d", 1.0)
     assert high1[0, tr.FEATURES.index("x1_d×any_no_distinctive")] == 1.0  # 요부 없음 유지
     assert tr.perturbed(X, tr.TREE_FEATURES[:3], np.asarray(["text"]), "x4", 1.0) is None
+
+
+def test_pattern_helpers_and_choice():
+    axes = tr.PATTERN_AXES
+    assert tr.pattern_features("base", axes) == tr.PATTERN_BASE
+    assert tr.pattern_features("x2_whole+x4", axes) == tr.PATTERN_BASE + [
+        "x2_whole", "x2_whole×도형계", "x4"]
+    assert tr.pattern_features("x2_whole", ("x2_whole",)) == tr.PATTERN_BASE + [
+        "x2_whole", "x2_whole×도형계", "x4", "miss_x4"]  # 폴백: 패턴 밖 축은 값 + 지시변수
+    assert tr.pattern_features("base", ()) == tr.PATTERN_BASE + [
+        "x2_whole", "x2_whole×도형계", "miss_x2img", "x4", "miss_x4"]
+    rows = [{"x2_whole": 0.4, "x4": np.nan}, {"x2_whole": np.nan, "x4": 0.0},
+            {"x2_whole": 0.9, "x4": 1.0}, {"x2_whole": np.nan, "x4": np.nan}]
+    assert list(tr.row_pattern_keys(rows, axes)) == ["x2_whole", "x4", "x2_whole+x4", "base"]
+    masks = tr.pattern_masks(rows, axes)
+    assert masks["base"].tolist() == [True] * 4
+    assert masks["x2_whole"].tolist() == [True, False, True, False]
+    assert masks["x4"].tolist() == [False, True, True, False]
+    assert masks["x2_whole+x4"].tolist() == [False, False, True, False]
+    y = np.asarray([1.0, 0.0, 1.0, 0.0])
+    chosen, report = tr.choose_pattern_axes(rows, y, min_minority=1)
+    assert chosen == () and len(report["시도"]) == 3  # x2_whole+x4 행 1개(비유사 0) → 축을 다 뺀다
+    assert report["시도"][0]["패턴"]["x2_whole+x4"] == {"n": 1, "유사": 1, "비유사": 0}
+    chosen, _ = tr.choose_pattern_axes(rows, y, min_minority=0)
+    assert chosen == axes
+
+
+def test_coupling_rows_feasible_at_prior_mean_and_joint_fit_satisfies_constraints(data):
+    features, easy = data
+    rows = [row for row in tr.load_rows(features, easy) if row["최종라벨"] in ("유사", "비유사")
+            and (row["pair_source"] != "trial" or tr.has_name(row))]
+    y = tr.labels_for(rows, "최종").astype(np.float64)
+    weight = tr.sample_weights(rows, 0.5)
+    design = tr.PatternDesign(rows, tr.PATTERN_AXES)
+    assert design.keys == ["base", "x2_whole", "x4", "x2_whole+x4"] and design.full == "x2_whole+x4"
+    assert design.size == sum(len(design.names[k]) + 1 for k in design.keys) == 7 + 9 + 8 + 10
+    floors = {"x2_whole": 0.35, "x4": 0.03}
+    A = tr.coupling_rows(design, floors)
+    assert A.shape == (32 + 32 + 64 + 64, design.size)
+    start = np.zeros(design.size)
+    for key in design.keys:
+        offset = design.offset[key]
+        for i, name in enumerate(design.names[key]):
+            start[offset + i] = tr.PRIOR_MU.get(name, 0.0)
+    assert (A @ start >= -1e-12).all()  # 사전평균·절편 0 은 실행 가능 시작점
+    assert (tr.monotone_rows(design) @ start >= -1e-12).all()
+    fitted = tr.fit_patterns_prior(design, y, weight, np.arange(y.size), 1.0, floors)
+    theta = np.concatenate([np.concatenate([fitted[k][0], [fitted[k][1]]]) for k in design.keys])
+    assert (A @ theta >= -1e-6).all() and (tr.monotone_rows(design) @ theta >= -1e-6).all()
+    blocks = tr.rounded_blocks(design, fitted, floors)
+    model_like = {"patterns": blocks, "pattern_axes": list(design.axes),
+                  "coupling": {"floors": floors}}
+    assert rm.coupling_violations(model_like) == []
+    for block in blocks.values():
+        assert rm.monotone_violations(block["coefficients"]) == []
+    # 패턴별 독립 L2 적합(기준 방법)은 제약이 없어 결합 제약을 어길 수 있다 — 함수는 돈다
+    independent = tr.fit_patterns_logistic(design, y, weight, np.arange(y.size), 1.0)
+    assert set(independent) == set(design.keys)
+    own = design.own_prob(fitted, np.arange(y.size))
+    assert own.shape == (y.size,) and ((own > 0) & (own < 1)).all()
+
+
+def test_rounded_blocks_repairs_rounding_violations(data):
+    features, easy = data
+    rows = [row for row in tr.load_rows(features, easy) if row["최종라벨"] in ("유사", "비유사")]
+    design = tr.PatternDesign(rows, tr.PATTERN_AXES)
+    floors = {"x2_whole": 0.3, "x4": 0.02}
+    # 공통 항·패턴 축 계수 0 → 결합 여유 = 절편 차. 상위 절편을 0.00009 낮게 두면 반올림 뒤
+    # −0.0001 위반.
+    fitted = {key: (np.zeros(len(design.names[key])), -3.0) for key in design.keys}
+    fitted["x2_whole"] = (fitted["x2_whole"][0], -3.00009)
+    fitted["x2_whole+x4"] = (fitted["x2_whole+x4"][0], -3.00018)
+    assert tr.coupling_slack(
+        {k: {"features": design.names[k], "coefficients": dict.fromkeys(design.names[k], 0.0),
+             "intercept": round(v[1], 4)} for k, v in fitted.items()},
+        design.axes, floors, "x2_whole") < 0
+    blocks = tr.rounded_blocks(design, fitted, floors)
+    assert blocks["x2_whole"]["intercept"] >= blocks["base"]["intercept"]
+    assert blocks["x2_whole+x4"]["intercept"] >= max(blocks["x2_whole"]["intercept"],
+                                                     blocks["x4"]["intercept"])
+    assert rm.coupling_violations({"patterns": blocks, "pattern_axes": list(design.axes),
+                                   "coupling": {"floors": floors}}) == []
+
+
+def test_shipped_model_monotone_on_training_pairs():
+    """배포 JSON(v1.3)·학습 데이터가 있을 때: 정답 데이터 전체 쌍에서 이미지·상품을 더 관측해도(값이
+    하한 이상이면) p 가 내려가지 않는다 — 결합 제약의 데이터 확인."""
+    if not rm.DEFAULT_MODEL_PATH.exists() or not tr.DEFAULT_FEATURES.exists():
+        pytest.skip("계수 파일 또는 학습 데이터 없음")
+    model = rm.load_model()
+    if not model.get("patterns") or not model.get("coupling"):
+        pytest.skip("패턴·결합 제약 없는 모델")
+    floors = model["coupling"]["floors"]
+    rows = [row for row in tr.load_rows(tr.DEFAULT_FEATURES, tr.DEFAULT_EASY)
+            if row["최종라벨"] in ("유사", "비유사")]
+    checked = 0
+    for row in rows:
+        features = tr.row_features(row)
+        for axis in model["pattern_axes"]:
+            value = features.get(axis)
+            if value is None or value < floors[axis]:
+                continue
+            with_axis = rm.risk_score(features, model).prob
+            without = rm.risk_score({**features, axis: None}, model).prob
+            assert with_axis >= without - 1e-9, (row["심판번호"], axis, value, with_axis, without)
+            checked += 1
+    assert checked > 100

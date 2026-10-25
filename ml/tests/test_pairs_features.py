@@ -6,6 +6,7 @@ from __future__ import annotations
 import csv
 import json
 
+import numpy as np
 import pytest
 from src.axes import x3_semantic as x3
 from src.axes.distinctiveness import Distinctiveness, goods_index
@@ -250,3 +251,62 @@ def test_run_with_easy_negatives_writes_second_csv(paths, monkeypatch):
     )
     assert report["식별력"]["theta"] == 0.5 and "식별력_적용으로_바뀐_쌍" in report
     assert all(r["pair_source"] in ("cross", "db") for r in easy_rows)
+
+
+def test_easy_image_scores_fills_cross_and_db_pairs():
+    """쉬운 음성 이미지 축(v1.3): cross 는 이름 A 쪽 this 이미지 × 이름 B 쪽 상대 이미지(같은
+    이름이 둘이면 상대번호 순 첫 것), db 는 색인 벡터. 코사인(음수는 0)을 x2_whole 에,
+    has_image 1."""
+    features = [
+        {"심판번호": "C1", "상대번호": "11", "이름A": "Alpha", "이름B": "Bravo"},
+        {"심판번호": "C2", "상대번호": "", "이름A": "Charlie", "이름B": "Delta"},
+        {"심판번호": "C2", "상대번호": "22", "이름A": "Charlie", "이름B": "Delta"},
+        {"심판번호": "C3", "상대번호": "33", "이름A": "Echo", "이름B": "Foxtrot"},  # 이미지 쌍 없음
+    ]
+    image_rows = [
+        {"심판번호": "C1", "상대번호": "11", "이미지A": "images/C1/this.png",
+         "이미지B": "images/C1/prior_1.png"},
+        {"심판번호": "C2", "상대번호": "", "이미지A": "images/C2/this.png",
+         "이미지B": "images/C2/target.png"},
+        {"심판번호": "C2", "상대번호": "22", "이미지A": "images/C2/this.png",
+         "이미지B": "images/C2/prior_1.png"},
+    ]
+    db_records = [{"이미지파일": "a.png"}, {"이미지파일": "b.png"}, {"이미지파일": ""}]
+
+    def easy(key, source, name_b):
+        return {"심판번호": key, "pair_source": source, "이름A": "x", "이름B": name_b,
+                "x2_whole": "", "has_image": 0}
+
+    rows = [
+        easy("cross:C1|C2", "cross", "Delta"),  # B 둘(target·prior_1) → 상대번호 "" 먼저 → target
+        easy("cross:C3|C1", "cross", "Bravo"),  # A 이미지 없음
+        easy("cross:C1|C3", "cross", "Foxtrot"),  # B 이미지 없음
+        easy("db:0|1", "db", "y"),
+        easy("db:1|2", "db", "z"),  # DB 이미지 없음
+        easy("db:0|0", "db", "w"),  # 같은 이미지 → 코사인 1
+    ]
+
+    def unit(*values):
+        vector = np.asarray(values, dtype=np.float32)
+        return vector / np.linalg.norm(vector)
+
+    trial = {"images/C1/this.png": unit(1, 0), "images/C2/target.png": unit(1, 1),
+             "images/C2/prior_1.png": unit(0, 1)}
+    db = {"a.png": unit(1, 0), "b.png": unit(-1, 0)}
+    report = pf.easy_image_scores(
+        rows, features, image_rows, db_records,
+        trial_embeddings=lambda paths: {p: trial[p] for p in paths if p in trial},
+        db_embeddings=lambda names: {n: db[n] for n in names if n in db},
+    )
+    assert rows[0]["x2_whole"] == "0.7071" and rows[0]["has_image"] == 1
+    assert rows[1]["x2_whole"] == "" and rows[2]["x2_whole"] == ""
+    assert rows[3]["x2_whole"] == "0.0000" and rows[3]["has_image"] == 1  # 코사인 −1 → 0
+    assert rows[4]["x2_whole"] == "" and rows[4]["has_image"] == 0
+    assert report["cross"] == 1 and report["db"] == 2 and rows[5]["x2_whole"] == "1.0000"
+    assert report["없음"]["A 이미지 없음"] == 1 and report["없음"]["B 이미지 없음"] == 1
+    assert report["없음"]["B 모호(상대번호 순 첫 이미지)"] == 1
+    assert report["없음"]["DB 이미지 없음"] == 1 and report["없음"]["임베딩 없음"] == 0
+    assert report["x2_whole_평균"] == {"cross": 0.7071, "db": 0.5}
+    sides, reasons = pf.easy_image_sides(rows, features, image_rows, db_records)
+    assert sides[0] == ("images/C1/this.png", "images/C2/target.png") and sides[1] is None
+    assert sides[5] == ("a.png", "a.png") and reasons["DB 이미지 없음"] == 1

@@ -76,7 +76,7 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.2.1"
+    assert ms.state.model["version"] == "risk_model_v1.3"
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
 
 
@@ -140,7 +140,14 @@ def test_image_only_uses_fake_ocr_and_figure_rule(client, ocr_on):
     for candidate in data["candidates"]:
         assert all(candidate["axes"][key] is None for key in ("x1", "x2_text", "x3", "x4"))
         assert candidate["salient"]["query_tokens"] == [] and candidate["salient"]["removed"] == []
-        assert candidate["risk"]["contributions"]["X2"] == 0.0  # 도형계: CLIP 효과 상쇄(설계 §7-2)
+        # 도형계 이미지만 → 결측 패턴 x2_whole 의 계수 집합(설계 §7-3):
+        # X2 = (x2_whole + x2_whole×도형계)·x2_img
+        block = ms.state.model["patterns"]["x2_whole"]["coefficients"]
+        expected = (block["x2_whole"] + block["x2_whole×도형계"]) * candidate["axes"]["x2_img"]
+        assert candidate["risk"]["contributions"]["X2"] == pytest.approx(expected, abs=1e-3)
+        assert candidate["risk"]["missing_adjustment"] == pytest.approx(
+            ms.state.model["patterns"]["x2_whole"]["intercept"] - ms.state.model["intercept"],
+            abs=1e-3)
         _assert_logit(candidate, ms.state.model["intercept"])
     x2 = [c["axes"]["x2_img"] for c in data["candidates"]]
     assert x2 == sorted(x2, reverse=True)  # 동점 p 는 x2_img 내림차순
@@ -262,7 +269,7 @@ def test_meta_thresholds_come_from_model_json(client):
     data = engine.multi_search(name=NAME).to_dict()
     model = ms.state.model
     assert data["meta"]["model_version"] == model["version"]
-    assert data["meta"]["grade_precision"] == model["meta"]["grade_precision"] == 0.6855
+    assert data["meta"]["grade_precision"] == model["meta"]["grade_precision"] == 0.7039
     assert data["meta"]["thresholds"]["grade"] == model["grade_thresholds"]
     assert data["meta"]["thresholds"]["standalone"] == {
         "x1": model["standalone_thresholds"]["x1_d"],
