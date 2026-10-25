@@ -1,39 +1,54 @@
-"""통합 모델 v1.2.1 학습 — 심결례 정답 데이터(`pairs_features.csv`)로 4축 결합 방법을 비교하고 판례
-사전분포 + 단조 제약 로지스틱을 채택한다(통합 모델 설계 §3·§4-3·§7·§7-1·§7-2). KIPRIS 호출 0, 서비스
-코드 미접촉. 산출물은 계수 JSON(`shared/model/risk_model_v1.json`, version risk_model_v1.2.1)·보고서
-(`ml/data/trials/risk_model_v1_report.md`·`_results.json`)·신뢰도 곡선·EBM 형상 곡선 PNG.
+"""통합 모델 v1.3 학습 — 심결례 정답 데이터(`pairs_features.csv`) + 쉬운
+음성(`pairs_features_easy.csv`)으로 4축 결합 방법을 비교하고 판례 사전분포 + 단조 제약 로지스틱을
+채택한다(통합 모델 설계 §3·§4-3·§7·§7-1·§7-2·§7-3). KIPRIS 호출 0, 서비스 코드 미접촉.
+산출물은 계수 JSON(`shared/model/risk_model_v1.json`, version
+risk_model_v1.3)·보고서(`ml/data/trials/risk_model_v1_report.md`·`_results.json`)·신뢰도
+곡선·EBM 형상 곡선 PNG.
 
-v1.2(§7-2): 절편은 사전분포 없이 자유, 사전분포는 유사도 축·교호작용에만. 요부 플래그 두 개 대신
-`any_no_distinctive`(한쪽이라도 요부 없음) + x1_d×any_no_distinctive(사전평균 −0.5, 2000후2453 —
-요부 없는 쌍은 호칭을 덜 믿음; 판례 (iv) 는 이 계수 < 0). 단조 제약은 x1 효과의 모든 조합(본체·
-+문자계·+요부없음·+둘 다) ≥ 0 으로 SLSQP 선형 제약. 도형 규칙(figure_rule: 도형계 입력은 caveat,
-x2_whole ≥ 0.9 면 등급 하한 검토 권장)은 데이터로 검증하지 않은 제품 규칙으로 JSON 에만 기록한다.
+v1.3(§7-3) — "입력을 더 주면 위험도가 내려가는" 결측 편향 제거:
+  ① 쉬운 음성 쌍에도 x2_whole 이 있다(pairs_features.py --fill-easy-images: cross 는 심결 추출
+     이미지, db 는 서비스 색인 벡터). 그래서 이미지 블록을 심결 행만으로 맞추던 2단계
+     오프셋(fit_linear 의 image_offset)은 패턴 학습에서 쓰지 않는다.
+  ② 결측 지시변수(miss_x2img·miss_x3·miss_x4) 대신 **결측 패턴별 계수 집합**: 패턴 축(기본
+     x2_whole·x4)의 관측 조합(base / x2_whole / x4 / x2_whole+x4)마다 그 축들이 관측된 모든 행으로
+     계수 집합을 적합한다(하위 패턴은 상위 패턴 행도 쓴다 — 축을 빼고 보면 되므로). X3 는 게이트
+     결측이라 값 0, 지시변수 없음. 패턴마다 소수 클래스(심결+쉬운 음성)가 MIN_PATTERN_MINORITY
+     미만이면 축을 하나 줄인다(이미지만 → 패턴 없음).
+  ③ 결합 제약(prior 방법): 네 계수 집합을 한 SLSQP 로 풀면서 "축 하나를 하한값(쉬운 음성 비유사 쌍
+     평균 — 현실 분포에서 '보통의 서로 다른 상표' 수준)으로 더 관측해도 로짓이 내려가지 않음"을
+     설계 항 상자의 모든 꼭짓점(rm.coupling_vertices)에서 선형 제약으로 건다. 런타임은 적재 때 같은
+     제약을 검증(rm.coupling_violations) — 입력을 더 주면 p 가 내려가지 않는다는 보장.
+  JSON: pattern_axes·patterns[키]{features, coefficients, intercept, meta}·reference_pattern(모든
+  축 관측, 최상위 features·coefficients·intercept 는 그 집합)·coupling{floors}. 등급 임계값은
+  행마다 자기 패턴의 OOF 확률을 모은 뒤(심결+cross+db) v1.2.1 과 같은 규칙으로. 참고로 v1.2.1
+  구조(지시변수)에 ①만 적용한 모델도 적합해 meta.indicator_reference 에 둔다(원인 확인용).
 
     ml/venv/bin/python ml/scripts/train_risk_model.py                  # 로지스틱 + 사전분포(기본)
     ml/venv/bin/python ml/scripts/train_risk_model.py --methods logistic,prior,ebm,gbm
         # EBM·GBM 은 ml/requirements-experiments.txt 설치 뒤(pip install -c constraints.txt -r …)
     ml/venv/bin/python ml/scripts/train_risk_model.py --bootstrap 50 --repeats 1   # 빠른 확인
 
-v1.1 입력(§7-1 ① 편향 제거): x1_d·x2_text_d·x2_whole·x3_d·x4, 결측 지시변수 miss_x2img·miss_x3·
-miss_x4, has_distinctive_part_a/b, 교호작용 x1_d×문자계·x2_whole×도형계. 상표 유형 주효과(type_*)와
-miss_x1·miss_x2text 는 뺐고 상대 이름이 없는 심결 행은 학습에서 제외한다 — 유형은 "어느 축을
-보느냐"만 바꾸고(교호작용), 이름 없음은 서비스에 없는 상황이다. 표준화 없음(계수 = 점수 1.0 당
-로짓).
+v1.1 입력(§7-1 ① 편향 제거): x1_d·x2_text_d·x2_whole·x3_d·x4, has_distinctive_part_a/b,
+교호작용 x1_d×문자계·x2_whole×도형계. 상표 유형 주효과(type_*)와 miss_x1·miss_x2text 는 뺐고
+상대 이름이 없는 심결 행은 학습에서 제외한다 — 유형은 "어느 축을 보느냐"만 바꾸고(교호작용), 이름
+없음은 서비스에 없는 상황이다. 표준화 없음(계수 = 점수 1.0 당 로짓). v1.2(§7-2): 절편은 사전분포
+없이 자유, 요부 플래그는 `any_no_distinctive` + x1_d×any_no_distinctive(사전평균 −0.5, 2000후2453),
+단조 제약은 x1 효과의 모든 조합 ≥ 0, 도형 규칙(figure_rule)은 미검증 제품 규칙으로 JSON 에만 기록.
 
 방법(같은 입력·같은 사건 단위 5겹×3반복 CV·같은 쉬운 음성 가중치 w_easy 0.5):
-  1. logistic — L2 로지스틱(v1 과 같은 목적함수 ½‖w‖² + C·Σ s·logloss, scipy L-BFGS), C 는 CV.
-  2. prior — 판례 사전분포 + 단조 제약 로지스틱: 계수마다 N(μ_j, σ²)(μ: x1 1.0·x1×문자계 +1.0,
-     x2_whole 0.5·x2_whole×도형계 +1.0, x2_text 0.5, x3 0.5, x4 1.0, 나머지·절편 0; σ ∈ {0.5, 1, 2}
-     는 CV),
-     유사도 축의 본체 계수 ≥ 0 과 본체 + 교호작용 ≥ 0 (L-BFGS-B 경계 + 재매개화).
-  3. ebm — interpret ExplainableBoostingClassifier(max_bins 16, interactions 3, 강한 정규화).
-  4. gbm — lightgbm(num_leaves 4, max_depth 2, n_estimators CV, 유사도 축 단조 +1) + SHAP.
-  쉬운 음성에는 이미지가 없어 1·2 는 이미지 블록(x2_whole·miss_x2img·x2_whole×도형계)을 심결
-  행만으로 적합한 값에 고정(오프셋)하고, 3·4 는 이미지 블록을 입력에서 뺀다("이미지 없음 = 쉬운
-  음성"을 배우지 않도록). 판례 4조건은 모든 방법에서 로짓 부분의존 기울기(축을 0 → 1 로 올렸을 때
-  로짓 변화의 부분집합 평균)로 잰다 — 선형 모델에서는 계수(합)와 같다. 채택 규칙: 심결 CV AUC 가
-  기준(logistic)보다 CI 밖으로 높은 방법이 없으면 2 를 채택(변별력이 같으면 판례 일관성·안전성
-  우선), 있으면 보고하고 채택은 사람이.
+  1. logistic — 패턴마다 독립 L2 로지스틱(½‖w‖² + C·Σ s·logloss, scipy L-BFGS), C 는 CV.
+     결합 제약 없음(기준).
+  2. prior — 판례 사전분포 + 단조 제약 + 결합 제약 로지스틱(MAP, SLSQP): 계수마다 N(μ_j, σ²)(μ:
+     x1 1.0·x1×문자계 +1.0, x2_whole 0.5·x2_whole×도형계 +1.0, x2_text 0.5, x3 0.5, x4 1.0, 요부
+     교호작용 −0.5; σ 1.0 고정), 유사도 축 본체 ≥ 0 과 본체 + 교호작용 ≥ 0.
+  3. ebm — interpret ExplainableBoostingClassifier(max_bins 16, interactions 3, 강한 정규화) —
+     지시변수 입력(TREE_FEATURES), 비교 전용.
+  4. gbm — lightgbm(num_leaves 4, max_depth 2, n_estimators CV, 유사도 축 단조 +1) + SHAP — 비교
+     전용.
+  판례 4조건은 모든 방법에서 로짓 부분의존 기울기(축을 0 → 1 로 올렸을 때 로짓 변화의 부분집합
+  평균)로 잰다 — 선형 모델에서는 계수(합)와 같다(패턴 모델은 모든 축을 관측한 집합으로). 채택 규칙:
+  심결 CV AUC 가 기준(logistic)보다 CI 밖으로 높은 방법이 없으면 2 를 채택(변별력이 같으면 판례
+  일관성·안전성 우선), 있으면 보고하고 채택은 사람이.
 """
 
 from __future__ import annotations
@@ -89,6 +104,7 @@ MIN_SUPPORT = 10
 # 위험 등급의 최소 지지: v1.2 는 10 이라 정밀도 0.8 을 채우는 p 0.899 위에 11쌍(재현율 0.05)만 남아
 # 경고 기능이 없었다(설계 §7-2). v1.2.1 부터 30 — 미달이면 대체값(검토 권장 하한과 1.0 의 중간).
 RISK_MIN_SUPPORT = 30
+# v1.2.1 입력(지시변수 구조) — 트리 방법·참고 지시변수 모델·fit_linear 테스트가 쓴다.
 FEATURES = [
     "x1_d", "x2_text_d", "x2_whole", "x3_d", "x4",
     "miss_x2img", "miss_x3", "miss_x4",
@@ -97,6 +113,15 @@ FEATURES = [
 ]
 REMOVED_TERMS = ["type_도형", "type_결합-문자요부", "type_결합-도형요부", "miss_x1", "miss_x2text",
                  "has_distinctive_part_a", "has_distinctive_part_b"]  # 뒤 둘은 v1.2 에서 대체
+# v1.3 결측 패턴: 패턴 축의 관측 조합마다 계수 집합. 공통 항 + 관측된 축의 항(+ 패턴으로 가르지 않는
+# 축은 값 + 지시변수 — 폴백).
+PATTERN_AXES = ("x2_whole", "x4")
+PATTERN_BASE = ["x1_d", "x2_text_d", "x3_d", "any_no_distinctive", "x1_d×문자계",
+                "x1_d×any_no_distinctive"]
+PATTERN_AXIS_TERMS = {"x2_whole": ["x2_whole", "x2_whole×도형계"], "x4": ["x4"]}
+MIN_PATTERN_MINORITY = 50  # 패턴마다 소수 클래스(심결+쉬운 음성)가 이 미만이면 패턴 축을 줄인다
+FLOOR_BASIS = ("쉬운 음성(cross·db, 현실 분포) 비유사 쌍 평균 — 심결 비유사는 다툼이 있던 경계 "
+               "쌍이라 '보통의 서로 다른 상표'보다 비슷하다")
 FIGURE_X2_THRESHOLD = 0.9  # 도형 규칙: 도형계 입력에서 x2_whole ≥ 이 값이면 하한 검토 권장(미검증)
 FIGURE_CAVEAT = "도형 유사는 검증 데이터가 적어 참고용"
 IMAGE_BLOCK = ("x2_whole", "miss_x2img", "x2_whole×도형계")
@@ -116,6 +141,7 @@ SETS = (("심결", ("trial",)), ("심결+cross", ("trial", "cross")),
 SOURCES = ("kipris", "llm", "본문", "ocr", "도형", "")
 CONDITIONS = ("(i) 문자계: x1 > x2_whole", "(ii) 도형계: x2_whole > x1", "(iii) x4 > 0",
               "(iv) 요부 없음 → x1 효과 감소")
+COUPLING_TOLERANCE = 1e-9
 
 
 # ---- 평가 도우미(x2_benchmark·axes_benchmark 와 같은 정의) --------------------------------------
@@ -274,6 +300,14 @@ def has_name(row: dict) -> bool:
     return not (value is None or (isinstance(value, float) and np.isnan(value)))
 
 
+def observed(rows: list[dict], axis: str) -> np.ndarray:
+    """축 점수가 관측된 행(NaN 이 아님)."""
+    return np.asarray([
+        not (row.get(axis) is None or (isinstance(row.get(axis), float)
+                                      and np.isnan(row.get(axis)))) for row in rows
+    ])
+
+
 def groups_for(rows: list[dict]) -> np.ndarray:
     """사건 단위 그룹: 심결 행은 심판번호, cross 행은 이름 A 의 사건, db 행은 자기 키."""
     out = []
@@ -395,9 +429,11 @@ def _project_feasible(coef: np.ndarray, G: np.ndarray, tolerance: float = 1e-9) 
 
 
 def fit_linear(X: np.ndarray, y: np.ndarray, weight: np.ndarray, names: list[str], easy: np.ndarray,
-               *, method: str, hyper: float) -> tuple[np.ndarray, float]:
-    """심결 행만으로 전체 적합(1단계) → 쉬운 음성이 있으면 이미지 블록을 고정하고 나머지를 다시
-    적합(2단계). 쉬운 음성 가중치가 0 이면 1단계 해 그대로."""
+               *, method: str, hyper: float, image_offset: bool = True) -> tuple[np.ndarray, float]:
+    """지시변수 구조(FEATURES) 단일 모델. image_offset(≤ v1.2.1 방식): 심결 행만으로 전체 적합
+    (1단계) → 쉬운 음성이 있으면 이미지 블록을 고정하고 나머지를 다시 적합(2단계).
+    image_offset=False 면 모든 행을 한 번에 적합(쉬운 음성에 이미지 축이 있을 때 — v1.3 참고
+    지시변수 모델)."""
     fitter = fit_logistic if method == "logistic" else None
     trial = ~easy
 
@@ -406,6 +442,8 @@ def fit_linear(X: np.ndarray, y: np.ndarray, weight: np.ndarray, names: list[str
             return fitter(Xs, ys, ws, hyper, offset=offset)
         return fit_prior(Xs, ys, ws, sub_names, hyper, offset=offset)
 
+    if not image_offset:
+        return fit(X, y, weight, names)
     coef, intercept = fit(X[trial], y[trial], weight[trial], names)
     if not np.any(easy & (weight > 0)):
         return coef, intercept
@@ -418,6 +456,406 @@ def fit_linear(X: np.ndarray, y: np.ndarray, weight: np.ndarray, names: list[str
     full = coef.copy()
     full[~image] = rest_coef
     return full, intercept
+
+
+# ---- v1.3 결측 패턴 ----------------------------------------------------------------------------
+
+def pattern_features(key: str, pattern_axes) -> list[str]:
+    """패턴 키의 입력 항: 공통 항 + 관측된 패턴 축의 항. 패턴으로 가르지 않는 축(폴백)은 값 +
+    지시변수."""
+    present = rm.pattern_present(key)
+    names = list(PATTERN_BASE)
+    for axis in PATTERN_AXES:
+        if axis in present:
+            names += PATTERN_AXIS_TERMS[axis]
+        elif axis not in pattern_axes:
+            names += PATTERN_AXIS_TERMS[axis] + [MISS_OF[axis]]
+    return names
+
+
+def row_pattern_keys(rows: list[dict], pattern_axes) -> np.ndarray:
+    """행마다 자기 결측 패턴 키(관측된 패턴 축의 조합) — 서비스가 그 입력에 고를 계수 집합."""
+    flags = {axis: observed(rows, axis) for axis in pattern_axes}
+    return np.asarray([
+        rm.pattern_key([axis for axis in pattern_axes if flags[axis][i]], pattern_axes)
+        for i in range(len(rows))
+    ])
+
+
+def pattern_masks(rows: list[dict], pattern_axes) -> dict[str, np.ndarray]:
+    """패턴 키 → 그 패턴의 축이 모두 관측된 행(하위 패턴은 상위 패턴 행도 포함)."""
+    flags = {axis: observed(rows, axis) for axis in pattern_axes}
+    out = {}
+    for key in rm.pattern_keys(pattern_axes):
+        mask = np.ones(len(rows), dtype=bool)
+        for axis in rm.pattern_present(key):
+            mask &= flags[axis]
+        out[key] = mask
+    return out
+
+
+def choose_pattern_axes(rows: list[dict], y: np.ndarray, *,
+                        min_minority: int = MIN_PATTERN_MINORITY) -> tuple[tuple[str, ...], dict]:
+    """패턴 축 결정: 이미지×상품 4패턴 → 소수 클래스(심결+쉬운 음성) < min_minority 인 패턴이 있으면
+    이미지만 2패턴 → 그래도 안 되면 패턴 없음(지시변수 구조). 시도별 집계를 함께 돌려준다."""
+    attempts = []
+    for axes in (PATTERN_AXES, PATTERN_AXES[:1], ()):
+        counts = {}
+        feasible = True
+        for key, mask in pattern_masks(rows, axes).items():
+            pos, neg = int((y[mask] == 1).sum()), int((y[mask] == 0).sum())
+            counts[key] = {"n": int(mask.sum()), "유사": pos, "비유사": neg}
+            feasible &= min(pos, neg) >= min_minority
+        attempts.append({"축": list(axes), "패턴": counts, "가능": feasible})
+        if feasible:
+            return tuple(axes), {"기준": f"패턴마다 소수 클래스 ≥ {min_minority}", "시도": attempts}
+    return (), {"기준": f"패턴마다 소수 클래스 ≥ {min_minority}", "시도": attempts}
+
+
+def dissimilar_floors(rows: list[dict], y: np.ndarray, easy: np.ndarray,
+                      pattern_axes) -> tuple[dict[str, float], dict]:
+    """결합 제약 하한: 축마다 쉬운 음성(현실 분포) 비유사 쌍의 평균(FLOOR_BASIS). 쉬운 음성에 관측이
+    없으면 심결 비유사 평균, 그것도 없으면 0. 참고로 심결 비유사·전체 비유사 평균도 함께."""
+    floors, detail = {}, {}
+    for axis in pattern_axes:
+        values = np.asarray([row.get(axis, np.nan) for row in rows], dtype=np.float64)
+        seen = ~np.isnan(values) & (y == 0)
+        easy_mean = float(values[seen & easy].mean()) if (seen & easy).any() else None
+        trial_mean = float(values[seen & ~easy].mean()) if (seen & ~easy).any() else None
+        all_mean = float(values[seen].mean()) if seen.any() else None
+        if easy_mean is not None:
+            floor, basis = easy_mean, "쉬운 음성 비유사 평균"
+        elif trial_mean is not None:
+            floor, basis = trial_mean, "심결 비유사 평균(쉬운 음성에 관측 없음)"
+        else:
+            floor, basis = 0.0, "관측 없음 → 0"
+        floors[axis] = round(floor, 4)
+        detail[axis] = {
+            "하한": floors[axis], "근거": basis, "쉬운_음성_비유사_평균": _round(easy_mean),
+            "심결_비유사_평균": _round(trial_mean), "전체_비유사_평균": _round(all_mean),
+            "쉬운_음성_관측_n": int((seen & easy).sum()),
+        }
+    return floors, detail
+
+
+class PatternDesign:
+    """패턴별 설계행렬·행 마스크·자기 패턴 키·공동 매개변수 θ 의 블록 위치."""
+
+    def __init__(self, rows: list[dict], pattern_axes):
+        self.axes = tuple(pattern_axes)
+        self.keys = rm.pattern_keys(self.axes)
+        self.full = self.keys[-1]  # 모든 패턴 축 관측(기준 패턴)
+        self.names = {key: pattern_features(key, self.axes) for key in self.keys}
+        self.X = {key: design_matrix(rows, self.names[key]) for key in self.keys}
+        self.mask = pattern_masks(rows, self.axes)
+        self.own = row_pattern_keys(rows, self.axes)
+        self.offset: dict[str, int] = {}
+        self.size = 0
+        for key in self.keys:
+            self.offset[key] = self.size
+            self.size += len(self.names[key]) + 1
+
+    def block(self, theta: np.ndarray, key: str) -> tuple[np.ndarray, float]:
+        start, d = self.offset[key], len(self.names[key])
+        return theta[start:start + d], float(theta[start + d])
+
+    def split(self, theta: np.ndarray) -> dict[str, tuple[np.ndarray, float]]:
+        return {key: self.block(theta, key) for key in self.keys}
+
+    def logit(self, fitted: dict, key: str, index: np.ndarray) -> np.ndarray:
+        coef, intercept = fitted[key]
+        return self.X[key][index] @ coef + intercept
+
+    def own_prob(self, fitted: dict, index: np.ndarray) -> np.ndarray:
+        """행마다 자기 패턴의 계수 집합으로 낸 확률(서비스와 같은 선택)."""
+        out = np.empty(len(index))
+        own = self.own[index]
+        for key in self.keys:
+            where = own == key
+            if where.any():
+                out[where] = expit(self.logit(fitted, key, index[where]))
+        return out
+
+
+def monotone_rows(design: PatternDesign) -> np.ndarray:
+    """패턴마다 단조 제약(monotone_constraints)을 θ 전체 길이로 — 블록 대각."""
+    rows = []
+    for key in design.keys:
+        for g in monotone_constraints(design.names[key]):
+            row = np.zeros(design.size)
+            start = design.offset[key]
+            row[start:start + len(g)] = g
+            rows.append(row)
+    return np.asarray(rows) if rows else np.zeros((0, design.size))
+
+
+def coupling_rows(design: PatternDesign, floors: dict[str, float]) -> np.ndarray:
+    """결합 제약 A·θ ≥ 0: 상위 패턴(축 하나 더 관측, 그 축 = 하한값)의 로짓 − 하위 패턴의 로짓
+    ≥ 0 을 설계 항 상자의 모든 꼭짓점(rm.coupling_vertices)에서."""
+    rows = []
+    for key in design.keys:
+        present = rm.pattern_present(key)
+        for axis in present:
+            lower_key = rm.pattern_key([a for a in present if a != axis], design.axes)
+            for vertex in rm.coupling_vertices(design.names[lower_key]):
+                row = np.zeros(design.size)
+                high = rm.design_vector({**vertex, axis: floors[axis]}, design.names[key])
+                low = rm.design_vector(vertex, design.names[lower_key])
+                start = design.offset[key]
+                row[start:start + len(high)] += high
+                row[start + len(high)] += 1.0
+                start = design.offset[lower_key]
+                row[start:start + len(low)] -= low
+                row[start + len(low)] -= 1.0
+                rows.append(row)
+    return np.asarray(rows) if rows else np.zeros((0, design.size))
+
+
+def _select(index: np.ndarray, mask: np.ndarray, weight: np.ndarray) -> np.ndarray:
+    """index(중복 허용 — 부트스트랩) 중 mask 와 가중치 > 0 인 것."""
+    index = np.asarray(index)
+    return index[mask[index] & (weight[index] > 0)]
+
+
+def fit_patterns_prior(design: PatternDesign, y: np.ndarray, weight: np.ndarray,
+                       index: np.ndarray, sigma: float, floors: dict[str, float], *,
+                       mu: dict[str, float] | None = None) -> dict[str, tuple[np.ndarray, float]]:
+    """모든 패턴의 계수 집합을 한 번에: Σ_패턴 [사전분포 벌점 + Σ s·logloss(그 패턴 축이 관측된
+    행)] 을 단조 제약(패턴마다) + 결합 제약(패턴 사이) 아래 SLSQP 로 최소화."""
+    mu_map = mu or PRIOR_MU
+    blocks = []
+    start = np.zeros(design.size)
+    for key in design.keys:
+        rows_index = _select(index, design.mask[key], weight)
+        names = design.names[key]
+        mu_vector = np.asarray([mu_map.get(name, 0.0) for name in names])
+        precision = np.asarray([1.0 / (sigma * sigma) if name in mu_map else 0.0
+                                for name in names])
+        offset = design.offset[key]
+        start[offset:offset + len(names)] = mu_vector
+        blocks.append((design.X[key][rows_index], y[rows_index], weight[rows_index], mu_vector,
+                       precision, offset))
+
+    def objective(theta: np.ndarray) -> tuple[float, np.ndarray]:
+        value = 0.0
+        gradient = np.zeros_like(theta)
+        for X, yy, ww, mu_vector, precision, offset in blocks:
+            d = X.shape[1]
+            coef, b = theta[offset:offset + d], theta[offset + d]
+            z = X @ coef + b
+            loss = np.logaddexp(0.0, z) - yy * z
+            diff = coef - mu_vector
+            value += 0.5 * float(np.sum(precision * diff * diff)) + float(np.sum(ww * loss))
+            residual = ww * (expit(z) - yy)
+            gradient[offset:offset + d] = precision * diff + X.T @ residual
+            gradient[offset + d] = float(residual.sum())
+        return value, gradient
+
+    G = np.vstack([monotone_rows(design), coupling_rows(design, floors)])
+    constraints = ([{"type": "ineq", "fun": lambda t: G @ t, "jac": lambda t: G}]
+                   if G.shape[0] else [])
+    result = minimize(objective, start, jac=True, method="SLSQP", constraints=constraints,
+                      options={"maxiter": 2000, "ftol": 1e-12})
+    theta = result.x
+    if G.shape[0]:
+        theta = _project_feasible(theta, G)
+    return design.split(theta)
+
+
+def fit_patterns_logistic(design: PatternDesign, y: np.ndarray, weight: np.ndarray,
+                          index: np.ndarray, C: float) -> dict[str, tuple[np.ndarray, float]]:
+    """패턴마다 독립 L2 로지스틱(기준 방법 — 제약 없음)."""
+    out = {}
+    for key in design.keys:
+        rows_index = _select(index, design.mask[key], weight)
+        out[key] = fit_logistic(design.X[key][rows_index], y[rows_index], weight[rows_index], C)
+    return out
+
+
+def fit_patterns(method: str, design: PatternDesign, y: np.ndarray, weight: np.ndarray,
+                 index: np.ndarray, hyper, floors: dict[str, float]) -> dict:
+    if method == "prior":
+        return fit_patterns_prior(design, y, weight, index, float(hyper), floors)
+    if method == "logistic":
+        return fit_patterns_logistic(design, y, weight, index, float(hyper))
+    raise ValueError(f"패턴 적합은 선형 방법만: {method}")
+
+
+def full_fitted(design: PatternDesign, fitted: dict, method: str) -> "Fitted":
+    """기준 패턴(모든 축 관측) 계수 집합을 Fitted 로 — 판례 조건·기울기 계산용."""
+    coef, intercept = fitted[design.full]
+    return Fitted(method, design.names[design.full], coef=coef, intercept=intercept)
+
+
+def cv_patterns(method: str, design: PatternDesign, y: np.ndarray, weight: np.ndarray,
+                groups: np.ndarray, hyper, floors: dict[str, float], *, folds: int, repeats: int,
+                seed: int) -> tuple[np.ndarray, dict[str, np.ndarray], list]:
+    """사건 단위 반복 교차검증: 행마다 자기 패턴의 OOF 확률(반복 평균), 패턴별 OOF 확률(모든 행에
+    그 패턴의 계수 집합을 적용 — 적용 가능 행만 평가에 쓴다), 겹 모델 목록."""
+    own_total = np.zeros(y.size)
+    per_total = {key: np.zeros(y.size) for key in design.keys}
+    fold_fits = []
+    for repeat in range(repeats):
+        for train, test in folds_for(y, groups, folds=folds, seed=seed + repeat):
+            fitted = fit_patterns(method, design, y, weight, train, hyper, floors)
+            own_total[test] += design.own_prob(fitted, test)
+            for key in design.keys:
+                per_total[key][test] += expit(design.logit(fitted, key, test))
+            fold_fits.append((fitted, test))
+    return own_total / repeats, {k: v / repeats for k, v in per_total.items()}, fold_fits
+
+
+def bootstrap_patterns(method: str, design: PatternDesign, y: np.ndarray, weight: np.ndarray,
+                       groups: np.ndarray, easy: np.ndarray, family: np.ndarray,
+                       distinct: np.ndarray, hyper, floors: dict[str, float], *, rounds: int,
+                       seed: int) -> dict:
+    """심결 사건 복원추출(쉬운 음성 고정) 부트스트랩: 패턴별 계수 분포 + 기준 패턴의 판례 조건 성립
+    비율."""
+    rng = np.random.default_rng(seed)
+    trial_index = np.flatnonzero(~easy)
+    easy_index = np.flatnonzero(easy)
+    by_group: dict[str, list[int]] = {}
+    for index in trial_index:
+        by_group.setdefault(groups[index], []).append(index)
+    group_keys = np.asarray(list(by_group))
+    group_rows = {key: np.asarray(value) for key, value in by_group.items()}
+    samples = {key: [] for key in design.keys}
+    intercepts = {key: [] for key in design.keys}
+    checks: list[dict] = []
+    for _ in range(rounds):
+        chosen = rng.choice(group_keys, group_keys.size, replace=True)
+        index = np.concatenate([group_rows[key] for key in chosen] + [easy_index])
+        fitted = fit_patterns(method, design, y, weight, index, hyper, floors)
+        for key in design.keys:
+            samples[key].append(fitted[key][0])
+            intercepts[key].append(fitted[key][1])
+        checks.append(condition_checks(full_fitted(design, fitted, method), design.X[design.full],
+                                       family, ~easy, distinct))
+    tables = {}
+    for key in design.keys:
+        matrix = np.asarray(samples[key])
+        table = {}
+        for i, name in enumerate(design.names[key]):
+            column = matrix[:, i]
+            table[name] = {"평균": _round(float(column.mean())),
+                           "ci95": [_round(float(np.percentile(column, 2.5))),
+                                    _round(float(np.percentile(column, 97.5)))]}
+        b = np.asarray(intercepts[key])
+        table["intercept"] = {"평균": _round(float(b.mean())),
+                              "ci95": [_round(float(np.percentile(b, 2.5))),
+                                       _round(float(np.percentile(b, 97.5)))]}
+        tables[key] = table
+    return {"rounds": rounds, "계수": tables[design.full], "패턴": tables,
+            "판례_조건_성립_비율": condition_rates(checks)}
+
+
+def monotonicity_report(design: PatternDesign, fitted: dict, rows: list[dict],
+                        floors: dict[str, float]) -> dict:
+    """결합 제약 검사(학습 행): 축 하나를 더 관측한 패턴과 그렇지 않은 패턴의 로짓 차 — 실제 값이
+    하한 이상인 행에서 음수면 위반(제약이 맞으면 0건), 하한 미만인 행은 내려갈 수 있다(음의 증거).
+    하한값을 대입한 차의 최소도 함께(꼭짓점 제약의 데이터 확인)."""
+    out = {}
+    for key in design.keys:
+        present = rm.pattern_present(key)
+        for axis in present:
+            lower_key = rm.pattern_key([a for a in present if a != axis], design.axes)
+            index = np.flatnonzero(design.mask[key])
+            if index.size == 0:
+                continue
+            values = np.asarray([rows[i][axis] for i in index], dtype=np.float64)
+            delta = design.logit(fitted, key, index) - design.logit(fitted, lower_key, index)
+            floor_rows = np.asarray([
+                rm.design_vector({**row_features(rows[i]), axis: floors[axis]}, design.names[key])
+                for i in index
+            ])
+            coef, intercept = fitted[key]
+            delta_floor = (floor_rows @ coef + intercept) - design.logit(fitted, lower_key, index)
+            above = values >= floors[axis]
+            out[f"{lower_key} → {key} ({axis})"] = {
+                "하한": floors[axis], "n": int(index.size),
+                "하한_이상": {
+                    "n": int(above.sum()),
+                    "위반(p 내려감)": int((delta[above] < -COUPLING_TOLERANCE).sum()),
+                    "로짓차_평균": _round(float(delta[above].mean())) if above.any() else None,
+                    "로짓차_최소": _round(float(delta[above].min())) if above.any() else None,
+                },
+                "하한_미만": {"n": int((~above).sum()),
+                          "내려간_수": int((delta[~above] < 0).sum()),
+                          "로짓차_평균": _round(float(delta[~above].mean())) if (~above).any()
+                          else None},
+                "하한값_대입_로짓차_최소": _round(float(delta_floor.min())),
+            }
+    return out
+
+
+def coupling_slack(blocks: dict[str, dict], axes, floors: dict[str, float], upper: str) -> float:
+    """상위 패턴 upper 의 결합 제약 최소 여유(음수면 위반) — 반올림 뒤 보정에 쓴다."""
+    present = rm.pattern_present(upper)
+    worst = float("inf")
+    for axis in present:
+        lower = blocks[rm.pattern_key([a for a in present if a != axis], axes)]
+        for vertex in rm.coupling_vertices(lower["features"]):
+            low = rm.block_logit(lower, rm.design_values(vertex))
+            high = rm.block_logit(blocks[upper], rm.design_values({**vertex, axis: floors[axis]}))
+            worst = min(worst, high - low)
+    return worst
+
+
+def rounded_blocks(design: PatternDesign, fitted: dict, floors: dict[str, float] | None,
+                   digits: int = 4) -> dict[str, dict]:
+    """계수·절편을 반올림한 계수 집합. 반올림이 만든 작은 위반은 보정한다 — 단조: 교호작용 항을
+    1e-4 씩 올림, 결합: 패턴 키 순서(축 적은 것부터)로 상위 패턴 절편을 1e-4 단위로 올림(하위
+    패턴은 이미 확정)."""
+    step = 10.0 ** -digits
+    blocks = {}
+    for key in design.keys:
+        coef, intercept = fitted[key]
+        blocks[key] = {"features": list(design.names[key]),
+                       "coefficients": {name: round(float(value), digits)
+                                        for name, value in zip(design.names[key], coef)},
+                       "intercept": round(float(intercept), digits)}
+    for block in blocks.values():
+        for _ in range(20):
+            violations = rm.monotone_violations(block["coefficients"])
+            if not violations:
+                break
+            for name in ("x2_whole×도형계", "x1_d×문자계", "x1_d×any_no_distinctive"):
+                if name in block["coefficients"] and any(name in v for v in violations):
+                    block["coefficients"][name] = round(block["coefficients"][name] + step, digits)
+            for axis in AXES:
+                if any(v.startswith(f"{axis} ") and "+" not in v for v in violations):
+                    block["coefficients"][axis] = 0.0
+    if floors:
+        for key in design.keys:
+            if key == rm.PATTERN_BASE_KEY:
+                continue
+            for _ in range(10_000):
+                slack = coupling_slack(blocks, design.axes, floors, key)
+                if slack >= -COUPLING_TOLERANCE:
+                    break
+                blocks[key]["intercept"] = round(blocks[key]["intercept"] + max(step, -slack),
+                                                 digits)
+    return blocks
+
+
+def indicator_reference(rows: list[dict], y: np.ndarray, weight: np.ndarray, easy: np.ndarray,
+                        groups: np.ndarray, masks: dict[str, np.ndarray], sigma: float, *,
+                        folds: int, repeats: int, seed: int) -> dict:
+    """참고 — v1.2.1 구조(결측 지시변수) + ①(쉬운 음성 이미지 축)만 적용, 오프셋 없이 전체 행 적합.
+    지시변수 계수가 어떻게 바뀌는지(원인 확인)와 성능을 보고한다."""
+    names = list(FEATURES)
+    X = design_matrix(rows, names)
+    prob, _ = cv_predictions("prior", X, y, weight, names, easy, groups, sigma, folds=folds,
+                             repeats=repeats, seed=seed, image_offset=False)
+    final = fit_method("prior", X, y, weight, names, easy, sigma, seed=seed, image_offset=False)
+    return {
+        "설명": "v1.2.1 지시변수 구조 + 쉬운 음성 이미지 축(오프셋 없이 전체 행 적합) — 참고",
+        "계수": {name: round(float(value), 4) for name, value in zip(names, final.coef)},
+        "절편": round(final.intercept, 4),
+        "cv_auc": {name: _round(roc_auc(prob[mask], y[mask])) for name, mask in masks.items()},
+        "brier": {name: _round(float(np.mean((prob[mask] - y[mask]) ** 2)))
+                  for name, mask in masks.items() if name in ("심결", "심결+cross+db")},
+    }
 
 
 # ---- 트리 방법(실험 의존성) ----------------------------------------------------------------------
@@ -467,9 +905,10 @@ class Fitted:
 
 
 def fit_method(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarray, names: list[str],
-               easy: np.ndarray, hyper, seed: int = 0) -> Fitted:
+               easy: np.ndarray, hyper, seed: int = 0, *, image_offset: bool = True) -> Fitted:
     if method in ("logistic", "prior"):
-        coef, intercept = fit_linear(X, y, weight, names, easy, method=method, hyper=hyper)
+        coef, intercept = fit_linear(X, y, weight, names, easy, method=method, hyper=hyper,
+                                     image_offset=image_offset)
         return Fitted(method, names, coef=coef, intercept=intercept)
     if method == "ebm":
         return Fitted(method, names, model=fit_ebm(X, y, weight, names, seed))
@@ -498,14 +937,16 @@ def folds_for(y: np.ndarray, groups: np.ndarray, *, folds: int, seed: int):
 
 def cv_predictions(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarray,
                    names: list[str], easy: np.ndarray, groups: np.ndarray, hyper, *, folds: int,
-                   repeats: int, seed: int) -> tuple[np.ndarray, list[tuple[Fitted, np.ndarray]]]:
-    """반복 교차검증 OOF 확률(반복 평균)과 겹 모델 목록(판례 조건 안정성용)."""
+                   repeats: int, seed: int, image_offset: bool = True
+                   ) -> tuple[np.ndarray, list[tuple[Fitted, np.ndarray]]]:
+    """반복 교차검증 OOF 확률(반복 평균)과 겹 모델 목록(판례 조건 안정성용) — 단일 모델(트리·
+    참고 지시변수 모델)."""
     total = np.zeros(y.size)
     fold_models: list[tuple[Fitted, np.ndarray]] = []
     for repeat in range(repeats):
         for train, test in folds_for(y, groups, folds=folds, seed=seed + repeat):
             fitted = fit_method(method, X[train], y[train], weight[train], names, easy[train],
-                                hyper, seed=seed + repeat)
+                                hyper, seed=seed + repeat, image_offset=image_offset)
             total[test] += fitted.prob(X[test])
             fold_models.append((fitted, test))
     return total / repeats, fold_models
@@ -618,9 +1059,11 @@ def condition_rates(checks: list[dict]) -> dict[str, float | None]:
 
 def bootstrap_linear(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarray,
                      names: list[str], easy: np.ndarray, groups: np.ndarray, family: np.ndarray,
-                     distinct: np.ndarray, hyper, *, rounds: int, seed: int) -> dict:
-    """심결 사건 복원추출(쉬운 음성 고정) 부트스트랩: 계수 분포 + 판례 조건 성립 비율. (iv) 는
-    x1_d×any_no_distinctive 계수(요부 없는 쌍의 x1 기울기 차) < 0 으로 condition_checks 가 잰다."""
+                     distinct: np.ndarray, hyper, *, rounds: int, seed: int,
+                     image_offset: bool = True) -> dict:
+    """심결 사건 복원추출(쉬운 음성 고정) 부트스트랩: 계수 분포 + 판례 조건 성립 비율(단일 모델).
+    (iv) 는 x1_d×any_no_distinctive 계수(요부 없는 쌍의 x1 기울기 차) < 0 으로 condition_checks 가
+    잰다."""
     rng = np.random.default_rng(seed)
     trial_index = np.flatnonzero(~easy)
     easy_index = np.flatnonzero(easy)
@@ -635,7 +1078,8 @@ def bootstrap_linear(method: str, X: np.ndarray, y: np.ndarray, weight: np.ndarr
     for _ in range(rounds):
         chosen = rng.choice(group_keys, group_keys.size, replace=True)
         index = np.concatenate([group_rows[key] for key in chosen] + [easy_index])
-        fitted = fit_method(method, X[index], y[index], weight[index], names, easy[index], hyper)
+        fitted = fit_method(method, X[index], y[index], weight[index], names, easy[index], hyper,
+                            image_offset=image_offset)
         samples.append(fitted.coef)
         intercepts.append(fitted.intercept)
         checks.append(condition_checks(fitted, X, family, ~easy, distinct))
@@ -700,8 +1144,7 @@ def grade_thresholds(prob: np.ndarray, y: np.ndarray, *, precision_risk: float =
 
 def risk_grade_precision(grade_block: dict) -> float | None:
     """"위험" 등급의 정밀도(등급 안 유사율, OOF) — 계수 JSON `meta.grade_precision`. 서비스가 화면
-    문구
-    "검증 데이터 기준 10건 중 N건"(API 계약 v2 §4-3)에 쓰며 상수로 두지 않는다(E-6)."""
+    문구 "검증 데이터 기준 10건 중 N건"(API 계약 v2 §4-3)에 쓰며 상수로 두지 않는다(E-6)."""
     for row in grade_block.get("등급별", []):
         if row.get("등급") == "위험":
             return row.get("정밀도(등급 안 유사율)")
@@ -738,14 +1181,13 @@ def standalone_thresholds(rows: list[dict], y: np.ndarray, mask: np.ndarray, *,
     """③ 축별 정밀도 ≥ target 인 최소 점수 τ(지지 ≥ 10). 넘으면 등급 하한 "검토 권장". 없으면
     null."""
     out: dict = {}
-    table: list[dict] = {}
     reasons: dict = {}
-    table = []
+    table: list[dict] = []
     for axis in AXES:
         scores = np.asarray([row.get(axis, np.nan) for row in rows], dtype=np.float64)
         valid = mask & ~np.isnan(scores)
         result = precision_threshold(scores[valid], y[valid], target=target,
-                                        min_support=MIN_SUPPORT)
+                                     min_support=MIN_SUPPORT)
         out[axis] = result["threshold"]
         best = result.get("최대_정밀도") or {}
         active = result["threshold"] is not None
@@ -918,10 +1360,30 @@ def adopt(results: dict, baseline: str = "logistic", preferred: str = "prior") -
     return preferred, False, notes
 
 
+def _pattern_summary(design: PatternDesign, y: np.ndarray, easy: np.ndarray,
+                     per_prob: dict[str, np.ndarray], masks: dict[str, np.ndarray]) -> dict:
+    """패턴별 행 수·클래스·적용 가능 행 OOF AUC(심결 / 심결+cross+db)."""
+    out = {}
+    for key in design.keys:
+        mask = design.mask[key]
+        own = design.own == key
+        out[key] = {
+            "관측_축": rm.pattern_present(key), "입력": design.names[key],
+            "n": int(mask.sum()), "n_심결": int((mask & ~easy).sum()),
+            "n_쉬운_음성": int((mask & easy).sum()),
+            "유사": int((y[mask] == 1).sum()), "비유사": int((y[mask] == 0).sum()),
+            "자기_패턴_행": int(own.sum()),
+            "cv_auc": {name: _round(roc_auc(per_prob[key][mask & set_mask], y[mask & set_mask]))
+                       for name, set_mask in masks.items() if name in ("심결", "심결+cross+db")},
+        }
+    return out
+
+
 def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_path: Path,
         methods=DEFAULT_METHODS, c_grid=C_GRID, sigma_grid=SIGMA_GRID,
         estimators_grid=ESTIMATORS_GRID, w_easy: float = W_EASY, folds: int = FOLDS,
-        repeats: int = REPEATS, bootstrap: int = BOOTSTRAP, seed: int = 0) -> dict:
+        repeats: int = REPEATS, bootstrap: int = BOOTSTRAP, seed: int = 0,
+        min_pattern_minority: int = MIN_PATTERN_MINORITY) -> dict:
     all_rows = load_rows(features_path, easy_path)
     y_all = labels_for(all_rows, "최종")
     rows = [row for row, label in zip(all_rows, y_all) if label >= 0]
@@ -939,6 +1401,11 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
         bool(int(row.get("has_distinctive_part_b") or 0)) for row in rows
     ])
     n_trial, n_pos, n_neg = int(trial.sum()), int(y[trial].sum()), int((1 - y[trial]).sum())
+    pattern_axes, pattern_choice = choose_pattern_axes(rows, y, min_minority=min_pattern_minority)
+    design = PatternDesign(rows, pattern_axes)
+    floors, floor_detail = dissimilar_floors(rows, y, easy, pattern_axes)
+    removed = REMOVED_TERMS + [MISS_OF[axis] for axis in pattern_axes] + ["miss_x3"]
+    full_names = design.names[design.full]
     data_summary = {
         "라벨": "최종", "심결_행": n_trial, "유사": n_pos, "비유사": n_neg,
         "이름_없어_제외": {"행": len(excluded),
@@ -946,32 +1413,51 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
                       "비유사": sum(1 for r in excluded if r["최종라벨"] == "비유사")},
         "쉬운_음성": {name: int((np.asarray([r["pair_source"] for r in rows]) == name).sum())
                    for name in ("cross", "db")},
-        "w_easy": w_easy, "입력": FEATURES, "제거_항": REMOVED_TERMS,
-        "트리_입력(이미지 블록 제외)": TREE_FEATURES,
-        "소수_클래스_대_입력(EPV)": _round(min(n_pos, n_neg) / len(FEATURES)),
+        "쉬운_음성_이미지_있음": int((easy & observed(rows, "x2_whole")).sum()),
+        "쉬운_음성_상품_있음": int((easy & observed(rows, "x4")).sum()),
+        "w_easy": w_easy, "입력": full_names,
+        "입력(패턴별)": {key: design.names[key] for key in design.keys},
+        "패턴_축": list(pattern_axes), "패턴_결정": pattern_choice,
+        "결합_하한": floor_detail, "결합_하한_근거": FLOOR_BASIS,
+        "제거_항": removed, "트리_입력(이미지 블록 제외)": TREE_FEATURES,
+        "소수_클래스_대_입력(EPV)": _round(min(n_pos, n_neg) / len(full_names)),
     }
     results: dict[str, dict] = {}
     for method in methods:
-        names = feature_names_for(method)
-        X = design_matrix(rows, names)
+        linear = method in ("logistic", "prior")
+        names = full_names if linear else feature_names_for(method)
+        X = design.X[design.full] if linear else design_matrix(rows, names)
         per_hyper = {}
         for hyper in hyper_grid(method, c_grid=c_grid, sigma_grid=sigma_grid,
                                 estimators_grid=estimators_grid):
-            prob, fold_models = cv_predictions(method, X, y, weight, names, easy, groups, hyper,
-                                               folds=folds, repeats=repeats, seed=seed)
-            per_hyper[hyper] = (prob, fold_models,
+            if linear:
+                prob, per_prob, fold_fits = cv_patterns(method, design, y, weight, groups, hyper,
+                                                        floors, folds=folds, repeats=repeats,
+                                                        seed=seed)
+                fold_models = [(full_fitted(design, fitted, method), test)
+                               for fitted, test in fold_fits]
+            else:
+                prob, fold_models = cv_predictions(method, X, y, weight, names, easy, groups,
+                                                   hyper, folds=folds, repeats=repeats, seed=seed)
+                per_prob = None
+            per_hyper[hyper] = (prob, fold_models, per_prob,
                                 auc_block(prob, y, masks["심결"], seed=seed, bootstrap=0)["auc"])
-        best = max(per_hyper, key=lambda h: per_hyper[h][2] or 0.0)
-        prob, fold_models, _ = per_hyper[best]
+        best = max(per_hyper, key=lambda h: per_hyper[h][3] or 0.0)
+        prob, fold_models, per_prob, _ = per_hyper[best]
         started = time.perf_counter()
-        final = fit_method(method, X, y, weight, names, easy, best, seed=seed)
+        if linear:
+            fitted = fit_patterns(method, design, y, weight, np.arange(y.size), best, floors)
+            final = full_fitted(design, fitted, method)
+        else:
+            fitted = None
+            final = fit_method(method, X, y, weight, names, easy, best, seed=seed)
         elapsed = time.perf_counter() - started
-        fold_checks = [condition_checks(fitted, X, family, trial, distinct)
-                       for fitted, _ in fold_models]
+        fold_checks = [condition_checks(model, X, family, trial, distinct)
+                       for model, _ in fold_models]
         final_check = condition_checks(final, X, family, trial, distinct)
         item = {
             "method": method, "hyper": best, "features": names,
-            "hyper_후보": {str(h): _round(per_hyper[h][2]) for h in per_hyper},
+            "hyper_후보": {str(h): _round(per_hyper[h][3]) for h in per_hyper},
             "cv": {name: auc_block(prob, y, mask, seed=seed, bootstrap=bootstrap)
                    for name, mask in masks.items()},
             "calibration": {name: calibration(prob[mask], y[mask]) for name, mask in masks.items()
@@ -981,14 +1467,23 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
             "로짓_기울기(최종 적합)": {k: (_round(v) if v is not None else None)
                                for k, v in final_check["_기울기"].items()},
             "판례_조건_겹_성립_비율": condition_rates(fold_checks),
-            "_prob": prob, "_final": final, "_X": X,
+            "_prob": prob, "_final": final, "_X": X, "_fitted": fitted,
         }
-        if method in ("logistic", "prior"):
+        if linear:
             item["계수"] = {name: round(float(value), 4) for name, value in zip(names, final.coef)}
             item["절편"] = round(final.intercept, 4)
-            item["부트스트랩"] = bootstrap_linear(method, X, y, weight, names, easy, groups, family,
-                                             distinct, best, rounds=bootstrap, seed=seed)
-            item["해석"] = "계수(점수 1.0 당 로짓)"
+            item["패턴"] = _pattern_summary(design, y, easy, per_prob, masks)
+            item["패턴_계수"] = {
+                key: {"계수": {n: round(float(v), 4) for n, v in zip(design.names[key],
+                                                                   fitted[key][0])},
+                      "절편": round(float(fitted[key][1]), 4)}
+                for key in design.keys
+            }
+            item["부트스트랩"] = bootstrap_patterns(method, design, y, weight, groups, easy, family,
+                                               distinct, best, floors, rounds=bootstrap,
+                                               seed=seed)
+            item["단조성"] = monotonicity_report(design, fitted, rows, floors)
+            item["해석"] = "계수(점수 1.0 당 로짓) — 기준 패턴(모든 축 관측); 패턴별은 패턴_계수"
         elif method == "ebm":
             shapes = ebm_shapes(final.model, names)
             item["형상_곡선"] = shapes
@@ -1001,9 +1496,7 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
     adopted_method, pending, adopt_notes = adopt(results) if "logistic" in results and (
         "prior" in results) else (methods[0], False, ["기준·사전분포 둘 다 없어 첫 방법 사용"])
     adopted = results[adopted_method]
-    names = adopted["features"]
     prob = adopted["_prob"]
-    final = adopted["_final"]
     baselines = {
         name: {set_name: auc_block(scores, y, mask, seed=seed, bootstrap=bootstrap)
                for set_name, mask in masks.items()}
@@ -1016,37 +1509,63 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
     crosstab = distinctive_crosstab(rows, y, trial)
     if adopted_method not in ("logistic", "prior"):
         raise ValueError("런타임은 선형 계수만 지원 — 채택 방법이 선형이어야 합니다")
+    reference_sigma = float(results["prior"]["hyper"]) if "prior" in results else (
+        float(sigma_grid[0]))
+    indicator = indicator_reference(rows, y, weight, easy, groups, masks, reference_sigma,
+                                    folds=folds, repeats=repeats, seed=seed)
+    coupled = adopted_method == "prior" and bool(pattern_axes)
+    blocks = rounded_blocks(design, adopted["_fitted"], floors if coupled else None)
+    reference = blocks[design.full]
+    pattern_meta = adopted["패턴"]
     model = {
         "version": rm.MODEL_VERSION, "trained_at": date.today().isoformat(), "label": "최종",
         "method": "prior_monotone_logistic" if adopted_method == "prior" else "logistic_l2",
         "w_easy": w_easy, "hyper": adopted["hyper"],
-        "removed_terms": REMOVED_TERMS,
-        "prior": ({"mu": {name: PRIOR_MU[name] for name in names if name in PRIOR_MU},
+        "removed_terms": removed,
+        "prior": ({"mu": {name: PRIOR_MU[name] for name in full_names if name in PRIOR_MU},
                    "sigma": adopted["hyper"],
-                   "applies_to": [name for name in names if name in PRIOR_MU],
+                   "applies_to": [name for name in full_names if name in PRIOR_MU],
                    "intercept_prior": False} if adopted_method == "prior" else None),
-        "monotone": {"features": [n for n in MONOTONE_FEATURES if n in names],
+        "monotone": {"features": [n for n in MONOTONE_FEATURES if n in full_names],
                      "constraint": ("유사도 축 본체 ≥ 0; x2_whole 본체 + 도형계 교호작용 ≥ 0; "
-                                    "x1 본체 + {문자계, 요부없음} 교호작용 모든 조합 ≥ 0")}
+                                    "x1 본체 + {문자계, 요부없음} 교호작용 모든 조합 ≥ 0 — "
+                                    "패턴마다")}
         if adopted_method == "prior" else None,
         "figure_rule": {"threshold": FIGURE_X2_THRESHOLD, "caveat": FIGURE_CAVEAT,
                         "validated": False,
                         "basis": ("97후3050 후단(한 축의 유사로 혼동 우려) — 도형계 쌍 17 로 "
                                   "데이터 검증 불가, 제품 규칙(미검증). 도형계 입력은 "
                                   "figure_caveat True")},
-        "features": names,
-        "coefficients": {name: round(float(value), 4) for name, value in zip(names, final.coef)},
-        "intercept": round(final.intercept, 4),
+        "pattern_axes": list(pattern_axes),
+        "pattern_rule": pattern_choice["기준"],
+        "reference_pattern": design.full,
+        "patterns": {
+            key: {"requires": rm.pattern_present(key), **blocks[key],
+                  "meta": {k: pattern_meta[key][k] for k in ("n", "n_심결", "n_쉬운_음성", "유사",
+                                                           "비유사", "자기_패턴_행", "cv_auc")}}
+            for key in design.keys
+        },
+        "features": reference["features"],
+        "coefficients": reference["coefficients"],
+        "intercept": reference["intercept"],
+        "coupling": ({"floors": floors, "basis": FLOOR_BASIS,
+                      "constraint": ("상위 패턴(축 하나 더 관측, 그 축 = 하한값) 로짓 ≥ 하위 패턴 "
+                                     "로짓 — 설계 항 상자의 모든 꼭짓점(rm.coupling_vertices); "
+                                     "학습은 SLSQP 선형 제약, 런타임은 적재 때 검증")}
+                     if coupled else None),
         "grade_thresholds": grades["심결+cross+db"]["thresholds"],
-        "grade_basis": (f"심결+cross+db OOF 확률(위험 정밀도 ≥ {PRECISION_RISK}·최소 지지 "
-                        f"{RISK_MIN_SUPPORT}, 검토 권장 재현율 ≥ {RECALL_REVIEW}, 안전/주의 등분; "
-                        "미달이면 위험 하한은 검토 권장 하한과 1.0 의 중간)"),
+        "grade_basis": (f"심결+cross+db OOF 확률(행마다 자기 결측 패턴의 계수 집합; 위험 정밀도 ≥ "
+                        f"{PRECISION_RISK}·최소 지지 {RISK_MIN_SUPPORT}, 검토 권장 재현율 ≥ "
+                        f"{RECALL_REVIEW}, 안전/주의 등분; 미달이면 위험 하한은 검토 권장 하한과 "
+                        "1.0 의 중간)"),
         "standalone_thresholds": standalone["thresholds"],
         "standalone_precision": STANDALONE_PRECISION,
         "standalone_reason": standalone["이유"],
         "meta": {
             "n_trial": n_trial, "n_pos": n_pos, "n_neg": n_neg,
             "n_excluded_no_name": len(excluded), "n_easy": int(easy.sum()),
+            "n_easy_with_image": data_summary["쉬운_음성_이미지_있음"],
+            "n_easy_with_goods": data_summary["쉬운_음성_상품_있음"],
             "folds": folds, "repeats": repeats, "bootstrap": bootstrap,
             "cv_auc": {name: block["auc"] for name, block in adopted["cv"].items()},
             "cv_auc_ci95": {name: block["auc_ci95"] for name, block in adopted["cv"].items()},
@@ -1059,15 +1578,20 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
                             if len(tuple(sigma_grid)) == 1 else None),
             "risk_min_support": RISK_MIN_SUPPORT,
             # 계약 v2 meta.grade_precision — "위험" 등급의 OOF 정밀도(심결+cross+db). 서비스 화면
-            # 문구
-            # "검증 데이터 기준 10건 중 N건"의 출처(E-6).
+            # 문구 "검증 데이터 기준 10건 중 N건"의 출처(E-6).
             "grade_precision": risk_grade_precision(grades["심결+cross+db"]),
+            "pattern_choice": pattern_choice,
+            "coupling_floors": floor_detail,
+            "monotonicity": adopted["단조성"],
+            "indicator_reference": indicator,
             "feature_definitions": (
-                "축 점수 0~1(결측 0 + miss_*=1; x3_d 는 has_meaning_both False 면 결측), "
+                "축 점수 0~1. 결측 패턴(pattern_axes 의 관측 조합)마다 계수 집합 — 관측된 축만 "
+                "입력, "
+                "결측 지시변수 없음(x3_d 는 has_meaning_both False 면 값 0). "
                 "any_no_distinctive = 1 − has_distinctive_part_a·b, 교호작용 x1_d×문자계(문자·"
                 "결합-문자요부·미상·결합)·x2_whole×도형계(도형·결합-도형요부)·"
-                "x1_d×any_no_distinctive. "
-                "유형 주효과·miss_x1·miss_x2text·요부 플래그 2개 없음. 표준화 없음."
+                "x1_d×any_no_distinctive. 유형 주효과·miss_*·요부 플래그 2개 없음. 표준화 없음. "
+                "기여도 miss_pattern = 패턴 절편 − 기준 절편."
             ),
         },
     }
@@ -1085,7 +1609,7 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
         "채택": {"method": adopted_method, "pending": pending, "규칙": adopt_notes,
                "hyper": adopted["hyper"]},
         "기준선": baselines, "등급": grades, "단독_임계값": standalone, "부분집합": subsets,
-        "요부_교차표": crosstab, "모델_파일": str(model_path),
+        "요부_교차표": crosstab, "참고_지시변수_모델": indicator, "모델_파일": str(model_path),
     }
     (out_dir / "risk_model_v1_results.json").write_text(
         json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
@@ -1109,13 +1633,18 @@ def _rate(value) -> str:
 
 def report_text(summary: dict) -> str:
     data = summary["데이터"]
-    lines = [f"# 통합 모델 v1.2.1 학습 보고 ({summary['기준일']})", ""]
+    lines = [f"# 통합 모델 v1.3 학습 보고 ({summary['기준일']})", ""]
     lines.append(f"- 라벨 최종 · 심결 {data['심결_행']}행(유사 {data['유사']}·비유사 "
                  f"{data['비유사']}; 이름 없어 제외 {data['이름_없어_제외']['행']}행) · 쉬운 음성 "
                  f"cross "
                  f"{data['쉬운_음성']['cross']}·db {data['쉬운_음성']['db']} (w_easy "
-                 f"{data['w_easy']}) · 입력 {len(data['입력'])}개 · 제거 항 {data['제거_항']} · "
-                 f"EPV {data['소수_클래스_대_입력(EPV)']}")
+                 f"{data['w_easy']}; 이미지 있음 {data['쉬운_음성_이미지_있음']}·상품 있음 "
+                 f"{data['쉬운_음성_상품_있음']}) · 기준 패턴 입력 {len(data['입력'])}개 · 패턴 축 "
+                 f"{data['패턴_축']} · 제거 항 {data['제거_항']} · EPV "
+                 f"{data['소수_클래스_대_입력(EPV)']}")
+    lines.append(f"- 결합 제약 하한({data['결합_하한_근거']}): " + ", ".join(
+        f"{axis} {d['하한']}({d['근거']}; 심결 비유사 {d['심결_비유사_평균']}·전체 비유사 "
+        f"{d['전체_비유사_평균']})" for axis, d in data["결합_하한"].items()))
     lines += ["", "## 방법 비교 (같은 입력·사건 단위 CV·w_easy 0.5)", "",
               "| 방법 | 하이퍼 | 심결 AUC | 심결+cross | 심결+cross+db | Brier 심결/현실 | "
               "판례 (i)/(ii)/(iii)/(iv) 겹 성립 | 학습 시간 | 해석 |",
@@ -1142,9 +1671,24 @@ def report_text(summary: dict) -> str:
                   f"- 하이퍼 후보(심결 CV AUC): {item['hyper_후보']}",
                   f"- 로짓 기울기(최종 적합, 0 → 1): {item['로짓_기울기(최종 적합)']}",
                   f"- 판례 조건(최종 적합): {item['판례_조건(최종 적합)']}"]
+        if "패턴" in item:
+            lines += ["", "### 결측 패턴별 계수 집합", "",
+                      "| 패턴 | 관측 축 | n(심결·쉬운 음성) | 유사/비유사 | 자기 패턴 행 | "
+                      "OOF AUC 심결 | 심결+cross+db | 절편 | 계수 |",
+                      "|---|---|---|---|---|---|---|---|---|"]
+            for key, block in item["패턴"].items():
+                coefficients = item["패턴_계수"][key]
+                lines.append(
+                    f"| {key} | {'·'.join(block['관측_축']) or '—'} | "
+                    f"{block['n']}({block['n_심결']}·"
+                    f"{block['n_쉬운_음성']}) | {block['유사']}/{block['비유사']} | "
+                    f"{block['자기_패턴_행']} | {block['cv_auc'].get('심결')} | "
+                    f"{block['cv_auc'].get('심결+cross+db')} | {coefficients['절편']} | "
+                    + ", ".join(f"{n} {v}" for n, v in coefficients["계수"].items()) + " |")
         if "계수" in item:
             boot = item["부트스트랩"]
-            lines += ["", f"| 항 | 계수 | 부트스트랩 {boot['rounds']}회 평균 | 95% 구간 |",
+            lines += ["", f"기준 패턴(모든 축 관측) 계수 — 부트스트랩 {boot['rounds']}회", "",
+                      "| 항 | 계수 | 부트스트랩 평균 | 95% 구간 |",
                       "|---|---|---|---|", f"| intercept | {item['절편']} | — | — |"]
             for term, value in item["계수"].items():
                 b = boot["계수"][term]
@@ -1153,8 +1697,24 @@ def report_text(summary: dict) -> str:
             b = boot["계수"]["intercept"]
             lines.append(f"| intercept(부트스트랩) | — | {b['평균']} | {b['ci95'][0]} ~ "
                          f"{b['ci95'][1]} |")
+            if "패턴" in boot:
+                lines += ["", "패턴별 절편(부트스트랩 평균, 95% 구간): " + ", ".join(
+                    f"{key} {table['intercept']['평균']} ({table['intercept']['ci95'][0]} ~ "
+                    f"{table['intercept']['ci95'][1]})" for key, table in boot["패턴"].items())]
             lines += ["", "부트스트랩 판례 조건 성립 비율: " + ", ".join(
                 f"{k} {_rate(v)}" for k, v in boot["판례_조건_성립_비율"].items())]
+        if "단조성" in item:
+            lines += ["", "### 단조성(결합 제약) 검사 — 축 하나를 더 관측했을 때 로짓 차", "",
+                      "| 패턴 | 하한 | n | 하한 이상 n / 위반 / 로짓차 평균·최소 | "
+                      "하한 미만 n / 내려간 수 / 로짓차 평균 | 하한값 대입 최소 |",
+                      "|---|---|---|---|---|---|"]
+            for name_, block in item["단조성"].items():
+                above, below = block["하한_이상"], block["하한_미만"]
+                lines.append(
+                    f"| {name_} | {block['하한']} | {block['n']} | {above['n']} / "
+                    f"{above['위반(p 내려감)']} / {above['로짓차_평균']}·{above['로짓차_최소']} | "
+                    f"{below['n']} / {below['내려간_수']} / {below['로짓차_평균']} | "
+                    f"{block['하한값_대입_로짓차_최소']} |")
         if "형상_곡선" in item:
             lines.append("")
             for axis, cells in item["형상_곡선"].items():
@@ -1163,7 +1723,15 @@ def report_text(summary: dict) -> str:
             lines += ["", "| 항 | 평균 \\|SHAP\\|(로짓) |", "|---|---|"]
             for term, value in sorted(item["shap_평균절대값"].items(), key=lambda kv: -kv[1]):
                 lines.append(f"| {term} | {value} |")
-    lines += ["", "## 등급 임계값 (채택 모델 OOF)", ""]
+    indicator = summary.get("참고_지시변수_모델")
+    if indicator:
+        lines += ["", "## 참고 — 지시변수 모델(v1.2.1 구조 + 쉬운 음성 이미지 축, 오프셋 없음)", "",
+                  f"- {indicator['설명']}",
+                  f"- 심결 AUC {indicator['cv_auc'].get('심결')} · 심결+cross+db "
+                  f"{indicator['cv_auc'].get('심결+cross+db')} · Brier {indicator['brier']}",
+                  "- 계수: " + ", ".join(f"{k} {v}" for k, v in indicator["계수"].items())
+                  + f", intercept {indicator['절편']}"]
+    lines += ["", "## 등급 임계값 (채택 모델 OOF, 행마다 자기 패턴)", ""]
     for set_name, block in summary["등급"].items():
         lines += [f"### {set_name} 기준 — {block['thresholds']}", ""]
         for note in block["기준"]:
@@ -1214,6 +1782,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--repeats", type=int, default=REPEATS)
     parser.add_argument("--bootstrap", type=int, default=BOOTSTRAP)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--min-pattern-minority", type=int, default=MIN_PATTERN_MINORITY,
+                        help="패턴마다 소수 클래스 최소 행 수(미달이면 패턴 축을 줄인다)")
     args = parser.parse_args(argv)
     methods = tuple(m.strip() for m in args.methods.split(",") if m.strip())
     unknown = [m for m in methods if m not in METHODS]
@@ -1221,7 +1791,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error(f"모르는 방법 {unknown} (가능: {METHODS})")
     summary = run(args.features, args.easy, out_dir=args.out_dir, model_path=args.model,
                   methods=methods, w_easy=args.w_easy, folds=args.folds, repeats=args.repeats,
-                  bootstrap=args.bootstrap, seed=args.seed)
+                  bootstrap=args.bootstrap, seed=args.seed,
+                  min_pattern_minority=args.min_pattern_minority)
     print(report_text(summary))
     return 0
 

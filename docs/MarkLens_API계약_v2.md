@@ -4,10 +4,10 @@
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), 엔드포인트·BFF·zod·화면은 구현 전**. 백엔드와
   프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현한다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
-  §3(입력)·§7-2(v1.2.1 등급·단독·도형 규칙), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
+  §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
   README "다음 단계"(서비스 연결 범위).
 - 코드 근거(2026-10-24 현재): 런타임 `ml/src/model/risk_model.py`(`risk_score → RiskResult(prob, grade, contributions, figure_caveat)`),
-  계수 `shared/model/risk_model_v1.json`(version `risk_model_v1.2.1`), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
+  계수 `shared/model/risk_model_v1.json`(version `risk_model_v1.3`), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
   `pair_generic`·`judge`), 축 함수 X1 `phonetic_similarity`·X2 철자 `orthographic_similarity`·X3 `semantic_similarity`·X4
   `goods_similarity`, 프론트-6 선택 지정상품 `frontend/lib/goods.ts`(`SelectedGood`·`goodsCodeUnion`).
 - §3 의 숫자는 위 코드로 **실제 계산한 값**이다(모델 한계도 그대로 드러난다 — §3-2, §5-3).
@@ -17,7 +17,7 @@
 | 항목 | 내용 |
 |---|---|
 | 입력 | `image`(파일) · `name`(상표명) · `goods_codes[]`(유사군 코드) 중 **하나 이상** + 선택 `type_override`(문자/도형/결합) |
-| 처리 | 입력별 후보 풀(CLIP·발음·철자·관념·유사군)을 합쳐 → 후보마다 4축 점수(식별력 필터 적용) → 통합 모델 v1.2.1 `risk_score` → 위험도 내림차순 |
+| 처리 | 입력별 후보 풀(CLIP·발음·철자·관념·유사군)을 합쳐 → 후보마다 4축 점수(식별력 필터 적용) → 통합 모델 v1.3 `risk_score`(입력의 결측 패턴에 맞는 계수 집합) → 위험도 내림차순 |
 | 출력 | `overall`(등급·위험도·주의 문구·유형) · `candidates[]`(축 점수·위험도·등급·근거 축 기여도·규칙·요부·지정상품) · `meta`(모델 버전·등급 정밀도·임계값·소요) |
 | 경계 | v1 과 같다 — 브라우저는 same-origin BFF `/api/search/v2` 만, FastAPI 는 내부(`X-API-Key`), Turnstile 1회용 토큰, `X-Request-ID` |
 | 한도 | v1 `/search` 와 같은 설정값·같은 버킷(`MARKLENS_SEARCH_RATELIMIT` 기본 10/minute, gateway 사용자별 5회/분) |
@@ -115,10 +115,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `axes.x2_img` | 0~1 | 이미지 없음·후보 이미지 없음이면 null | X2 전체 이미지 CLIP 코사인(v1 `similarity`, 음수는 0 으로 자른다) — `x2_whole` |
 | `axes.x3` | 0~1 | 이름 없음·어느 쪽이든 관념 없음(`has_meaning` false — 조어·기호)이면 null | X3 관념 `semantic_similarity(…, extra_generic=removed)` — `x3_d`. 두 이름 모두 사전어가 있어야 값이 있다(게이트) |
 | `axes.x4` | 0~1 | `goods_codes` 없음·후보에 유사군 없음이면 null | X4 `goods_similarity(goods_codes, candidate.goods.codes)` 자카드 |
-| `risk.prob` | 0~1 | 아니오 | 통합 모델 위험도(소수 3자리). null 축은 "값 0 + 결측 지시변수"로 들어간다(설계 §3) |
+| `risk.prob` | 0~1 | 아니오 | 통합 모델 위험도(소수 3자리). v1.3: null 인 이미지·상품 축은 지시변수가 아니라 **결측 패턴별 계수 집합**으로 — 관측된 축 조합(base / x2_whole / x4 / x2_whole+x4)마다 계수·절편이 따로 있고 런타임이 입력에 맞는 집합을 고른다(설계 §7-3). 관념 축이 null 이면 값 0 |
 | `risk.grade` | 4등급 | 아니오 | §2-4 규칙 적용 뒤 등급 |
-| `risk.contributions` | `{ "X1": n, "X2": n, "X3": n, "X4": n, "요부": n }` | 아니오 | 축별 **로짓 기여도**(계수×값, 양·음 가능). 점수 항만 모은다 — `x1`·`x1×문자계`·`x1×요부없음` → X1, `x2_text`·`x2_img`·`x2_img×도형계` → X2, `x3` → X3, `x4` → X4, `any_no_distinctive` → 요부. 결측 지시변수(`miss_*`)는 넣지 않는다(아래 `missing_adjustment`). 런타임 `axis_contributions()` 는 결측 항을 포함하므로 엔진이 `miss_` 항을 떼어 낸다 |
-| `risk.missing_adjustment` | number | 아니오 | 결측 지시변수 기여도 합(`miss_x2img` 0.500·`miss_x3` 0.308·`miss_x4` 0.281 중 해당분). `intercept(−4.692) + Σcontributions + missing_adjustment = logit(prob)` 가 성립해야 한다(엔진 테스트 조건; §3 예시는 소수 3자리로 반올림했으므로 되계산한 p 는 ±0.001 안 — 후보 "블루보틀"은 정확히 0.564, 반올림 값으로는 0.563) |
+| `risk.contributions` | `{ "X1": n, "X2": n, "X3": n, "X4": n, "요부": n }` | 아니오 | 축별 **로짓 기여도**(계수×값, 양·음 가능). 점수 항만 모은다 — `x1`·`x1×문자계`·`x1×요부없음` → X1, `x2_text`·`x2_img`·`x2_img×도형계` → X2, `x3` → X3, `x4` → X4, `any_no_distinctive` → 요부. 결측 보정(`miss_pattern`)은 넣지 않는다(아래 `missing_adjustment`). 런타임 `axis_contributions()` 는 결측 항을 포함하므로 엔진이 `miss_` 항을 떼어 낸다 |
+| `risk.missing_adjustment` | number | 아니오 | 결측 패턴 절편 보정 = 쓰인 패턴의 절편 − 기준 절편(기준 = 이미지·상품 모두 관측한 패턴 `x2_whole+x4`, 절편 -3.4712). v1.3 패턴 절편: base -3.6361·x2_whole -3.8103·x4 -3.4535 → 보정 -0.165·-0.339·0.018·0(음수 가능, 결측 지시변수 아님). `intercept(-3.4712) + Σcontributions + missing_adjustment = logit(prob)` 가 성립해야 한다(엔진 테스트 조건; §3 예시는 소수 3자리로 반올림했으므로 되계산한 p 는 ±0.001 안) |
 | `risk.figure_caveat` | bool | 아니오 | 유형이 도형계(도형·결합-도형요부)면 true — `RiskResult.figure_caveat` |
 | `risk.rule_triggers` | string[] | 아니오(빈 배열 가능) | 등급 하한을 "검토 권장"으로 올린 규칙: `standalone_x1`(x1 ≥ 0.98), `standalone_x2_text`(≥ 0.75), `standalone_x3`(≥ 0.7707), `figure_x2_img`(도형계이고 x2_img ≥ 0.9). `x2_img`·`x4` 의 단독 임계값은 null(비활성)이라 없다. 규칙이 걸려도 `prob` 는 바뀌지 않는다 |
 | `salient.query_tokens` | string[] | 아니오 | 입력 상표명의 **요부 후보**(식별력 점수 ≥ θ 0.5, 이름 순서, NFKC·소문자 정규화). 이름이 없으면 빈 배열. 비어 있고 이름이 있으면 "요부 없음 → 전체 대비"(2000후2453) |
@@ -131,9 +131,9 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.2.1"` |
-| `grade_precision` | 0~1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF)에서 "위험"으로 분류된 159쌍 중 심결이 유사로 본 109쌍 → 0.6855 ≈ **0.69**(설계 §7-2 끝). 2026-10-24 현재 계수 JSON 에 이 키가 없으므로 학습 스크립트가 `meta.grade_precision` 을 쓰도록 한 줄 더하기 전(§6 E-6)까지 엔진 상수 0.69 |
-| `thresholds.grade` | `{ "주의": 0.063, "검토 권장": 0.126, "위험": 0.563 }` | 등급 하한 p(JSON `grade_thresholds`). 안전은 0~0.063 |
+| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.3"` |
+| `grade_precision` | 0~1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF, 행마다 자기 결측 패턴)에서 "위험"으로 분류된 152쌍 중 심결이 유사로 본 107쌍 → 0.7039 ≈ **0.70**(v1.3, 설계 §7-3; v1.2.1 은 159쌍 중 109 → 0.6855). 엔진은 JSON `meta.grade_precision` 을 읽는다(E-6) |
+| `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 }` | 등급 하한 p(JSON `grade_thresholds`, v1.3). 안전은 0~0.0902 |
 | `thresholds.standalone` | `{ "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null }` | 단독 임계값 τ(JSON `standalone_thresholds`, 정밀도 ≥ 0.7 지점). null 은 비활성 |
 | `thresholds.figure` | 0.9 | 도형 규칙 τ(JSON `figure_rule.threshold`, 미검증) |
 | `pool` | `{ "image": n, "phonetic": n, "spelling": n, "semantic": n, "goods": n, "total": n }` | 후보 풀 크기(§1-3). 입력이 없는 축은 0 |
@@ -144,9 +144,11 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 ### 2-4. 등급 규칙(요약 — 정본은 통합 모델 설계 §7-2)
 
-1. `prob = sigmoid(intercept + Σ 계수×값)`. null 축은 값 0 + 결측 지시변수 1. 유형은 `overall.query_type.type` 하나를 쌍 전체에 쓴다
-   (학습이 이 사건 표장의 유형으로 했으므로).
-2. `grade` 는 `meta.thresholds.grade` 의 하한으로 — 0.563 이상 위험, 0.126 이상 검토 권장, 0.063 이상 주의, 그 아래 안전.
+1. `prob = sigmoid(intercept + Σ 계수×값)`. 계수 집합은 입력의 결측 패턴(이미지 유무 × 상품 유무, v1.3 §7-3)에 따라 넷 중 하나 —
+   관측된 축만 입력에 있고 결측 지시변수는 없다(관념 축이 null 이면 값 0). 축 하나를 하한값(현실 분포 비유사 쌍 평균: 이미지
+   0.3487·상품 0.0252) 이상으로 더 관측하면 `prob` 는 내려가지 않는다(결합 제약, 적재 때 검증). 유형은 `overall.query_type.type`
+   하나를 쌍 전체에 쓴다(학습이 이 사건 표장의 유형으로 했으므로).
+2. `grade` 는 `meta.thresholds.grade` 의 하한으로 — 0.5902 이상 위험, 0.1805 이상 검토 권장, 0.0902 이상 주의, 그 아래 안전(v1.3).
 3. **단독 규칙**(97후3050 후단): 어느 축이든 τ 이상이면 등급 하한 "검토 권장"(자동 "위험" 아님) → `rule_triggers`.
 4. **도형 규칙**(미검증 제품 규칙): 도형계 유형이면 `figure_caveat = true` + `caveats` 에 도형 문구, `x2_img ≥ 0.9` 면 등급 하한 "검토 권장".
 5. 유형 규칙(2026-10-24 개정 — OCR 은 유형의 최종 결정자가 아니라 이름이 없을 때 글자를 찾아 주는 도우미):
@@ -166,7 +168,9 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
      도형으로 판정해 p 0.08(검토 권장)로 떨어졌다 → 이름이 있으면 문자계로 고정.
      개정 후 실측(2026-10-25): 같은 셋 다 입력이 결합-문자요부(OCR `fig_ratio` 0.717)로 판정돼 **p 0.47(검토 권장)** —
      `x1×문자계` 는 돌아왔고, 이름만(0.58 위험)과의 남은 차이는 유형이 아니라 이미지 결측 보정(`miss_x2img` +0.50 로짓)이
-     실제 x2_img 0.36 의 기여(+0.08, 1.0 이어도 +0.21)보다 큰 v1.2.1 모델 성질이다(이 개정 범위 밖 — 통합 모델 설계 §8).
+     실제 x2_img 0.36 의 기여(+0.08, 1.0 이어도 +0.21)보다 큰 v1.2.1 모델 성질이었다 → **통합 모델 v1.3(2026-10-25, 설계
+     §7-3)** 이 결측 지시변수를 결측 패턴별 계수 집합 + 결합 제약으로 바꿔 닫았다: 같은 쌍 이름만 p 0.530, 셋 다(x2_img 0.36)
+     0.531 — 입력을 더 주면 위험도가 내려가지 않는다(둘 다 검토 권장; 위험 하한 0.5902).
 
 ### 2-5. `caveats` 문구 표(응답은 문구 문자열만 싣는다)
 
@@ -187,7 +191,8 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 ## 3. 예시 JSON
 
-두 예시 모두 2026-10-24 현재 코드로 계산한 값이다(식별력 v0.3, X1 v1.6, X2 철자, X3 MiniLM 재보정, X4 자카드, 모델 v1.2.1).
+두 예시 모두 2026-10-25 현재 코드로 계산한 값이다(식별력 v0.3, X1 v1.6, X2 철자, X3 MiniLM 재보정, X4 자카드, 모델 v1.3 — 축
+값은 2026-10-24 와 같고 `risk.*`·`meta` 만 v1.3 으로 다시 계산).
 후보의 출원번호·출원인은 가짜고 상표명·유사군만 의미가 있다. 프론트는 이 두 응답을 Vitest 픽스처로, 백엔드는 스텁 응답으로 그대로 쓴다.
 
 ### 3-1. 문자상표 — 이름 "블루커피" + 카페 세트, 이미지 없음
@@ -206,7 +211,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
   "legal_conclusion": false,
   "overall": {
     "grade": "위험",
-    "prob": 0.621,
+    "prob": 0.604,
     "caveats": [
       "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
       "비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다"
@@ -224,10 +229,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "nice_classes": [43],
       "axes": { "x1": 0.891, "x2_text": 0.556, "x2_img": null, "x3": 0.548, "x4": 0.25 },
       "risk": {
-        "prob": 0.621,
+        "prob": 0.604,
         "grade": "위험",
-        "contributions": { "X1": 3.628, "X2": 0.608, "X3": 0.095, "X4": 0.357, "요부": 0.0 },
-        "missing_adjustment": 0.5,
+        "contributions": { "X1": 3.162, "X2": 0.475, "X3": 0.0, "X4": 0.24, "요부": 0.0 },
+        "missing_adjustment": 0.018,
         "figure_caveat": false,
         "rule_triggers": []
       },
@@ -251,10 +256,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "nice_classes": [30, 43],
       "axes": { "x1": 0.673, "x2_text": 0.5, "x2_img": null, "x3": 0.52, "x4": 0.75 },
       "risk": {
-        "prob": 0.564,
-        "grade": "위험",
-        "contributions": { "X1": 2.739, "X2": 0.547, "X3": 0.09, "X4": 1.071, "요부": 0.0 },
-        "missing_adjustment": 0.5,
+        "prob": 0.52,
+        "grade": "검토 권장",
+        "contributions": { "X1": 2.388, "X2": 0.427, "X3": 0.0, "X4": 0.719, "요부": 0.0 },
+        "missing_adjustment": 0.018,
         "figure_caveat": false,
         "rule_triggers": []
       },
@@ -277,10 +282,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "nice_classes": [3],
       "axes": { "x1": 0.778, "x2_text": 0.625, "x2_img": null, "x3": 0.539, "x4": 0.0 },
       "risk": {
-        "prob": 0.438,
+        "prob": 0.46,
         "grade": "검토 권장",
-        "contributions": { "X1": 3.167, "X2": 0.684, "X3": 0.094, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": 0.5,
+        "contributions": { "X1": 2.761, "X2": 0.534, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": 0.018,
         "figure_caveat": false,
         "rule_triggers": []
       },
@@ -302,10 +307,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "nice_classes": [30, 43],
       "axes": { "x1": 0.473, "x2_text": 0.0, "x2_img": null, "x3": 0.0, "x4": 0.5 },
       "risk": {
-        "prob": 0.175,
+        "prob": 0.215,
         "grade": "검토 권장",
-        "contributions": { "X1": 1.925, "X2": 0.0, "X3": 0.0, "X4": 0.714, "요부": 0.0 },
-        "missing_adjustment": 0.5,
+        "contributions": { "X1": 1.679, "X2": 0.0, "X3": 0.0, "X4": 0.479, "요부": 0.0 },
+        "missing_adjustment": 0.018,
         "figure_caveat": false,
         "rule_triggers": []
       },
@@ -320,10 +325,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.2.1",
-    "grade_precision": 0.69,
+    "model_version": "risk_model_v1.3",
+    "grade_precision": 0.7039,
     "thresholds": {
-      "grade": { "주의": 0.063, "검토 권장": 0.126, "위험": 0.563 },
+      "grade": { "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 },
       "standalone": { "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null },
       "figure": 0.9
     },
@@ -342,15 +347,16 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 }
 ```
 
-검산: 후보 1 의 로짓 = −4.692(절편) + 3.628 + 0.608 + 0.095 + 0.357 + 0.5(결측 `miss_x2img`) = 0.496 → sigmoid 0.621. 후보 2 는 0.564 로
-"위험" 하한 0.563 바로 위라 경계값 표시의 좋은 픽스처다. "레드커피"는 `커피`를 양쪽에서 떼면 `블루` 대 `레드`라 철자 0·관념 0(재보정 뒤
+검산(v1.3, 이미지 없음·상품 있음 → 패턴 `x4`, 절편 -3.4535): 후보 1 의 로짓 = -3.4712(기준 절편) + 3.162 + 0.475 + 0.0 + 0.24 +
+0.018(패턴 절편 보정) = 0.424 → sigmoid 0.604. 후보 2 는 0.52 로 "위험" 하한 0.5902 아래의 "검토 권장"(v1.2.1 에서는 0.564 위험 — 결측
+지시변수 +0.5 가 빠진 만큼 내려갔다). X3 기여가 0 인 것은 v1.3 관념 계수가 0(단조 하한)이기 때문. "레드커피"는 `커피`를 양쪽에서 떼면 `블루` 대 `레드`라 철자 0·관념 0(재보정 뒤
 0 으로 잘림)이고 호칭 0.473(제거 전 전체 결합음 "블루커피/레드커피"가 X1 후보에 남아 0 이 아니다).
 
 ### 3-2. 도형상표 — 이미지만, 상표명·지정상품 없음
 
 요청: `POST /api/search/v2?top_k=3`, multipart `image=<png>`. OCR 글자 면적 0.01 → 도형(`source: ocr`). 후보는 CLIP 상위 20 중 위험도
-순 3건. 호칭·철자·관념·상품 축은 전부 null 이라 `prob` 는 절편 + 결측 지시변수뿐(0.016)이고, 1위는 `x2_img 0.93 ≥ 0.9` 도형 규칙으로
-"검토 권장", 2·3위는 "안전"이다. `visual_status` 는 같은 이미지의 v1 판정(top-1 0.93 ≥ 0.75 → `STRONG_MATCH`).
+순 3건. 호칭·철자·관념·상품 축은 전부 null 이라 패턴 `x2_whole`(절편 -3.8103)의 이미지 항만 남고(`prob` 0.06·0.053·0.043), 1위는
+`x2_img 0.93 ≥ 0.9` 도형 규칙으로 "검토 권장", 2·3위는 "안전"이다. `visual_status` 는 같은 이미지의 v1 판정(top-1 0.93 ≥ 0.75 → `STRONG_MATCH`).
 
 ```json
 {
@@ -359,7 +365,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
   "legal_conclusion": false,
   "overall": {
     "grade": "검토 권장",
-    "prob": 0.016,
+    "prob": 0.06,
     "caveats": [
       "도형 유사는 검증 데이터가 적어 참고용",
       "상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다",
@@ -380,10 +386,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "nice_classes": [25],
       "axes": { "x1": null, "x2_text": null, "x2_img": 0.93, "x3": null, "x4": null },
       "risk": {
-        "prob": 0.016,
+        "prob": 0.06,
         "grade": "검토 권장",
-        "contributions": { "X1": 0.0, "X2": 0.0, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": 0.589,
+        "contributions": { "X1": 0.0, "X2": 1.059, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": -0.339,
         "figure_caveat": true,
         "rule_triggers": ["figure_x2_img"]
       },
@@ -399,10 +405,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "nice_classes": [9, 42],
       "axes": { "x1": null, "x2_text": null, "x2_img": 0.81, "x3": null, "x4": null },
       "risk": {
-        "prob": 0.016,
+        "prob": 0.053,
         "grade": "안전",
-        "contributions": { "X1": 0.0, "X2": 0.0, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": 0.589,
+        "contributions": { "X1": 0.0, "X2": 0.922, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": -0.339,
         "figure_caveat": true,
         "rule_triggers": []
       },
@@ -418,10 +424,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
       "nice_classes": [35],
       "axes": { "x1": null, "x2_text": null, "x2_img": 0.62, "x3": null, "x4": null },
       "risk": {
-        "prob": 0.016,
+        "prob": 0.043,
         "grade": "안전",
-        "contributions": { "X1": 0.0, "X2": 0.0, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": 0.589,
+        "contributions": { "X1": 0.0, "X2": 0.706, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": -0.339,
         "figure_caveat": true,
         "rule_triggers": []
       },
@@ -430,10 +436,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.2.1",
-    "grade_precision": 0.69,
+    "model_version": "risk_model_v1.3",
+    "grade_precision": 0.7039,
     "thresholds": {
-      "grade": { "주의": 0.063, "검토 권장": 0.126, "위험": 0.563 },
+      "grade": { "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 },
       "standalone": { "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null },
       "figure": 0.9
     },
@@ -452,9 +458,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 }
 ```
 
-검산: 도형계에서 `x2_img` 의 계수 0.210 과 교호작용 `x2_img×도형계` −0.210 이 상쇄되어 X2 기여도는 0 — 모델은 도형계에서 CLIP 효과를
-0 으로 학습했다(설계 §7-2, 판례 조건 (ii) 불성립). 로짓 = −4.692 + 0.308(`miss_x3`) + 0.281(`miss_x4`) = −4.103 → 0.016. 이미지만 넣은
-질의는 모델이 아니라 **도형 규칙과 `visual_status`** 로 읽어야 하며 화면은 `axes.x2_img` 값과 caveat 를 함께 보여 준다(§4-5).
+검산(v1.3): 도형계에서 패턴 `x2_whole` 의 `x2_img` 계수 0.5 + 교호작용 `x2_img×도형계` 0.6382 → 1위 X2 = 1.059, 로짓 = -3.4712 +
+-0.339(패턴 절편 보정) + 1.059 = -2.751 → 0.06. 도형계 이미지 계수는 결합 제약이 정한 값이지 심결 데이터의 증거가 아니다(설계
+§7-3 — 도형계 쌍 37 뿐, 판례 조건 (ii) 불성립 그대로). 이미지만 넣은 질의는 모델이 아니라 **도형 규칙과 `visual_status`** 로 읽어야
+하며 화면은 `axes.x2_img` 값과 caveat 를 함께 보여 준다(§4-5).
 
 ## 4. 화면 문구 규약(프론트가 그대로 구현)
 
@@ -543,11 +550,12 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 ### 5-3. 축 결측과 모델 한계
 
-- 축이 null 이면 모델은 "값 0 + 결측 지시변수"로 계산한다(결측은 비유사가 아니다). 결측 지시변수의 계수는 양수(0.28~0.50)라 입력이
-  적을수록 `prob` 가 조금 오르는 쪽이지 내려가지 않는다.
-- 이미지만 입력하면 `prob` 는 0.02 안팎이고 등급은 도형 규칙으로만 오른다(§3-2). 지정상품만 입력하면 `x4` 뿐이라 `prob` 는 최대
-  0.1 안팎(절편 −4.69 + x4 1.43 + 결측 1.08) → "주의"가 상한이다. 두 경우 모두 `caveats` 로 알린다.
-- "위험" 정밀도 0.69 는 검증 데이터(경계 사례 심결 + 쉬운 음성) 기준이며 서비스 분포의 정확도가 아니다(README "경계 사례 데이터").
+- 이미지·상품 축이 null 이면 모델은 그 축 없이 학습한 계수 집합(결측 패턴, v1.3 §7-3)으로 계산한다(결측은 비유사가 아니다). 축을
+  하한값(현실 분포 비유사 평균) 이상으로 더 관측하면 `prob` 는 내려가지 않고, 하한 아래(비유사 평균보다 덜 비슷한 이미지·겹치지 않는
+  상품)면 내려갈 수 있다 — 음의 증거. v1.2.1 의 "입력을 더 주면 내려가는" 결측 지시변수 편향은 없다.
+- 이미지만 입력하면 `prob` 는 0.05 안팎이고 등급은 도형 규칙으로만 오른다(§3-2). 지정상품만 입력하면 `x4` 뿐이라 `prob` 는 최대
+  0.08 안팎(패턴 `x4` 절편 -3.4535 + x4 0.9583) → "안전"이 상한이다. 두 경우 모두 `caveats` 로 알린다.
+- "위험" 정밀도 0.70(v1.3; v1.2.1 0.69) 은 검증 데이터(경계 사례 심결 + 쉬운 음성) 기준이며 서비스 분포의 정확도가 아니다(README "경계 사례 데이터").
 
 ### 5-4. 후보 0건
 
@@ -584,8 +592,8 @@ OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아�
 | E-2 | 엔진 | 쌍별 축 계산 — `pair_generic` 으로 제외 토큰을 구해 `x1_d`·`x2_text_d`·`x3_d`, CLIP 코사인 `x2_whole`, 자카드 `x4`; 게이트(`has_pronunciation`·`has_spelling`·`has_meaning`·`has_goods`)로 null | `axes.*`, `salient.*`, `goods.jaccard` | 학습 `ml/scripts/pairs_features.py::name_axes` 와 같은 식 |
 | E-3 | 엔진 | **고시 명칭 접미 분리** — 붙여쓴 한글 이름(블루커피)에서 끝이 고시 단일 명칭(커피)이면 토큰을 나눠 판정. 2026-10-24 현재 `normalize_name("블루커피")` 은 한 토큰이라 `커피` 가 제외되지 않는다(X1 설계 §4 한계 5). §3-1 예시는 이 규칙이 있는 상태의 값 | `salient.removed` 의 `커피` 행, `x1`·`x2_text`·`x3` 값 | 규칙은 식별력 `Distinctiveness` 에 넣고 X1·X2 철자·X3 가 같은 토큰을 받게 한다 |
 | E-4 | 엔진 | 유형 판정 — OCR 글자 면적(`x2_split.auto_type` 규칙 0.05/0.08)으로 문자·도형·결합(+요부), 실패·미설치면 fallback, `type_override` 우선 → 2026-10-25 개정(§2-4 5항): 이름이 있으면 항상 문자계, OCR 은 이름 없는 질의의 글자 제안 `suggested_name` | `overall.query_type` | **결정 대기**: OCR 라이브러리(벤치마크는 easyocr)를 서비스 의존성에 넣을지(`constraints.txt`·Dockerfile·CI 설치 시간). 안 넣으면 `source` 는 항상 `fallback`/`user` |
-| E-5 | 엔진 | `risk_score` 호출, 기여도를 축별로 묶되 `miss_*` 는 `missing_adjustment` 로 분리, 단독·도형 규칙 판정을 `rule_triggers` 로, 위험도 내림차순 정렬, `overall` 집계(최대 등급·최대 p·caveat 합집합) | `risk.*`, `overall.grade`·`prob`·`caveats` | 테스트: `intercept + Σcontributions + missing_adjustment = logit(prob)`, 예시 3-1·3-2 와 같은 값 |
-| E-6 | 엔진 | 학습 스크립트가 `meta.grade_precision`(위험 등급 OOF 정밀도)을 계수 JSON 에 쓰도록 한 줄 추가 → 재학습 없이 JSON 만 갱신(값 0.6855) | `meta.grade_precision` | 그 전까지 엔진 상수 0.69 |
+| E-5 | 엔진 | `risk_score` 호출, 기여도를 축별로 묶되 `miss_*`(v1.3 은 `miss_pattern` = 패턴 절편 보정)는 `missing_adjustment` 로 분리, 단독·도형 규칙 판정을 `rule_triggers` 로, 위험도 내림차순 정렬, `overall` 집계(최대 등급·최대 p·caveat 합집합) | `risk.*`, `overall.grade`·`prob`·`caveats` | 테스트: `intercept + Σcontributions + missing_adjustment = logit(prob)`, 예시 3-1·3-2 와 같은 값 |
+| E-6 | 엔진 | 학습 스크립트가 `meta.grade_precision`(위험 등급 OOF 정밀도)을 계수 JSON 에 쓰도록 한 줄 추가 → 재학습 없이 JSON 만 갱신(값 0.6855; v1.3 재학습 뒤 0.7039) | `meta.grade_precision` | 그 전까지 엔진 상수 0.69 |
 | B-1 | 백엔드(현수) | `POST /search/v2` — multipart 파싱(`image`·`name`·`goods_codes` 반복 필드·`type_override`), 검증 400/413/415/422, 한도 버킷 공유, `X-Request-ID`·로깅(검색어·이미지 미기록) | 요청 전체, 오류 응답 | pydantic 응답 모델 `SearchV2Response` 를 `backend/src/schemas/search_v2.py` 에 — §2 표가 필드 정의 |
 | B-2 | 백엔드 | BFF `frontend/app/api/search/v2/route.ts` — v1 `/api/search` 복제 + 세 필드 검증·전달 | — | Turnstile 검증 뒤 토큰 제거(v1 과 같음) |
 | B-3 | 백엔드 | zod `SearchV2ResponseSchema`(`frontend/lib/contracts.ts`) — null 허용 축·등급 열거·`caveats` 문자열 배열, `.passthrough()` 로 전진 호환 | 응답 검증 | §3 두 JSON 이 통과해야 한다(테스트 픽스처) |
