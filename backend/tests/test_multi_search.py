@@ -83,7 +83,9 @@ def test_startup_prepared_caches(client):
 def test_name_only(client, ocr_on):
     result = engine.multi_search(name=NAME_Q, top_k=5)
     data = result.to_dict()
-    assert data["overall"]["query_type"] == {"type": "문자", "source": "fallback", "detail": None}
+    assert data["overall"]["query_type"] == {
+        "type": "문자", "source": "fallback", "detail": None, "suggested_name": None,
+    }
     assert data["overall"]["visual_status"] is None
     caveats = data["overall"]["caveats"]
     assert ms.CAVEAT_NO_IMAGE in caveats and ms.CAVEAT_NO_GOODS in caveats
@@ -123,6 +125,7 @@ def test_image_only_uses_fake_ocr_and_figure_rule(client, ocr_on):
     query_type = data["overall"]["query_type"]
     assert query_type["type"] == "도형" and query_type["source"] == "ocr"
     assert set(query_type["detail"]) == {"text_ratio", "fig_ratio"}
+    assert query_type["suggested_name"] is None  # 가짜 OCR 은 글자를 읽지 않는다
     assert data["overall"]["visual_status"] == "STRONG_MATCH"  # 가짜 CLIP 은 1번 벡터와 1.0
     caveats = data["overall"]["caveats"]
     assert caveats[0] == ms.state.model["figure_rule"]["caveat"] == ms.CAVEAT_FIGURE_LOW_DATA
@@ -165,6 +168,10 @@ def test_image_and_name(client, ocr_on):
     assert ms.CAVEAT_NO_IMAGE not in caveats and ms.CAVEAT_NO_NAME not in caveats
     assert ms.CAVEAT_NO_GOODS in caveats
     assert data["overall"]["query_type"]["source"] == "ocr"
+    # 이름이 있으면 문자계 — 단색 이미지는 fig_ratio 0 이라 문자
+    assert data["overall"]["query_type"]["type"] == "문자"
+    assert data["overall"]["query_type"]["suggested_name"] is None
+    assert ms.CAVEAT_FIGURE_LOW_DATA not in caveats
     assert data["meta"]["pool"]["image"] == 9 and data["meta"]["pool"]["phonetic"] > 0
     top = data["candidates"][0]
     assert top["axes"]["x2_img"] is not None and top["axes"]["x1"] is not None
@@ -184,6 +191,8 @@ def test_all_three_inputs(client, ocr_on):
     caveats = data["overall"]["caveats"]
     for text in (ms.CAVEAT_NO_IMAGE, ms.CAVEAT_NO_NAME, ms.CAVEAT_NO_GOODS, ms.CAVEAT_GOODS_ONLY):
         assert text not in caveats
+    assert ms.CAVEAT_FIGURE_LOW_DATA not in caveats  # 이름이 있으면 도형계가 아니다
+    assert data["overall"]["query_type"]["type"] == "문자"
     assert data["top_k_returned"] == 2
     top = data["candidates"][0]
     assert all(top["axes"][key] is not None for key in ("x1", "x2_text", "x2_img", "x4"))
@@ -193,7 +202,7 @@ def test_all_three_inputs(client, ocr_on):
 def test_type_override_wins_over_ocr(client, ocr_on):
     with_name = engine.multi_search(image=_image(), name=NAME, type_override="결합").to_dict()
     assert with_name["overall"]["query_type"] == {
-        "type": "결합-문자요부", "source": "user", "detail": None,
+        "type": "결합-문자요부", "source": "user", "detail": None, "suggested_name": None,
     }
     without_name = engine.multi_search(image=_image(), type_override="결합").to_dict()
     assert without_name["overall"]["query_type"]["type"] == "결합-도형요부"
@@ -206,7 +215,7 @@ def test_type_override_wins_over_ocr(client, ocr_on):
 def test_ocr_fallback_caveat(client, monkeypatch):
     monkeypatch.setattr(config, "OCR_ENABLED", False)
     with_name = engine.multi_search(image=_image(), name=NAME).to_dict()
-    expected = {"type": "문자", "source": "fallback", "detail": None}
+    expected = {"type": "문자", "source": "fallback", "detail": None, "suggested_name": None}
     assert with_name["overall"]["query_type"] == expected
     assert ms.CAVEAT_OCR_FALLBACK.format(type="문자", ro="로") in with_name["overall"]["caveats"]
     image_only = engine.multi_search(image=_image()).to_dict()
@@ -240,6 +249,8 @@ def test_caveat_texts_match_contract_table():
     assert table["GOODS_ONLY"] == ms.CAVEAT_GOODS_ONLY
     assert table["NO_CANDIDATES"] == ms.CAVEAT_NO_CANDIDATES
     assert table["X3_DISABLED"] == ms.CAVEAT_X3_DISABLED
+    suggested = ms.CAVEAT_NAME_SUGGESTED.format(text="BLU")
+    assert table["NAME_SUGGESTED"].replace("{텍스트}", "BLU") == suggested
     coverage = ms.CAVEAT_GOODS_COVERAGE.format(with_goods="100", total="1,100")
     assert table["GOODS_COVERAGE"] == coverage
     assert table["OCR_FALLBACK"].replace("{도형|문자}(으)로", "도형으로") == (
@@ -305,3 +316,73 @@ def test_no_candidates_when_name_has_no_match(client, monkeypatch):
     assert ms.CAVEAT_NO_CANDIDATES in data["overall"]["caveats"]
     assert ms.CAVEAT_NO_PRONUNCIATION in data["overall"]["caveats"]
     assert data["meta"]["pool"]["total"] == 0
+
+
+def _figure_image():
+    """글자 없이 뚜렷한 도형 영역만 있는 이미지 — 가짜 OCR: text_ratio 0, fig_ratio 0.36."""
+    from PIL import ImageDraw
+
+    image = Image.new("RGB", (100, 100), "white")
+    ImageDraw.Draw(image).rectangle((20, 20, 80, 80), fill="black")
+    return image
+
+
+def _ocr_reads(text: str, text_ratio: float = 0.3, fig_ratio: float = 0.5):
+    from backend.src.core.ocr import TypeDetection
+
+    def fake(image, timeout=None):
+        return TypeDetection(text_ratio, fig_ratio, "결합", "도형", 1, text, 1.0)
+
+    return fake
+
+
+def test_rule_name_with_figure_image_is_text_family(client, ocr_on):
+    data = engine.multi_search(image=_figure_image(), name=NAME).to_dict()
+    query_type = data["overall"]["query_type"]
+    assert query_type["type"] == "결합-문자요부" and query_type["source"] == "ocr"
+    assert query_type["detail"]["fig_ratio"] >= 0.08 and query_type["suggested_name"] is None
+    assert ms.CAVEAT_FIGURE_LOW_DATA not in data["overall"]["caveats"]
+    assert all(c["risk"]["figure_caveat"] is False for c in data["candidates"])
+    top = data["candidates"][0]
+    assert top["id"] == "4020210000001" and "standalone_x1" in top["risk"]["rule_triggers"]
+
+
+def test_rule_name_with_ocr_failure_stays_text(client, monkeypatch):
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(ms.ocr, "detect", lambda image, timeout=None: None)
+    data = engine.multi_search(image=_figure_image(), name=NAME).to_dict()
+    assert data["overall"]["query_type"] == {
+        "type": "문자", "source": "fallback", "detail": None, "suggested_name": None,
+    }
+    assert ms.CAVEAT_OCR_FALLBACK.format(type="문자", ro="로") in data["overall"]["caveats"]
+    assert ms.CAVEAT_FIGURE_LOW_DATA not in data["overall"]["caveats"]
+
+
+def test_rule_image_only_with_ocr_text_suggests_name(client, monkeypatch):
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(ms.ocr, "detect", _ocr_reads("BLU hands"))
+    data = engine.multi_search(image=_image()).to_dict()
+    query_type = data["overall"]["query_type"]
+    assert query_type["type"] == "결합-도형요부"  # 글자 영역 ≥ 0.05 → 결합-도형요부(도형계)
+    assert query_type["source"] == "ocr"
+    assert query_type["suggested_name"] == "BLU hands"
+    caveats = data["overall"]["caveats"]
+    assert ms.CAVEAT_NAME_SUGGESTED.format(text="BLU hands") in caveats
+    assert ms.CAVEAT_FIGURE_LOW_DATA in caveats and ms.CAVEAT_NO_NAME in caveats
+    assert data["meta"]["pool"]["phonetic"] == 0  # 이름 축은 자동 계산하지 않는다(재요청)
+    assert all(c["axes"]["x1"] is None for c in data["candidates"])
+    assert all(c["risk"]["figure_caveat"] for c in data["candidates"])
+
+
+def test_rule_image_only_without_text_is_figure(client, monkeypatch):
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(ms.ocr, "detect", _ocr_reads("", text_ratio=0.0, fig_ratio=0.7))
+    data = engine.multi_search(image=_image()).to_dict()
+    assert data["overall"]["query_type"]["type"] == "도형"
+    assert data["overall"]["query_type"]["suggested_name"] is None
+    assert not any(c.startswith("이미지에서 '") for c in data["overall"]["caveats"])
+    disabled = engine.multi_search(image=_image(), type_override="도형", name=NAME).to_dict()
+    assert disabled["overall"]["query_type"]["type"] == "도형"  # 사용자 선택은 그대로 도형계
+    assert disabled["overall"]["query_type"]["source"] == "user"
+    assert ms.CAVEAT_FIGURE_LOW_DATA in disabled["overall"]["caveats"]
+
