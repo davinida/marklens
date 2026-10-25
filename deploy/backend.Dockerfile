@@ -21,7 +21,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir \
        --index-url https://download.pytorch.org/whl/cpu \
        "torch==${TORCH_VERSION}" "torchvision==${TORCHVISION_VERSION}" \
-    && python -m pip install --no-cache-dir "setuptools==83.0.0" \
+    && python -m pip install --no-cache-dir "setuptools==84.1.0" \
     && python -m pip install --no-cache-dir \
        -c /tmp/constraints.txt \
        -r /tmp/ml-requirements.txt -r /tmp/backend-requirements.txt
