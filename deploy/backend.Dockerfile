@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.15-slim-bookworm
 
 ARG TORCH_VERSION=2.13.0
 ARG TORCHVISION_VERSION=0.28.0
