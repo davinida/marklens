@@ -20,7 +20,7 @@ uvicorn[standard]>=0.54.0,<1.0.0
 python-multipart>=0.0.20,<1.0.0
 
 # .env 로드 (KIPRIS 키/DATABASE_URL — 키 커밋 금지 정책의 실행 수단)
-python-dotenv>=1.0.0,<2.0.0
+python-dotenv>=1.2.4,<2.0.0
 
 # KIPRIS Open API 호출 (백엔드-5 수집 / 백엔드-7 호칭 검색)
 httpx>=0.27.0,<1.0.0
