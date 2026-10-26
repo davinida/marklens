@@ -528,7 +528,8 @@ def extract_document(pdf_path: Path, out_dir: Path, *, min_size: int = MIN_SIZE)
                 row.update({
                     "쪽": hit.page + 1, "bbox": _bbox_text(hit.bbox), "폭": hit.width,
                     "높이": hit.height, "xref": hit.xref, "연결신뢰도": hit.confidence,
-                    "경로": str(path.relative_to(out_dir.parent)), "사진추정": _photo_like(path),
+                    "경로": path.relative_to(out_dir.parent).as_posix(),
+                    "사진추정": _photo_like(path),
                 })
             else:
                 # 래스터 이미지가 아예 없을 때만 벡터 그림을 찾는다(소형 래스터가 있던 표장은 소형)
@@ -545,7 +546,7 @@ def extract_document(pdf_path: Path, out_dir: Path, *, min_size: int = MIN_SIZE)
                         "쪽": block.gusung.page + 1, "bbox": _bbox_text(tuple(region)),
                         "폭": pix.width, "높이": pix.height, "rendered": 1,
                         "연결신뢰도": "low" if block.other_heading else "high",
-                        "경로": str(path.relative_to(out_dir.parent)), "사진추정": 0,
+                        "경로": path.relative_to(out_dir.parent).as_posix(), "사진추정": 0,
                     })
                 elif block.gusung_inline or block.text_after_gusung:
                     row["사유"] = "문자"
