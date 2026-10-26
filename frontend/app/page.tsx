@@ -3,18 +3,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ErrorView from "@/components/ErrorView";
 import LoadingView from "@/components/LoadingView";
-import ResultView from "@/components/ResultView";
+import ResultViewV2 from "@/components/ResultViewV2";
 import SearchForm, {
   type SearchDraft,
   type SearchFormValue,
 } from "@/components/SearchForm";
-import { searchTrademark, type SearchResponse } from "@/lib/api";
+import { searchV2, type SearchV2Response } from "@/lib/api";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
 type Phase =
   | { name: "idle" }
   | { name: "loading" }
-  | { name: "result"; data: SearchResponse }
+  | { name: "result"; data: SearchV2Response }
   | { name: "error"; error: unknown };
 
 export default function Home() {
@@ -48,19 +48,26 @@ export default function Home() {
     requestRef.current = controller;
     const generation = ++generationRef.current;
     setDraft({
-      file: value.file,
+      file: value.file ?? null,
       markName: value.markName,
       topK: value.topK,
       nameCheck: value.nameCheck ?? null,
       phonetic: value.phonetic ?? null,
       semantic: value.semantic ?? null,
       goods: value.goods ?? null,
+      // 이번 제출 한 번에만 쓰는 값이라 draft 에는 남기지 않는다("유형 고치기" 재진입과 구분).
+      typeOverride: null,
     });
     setPhase({ name: "loading" });
 
     try {
-      const data = await searchTrademark(
-        value.file,
+      const data = await searchV2(
+        {
+          image: value.file ?? null,
+          name: value.markName,
+          goodsCodes: value.goodsCodes,
+          typeOverride: value.typeOverride ?? null,
+        },
         value.topK,
         value.turnstileToken,
         controller.signal,
@@ -87,6 +94,26 @@ export default function Home() {
     setDraft(null);
     setPhase({ name: "idle" });
   }, [cancelCurrentRequest]);
+
+  // "유형 고치기"·"상표명으로 넣기" — 입력 화면으로 돌아가 다음 제출에서만 쓸 값을 draft 에 채운다.
+  // 자동으로 다시 검색하지 않는다(API 계약 v2 §4-5) — 사용자가 확인하고 직접 제출해야 새 Turnstile
+  // 토큰을 받아 재요청한다.
+  const retypeTo = useCallback(
+    (type: "문자" | "도형" | "결합") => {
+      cancelCurrentRequest();
+      setDraft((current) => (current ? { ...current, typeOverride: type } : current));
+      setPhase({ name: "idle" });
+    },
+    [cancelCurrentRequest],
+  );
+  const useSuggestedName = useCallback(
+    (name: string) => {
+      cancelCurrentRequest();
+      setDraft((current) => (current ? { ...current, markName: name } : current));
+      setPhase({ name: "idle" });
+    },
+    [cancelCurrentRequest],
+  );
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -118,14 +145,13 @@ export default function Home() {
           <LoadingView queryPreview={queryPreview} onCancel={edit} />
         )}
         {phase.name === "result" && (
-          <ResultView
+          <ResultViewV2
             result={phase.data}
             queryPreview={queryPreview}
-            nameCheck={draft?.nameCheck ?? null}
-            phonetic={draft?.phonetic ?? null}
-            semantic={draft?.semantic ?? null}
-            goods={draft?.goods ?? null}
+            queryHasName={Boolean(draft?.markName)}
             onReset={reset}
+            onRetypeTo={retypeTo}
+            onUseSuggestedName={useSuggestedName}
           />
         )}
         {phase.name === "error" && (

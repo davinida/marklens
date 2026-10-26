@@ -23,6 +23,9 @@
   --review: #ff8a00;
   --review-deep: #a96000;
   --review-bg: #fff4e5;
+  --warn: #e8b200;
+  --warn-deep: #8a6900;
+  --warn-bg: #fdf6df;
   --safe: #00a05a;
   --safe-deep: #007a45;
   --safe-bg: #e6f6ee;
@@ -50,6 +53,9 @@
   --color-review: var(--review);
   --color-review-deep: var(--review-deep);
   --color-review-bg: var(--review-bg);
+  --color-warn: var(--warn);
+  --color-warn-deep: var(--warn-deep);
+  --color-warn-bg: var(--warn-bg);
   --color-safe: var(--safe);
   --color-safe-deep: var(--safe-deep);
   --color-safe-bg: var(--safe-bg);

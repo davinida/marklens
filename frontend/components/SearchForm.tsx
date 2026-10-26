@@ -31,8 +31,11 @@ const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 const TOP_K_OPTIONS = [5, 10, 20] as const;
 
+export type MarkTypeOverride = "문자" | "도형" | "결합";
+
 export interface SearchDraft {
-  file: File;
+  /** API 계약 v2: image·markName·지정상품 중 하나 이상이면 제출 가능(이미지 필수 아님). */
+  file?: File | null;
   markName: string;
   topK: number;
   nameCheck?: NameCheckResult | null;
@@ -40,11 +43,13 @@ export interface SearchDraft {
   semantic?: SemanticSearchResponse | null;
   /** 지정상품 선택(프론트-6). 이름 확인·검색을 거쳐도 유지되고 폼 초기화(다른 로고 비교하기)에서만 비운다. */
   goods?: SelectedGood[] | null;
+  /** 결과 화면의 "유형 고치기"로 돌아왔을 때만 채워진다 — 다음 제출 한 번에만 쓰고 지운다. */
+  typeOverride?: MarkTypeOverride | null;
 }
 
 export interface SearchFormValue extends SearchDraft {
   turnstileToken: string;
-  /** 선택한 지정상품의 유사군 코드 합집합 — /search 연동(범위 ③, 유사군 백필 후) 입력용 파생값. */
+  /** 선택한 지정상품의 유사군 코드 합집합 — API 계약 v2 `goods_codes` 입력. */
   goodsCodes: string[];
 }
 
@@ -263,20 +268,24 @@ export default function SearchForm({
     }
   };
 
+  const trimmedName = markName.trim();
+  const hasAnyInput = Boolean(file || trimmedName || goodsCodes.length > 0);
+
   const submit = () => {
-    if (!file || !turnstileToken) return;
+    if (!hasAnyInput || !turnstileToken) return;
     const token = turnstileToken;
     setTurnstileToken(null);
     turnstileRef.current?.reset();
     onSubmit({
-      file,
-      markName: markName.trim(),
+      file: file ?? null,
+      markName: trimmedName,
       topK,
       nameCheck: namePhase.name === "result" ? namePhase.data : null,
       phonetic: phoneticPhase.name === "result" ? phoneticPhase.data : null,
       semantic: semanticPhase.name === "result" ? semanticPhase.data : null,
       goods: selectedGoods,
       goodsCodes,
+      typeOverride: initialValue?.typeOverride ?? null,
       turnstileToken: token,
     });
   };
@@ -350,9 +359,9 @@ export default function SearchForm({
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-bg text-[22px] font-bold text-blue-dark" aria-hidden>
               +
             </span>
-            <span className="block text-[15px] font-bold">로고 이미지 선택</span>
+            <span className="block text-[15px] font-bold">로고 이미지 선택 (선택)</span>
             <span id="upload-help" className="mt-1 block text-[12px] text-sub">
-              사진과 화면 캡처 지원 · PNG · JPG · WEBP · 10MB 이하
+              이미지 없이 상표명·지정상품만으로도 검색할 수 있어요 · PNG · JPG · WEBP · 10MB 이하
             </span>
           </button>
         )}
@@ -498,7 +507,7 @@ export default function SearchForm({
       <div className="rise rise-3 mt-1">
         <button
           type="submit"
-          disabled={!file || !turnstileToken || namePhase.name === "loading"}
+          disabled={!hasAnyInput || !turnstileToken || namePhase.name === "loading"}
           className="press w-full rounded-md bg-blue-dark py-4 text-[16px] font-bold text-white hover:bg-[#174ea6] disabled:bg-disabled disabled:text-disabled-text"
         >
           비슷한 상표 찾아보기

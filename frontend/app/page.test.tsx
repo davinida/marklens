@@ -25,7 +25,7 @@ const NAME_CHECK: NameCheckResult = {
   source: "KIPRIS fixture",
 };
 
-vi.mock("@/lib/api", () => ({ searchTrademark: searchMock }));
+vi.mock("@/lib/api", () => ({ searchV2: searchMock }));
 vi.mock("@/components/SearchForm", () => ({
   default: ({
     onSubmit,
@@ -36,6 +36,7 @@ vi.mock("@/components/SearchForm", () => ({
       markName: string;
       topK: number;
       nameCheck?: NameCheckResult | null;
+      goodsCodes: string[];
       turnstileToken: string;
     }) => void;
     initialValue?: { file: File } | null;
@@ -50,6 +51,7 @@ vi.mock("@/components/SearchForm", () => ({
             markName: "MarkLens",
             topK: 5,
             nameCheck: NAME_CHECK,
+            goodsCodes: [],
             turnstileToken: "fresh-token",
           })
         }
@@ -66,11 +68,11 @@ vi.mock("@/components/LoadingView", () => ({
     </button>
   ),
 }));
-vi.mock("@/components/ResultView", () => ({
-  default: ({ nameCheck }: { nameCheck?: NameCheckResult | null }) => (
+vi.mock("@/components/ResultViewV2", () => ({
+  default: ({ queryHasName }: { queryHasName: boolean }) => (
     <div>
       search result
-      {nameCheck && <span>name evidence {nameCheck.normalizedName}</span>}
+      {queryHasName && <span>name evidence BBQ</span>}
     </div>
   ),
 }));
