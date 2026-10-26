@@ -10,7 +10,9 @@ easyocr(CRAFT 검출 + ko·en 인식, CPU)를 **첫 호출 때 지연 로드**�
 - `MARKLENS_OCR_ENABLED`(기본 1): 0 이면 항상 None(easyocr 를 import 하지 않는다).
 - `MARKLENS_OCR_TIMEOUT`(기본 2.0초): 로드·인식이 이 시간을 넘으면 그 요청은 None. 작업은 전용
 스레드 1개
-  에서 이어지므로 첫 로드(모델 다운로드·초기화 수 초)가 끝난 뒤의 요청부터 OCR 결과가 나온다.
+  에서 이어지므로 첫 로드(모델 다운로드·초기화 수 초)가 끝난 뒤의 요청부터 OCR 결과가 나온다 —
+  그래서 서버 기동 때 `warm_up()` 으로 미리 적재하고, 큰 업로드는 긴 변 `OCR_MAX_SIDE` 로
+  줄여 넣는다.
 - `EASYOCR_MODULE_PATH`: 모델 디렉터리(비우면 easyocr 기본 ~/.EasyOCR). 컨테이너는 빌드 때 받아
 둔다.
 - `MARKLENS_FAKE_ML`: 가짜 OCR — 글자 박스를 찾지 않고 면적 비율만 계산한다(결정적, 모델 없음). 단색
@@ -29,7 +31,7 @@ import os
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 from dataclasses import dataclass, field
 
@@ -51,6 +53,11 @@ ENV_FAKE = "MARKLENS_FAKE_ML"
 # 하한(MIN_TEXT_CONF 0.2)보다 엄격하다.
 SUGGEST_MIN_CONF = 0.5
 SUGGEST_MAX_CHARS = 60
+# OCR 입력의 긴 변 상한(px). 서비스 업로드는 수천 px(폰 사진·로고 원본)이라 CPU CRAFT 검출이
+# 원본 그대로면 6~31초 걸려 2초 상한에 항상 걸리고 fallback 된다. 실측(Apple Silicon,
+# 2026-10-26, 합성 로고 4종): 원본 6.5~31초 → 640px 0.6~1.1초, 읽은 글자는 같다(심결 PDF 의
+# 작은 표장은 이 상한에 걸리지 않아 벤치마크와 같다).
+OCR_MAX_SIDE = 640
 
 
 @dataclass(frozen=True)
@@ -117,14 +124,23 @@ def _get_reader():
         return state.reader
 
 
+def _ocr_scale(width: int, height: int) -> float:
+    """OCR 입력 배율 — 작은 이미지는 짧은 변 160px 로 키우고(x2_split 과 같음), 그 결과의 긴 변이
+    OCR_MAX_SIDE 를 넘으면 긴 변을 OCR_MAX_SIDE 로 줄인다(시간 상한 우선)."""
+    scale = max(1.0, mt.UPSCALE_MIN_SIDE / max(1, min(width, height)))
+    if max(width, height) * scale > OCR_MAX_SIDE:
+        scale = OCR_MAX_SIDE / max(width, height)
+    return scale
+
+
 def _easyocr_boxes(image) -> list[mt.TextBox]:
-    """x2_split.EasyOcrDetector 와 같은 방식 — 작은 이미지는 짧은 변 160px 로 키워 넣고 좌표를
-    되돌린다."""
+    """x2_split.EasyOcrDetector 와 같은 방식 — 작은 이미지는 짧은 변 160px 로 키워 넣고(큰 이미지는
+    긴 변 OCR_MAX_SIDE 로 줄여) 좌표를 원본 크기로 되돌린다."""
     reader = _get_reader()
     rgb = image.convert("RGB")
     width, height = rgb.size
-    scale = max(1.0, mt.UPSCALE_MIN_SIDE / max(1, min(width, height)))
-    if scale > 1.0:
+    scale = _ocr_scale(width, height)
+    if scale != 1.0:
         from PIL import Image
 
         rgb = rgb.resize((round(width * scale), round(height * scale)), Image.LANCZOS)
@@ -166,6 +182,26 @@ def detect_fake(image) -> TypeDetection:
     """가짜 OCR(MARKLENS_FAKE_ML): 글자 박스 없음 → 면적 비율만. 내용이 있는 이미지는 도형, 없으면
     도형(0/0)."""
     return _detection(image, [], time.perf_counter())
+
+
+def warm_up() -> Future | None:
+    """기동 때 리더를 OCR 워커에서 미리 적재한다(기다리지 않음). 첫 적재는 수 초(모델이 없으면
+    다운로드 수 분)라 그대로 두면 재기동 뒤 첫 이미지 요청들이 2초 상한에 걸려 fallback 된다. 같은
+    워커라 적재 중에 온 요청은 그 뒤에 줄을 선다. 비활성·가짜 모드면 아무것도 하지 않는다. 실패해도
+    기동은 계속하고 요청 때 다시 시도한다."""
+    if not enabled() or is_fake():
+        return None
+
+    def load() -> None:
+        try:
+            # 첫 readtext 는 추론 경로 초기화로 느리다 — 작은 흰 이미지로 한 번 돌려 둔다
+            _get_reader().readtext(np.full((mt.UPSCALE_MIN_SIDE,) * 2 + (3,), 255, np.uint8))
+        except Exception as exc:
+            state.failures += 1
+            state.last_error = type(exc).__name__
+            logger.warning("OCR 미리 적재 실패(%s) — 요청 때 다시 시도", type(exc).__name__)
+
+    return _executor.submit(load)
 
 
 def detect(image, *, timeout: float | None = None) -> TypeDetection | None:
