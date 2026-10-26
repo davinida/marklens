@@ -30,6 +30,7 @@ from .core import (  # noqa: E402
     engine,
     goods,
     kipris_client,
+    ocr,
     phonetic_search,
     semantic_search,
     storage,
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI):
             raise
         goods.load_all()  # 예외를 내지 않는다 — 변환표가 없으면 state.error 만 남기고 /goods/* 503
         semantic_search.load_all()  # 예외 없음 — 모델 실패·X3 비활성이면 /semantic-search 만 503
+        ocr.warm_up()  # 기다리지 않음 — 첫 이미지 요청이 리더 적재로 2초 상한에 걸리지 않게
         yield
     finally:
         # startup 중간 실패에도 이미 열린 DB/HTTP 자원을 정리한다.

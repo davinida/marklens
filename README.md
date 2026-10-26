@@ -470,7 +470,9 @@ BFF `/api/search/v2`·결과 화면 v2 는 진행 중입니다. 백엔드·프�
 (`type_override`)만. 상표명 없는 이미지 질의에서 OCR 이 글자를 읽으면 `overall.query_type.suggested_name` 과 caveat 로 "상표명으로 넣기"를
 제안하고(이 요청에서 이름 축은 계산하지 않음), 화면은 사용자 확인 뒤 재요청합니다. OCR 은 easyocr(ko·en, CPU, 지연 로드, 실패·시간 초과면
 fallback + caveat)이고 환경변수는 `.env` 의 `MARKLENS_OCR_ENABLED`(기본 1), `MARKLENS_OCR_TIMEOUT`(기본 2.0초 — 넘으면 그 요청만 fallback),
-`EASYOCR_MODULE_PATH`(모델 디렉터리, 비우면 easyocr 기본 `~/.EasyOCR`; 컨테이너는 빌드 때 미리 받는 것이 남은 일)입니다.
+`EASYOCR_MODULE_PATH`(모델 디렉터리, 비우면 easyocr 기본 `~/.EasyOCR`; 컨테이너는 빌드 때 `/models/easyocr` 에 미리 받음)입니다.
+서버는 기동 때 리더를 백그라운드로 미리 적재하고(`ocr.warm_up`), 큰 업로드는 긴 변 640px 로 줄여 OCR 에 넣습니다 — 원본 그대로면
+1~4천 px 이미지가 6~31초 걸려 2초 상한에 항상 걸렸습니다(2026-10-26 실측, 줄여도 읽은 글자는 같음).
 
 실측(실제 엔진, Apple Silicon Mac, 2026-10-25, 모델 v1.3): 이름 "블루커피" + 카페 유사군 세트 72ms(풀 55; 첫 호출 348ms), 셋 다(+ 도형상표
 이미지) 331ms(풀 74; easyocr 첫 로드 포함 1.8초), 이미지만 112~280ms(풀 20). 유형 사전 계산(`ml/data/types.json`, 1,100건: 결합 993·도형 107)은

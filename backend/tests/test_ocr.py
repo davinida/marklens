@@ -99,3 +99,58 @@ def test_suggested_text_filters_by_confidence_and_order():
     detection = _detection(Image.new("RGB", (100, 100), "white"), boxes, time.perf_counter())
     assert detection.text == "BLU hands" and detection.boxes == 3  # 면적 하한 0.2 는 x 도 셈
 
+
+
+@pytest.mark.parametrize("size,expected", [
+    ((64, 64), (160, 160)),  # 작은 표장은 짧은 변 160px 로 키운다(x2_split 과 같음)
+    ((500, 300), (500, 300)),  # 범위 안은 그대로
+    ((1920, 892), (640, 297)),  # 큰 업로드는 긴 변 640px 로 줄인다
+    ((3024, 4032), (480, 640)),
+    ((1000, 100), (640, 64)),  # 키우면 상한을 넘는 가로형은 상한이 우선
+])
+def test_ocr_input_is_bounded_and_boxes_map_back(monkeypatch, size, expected):
+    seen = []
+
+    class Reader:
+        def readtext(self, array, detail=1):
+            seen.append((array.shape[1], array.shape[0]))
+            h, w = array.shape[:2]
+            return [([[0, 0], [w, 0], [w, h // 2], [0, h // 2]], "BLU", 0.9)]
+
+    monkeypatch.setattr(ocr, "_get_reader", lambda: Reader())
+    boxes = ocr._easyocr_boxes(Image.new("RGB", size, "white"))
+    assert seen == [expected]
+    x0, y0, x1, y1 = boxes[0].bbox  # 좌표는 원본 크기로 되돌린다(축소 입력의 1px 오차 안)
+    tolerance = size[1] / expected[1] + 1
+    assert (x0, y0) == (0, 0) and abs(x1 - size[0]) <= 1 and abs(y1 - size[1] / 2) <= tolerance
+
+
+def test_warm_up_is_noop_when_disabled_or_fake(monkeypatch):
+    monkeypatch.setattr(ocr, "_get_reader", lambda: pytest.fail("리더를 올리면 안 된다"))
+    monkeypatch.setattr(config, "OCR_ENABLED", False)
+    assert ocr.warm_up() is None
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setenv("MARKLENS_FAKE_ML", "1")
+    assert ocr.warm_up() is None
+
+
+def test_warm_up_loads_reader_in_background_and_survives_failure(monkeypatch):
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(ocr, "is_fake", lambda: False)
+    calls = []
+
+    class Reader:
+        def readtext(self, array, detail=1):
+            calls.append(array.shape)
+            return []
+
+    monkeypatch.setattr(ocr, "_get_reader", lambda: Reader())
+    ocr.warm_up().result(timeout=5)
+    assert calls == [(160, 160, 3)]
+
+    def broken():
+        raise RuntimeError("download failed")
+
+    monkeypatch.setattr(ocr, "_get_reader", broken)
+    ocr.warm_up().result(timeout=5)  # 예외를 밖으로 내지 않는다
+    assert ocr.state.failures == 1 and ocr.state.last_error == "RuntimeError"
