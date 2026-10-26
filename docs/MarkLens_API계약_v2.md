@@ -1,7 +1,7 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24 · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1~E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
-  `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway는 구현됨(2026-10-26 작업 브랜치), 화면·E2E v2 연결은 남음**. 백엔드와
+  `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway는 구현됨(2026-10-26, PR #69), 화면·E2E v2 연결은 남음**. 백엔드와
   프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현한다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
   §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
@@ -124,7 +124,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `salient.query_tokens` | string[] | 아니오 | 입력 상표명의 **요부 후보**(식별력 점수 ≥ θ 0.5, 이름 순서, NFKC·소문자 정규화). 이름이 없으면 빈 배열. 비어 있고 이름이 있으면 "요부 없음 → 전체 대비"(2000후2453) |
 | `salient.candidate_tokens` | string[] | 아니오 | 후보 상표명의 요부 후보(같은 규칙) |
 | `salient.removed[]` | `{ "token": s, "reason": s, "side": "query" \| "candidate" \| "both" }` | 아니오(빈 배열 가능) | 이 쌍의 비교에서 **실제로 뺀 토큰**(`pair_generic(query, title, goods_codes)` 결과)과 판정 사유(`judge().reasons` 를 `·` 로 이음: `1호 보통명칭`, `3호 기술적 표장:원재료(류 30,35,43)`, `4호 지명`, `5호 흔한 성`, `6호 간단 표장`, `일반어(zipf 4.6)`, `다수 등록(A=53, N=54)`). 결합 규칙 v0.2·v0.3 이 요부로 되돌린 토큰은 여기 없다(비교에 쓰였으므로) |
-| `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`). DB 보유 100/1,100 건 — 없으면 빈 배열이고 `x4` 는 null |
+| `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`). DB 보유 500/1,100 건(2026-10-26 1차 백필) — 없으면 빈 배열이고 `x4` 는 null |
 | `goods.jaccard` | 0~1 | `x4` 와 같은 조건으로 null | `axes.x4` 와 같은 값(지정상품 요약 영역용 중복 제공) |
 
 ### 2-3. `meta`
@@ -182,7 +182,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `NO_PRONUNCIATION` | 입력 상표명에 호칭이 없어(기호·한자만) 호칭 축은 비교하지 않았습니다 | `name` 은 있으나 `has_pronunciation` false |
 | `NO_MEANING` | 입력 상표명에 사전적 의미가 없어(조어) 관념 축은 비교하지 않았습니다 | `name` 은 있으나 `has_meaning` false |
 | `NO_GOODS` | 지정상품이 없어 상품 견련성은 비교하지 않았습니다 | `goods_codes` 없음 |
-| `GOODS_COVERAGE` | 비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다 | `goods_codes` 있음(DB 유사군 백필 전; 수치는 `index_size` 기준으로 서버가 채움) |
+| `GOODS_COVERAGE` | 비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다 | `goods_codes` 있음(수치는 유사군 보유 수·`index_size` 로 서버가 채움 — 2026-10-26 1차 백필 뒤 500/1,100. 아래 §3-1 예시는 백필 전 값) |
 | `GOODS_ONLY` | 지정상품만으로는 유사군이 겹치는 상표를 나열할 뿐 표장 유사는 비교하지 않았습니다 | 지정상품만 입력 |
 | `OCR_FALLBACK` | 이미지에서 글자를 읽지 못해 유형을 {도형\|문자}(으)로 두었습니다. 아니면 유형을 고쳐 주세요 | `image` 있고 `source = fallback` |
 | `NO_CANDIDATES` | 비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다 | `candidates` 0건 |
@@ -610,4 +610,4 @@ OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아�
 `visual_status`·`applicant`·`nice_classes` **포함** ③ v1 엔드포인트는 최종 발표(2026-12-20)까지 유지 뒤 별도 PR 로 제거(§5-5) ④ 접미
 분리(E-3)는 **고시 단일 명칭만**(2음절 이상 접미·2음절 이상 앞부분, 1음절 앞부분은 오분리가 많아 제외 — `Distinctiveness.
 split_goods_suffix`). 엔진 몫 E-1~E-6 은 `feat/engine-multiaxis` 에 구현됐고(`backend/src/core/multi_search.py`·`ocr.py`,
-`ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`). B-1~B-5의 API·문서용 Pydantic 스키마·BFF·zod·gateway는 2026-10-26 작업 브랜치에 구현했다. F-1~F-5 화면과 E2E v2 연결은 남아 있으며, 실제 모델·운영 배포의 검증 완료를 뜻하지 않는다.
+`ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`). B-1~B-5의 API·문서용 Pydantic 스키마·BFF·zod·gateway는 2026-10-26 구현했다(PR #69 — 실제 모델로 BFF까지 §2 스키마·등급 규칙·로짓 검산 확인). F-1~F-5 화면과 E2E v2 연결은 남아 있고, 운영 배포 검증은 별도다.

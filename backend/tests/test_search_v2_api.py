@@ -285,3 +285,43 @@ def test_document_examples_match_response_schema():
     assert len(examples) >= 2
     for example in examples:
         SearchV2Response.model_validate(json.loads(example))
+
+
+@pytest.fixture(scope="module")
+def live(fake_ml_mode):
+    """실제 앱(lifespan·인증·한도·엔진) + FAKE_ML 픽스처 9건 — 엔진을 바꿔 끼우지 않는다."""
+    if not fake_ml_mode:
+        pytest.skip("FAKE_ML 픽스처(더미 9건) 전용 테스트")
+    from backend.src.main import app
+
+    limiter.reset()
+    with TestClient(app) as client:
+        yield client
+    limiter.reset()
+
+
+@pytest.mark.parametrize("fields,image", [
+    ({"name": "더미상표1 커피", "goods_codes": "S0101"}, False),
+    ({}, True),
+    ({"name": "더미상표1", "goods_codes": "s0101", "type_override": "결합"}, True),
+])
+def test_live_engine_response_matches_schema(live, fields, image):
+    from backend.src.schemas.search_v2 import SearchV2Response
+
+    files = {"image": ("q.png", png(), "image/png")} if image else None
+    response = live.post("/search/v2?top_k=3", data=fields, files=files,
+                         headers={"X-Request-ID": "live-v2"})
+    assert response.status_code == 200, response.text
+    assert response.headers["X-Request-ID"] == "live-v2"
+    body = response.json()
+    SearchV2Response.model_validate(body)
+    assert body["top_k_requested"] == 3 and body["top_k_returned"] == len(body["candidates"])
+    assert body["candidates"], "픽스처 9건이면 후보가 있어야 한다"
+    assert (body["overall"]["visual_status"] is not None) == image
+
+
+def test_live_engine_requires_api_key_when_configured(live, monkeypatch):
+    monkeypatch.setattr(config, "API_KEY", "secret")
+    assert live.post("/search/v2", data={"name": "x"}).status_code == 401
+    ok = live.post("/search/v2", data={"name": "더미상표1"}, headers={"X-API-Key": "secret"})
+    assert ok.status_code == 200
