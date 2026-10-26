@@ -105,6 +105,142 @@ export const SearchResponseSchema = z
   })
   .passthrough();
 
+// ---- 통합 검색 v2: docs/MarkLens_API계약_v2.md §2 ----
+const UnitScore = z.number().finite().min(0).max(1);
+const NullableUnitScore = UnitScore.nullable();
+const NonnegativeInt = z.number().int().nonnegative();
+
+export const SearchV2GradeSchema = z.enum(["안전", "주의", "검토 권장", "위험"]);
+export const SearchV2QueryTypeSchema = z
+  .object({
+    type: z.enum(["문자", "도형", "결합-문자요부", "결합-도형요부"]),
+    source: z.enum(["ocr", "fallback", "user"]),
+    detail: z
+      .object({ text_ratio: UnitScore, fig_ratio: UnitScore })
+      .passthrough()
+      .nullable(),
+    suggested_name: z.string().nullable(),
+  })
+  .passthrough();
+
+export const SearchV2CandidateSchema = z
+  .object({
+    id: z.string().regex(/^[0-9]{13}$/),
+    title: z.string().nullable(),
+    image_url: z.string().nullable(),
+    type: z.enum(["문자", "도형", "결합"]).nullable(),
+    applicant: z.string().nullable(),
+    nice_classes: z.array(z.number().int().min(1).max(45)),
+    axes: z
+      .object({
+        x1: NullableUnitScore,
+        x2_text: NullableUnitScore,
+        x2_img: NullableUnitScore,
+        x3: NullableUnitScore,
+        x4: NullableUnitScore,
+      })
+      .passthrough(),
+    risk: z
+      .object({
+        prob: UnitScore,
+        grade: SearchV2GradeSchema,
+        // Logit contributions and missing-pattern offsets can be negative.
+        contributions: z
+          .object({
+            X1: z.number().finite(),
+            X2: z.number().finite(),
+            X3: z.number().finite(),
+            X4: z.number().finite(),
+            요부: z.number().finite(),
+          })
+          .passthrough(),
+        missing_adjustment: z.number().finite(),
+        figure_caveat: z.boolean(),
+        rule_triggers: z.array(z.string()),
+      })
+      .passthrough(),
+    salient: z
+      .object({
+        query_tokens: z.array(z.string()),
+        candidate_tokens: z.array(z.string()),
+        removed: z.array(
+          z
+            .object({
+              token: z.string(),
+              reason: z.string(),
+              side: z.enum(["query", "candidate", "both"]),
+            })
+            .passthrough(),
+        ),
+      })
+      .passthrough(),
+    goods: z
+      .object({ codes: z.array(z.string()), jaccard: NullableUnitScore })
+      .passthrough(),
+  })
+  .passthrough();
+
+export const SearchV2ResponseSchema = z
+  .object({
+    api_version: z.literal("2026-10-24"),
+    research_beta: z.literal(true),
+    legal_conclusion: z.literal(false),
+    overall: z
+      .object({
+        grade: SearchV2GradeSchema.nullable(),
+        prob: NullableUnitScore,
+        caveats: z.array(z.string()),
+        query_type: SearchV2QueryTypeSchema,
+        visual_status: StatusCodeSchema.nullable(),
+      })
+      .passthrough(),
+    candidates: z.array(SearchV2CandidateSchema),
+    meta: z
+      .object({
+        model_version: z.string(),
+        grade_precision: UnitScore,
+        thresholds: z
+          .object({
+            grade: z
+              .object({ 주의: UnitScore, "검토 권장": UnitScore, 위험: UnitScore })
+              .passthrough(),
+            standalone: z
+              .object({
+                x1: NullableUnitScore,
+                x2_text: NullableUnitScore,
+                x2_img: NullableUnitScore,
+                x3: NullableUnitScore,
+                x4: NullableUnitScore,
+              })
+              .passthrough(),
+            figure: UnitScore,
+          })
+          .passthrough(),
+        pool: z
+          .object({
+            image: NonnegativeInt,
+            phonetic: NonnegativeInt,
+            spelling: NonnegativeInt,
+            semantic: NonnegativeInt,
+            goods: NonnegativeInt,
+            total: NonnegativeInt,
+          })
+          .passthrough(),
+        elapsed_ms: NonnegativeInt,
+      })
+      .passthrough(),
+    dataset_info: DatasetInfoSchema,
+    index_size: NonnegativeInt,
+    top_k_requested: z.number().int().min(1).max(20),
+    top_k_returned: NonnegativeInt.max(20),
+  })
+  .passthrough();
+
+export type SearchV2Response = z.infer<typeof SearchV2ResponseSchema>;
+export type SearchV2Candidate = z.infer<typeof SearchV2CandidateSchema>;
+export type SearchV2Grade = z.infer<typeof SearchV2GradeSchema>;
+export type SearchV2QueryType = z.infer<typeof SearchV2QueryTypeSchema>;
+
 const NameCheckCandidateInputSchema = z.union([
   z.string(),
   z.record(z.string(), z.unknown()),

@@ -105,6 +105,28 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  backend-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build backend image with bundled OCR models
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: deploy/backend.Dockerfile
+          load: true
+          tags: marklens-backend:ci
+          cache-from: type=gha,scope=marklens-backend
+          cache-to: type=gha,mode=max,scope=marklens-backend
+      - name: Verify offline OCR and canonical assets as non-root
+        run: >-
+          docker run --rm --network none --user 10001:10001
+          -e HF_HUB_OFFLINE=1 -e TRANSFORMERS_OFFLINE=1
+          --entrypoint python marklens-backend:ci
+          /app/scripts/check_backend_image.py
+
   deployment-config:
     runs-on: ubuntu-latest
     timeout-minutes: 5

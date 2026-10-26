@@ -1,0 +1,97 @@
+{
+  "api_version": "2026-10-24",
+  "research_beta": true,
+  "legal_conclusion": false,
+  "overall": {
+    "grade": "검토 권장",
+    "prob": 0.06,
+    "caveats": [
+      "도형 유사는 검증 데이터가 적어 참고용",
+      "상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다",
+      "지정상품이 없어 상품 견련성은 비교하지 않았습니다"
+    ],
+    "query_type": {
+      "type": "도형", "source": "ocr", "detail": { "text_ratio": 0.01, "fig_ratio": 0.62 }, "suggested_name": null
+    },
+    "visual_status": "STRONG_MATCH"
+  },
+  "candidates": [
+    {
+      "id": "4020190004444",
+      "title": null,
+      "image_url": "/api/images/4020190004444.png",
+      "type": "도형",
+      "applicant": "예시 출원인 5",
+      "nice_classes": [25],
+      "axes": { "x1": null, "x2_text": null, "x2_img": 0.93, "x3": null, "x4": null },
+      "risk": {
+        "prob": 0.06,
+        "grade": "검토 권장",
+        "contributions": { "X1": 0.0, "X2": 1.059, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": -0.339,
+        "figure_caveat": true,
+        "rule_triggers": ["figure_x2_img"]
+      },
+      "salient": { "query_tokens": [], "candidate_tokens": [], "removed": [] },
+      "goods": { "codes": [], "jaccard": null }
+    },
+    {
+      "id": "4020210005555",
+      "title": "뫼비우스 MOBIUS",
+      "image_url": "/api/images/4020210005555.png",
+      "type": "결합",
+      "applicant": "예시 출원인 6",
+      "nice_classes": [9, 42],
+      "axes": { "x1": null, "x2_text": null, "x2_img": 0.81, "x3": null, "x4": null },
+      "risk": {
+        "prob": 0.053,
+        "grade": "안전",
+        "contributions": { "X1": 0.0, "X2": 0.922, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": -0.339,
+        "figure_caveat": true,
+        "rule_triggers": []
+      },
+      "salient": { "query_tokens": [], "candidate_tokens": ["뫼비우스", "mobius"], "removed": [] },
+      "goods": { "codes": ["G390802"], "jaccard": null }
+    },
+    {
+      "id": "4020220006666",
+      "title": "INFINITY",
+      "image_url": null,
+      "type": "결합",
+      "applicant": "예시 출원인 7",
+      "nice_classes": [35],
+      "axes": { "x1": null, "x2_text": null, "x2_img": 0.62, "x3": null, "x4": null },
+      "risk": {
+        "prob": 0.043,
+        "grade": "안전",
+        "contributions": { "X1": 0.0, "X2": 0.706, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": -0.339,
+        "figure_caveat": true,
+        "rule_triggers": []
+      },
+      "salient": { "query_tokens": [], "candidate_tokens": ["infinity"], "removed": [] },
+      "goods": { "codes": [], "jaccard": null }
+    }
+  ],
+  "meta": {
+    "model_version": "risk_model_v1.3",
+    "grade_precision": 0.7039,
+    "thresholds": {
+      "grade": { "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 },
+      "standalone": { "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null },
+      "figure": 0.9
+    },
+    "pool": { "image": 20, "phonetic": 0, "spelling": 0, "semantic": 0, "goods": 0, "total": 20 },
+    "elapsed_ms": 410
+  },
+  "dataset_info": {
+    "총_상표수": 1100,
+    "출원일자_범위": "2021-01-05 ~ 2026-08-20",
+    "데이터_기준": "KIPRIS Plus 등록상표, generation 20260827T035002Z-25f84a6eeb26",
+    "생성일자": "2026-08-27"
+  },
+  "index_size": 1100,
+  "top_k_requested": 3,
+  "top_k_returned": 3
+}

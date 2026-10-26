@@ -6,7 +6,8 @@ ARG TORCHVISION_VERSION=0.28.0
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    HF_HOME=/models/huggingface
+    HF_HOME=/models/huggingface \
+    EASYOCR_MODULE_PATH=/models/easyocr
 
 WORKDIR /app
 
@@ -26,8 +27,15 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
        -c /tmp/constraints.txt \
        -r /tmp/ml-requirements.txt -r /tmp/backend-requirements.txt
 
+# Runtime OCR uses this explicit directory, rather than EasyOCR's default /model
+# subdirectory. Readers verify the upstream checksums while downloading all
+# detector/recognizer weights during the build, before the network is removed.
+RUN python -c "import os; import easyocr; model_dir = os.environ['EASYOCR_MODULE_PATH']; [easyocr.Reader(languages, gpu=False, detect_network='craft', recog_network=recognizer, model_storage_directory=model_dir, verbose=False) for languages, recognizer in [(['ko', 'en'], 'korean_g2'), (['en'], 'english_g2')]]"
+
 COPY ml/src /app/ml/src
 COPY backend /app/backend
+COPY shared /app/shared
+COPY scripts/check_backend_image.py /app/scripts/check_backend_image.py
 
 RUN useradd --create-home --uid 10001 marklens \
     && mkdir -p /data /state /models/huggingface \

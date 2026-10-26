@@ -1,0 +1,140 @@
+{
+  "api_version": "2026-10-24",
+  "research_beta": true,
+  "legal_conclusion": false,
+  "overall": {
+    "grade": "위험",
+    "prob": 0.604,
+    "caveats": [
+      "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
+      "비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다"
+    ],
+    "query_type": { "type": "문자", "source": "fallback", "detail": null, "suggested_name": null },
+    "visual_status": null
+  },
+  "candidates": [
+    {
+      "id": "4020230001001",
+      "title": "BLUE CAFE 블루카페",
+      "image_url": "/api/images/4020230001001.png",
+      "type": "결합",
+      "applicant": "예시 출원인 1",
+      "nice_classes": [43],
+      "axes": { "x1": 0.891, "x2_text": 0.556, "x2_img": null, "x3": 0.548, "x4": 0.25 },
+      "risk": {
+        "prob": 0.604,
+        "grade": "위험",
+        "contributions": { "X1": 3.162, "X2": 0.475, "X3": 0.0, "X4": 0.24, "요부": 0.0 },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": []
+      },
+      "salient": {
+        "query_tokens": ["블루"],
+        "candidate_tokens": ["블루카페"],
+        "removed": [
+          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "query" },
+          { "token": "blue", "reason": "일반어(zipf 5.1)·다수 등록(A=53, N=54)", "side": "candidate" },
+          { "token": "cafe", "reason": "3호 기술적 표장:용도(류 35,43)", "side": "candidate" }
+        ]
+      },
+      "goods": { "codes": ["S120602"], "jaccard": 0.25 }
+    },
+    {
+      "id": "4020220000777",
+      "title": "블루보틀 BLUE BOTTLE",
+      "image_url": "/api/images/4020220000777.png",
+      "type": "결합",
+      "applicant": "예시 출원인 2",
+      "nice_classes": [30, 43],
+      "axes": { "x1": 0.673, "x2_text": 0.5, "x2_img": null, "x3": 0.52, "x4": 0.75 },
+      "risk": {
+        "prob": 0.52,
+        "grade": "검토 권장",
+        "contributions": { "X1": 2.388, "X2": 0.427, "X3": 0.0, "X4": 0.719, "요부": 0.0 },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": []
+      },
+      "salient": {
+        "query_tokens": ["블루"],
+        "candidate_tokens": ["블루보틀", "bottle"],
+        "removed": [
+          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "query" },
+          { "token": "blue", "reason": "일반어(zipf 5.1)·다수 등록(A=53, N=54)", "side": "candidate" }
+        ]
+      },
+      "goods": { "codes": ["G0301", "G0502", "S120602"], "jaccard": 0.75 }
+    },
+    {
+      "id": "4020210000333",
+      "title": "블루밍 BLOOMING",
+      "image_url": null,
+      "type": "결합",
+      "applicant": "예시 출원인 3",
+      "nice_classes": [3],
+      "axes": { "x1": 0.778, "x2_text": 0.625, "x2_img": null, "x3": 0.539, "x4": 0.0 },
+      "risk": {
+        "prob": 0.46,
+        "grade": "검토 권장",
+        "contributions": { "X1": 2.761, "X2": 0.534, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": []
+      },
+      "salient": {
+        "query_tokens": ["블루"],
+        "candidate_tokens": ["블루밍", "blooming"],
+        "removed": [
+          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "query" }
+        ]
+      },
+      "goods": { "codes": ["G1201"], "jaccard": 0.0 }
+    },
+    {
+      "id": "4020200002222",
+      "title": "레드커피",
+      "image_url": "/api/images/4020200002222.png",
+      "type": "결합",
+      "applicant": "예시 출원인 4",
+      "nice_classes": [30, 43],
+      "axes": { "x1": 0.473, "x2_text": 0.0, "x2_img": null, "x3": 0.0, "x4": 0.5 },
+      "risk": {
+        "prob": 0.215,
+        "grade": "검토 권장",
+        "contributions": { "X1": 1.679, "X2": 0.0, "X3": 0.0, "X4": 0.479, "요부": 0.0 },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": []
+      },
+      "salient": {
+        "query_tokens": ["블루"],
+        "candidate_tokens": ["레드"],
+        "removed": [
+          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "both" }
+        ]
+      },
+      "goods": { "codes": ["G0502", "S120602"], "jaccard": 0.5 }
+    }
+  ],
+  "meta": {
+    "model_version": "risk_model_v1.3",
+    "grade_precision": 0.7039,
+    "thresholds": {
+      "grade": { "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 },
+      "standalone": { "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null },
+      "figure": 0.9
+    },
+    "pool": { "image": 0, "phonetic": 20, "spelling": 20, "semantic": 5, "goods": 20, "total": 41 },
+    "elapsed_ms": 180
+  },
+  "dataset_info": {
+    "총_상표수": 1100,
+    "출원일자_범위": "2021-01-05 ~ 2026-08-20",
+    "데이터_기준": "KIPRIS Plus 등록상표, generation 20260827T035002Z-25f84a6eeb26",
+    "생성일자": "2026-08-27"
+  },
+  "index_size": 1100,
+  "top_k_requested": 4,
+  "top_k_returned": 4
+}
