@@ -1,7 +1,7 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24 · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1~E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
-  `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), 엔드포인트·BFF·zod·화면은 구현 전**. 백엔드와
+  `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway는 구현됨(2026-10-26 작업 브랜치), 화면·E2E v2 연결은 남음**. 백엔드와
   프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현한다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
   §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
@@ -610,4 +610,4 @@ OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아�
 `visual_status`·`applicant`·`nice_classes` **포함** ③ v1 엔드포인트는 최종 발표(2026-12-20)까지 유지 뒤 별도 PR 로 제거(§5-5) ④ 접미
 분리(E-3)는 **고시 단일 명칭만**(2음절 이상 접미·2음절 이상 앞부분, 1음절 앞부분은 오분리가 많아 제외 — `Distinctiveness.
 split_goods_suffix`). 엔진 몫 E-1~E-6 은 `feat/engine-multiaxis` 에 구현됐고(`backend/src/core/multi_search.py`·`ocr.py`,
-`ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`), B-1~B-5·F-1~F-5 가 남았다.
+`ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`). B-1~B-5의 API·문서용 Pydantic 스키마·BFF·zod·gateway는 2026-10-26 작업 브랜치에 구현했다. F-1~F-5 화면과 E2E v2 연결은 남아 있으며, 실제 모델·운영 배포의 검증 완료를 뜻하지 않는다.

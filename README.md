@@ -6,7 +6,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 식별력 필터를 축 함수로 구현하고, 정답 데이터(심결례 라벨, 2026-10-11 마감)로 통합 모델을 v1.3 까지
 학습했습니다(2026-10-25, "입력을 더 주면 위험도가 내려가지 않음" 성질 확보). 지금은 **서비스 연결 단계**입니다:
 세 입력(이미지·상표명·지정상품) 통합 검색의 엔진(`engine.multi_search`, API 계약 v2)과 모델은 완료했고,
-`POST /search/v2` 엔드포인트·결과 화면 v2·E2E v2·유사군 백필이 진행 중입니다(아래 "서비스 — 세 입력 통합 검색"·"다음 단계").
+`POST /search/v2` API·BFF·zod·gateway는 작업 브랜치에 구현했고(2026-10-26), 결과 화면 v2·E2E v2 연결과 유사군 백필은 남아 있습니다(아래 "서비스 — 세 입력 통합 검색"·"다음 단계"). 실제 모델·운영 배포의 검증 완료를 뜻하지 않습니다.
 
 결과는 참고 정보입니다. 상표 등록 가능성, 침해 여부, 법적 위험 확률 또는 검색
 범위 밖 권리의 부재를 판정하지 않습니다.
@@ -23,7 +23,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 기능 | 상태 | 비고 |
 |---|---|---|
 | 이미지 검색(v1 `POST /search`) | 구현 | PNG/JPEG/WebP, 최대 10 MiB, 수동 크롭 지원. 최종 발표(2026-12-20)까지 유지 뒤 v2 로 대체(계약 v2 §5-5) |
-| 세 입력 통합 검색(`POST /search/v2`, API 계약 v2) | **엔진·모델 완료, 엔드포인트·화면 진행 중** | 이미지·상표명·지정상품 중 하나 이상 → 후보 풀 → 쌍별 4축 → 통합 모델 v1.3 → 등급·위험도·근거 축·요부·caveat(`engine.multi_search`, PR #65·#66·#67). 엔드포인트·BFF·zod(B-1~B-5)와 결과 화면 v2(F-1~F-5)는 진행 중 — 아래 "서비스 — 세 입력 통합 검색" |
+| 세 입력 통합 검색(`POST /search/v2`, API 계약 v2) | **API·BFF·zod·gateway 구현, 화면·E2E 연결 남음** | 이미지·상표명·지정상품 중 하나 이상 → 후보 풀 → 쌍별 4축 → 통합 모델 v1.3 → 등급·위험도·근거 축·요부·caveat(`engine.multi_search`, PR #65·#66·#67). B-1~B-5는 작업 브랜치 구현(2026-10-26), 결과 화면 v2(F-1~F-5)와 E2E v2 연결은 남음 |
 | 시각 후보 상태 | 구현 | 단조적 4개 상태, 교정 전 임시 임계값 |
 | 상표명 완전일치 확인 | 구현 | KIPRIS 실시간 조회, 후보 상세·상태 분포·완전성 표시. **검색과 별개 기능**(검색 점수에 반영되지 않음) |
 | KIPRIS 수집 및 인덱스 빌드 | 구현 | 체크포인트, authoritative key, manifest, 원자적 게시 |
@@ -79,15 +79,15 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 백엔드-5 수집 스크립트 | 현수 | 완료 | `backend/scripts/collect_pipeline.py` | 출원인명 검색 |
 | 백엔드-6 데이터 확장 | 현수 | 완료 | `docs/MarkLens_데이터확장_실행계획_2026-08.md` | 현재 1,100건 세대(2026-08-27) |
 | 백엔드-7 상표명 실시간 확인 | 현수 | 완료 | `backend/src/api/namecheck.py` | |
-| 백엔드-8 다축 오케스트레이션 | — | **진행 중** | 엔진 `backend/src/core/multi_search.py`(완료) | 다축 결합 자체는 엔진이 끝냈고(후보 풀 → 쌍별 4축 → 통합 모델 v1.3 → 규칙), 남은 것은 `POST /search/v2` 엔드포인트·pydantic 응답 모델·한도 버킷·로깅(계약 v2 §6 B-1·B-3~B-5) |
-| 백엔드-9 3입력·4축 응답 | — | **진행 중** | — | BFF `frontend/app/api/search/v2/route.ts`·zod 계약(B-2)과 엔드포인트가 엔진 결과(계약 v2 §2 `overall`·`candidates`·`meta`)를 그대로 내보내는 일 |
+| 백엔드-8 다축 오케스트레이션 | — | **작업 브랜치 구현** | `backend/src/api/search.py`·`backend/src/schemas/search_v2.py` | `POST /search/v2`·문서용 Pydantic 스키마·공유 한도·로깅 구현(2026-10-26). 화면·실제 모델 통합 검증은 별도 |
+| 백엔드-9 3입력·4축 응답 | — | **작업 브랜치 구현** | `frontend/app/api/search/v2/route.ts`·`frontend/lib/contracts.ts` | API 엔진 결과 그대로 반환·BFF 상태/본문 전달·zod 계약·gateway 연결 구현(2026-10-26). 화면·E2E v2 연결은 남음 |
 | 결과 화면 v2(F-1~F-5) | — | **진행 중** | — | 3층 결과 화면에 등급·위험도·근거 축·요부·caveat·질의 유형 고치기·"상표명으로 넣기"(제안 이름 → 확인 → 재요청) — 화면 문구 규약은 계약 v2 §4 |
 | DB 유사군 백필 | — | **진행 중** | — | 유사군 보유 100/1,100건. KIPRIS 월 예산(1,000회)과 11월 심결례 수집을 조율해 채운다 — 백필 뒤 후보 대부분에 `x4` 가 붙음 |
 | E2E v2(세 입력 흐름) | — | 예정 | — | 현재 Playwright 15건은 v1 화면(스펙 5 × 뷰포트 3). 세 입력·결과 화면 v2 가 들어오면 스펙 추가 |
 
 네 가지를 분명히 해 둡니다.
 
-- v1 검색 입력은 **이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음). 세 입력은 `POST /search/v2`(API 계약 v2) — 엔진·모델은 완료, 엔드포인트·화면은 진행 중입니다.
+- v1 검색 입력은 **이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음). 세 입력은 `POST /search/v2`(API 계약 v2) — API·BFF·zod·gateway는 작업 브랜치 구현, 화면·E2E 연결은 남아 있습니다.
 - 상표명 확인(`/name-check`)은 검색과 분리된 별도 기능이며 검색 점수에 영향을 주지 않습니다.
 - X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. v1 검색 점수·등급에는 반영되지 않고, v2 엔진에서 `x1` 축으로 위험도에 들어갑니다.
 - X3는 같은 방식으로 `POST /semantic-search`에 연결되어 같은 패널에 관념 유사 후보(최대 5건, 하한 0.55)를 보여 줍니다. 기동 시 DB 상표명 중 관념이 있는 515건을 임베딩해 캐시하며 `MARKLENS_X3_ENABLED=0`이면 이 엔드포인트만 503입니다.
@@ -97,8 +97,8 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 모델 단계(정답 데이터 → 축별 벤치마크 → 식별력 → 통합 모델 v1.2.1 → v1.3 결측 편향 제거)와 엔진 연결(계약 v2 E-1~E-6,
 유형 규칙)은 끝났습니다. 남은 일은 두 갈래입니다.
 
-1. **서비스 연결 잔여** — `POST /search/v2` 엔드포인트·pydantic 응답 모델·BFF `/api/search/v2`·zod 계약·한도 버킷·로깅
-   (계약 v2 §6 B-1~B-5, 진행 중), 결과 화면 v2(F-1~F-5: 등급·위험도·근거 축·요부·caveat·질의 유형 고치기·"상표명으로 넣기"
+1. **서비스 연결 잔여** — API·문서용 Pydantic 스키마·BFF `/api/search/v2`·zod·공유 한도·로깅·gateway는 작업 브랜치에 구현했습니다
+   (2026-10-26, 계약 v2 §6 B-1~B-5). 남은 일은 결과 화면 v2(F-1~F-5: 등급·위험도·근거 축·요부·caveat·질의 유형 고치기·"상표명으로 넣기"
    → 확인 → 재요청, 진행 중), E2E v2(세 입력 흐름, 예정), DB 유사군 백필(100/1,100건, KIPRIS 예산 조율, 진행 중 — 채워지면
    후보 대부분에 `x4` 가 붙고 지정상품 입력(프론트-6 ③)이 결과를 바꿉니다). v1 엔드포인트와 BFF 는 최종 발표(2026-12-20)까지
    유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은
@@ -418,7 +418,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `GET /api/turnstile-config` | 위젯 사이트 키·dev bypass 설정 전달 | — |
 | `GET /health` | 내부 FastAPI 엔진·인덱스 상태 | 없음 |
 | `POST /search` | 내부 이미지 검색 API (`file`, `top_k`) — v1, 최종 발표까지 유지 | 10/minute (`MARKLENS_SEARCH_RATELIMIT`) |
-| `POST /search/v2` | **진행 중** — 세 입력 통합 검색(엔진 `engine.multi_search` 완료, 엔드포인트는 계약 v2 §6 B-1). 응답은 계약 v2 §2 | v1 `/search` 와 같은 설정값·같은 버킷 |
+| `POST /search/v2` | **작업 브랜치 구현(2026-10-26)** — 세 입력 통합 검색 API·BFF·zod·gateway. 응답은 계약 v2 §2. 화면·E2E 연결 남음 | v1 `/search` 와 같은 설정값·같은 버킷 |
 | `POST /name-check` | 내부 명칭 확인 API(KIPRIS 실시간) | 30/minute (`MARKLENS_NAMECHECK_RATELIMIT`) + KIPRIS 월 예산 |
 | `POST /phonetic-search` | 내부 X1 호칭 유사도 검색 (`name`, `top_k` ≤ 20). 로컬 DB 계산, KIPRIS 무관 | 30/minute (`MARKLENS_PHONETIC_RATELIMIT`) |
 | `POST /semantic-search` | 내부 X3 관념 유사도 검색 (`name`, `top_k` ≤ 5). 기동 시 임베딩 캐시, `MARKLENS_X3_ENABLED=0`이면 503 | 30/minute (`MARKLENS_X3_RATELIMIT`) |
@@ -576,7 +576,7 @@ has_goods(set())                                                               #
 심결례 정답 데이터(2026-10-11 기준 351쌍 + 쉬운 음성 700)로 학습했고(`ml/scripts/train_risk_model.py`),
 런타임 `ml/src/model/risk_model.py` 의 `risk_score(features)` 가 계수 JSON(`shared/model/risk_model_v1.json`)을
 읽어 위험도·등급·근거 축 기여도를 냅니다. 모델 단계는 v1.2.1 로 닫았고 2026-10-25 v1.3 에서 결측 편향을 제거했으며(설계 §7-3), 엔진
-`multi_search` 가 적재합니다(`POST /search/v2`·화면은 "다음 단계"). 구조는 판례를 따릅니다.
+`multi_search` 가 적재합니다(`POST /search/v2` API는 작업 브랜치 구현, 화면·E2E 연결은 "다음 단계"). 구조는 판례를 따릅니다.
 
 | 상황 | 원칙 | 근거 |
 |---|---|---|
