@@ -45,6 +45,12 @@ export interface SearchDraft {
   goods?: SelectedGood[] | null;
   /** 결과 화면의 "유형 고치기"로 돌아왔을 때만 채워진다 — 다음 제출 한 번에만 쓰고 지운다. */
   typeOverride?: MarkTypeOverride | null;
+  /**
+   * "상표명으로 넣기"(§4-5)로 막 채워진 이름인지 — OCR이 글자를 잘못 읽을 수 있어
+   * (예: '블루'를 '불루'로) 사용자가 바로 알아채고 고칠 수 있게 입력칸에 포커스·전체
+   * 선택하고 안내 문구를 보여준다. 사용자가 직접 입력칸을 고치는 순간 꺼진다.
+   */
+  nameFromSuggestion?: boolean;
 }
 
 export interface SearchFormValue extends SearchDraft {
@@ -74,6 +80,9 @@ export default function SearchForm({
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [markName, setMarkName] = useState(initialValue?.markName ?? "");
+  const [nameFromSuggestion, setNameFromSuggestion] = useState(
+    Boolean(initialValue?.nameFromSuggestion),
+  );
   const [topK, setTopK] = useState<number>(initialValue?.topK ?? 5);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [namePhase, setNamePhase] = useState<NamePhase>(() =>
@@ -96,6 +105,7 @@ export default function SearchForm({
   );
   const goodsCodes = useMemo(() => goodsCodeUnion(selectedGoods), [selectedGoods]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const nameAbortRef = useRef<AbortController | null>(null);
   const nameGenerationRef = useRef(0);
@@ -146,6 +156,13 @@ export default function SearchForm({
     },
     [],
   );
+
+  // "상표명으로 넣기"로 막 돌아왔으면 이름칸에 포커스·전체 선택 — OCR 오독('블루'→'불루' 등)을
+  // 사용자가 바로 알아채고 고칠 수 있게. 한 번만 — 사용자가 고치기 시작하면 onChange 가 끈다.
+  useEffect(() => {
+    if (nameFromSuggestion) nameInputRef.current?.select();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
+  }, []);
 
   const takeFile = (next: File | undefined) => {
     if (!next) return;
@@ -395,12 +412,13 @@ export default function SearchForm({
         <div className="mt-2 flex items-end gap-2">
           {/* Safari 연락처 자동완성 아이콘 방지: autoComplete=off, id 에 'name' 을 쓰지 않는다 */}
           <input
+            ref={nameInputRef}
             id="mark-text"
             type="text"
             autoComplete="off"
             value={markName}
             maxLength={100}
-            aria-describedby="name-help"
+            aria-describedby={nameFromSuggestion ? "name-help name-suggestion-help" : "name-help"}
             onChange={(event) => {
               nameGenerationRef.current += 1;
               nameAbortRef.current?.abort();
@@ -410,12 +428,15 @@ export default function SearchForm({
               semanticAbortRef.current?.abort();
               pendingAxisRef.current = null;
               setMarkName(event.target.value);
+              setNameFromSuggestion(false);
               setNamePhase({ name: "idle" });
               setPhoneticPhase({ name: "idle" });
               setSemanticPhase({ name: "idle" });
             }}
             placeholder="예: 몬테로사 MONTEROSA"
-            className="min-w-0 flex-1 border-b-2 border-line pb-2 text-[17px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark"
+            className={`min-w-0 flex-1 border-b-2 pb-2 text-[17px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark ${
+              nameFromSuggestion ? "border-review" : "border-line"
+            }`}
           />
           <button
             type="button"
@@ -429,6 +450,15 @@ export default function SearchForm({
         <p id="name-help" className="mt-2 text-[11px] leading-relaxed text-sub">
           이미지 유사도와 별도로 동일·유사 명칭의 검색 범위를 확인해요.
         </p>
+        {nameFromSuggestion && (
+          <p
+            id="name-suggestion-help"
+            role="status"
+            className="mt-1.5 text-[11px] font-semibold text-review-deep"
+          >
+            이미지에서 읽은 글자예요 — 틀린 부분이 있으면 고쳐 주세요.
+          </p>
+        )}
         {namePhase.name === "result" && (
           <div className="mt-4 border-t border-line pt-4">
             <NameCheckPanel result={namePhase.data} live />

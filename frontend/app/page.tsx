@@ -57,6 +57,8 @@ export default function Home() {
       goods: value.goods ?? null,
       // 이번 제출 한 번에만 쓰는 값이라 draft 에는 남기지 않는다("유형 고치기" 재진입과 구분).
       typeOverride: null,
+      // 사용자가 직접 제출한 이름이니 "방금 OCR이 채운 값" 힌트는 끈다.
+      nameFromSuggestion: false,
     });
     setPhase({ name: "loading" });
 
@@ -109,7 +111,9 @@ export default function Home() {
   const useSuggestedName = useCallback(
     (name: string) => {
       cancelCurrentRequest();
-      setDraft((current) => (current ? { ...current, markName: name } : current));
+      setDraft((current) =>
+        current ? { ...current, markName: name, nameFromSuggestion: true } : current,
+      );
       setPhase({ name: "idle" });
     },
     [cancelCurrentRequest],

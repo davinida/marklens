@@ -92,6 +92,52 @@ describe("SearchForm goods picker", () => {
   });
 });
 
+describe("SearchForm OCR 제안 이름 (nameFromSuggestion)", () => {
+  it("힌트를 보여주고 이름칸을 전체 선택한다", async () => {
+    render(
+      <SearchForm
+        onSubmit={vi.fn()}
+        initialValue={{
+          file: null,
+          markName: "불루커피",
+          topK: 5,
+          nameFromSuggestion: true,
+        }}
+      />,
+    );
+
+    expect(
+      screen.getByText("이미지에서 읽은 글자예요 — 틀린 부분이 있으면 고쳐 주세요."),
+    ).toBeVisible();
+    const input = screen.getByRole("textbox", { name: "상표 이름" }) as HTMLInputElement;
+    await waitFor(() => expect(input.selectionEnd).toBe(input.value.length));
+    expect(input.selectionStart).toBe(0);
+  });
+
+  it("사용자가 고치기 시작하면 힌트가 사라진다", async () => {
+    const user = userEvent.setup();
+    render(
+      <SearchForm
+        onSubmit={vi.fn()}
+        initialValue={{
+          file: null,
+          markName: "불루커피",
+          topK: 5,
+          nameFromSuggestion: true,
+        }}
+      />,
+    );
+
+    const input = screen.getByRole("textbox", { name: "상표 이름" });
+    await user.clear(input);
+    await user.type(input, "블루커피");
+
+    expect(
+      screen.queryByText("이미지에서 읽은 글자예요 — 틀린 부분이 있으면 고쳐 주세요."),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe("SearchForm name check", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 
