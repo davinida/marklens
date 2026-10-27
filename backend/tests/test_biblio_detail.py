@@ -279,7 +279,8 @@ def sandbox(tmp_path, monkeypatch):
     monkeypatch.setattr(cp, "upsert_rows", fake_upsert)
     monkeypatch.setattr(cp.config, "DATABASE_URL", "postgresql://fake/marklens")
     # 이미지 다운로드는 tmp 에 더미 PNG 로 대체(네트워크 0).
-    def _dl(url, dest):
+    def _dl(url, dest, *, validate_image=False):
+        assert validate_image is True
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(b"\x89PNG\r\n\x1a\n(fake)")
         return dest

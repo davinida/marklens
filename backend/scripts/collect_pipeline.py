@@ -269,14 +269,53 @@ def search_batch(source: str) -> list[dict]:
 # --------------------------------------------------------------------
 # ① 레코드별 체크포인트
 # --------------------------------------------------------------------
+class CheckpointError(ValueError):
+    """기존 수집 진행 상태를 신뢰할 수 없어 재수집/덮어쓰기를 차단한다."""
+
+
+def _validate_checkpoint_payload(data: object) -> dict:
+    if not isinstance(data, dict):
+        raise ValueError("최상위 값은 JSON 객체여야 합니다")
+    if "schema_version" in data and (
+        type(data["schema_version"]) is not int or data["schema_version"] not in {1, 2, 3}
+    ):
+        raise ValueError("지원하지 않는 schema_version입니다")
+    collected = data.get("collected")
+    if not isinstance(collected, list) or any(
+        not isinstance(app_no, str) or not app_no.strip() for app_no in collected
+    ):
+        raise ValueError("collected는 비어 있지 않은 문자열의 배열이어야 합니다")
+    cursors = data.get("cursors", {})
+    if not isinstance(cursors, dict):
+        raise ValueError("cursors는 JSON 객체여야 합니다")
+    for cursor in cursors.values():
+        if not isinstance(cursor, dict):
+            raise ValueError("각 커서는 JSON 객체여야 합니다")
+        for key, minimum in (("page", 1), ("offset", 0)):
+            value = cursor.get(key)
+            if type(value) is not int or value < minimum:
+                raise ValueError(f"커서 {key}는 {minimum} 이상의 정수여야 합니다")
+        if "rows_per_page" in cursor:
+            rows = cursor["rows_per_page"]
+            if type(rows) is not int or not 1 <= rows <= kipris_client.ADVANCED_MAX_ROWS:
+                raise ValueError("커서 rows_per_page가 허용 범위를 벗어났습니다")
+    return data
+
+
 def _read_checkpoint_payload(path: Path) -> dict:
-    if not path.exists():
-        return {}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        return {}
-    return data if isinstance(data, dict) else {}
+        return _validate_checkpoint_payload(data)
+    except FileNotFoundError:
+        if not path.is_symlink():
+            return {}  # 체크포인트가 없는 최초 실행만 빈 상태로 시작한다.
+        reason = "체크포인트 링크의 대상 파일이 없습니다"
+    except (ValueError, OSError) as exc:
+        reason = str(exc)
+    raise CheckpointError(
+        f"체크포인트를 읽거나 검증하지 못했습니다: {path} ({reason}). "
+        "기존 파일을 보존했습니다. 백업을 복원하거나 내용을 확인·복구한 뒤 재실행하세요."
+    ) from None
 
 
 def _write_checkpoint_payload(payload: dict, path: Path) -> None:
@@ -303,11 +342,8 @@ def load_cursor(
     """출원인별 페이지/offset을 읽고 페이지 크기 변경 시 안전하게 처음부터 재개한다."""
     data = _read_checkpoint_payload(path or CHECKPOINT_PATH)
     cursor = data.get("cursors", {}).get(source, {})
-    try:
-        page = max(1, int(cursor.get("page", 1)))
-        offset = max(0, int(cursor.get("offset", 0)))
-    except (AttributeError, TypeError, ValueError):
-        return 1, 0
+    page = cursor.get("page", 1)
+    offset = cursor.get("offset", 0)
 
     if rows_per_page is not None and cursor:
         # schema v2까지는 수집기의 유일한 페이지 크기가 500건이었다.
@@ -315,10 +351,6 @@ def load_cursor(
             "rows_per_page",
             kipris_client.ADVANCED_DEFAULT_ROWS,
         )
-        try:
-            stored_rows = int(stored_rows)
-        except (TypeError, ValueError):
-            stored_rows = -1
         if stored_rows != rows_per_page:
             print(
                 f"[경고] {source}: 체크포인트 페이지 크기({stored_rows})와 "
@@ -1361,7 +1393,11 @@ def main() -> int:
         if args.file_staging
         else CHECKPOINT_PATH
     )
-    checkpoint = load_checkpoint(checkpoint_path)
+    try:
+        checkpoint = load_checkpoint(checkpoint_path)
+    except CheckpointError as exc:
+        print(f"[오류] {exc}", file=sys.stderr)
+        return 1
     if args.file_staging:
         db_existing = load_file_staging_app_numbers(args.file_staging)
     else:
@@ -1519,7 +1555,9 @@ def main() -> int:
                                 )
                                 if not image_url:
                                     raise kipris_client.KiprisError("ImagePath 없음")
-                                kipris_client.download_file_now(image_url, dest)
+                                kipris_client.download_file_now(
+                                    image_url, dest, validate_image=True
+                                )
                         except Exception as e:
                             report["이미지실패"] += 1
                             retry_offset = (
