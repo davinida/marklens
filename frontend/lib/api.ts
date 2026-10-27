@@ -4,12 +4,14 @@ import {
   parseNameCheckResponse,
   PhoneticSearchResponseSchema,
   SearchResponseSchema,
+  SearchV2ResponseSchema,
   SemanticSearchResponseSchema,
   type GoodsClassesResponse,
   type GoodsSearchResponse,
   type NameCheckResult,
   type PhoneticSearchResponse,
   type SearchResponse,
+  type SearchV2Response,
   type SemanticSearchResponse,
 } from "@/lib/contracts";
 
@@ -23,6 +25,8 @@ export type {
   PhoneticSearchResponse,
   SearchMatch,
   SearchResponse,
+  SearchV2Candidate,
+  SearchV2Response,
   SemanticMatch,
   SemanticSearchResponse,
   StatusCode,
@@ -121,6 +125,71 @@ export async function searchTrademark(
     );
   }
   return parsed.data;
+}
+
+export type TypeOverride = "문자" | "도형" | "결합";
+
+export interface SearchV2Request {
+  image?: File | null;
+  name?: string | null;
+  goodsCodes?: readonly string[] | null;
+  typeOverride?: TypeOverride | null;
+}
+
+/**
+ * 3입력 통합 검색 (API 계약 v2) — image·name·goodsCodes 중 하나 이상 필요(호출 전 검증은
+ * 호출부 책임, assembleSearchV2Form 이 최소 조건을 강제한다). type_override 는 사용자가
+ * 결과 화면에서 유형을 고쳐 재요청할 때만 보낸다.
+ */
+export async function searchV2(
+  request: SearchV2Request,
+  topK: number,
+  turnstileToken: string,
+  signal?: AbortSignal,
+): Promise<SearchV2Response> {
+  const form = assembleSearchV2Form(request);
+
+  let response: Response;
+  try {
+    response = await fetch(`/api/search/v2?top_k=${topK}`, {
+      method: "POST",
+      headers: { "x-turnstile-token": turnstileToken },
+      body: form,
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+    });
+  } catch (error) {
+    networkError(error);
+  }
+
+  const body = await assertOk(response);
+  const parsed = SearchV2ResponseSchema.safeParse(body);
+  if (!parsed.success) {
+    throw new ApiError(
+      502,
+      "검색 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
+      response.headers.get("x-request-id"),
+    );
+  }
+  return parsed.data;
+}
+
+/** image·name·goodsCodes 중 하나 이상 있는지 — 제출 버튼 활성 조건과 같은 기준. */
+export function hasSearchV2Input(request: SearchV2Request): boolean {
+  return Boolean(
+    request.image || request.name?.trim() || request.goodsCodes?.length,
+  );
+}
+
+function assembleSearchV2Form(request: SearchV2Request): FormData {
+  const form = new FormData();
+  if (request.image) form.append("image", request.image);
+  const name = request.name?.trim();
+  if (name) form.append("name", name);
+  for (const code of request.goodsCodes ?? []) form.append("goods_codes", code);
+  if (request.typeOverride) form.append("type_override", request.typeOverride);
+  return form;
 }
 
 export async function checkTrademarkName(

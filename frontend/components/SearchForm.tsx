@@ -31,8 +31,11 @@ const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 10 * 1024 * 1024;
 const TOP_K_OPTIONS = [5, 10, 20] as const;
 
+export type MarkTypeOverride = "문자" | "도형" | "결합";
+
 export interface SearchDraft {
-  file: File;
+  /** API 계약 v2: image·markName·지정상품 중 하나 이상이면 제출 가능(이미지 필수 아님). */
+  file?: File | null;
   markName: string;
   topK: number;
   nameCheck?: NameCheckResult | null;
@@ -40,11 +43,19 @@ export interface SearchDraft {
   semantic?: SemanticSearchResponse | null;
   /** 지정상품 선택(프론트-6). 이름 확인·검색을 거쳐도 유지되고 폼 초기화(다른 로고 비교하기)에서만 비운다. */
   goods?: SelectedGood[] | null;
+  /** 결과 화면의 "유형 고치기"로 돌아왔을 때만 채워진다 — 다음 제출 한 번에만 쓰고 지운다. */
+  typeOverride?: MarkTypeOverride | null;
+  /**
+   * "상표명으로 넣기"(§4-5)로 막 채워진 이름인지 — OCR이 글자를 잘못 읽을 수 있어
+   * (예: '블루'를 '불루'로) 사용자가 바로 알아채고 고칠 수 있게 입력칸에 포커스·전체
+   * 선택하고 안내 문구를 보여준다. 사용자가 직접 입력칸을 고치는 순간 꺼진다.
+   */
+  nameFromSuggestion?: boolean;
 }
 
 export interface SearchFormValue extends SearchDraft {
   turnstileToken: string;
-  /** 선택한 지정상품의 유사군 코드 합집합 — /search 연동(범위 ③, 유사군 백필 후) 입력용 파생값. */
+  /** 선택한 지정상품의 유사군 코드 합집합 — API 계약 v2 `goods_codes` 입력. */
   goodsCodes: string[];
 }
 
@@ -69,6 +80,9 @@ export default function SearchForm({
   const [fileError, setFileError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [markName, setMarkName] = useState(initialValue?.markName ?? "");
+  const [nameFromSuggestion, setNameFromSuggestion] = useState(
+    Boolean(initialValue?.nameFromSuggestion),
+  );
   const [topK, setTopK] = useState<number>(initialValue?.topK ?? 5);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [namePhase, setNamePhase] = useState<NamePhase>(() =>
@@ -91,6 +105,7 @@ export default function SearchForm({
   );
   const goodsCodes = useMemo(() => goodsCodeUnion(selectedGoods), [selectedGoods]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const nameAbortRef = useRef<AbortController | null>(null);
   const nameGenerationRef = useRef(0);
@@ -141,6 +156,13 @@ export default function SearchForm({
     },
     [],
   );
+
+  // "상표명으로 넣기"로 막 돌아왔으면 이름칸에 포커스·전체 선택 — OCR 오독('블루'→'불루' 등)을
+  // 사용자가 바로 알아채고 고칠 수 있게. 한 번만 — 사용자가 고치기 시작하면 onChange 가 끈다.
+  useEffect(() => {
+    if (nameFromSuggestion) nameInputRef.current?.select();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 시 1회만
+  }, []);
 
   const takeFile = (next: File | undefined) => {
     if (!next) return;
@@ -263,20 +285,24 @@ export default function SearchForm({
     }
   };
 
+  const trimmedName = markName.trim();
+  const hasAnyInput = Boolean(file || trimmedName || goodsCodes.length > 0);
+
   const submit = () => {
-    if (!file || !turnstileToken) return;
+    if (!hasAnyInput || !turnstileToken) return;
     const token = turnstileToken;
     setTurnstileToken(null);
     turnstileRef.current?.reset();
     onSubmit({
-      file,
-      markName: markName.trim(),
+      file: file ?? null,
+      markName: trimmedName,
       topK,
       nameCheck: namePhase.name === "result" ? namePhase.data : null,
       phonetic: phoneticPhase.name === "result" ? phoneticPhase.data : null,
       semantic: semanticPhase.name === "result" ? semanticPhase.data : null,
       goods: selectedGoods,
       goodsCodes,
+      typeOverride: initialValue?.typeOverride ?? null,
       turnstileToken: token,
     });
   };
@@ -350,9 +376,9 @@ export default function SearchForm({
             <span className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-blue-bg text-[22px] font-bold text-blue-dark" aria-hidden>
               +
             </span>
-            <span className="block text-[15px] font-bold">로고 이미지 선택</span>
+            <span className="block text-[15px] font-bold">로고 이미지 선택 (선택)</span>
             <span id="upload-help" className="mt-1 block text-[12px] text-sub">
-              사진과 화면 캡처 지원 · PNG · JPG · WEBP · 10MB 이하
+              이미지 없이 상표명·지정상품만으로도 검색할 수 있어요 · PNG · JPG · WEBP · 10MB 이하
             </span>
           </button>
         )}
@@ -386,12 +412,13 @@ export default function SearchForm({
         <div className="mt-2 flex items-end gap-2">
           {/* Safari 연락처 자동완성 아이콘 방지: autoComplete=off, id 에 'name' 을 쓰지 않는다 */}
           <input
+            ref={nameInputRef}
             id="mark-text"
             type="text"
             autoComplete="off"
             value={markName}
             maxLength={100}
-            aria-describedby="name-help"
+            aria-describedby={nameFromSuggestion ? "name-help name-suggestion-help" : "name-help"}
             onChange={(event) => {
               nameGenerationRef.current += 1;
               nameAbortRef.current?.abort();
@@ -401,12 +428,15 @@ export default function SearchForm({
               semanticAbortRef.current?.abort();
               pendingAxisRef.current = null;
               setMarkName(event.target.value);
+              setNameFromSuggestion(false);
               setNamePhase({ name: "idle" });
               setPhoneticPhase({ name: "idle" });
               setSemanticPhase({ name: "idle" });
             }}
             placeholder="예: 몬테로사 MONTEROSA"
-            className="min-w-0 flex-1 border-b-2 border-line pb-2 text-[17px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark"
+            className={`min-w-0 flex-1 border-b-2 pb-2 text-[17px] font-bold outline-none placeholder:font-medium placeholder:text-placeholder focus:border-blue-dark ${
+              nameFromSuggestion ? "border-review" : "border-line"
+            }`}
           />
           <button
             type="button"
@@ -420,6 +450,15 @@ export default function SearchForm({
         <p id="name-help" className="mt-2 text-[11px] leading-relaxed text-sub">
           이미지 유사도와 별도로 동일·유사 명칭의 검색 범위를 확인해요.
         </p>
+        {nameFromSuggestion && (
+          <p
+            id="name-suggestion-help"
+            role="status"
+            className="mt-1.5 text-[11px] font-semibold text-review-deep"
+          >
+            이미지에서 읽은 글자예요 — 틀린 부분이 있으면 고쳐 주세요.
+          </p>
+        )}
         {namePhase.name === "result" && (
           <div className="mt-4 border-t border-line pt-4">
             <NameCheckPanel result={namePhase.data} live />
@@ -498,7 +537,7 @@ export default function SearchForm({
       <div className="rise rise-3 mt-1">
         <button
           type="submit"
-          disabled={!file || !turnstileToken || namePhase.name === "loading"}
+          disabled={!hasAnyInput || !turnstileToken || namePhase.name === "loading"}
           className="press w-full rounded-md bg-blue-dark py-4 text-[16px] font-bold text-white hover:bg-[#174ea6] disabled:bg-disabled disabled:text-disabled-text"
         >
           비슷한 상표 찾아보기

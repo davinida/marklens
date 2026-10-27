@@ -5,47 +5,66 @@ const LOGO_PNG = Buffer.from(
   "base64",
 );
 
-const SEARCH_RESULT = {
-  grade: {
-    status_code: "NO_CLOSE_MATCH",
-    status_name: "가까운 시각 후보 미확인",
-    uncertain: false,
-    uncertainty_reasons: [],
-    scored_candidate_count: 1,
-    threshold_version: "e2e-fixture-v1",
-    scope: "visual_similarity_only",
-    calibrated: false,
+// API 계약 v2 §2 — 후보 1건(이미지 없음, "안전" 등급)인 최소 유효 응답.
+// 요청에 goods_codes 가 있으면 그 축(x4)만 채워서 돌려준다(아래 handler 가 조립).
+function buildSearchV2Result(options: { x4?: number | null; nice_classes?: number[] } = {}) {
+  const x4 = options.x4 ?? null;
+  return {
+    api_version: "2026-10-24",
+    research_beta: true,
     legal_conclusion: false,
-    grade_code: "LOW",
-    grade_name: "가까운 후보 미확인",
-    message: "테스트 데이터 범위에서 가까운 시각 후보를 찾지 못했어요.",
-    top1_similarity: 0.2,
-    separability_a: 0.1,
-    separability_b: 0.1,
-    warnings: [],
-  },
-  matches: [
-    {
-      rank: 1,
-      similarity: 0.2,
-      이미지파일: null,
-      이미지URL: null,
-      trademark: null,
+    overall: {
+      grade: "안전",
+      prob: 0.04,
+      caveats: ["이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"],
+      query_type: { type: "문자", source: "fallback", detail: null, suggested_name: null },
+      visual_status: null,
     },
-  ],
-  dataset_info: {
-    총_상표수: 1,
-    출원일자_범위: "E2E fixture",
-    데이터_기준: "브라우저 테스트",
-    생성일자: "2026-08-14",
-  },
-  index_size: 1,
-  top_k_requested: 5,
-  top_k_returned: 1,
-  scoring_k: 1,
-  api_version: "e2e",
-  research_beta: true,
-};
+    candidates: [
+      {
+        id: "4020260012345",
+        title: "이모지로고",
+        image_url: null,
+        type: "결합",
+        applicant: "예시 출원인",
+        nice_classes: options.nice_classes ?? [43],
+        axes: { x1: 0.3, x2_text: 0.2, x2_img: null, x3: null, x4 },
+        risk: {
+          prob: 0.04,
+          grade: "안전",
+          contributions: { X1: 0.2, X2: 0.1, X3: 0.0, X4: x4 ? 0.15 : 0.0, 요부: 0.0 },
+          missing_adjustment: 0.0,
+          figure_caveat: false,
+          rule_triggers: [],
+        },
+        salient: { query_tokens: [], candidate_tokens: [], removed: [] },
+        goods: { codes: x4 !== null ? ["G0502"] : [], jaccard: x4 },
+      },
+    ],
+    meta: {
+      model_version: "e2e-fixture",
+      grade_precision: 0.7,
+      thresholds: {
+        grade: { 주의: 0.09, "검토 권장": 0.18, 위험: 0.59 },
+        standalone: { x1: 0.98, x2_text: 0.75, x2_img: null, x3: 0.77, x4: null },
+        figure: 0.9,
+      },
+      pool: { image: 0, phonetic: 1, spelling: 1, semantic: 0, goods: x4 !== null ? 1 : 0, total: 1 },
+      elapsed_ms: 10,
+    },
+    dataset_info: {
+      총_상표수: 1,
+      출원일자_범위: "E2E fixture",
+      데이터_기준: "브라우저 테스트",
+      생성일자: "2026-08-14",
+    },
+    index_size: 1,
+    top_k_requested: 5,
+    top_k_returned: 1,
+  };
+}
+
+const SEARCH_V2_RESULT = buildSearchV2Result();
 
 const PHONETIC_RESULT = {
   query: { name: "BBQ", has_pronunciation: true, candidates: ["비비큐"] },
@@ -256,7 +275,7 @@ test("home and crop cancellation stay usable without viewport overflow", async (
 test("cropped upload renders a mocked same-origin search result", async ({ page }) => {
   let searchRequest: { contentType: string; token: string; bodyBytes: number } | null =
     null;
-  await page.route("**/api/search?*", async (route) => {
+  await page.route("**/api/search/v2*", async (route) => {
     const request = route.request();
     searchRequest = {
       contentType: request.headers()["content-type"] ?? "",
@@ -267,7 +286,7 @@ test("cropped upload renders a mocked same-origin search result", async ({ page 
       status: 200,
       contentType: "application/json",
       headers: { "x-request-id": "e2e-search-1" },
-      body: JSON.stringify(SEARCH_RESULT),
+      body: JSON.stringify(SEARCH_V2_RESULT),
     });
   });
 
@@ -283,14 +302,11 @@ test("cropped upload renders a mocked same-origin search result", async ({ page 
   await expect(submit).toBeEnabled();
   await submit.click();
 
-  await expect(
-    page.getByRole("heading", { name: "가까운 시각 후보를 찾지 못했어요" }),
-  ).toBeVisible();
+  await expect(page.getByTestId("overall-grade")).toHaveText("안전");
   await expect(
     page.getByRole("img", { name: "상표 이미지 없음" }).first(),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { name: "분석 근거 대시보드" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "분석 범위" })).toBeVisible();
+  await expect(page.getByText("이미지가 없어 외관(이미지) 축은 비교하지 않았습니다")).toBeVisible();
   expect(searchRequest).toEqual({
     contentType: expect.stringContaining("multipart/form-data; boundary="),
     token: "dev-bypass",
@@ -324,11 +340,11 @@ test("name evidence opens and remains visible in the result dashboard", async ({
       body: JSON.stringify(SEMANTIC_RESULT),
     });
   });
-  await page.route("**/api/search?*", async (route) => {
+  await page.route("**/api/search/v2*", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(SEARCH_RESULT),
+      body: JSON.stringify(SEARCH_V2_RESULT),
     });
   });
 
@@ -356,16 +372,10 @@ test("name evidence opens and remains visible in the result dashboard", async ({
     .click();
   await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
 
-  await expect(page.getByRole("heading", { name: "명칭 검색 근거" })).toBeVisible();
-  await expect(page.getByRole("button", { name: /BBQ/ })).toBeVisible();
-  await expect(page.getByText("별도 조회됨")).toBeVisible();
-  await expect(page.getByText("동일 명칭 등록상표 1건 확인")).toBeVisible();
-  await expect(
-    page.locator("[data-name-evidence] + [data-visual-candidates]"),
-  ).toBeVisible();
-  await expect(page.locator("[data-phonetic-evidence]")).toBeVisible();
-  await expect(page.locator("[data-semantic-evidence]")).toBeVisible();
-  await expect(page.getByText("호칭·관념 조회됨")).toBeVisible();
+  // 결과 화면은 v2(API 계약 v2) — 이름 확인·발음·관념 근거는 입력 화면(위에서 이미 확인)에만
+  // 남고, 결과 화면은 후보마다 호칭(X1) 축 값으로 같은 이름이 반영됐음을 보여준다.
+  await expect(page.getByTestId("overall-grade")).toHaveText("안전");
+  await expect(page.getByText("호칭 30%")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -391,11 +401,16 @@ test("selected goods survive the search and appear in the result summary", async
       body: JSON.stringify(GOODS_CLASSES_RESULT),
     });
   });
-  await page.route("**/api/search?*", async (route) => {
+  // 선택한 지정상품의 유사군 코드(G0502, S120602)가 /search/v2 요청에 실려가는지, 응답의
+  // X4(상품) 축이 결과 화면에 반영되는지 확인한다 — v1 의 "[data-goods-summary]" 요약은
+  // v2 결과 화면에 없고, 대신 후보의 상품 축 값·유사군으로 드러난다.
+  let searchBody = "";
+  await page.route("**/api/search/v2*", async (route) => {
+    searchBody = route.request().postData() ?? "";
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(SEARCH_RESULT),
+      body: JSON.stringify(buildSearchV2Result({ x4: 0.5, nice_classes: [43] })),
     });
   });
 
@@ -416,13 +431,12 @@ test("selected goods survive the search and appear in the result summary", async
     .click();
   await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
 
-  await expect(
-    page.getByRole("heading", { name: "가까운 시각 후보를 찾지 못했어요" }),
-  ).toBeVisible();
-  await expect(page.locator("[data-goods-summary]")).toContainText(
-    "선택한 지정상품: 커피, 커피전문점업 (유사군 2개)",
-  );
-  await expect(page.getByText("지정상품 2개 선택(유사군 2개) · 검색 반영 전")).toBeVisible();
+  await expect(page.getByTestId("overall-grade")).toHaveText("안전");
+  expect(searchBody).toContain("G0502");
+  expect(searchBody).toContain("S120602");
+  await expect(page.getByText("상품 50%")).toBeVisible();
+  await page.getByRole("button").filter({ hasText: "이모지로고" }).click();
+  await expect(page.getByText(/지정상품 유사군 G0502/)).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -439,11 +453,13 @@ test("a business preset adds three goods that show up in the result summary", as
       ),
     });
   });
-  await page.route("**/api/search?*", async (route) => {
+  let searchBody = "";
+  await page.route("**/api/search/v2*", async (route) => {
+    searchBody = route.request().postData() ?? "";
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(SEARCH_RESULT),
+      body: JSON.stringify(buildSearchV2Result({ x4: 0.75, nice_classes: [43] })),
     });
   });
 
@@ -484,8 +500,10 @@ test("a business preset adds three goods that show up in the result summary", as
     .click();
   await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
 
-  await expect(page.locator("[data-goods-summary]")).toContainText(
-    "선택한 지정상품: 커피전문점업, 커피, 커피 소매업 (유사군 4개)",
-  );
+  await expect(page.getByTestId("overall-grade")).toHaveText("안전");
+  for (const code of ["G0301", "G0502", "S120602", "S2005"]) {
+    expect(searchBody).toContain(code);
+  }
+  await expect(page.getByText("상품 75%")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
