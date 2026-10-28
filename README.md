@@ -6,24 +6,24 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 식별력 필터를 축 함수로 구현하고, 정답 데이터(심결례 라벨, 2026-10-11 마감)로 통합 모델을 v1.3 까지
 학습했습니다(2026-10-25, "입력을 더 주면 위험도가 내려가지 않음" 성질 확보). 지금은 **서비스 연결 단계**입니다:
 세 입력(이미지·상표명·지정상품) 통합 검색의 엔진(`engine.multi_search`, API 계약 v2)과 모델은 완료했고,
-`POST /search/v2` API·BFF·zod·gateway는 구현했고(2026-10-26, PR #69 — 실제 모델로 BFF까지 응답 계약 확인), 결과 화면 v2·E2E v2 연결이 남아 있습니다. DB 유사군은 589/1,100건입니다(시연 업종 7개 류 전부)(아래 "서비스 — 세 입력 통합 검색"·"다음 단계"). 운영 배포 검증은 별도입니다.
+`POST /search/v2` API·BFF·zod·gateway(2026-10-26, PR #69)·OCR 수정(PR #70)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 연결을 마쳤고, 2026-10-27 실제 모델로 BFF 경유 시나리오 8종을 계약 규칙으로 검산했습니다. DB 유사군은 589/1,100건이며(시연 업종 7개 류 전부, PR #71) 나머지는 11월에 수동 `plan → run` 으로 채웁니다(아래 "서비스 — 세 입력 통합 검색"·"운영"). 운영 배포 검증은 별도입니다.
 
 결과는 참고 정보입니다. 상표 등록 가능성, 침해 여부, 법적 위험 확률 또는 검색
 범위 밖 권리의 부재를 판정하지 않습니다.
 
-| 항목 | 2026-10-25 현재 |
+| 항목 | 2026-10-28 현재 |
 |---|---|
-| 마지막 갱신 | 2026-10-25 (`main` = `develop` = `f34b6e6` — PR #67 통합 모델 v1.3 병합; 10/14 이후 PR #57~#67: 보안 권고 #58·계약 v2 #57·엔진 #65·유형 규칙 #66·모델 v1.3 #67 + Dependabot 2회차 #47·#55·#63) |
+| 마지막 갱신 | 2026-10-28 (`main` = `develop` = `59bb3a4` — PR #72 결과 화면 v2 병합; 10/26~27 서비스 연결 PR #69 API·BFF·gateway · #70 OCR 축소·워밍업 · #56 수집 무결성 · #71 유사군 백필 589/1,100 · #72 화면; 그 전 10/14 이후 #57 계약 v2·#58 보안 권고·#65 엔진·#66 유형 규칙·#67 모델 v1.3 + Dependabot 2회차 #47·#55·#63) |
 | 데이터 | KIPRIS 등록상표 1,100건, generation `20260827T035002Z-25f84a6eeb26` (2026-08-27) |
-| 테스트 | Python `1173 passed, 26 skipped`(가짜 ML 모드, 2026-10-25 develop `f34b6e6` 실측 — 식별력 41·통합 모델 25·엔진 27·검토 화면 4·심결례 도구 포함; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `77 passed`(19 파일) · Playwright `15 passed`(스펙 5개 × 뷰포트 3개 — CI frontend 잡 23.8초; 로컬은 `npx playwright install` 먼저) |
-| CI | GitHub Actions 3잡(python · frontend · deployment-config) 통과 — 2026-10-25 develop `f34b6e6`(PR #67). `pip-audit`·`npm audit` 게이트는 2026-10-25 #58 보안 권고 반영으로 복구(아래 "운영") |
+| 테스트 | Python `1305 passed, 26 skipped`(가짜 ML 모드, 2026-10-28 develop `59bb3a4` 실측 — v2 API 18·OCR 14·유사군 백필 6·엔진 27·통합 모델 25 포함; X3 실제 모델 검증은 별도 `219 passed`) · 프런트 Vitest `199 passed`(22 파일) · Playwright `15 passed`(v2 스펙 5개 × 뷰포트 3개, 로컬 16.5초; 브라우저는 `npx playwright install chromium` 먼저) |
+| CI | GitHub Actions 4잡(python · frontend · deployment-config · backend-image) 통과 — 2026-10-27 develop `59bb3a4`(PR #72). `pip-audit`·`npm audit` 게이트는 2026-10-25 #58 보안 권고 반영으로 복구(아래 "운영") |
 
 ## 현재 범위
 
 | 기능 | 상태 | 비고 |
 |---|---|---|
 | 이미지 검색(v1 `POST /search`) | 구현 | PNG/JPEG/WebP, 최대 10 MiB, 수동 크롭 지원. 최종 발표(2026-12-20)까지 유지 뒤 v2 로 대체(계약 v2 §5-5) |
-| 세 입력 통합 검색(`POST /search/v2`, API 계약 v2) | **API·BFF·zod·gateway 구현, 화면·E2E 연결 남음** | 이미지·상표명·지정상품 중 하나 이상 → 후보 풀 → 쌍별 4축 → 통합 모델 v1.3 → 등급·위험도·근거 축·요부·caveat(`engine.multi_search`, PR #65·#66·#67). B-1~B-5 구현(2026-10-26, PR #69), 결과 화면 v2(F-1~F-5)와 E2E v2 연결은 남음 |
+| 세 입력 통합 검색(`POST /search/v2`, API 계약 v2) | **연결 완료(2026-10-27 — API #69·OCR #70·화면 #72·E2E v2 15건)** | 이미지·상표명·지정상품 중 하나 이상 → 후보 풀 → 쌍별 4축 → 통합 모델 v1.3 → 등급·위험도·근거 축·요부·caveat(`engine.multi_search`, PR #65·#66·#67). B-1~B-5(PR #69)·F-1~F-5(PR #72)·E2E v2(스펙 5 × 뷰포트 3) 완료 — 2026-10-27 실제 모델로 BFF 경유 시나리오 8종 로짓·등급·규칙·caveat·정렬 검산 통과 |
 | 시각 후보 상태 | 구현 | 단조적 4개 상태, 교정 전 임시 임계값 |
 | 상표명 완전일치 확인 | 구현 | KIPRIS 실시간 조회, 후보 상세·상태 분포·완전성 표시. **검색과 별개 기능**(검색 점수에 반영되지 않음) |
 | KIPRIS 수집 및 인덱스 빌드 | 구현 | 체크포인트, authoritative key, manifest, 원자적 게시 |
@@ -68,7 +68,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 프론트-6 지정상품 입력 UI | 다빈 | **완료(범위 ②, v1.1)** | `frontend/components/GoodsPicker.tsx`(+테스트), `lib/goods.ts`, `SearchForm.tsx`·`ResultView.tsx`, `shared/goods_map/business_presets.json`, `GET /goods/search`(q 선택·offset·`presets`)·`/goods/classes`, BFF `frontend/app/api/goods/*` | 2026-09-21 API·zod 계약(PR #24) → 2026-10-01 화면(PR #27): 상품명 검색(디바운스 250ms·2글자·류 배지·고시 명칭·키보드) + 분류로 찾기 + 선택 칩(최대 20, 유사군 합집합). v1.1: 업종 세트 25개·79건(일상어 → 여러 류 묶음, 고시 13판 원본으로 확인·실제 gz 검증 경고 0) 카드와 "자주 찾는 업종" 칩 12개, 류 목록 상품/서비스 두 묶음(모바일 접힘), 유사군 풀이. 이름 확인·검색을 거쳐도 유지, 결과 화면 상단 요약. ③ v2 요청 `goods_codes[]` 연동 — 엔진 완료, 결과 화면 v2 와 함께 진행 중 |
 | 프론트-7 관념 X3 | 다빈 | **완료(축 함수 v1.3 + 최소 연결)** | `ml/src/axes/x3_semantic.py`, `ml/tests/test_x3_semantic.py`(219건), `ml/scripts/x3_benchmark.py`, `docs/MarkLens_X3_관념유사도_설계.md`, `backend/src/core/semantic_search.py`, `backend/src/api/semantic_search.py`, `frontend/components/SemanticMatchesSection.tsx` | PR #25·#26(2026-09-30). MiniLM-L12-v2 + wordfreq 표제어 게이트(합성어 폴백, 영문 3자 이상, 1음절 명사 목록), 하한 0.55. `POST /semantic-search`(BFF `/api/semantic-search`)로 상표명 확인 패널에 연결, 관념 없는 입력은 안내 문구. 통합 모델 입력 `x3_d` 로 학습에 포함(v1.2.1 계수 0.17 → v1.3 0, 단조 하한 — 표본 확대 후 재측정), v2 엔진에서 `x3` 축 |
 | 프론트-8 상품 견련성 X4 | 다빈 | **완료(축 함수 + v2 엔진 축)** | `ml/src/axes/x4_goods.py`, `ml/src/axes/goods_map.py`(로더), `backend/src/api/goods.py`(상품 검색 API), `ml/tests/test_x4_goods.py`, `docs/MarkLens_X4_상품견련성_설계.md` | 2026-09-21(PR #24). v2 엔진에서 후보에 유사군이 있을 때 `x4`(계수 0.96) — DB 유사군 보유 589/1,100건(2026-10-27 — 시연 업종 7개 류 전부), 나머지 백필은 11월 |
-| 프론트-9 통합 모델·재보정 | 다빈 | **v1.3 학습 완료(2026-10-25, PR #67) — 엔진 연결 PR #65, 엔드포인트·화면은 진행 중** | `ml/src/model/risk_model.py`, `ml/scripts/train_risk_model.py`, `ml/scripts/pairs_features.py`(`--fill-easy-images`), `ml/requirements-experiments.txt`, `shared/model/risk_model_v1.json`, `ml/tests/test_risk_model.py`(13)·`test_train_risk_model.py`(12)·`test_pairs_features.py`(9), `docs/MarkLens_통합모델_설계.md` §7~§7-3 | **v1.3(2026-10-25, 설계 §7-3)**: 결측 지시변수(miss_x2img +0.50 > 이미지 기여 ≤ +0.21 → 같은 쌍 이름만 0.579 → 이미지 추가 0.474) 대신 결측 패턴별 계수 집합(이미지×상품 관측 조합 4개, 각 집합은 그 축이 관측된 모든 행으로 적합) + 결합 제약(축을 하한 이상으로 더 관측하면 p 비감소, SLSQP 꼭짓점 192 제약·적재 검증), 쉬운 음성 700쌍 CLIP 이미지 축 채움(①만으로는 miss_x2img 0.56 으로 남음 — 구조를 바꿔야 풀림). 심결 AUC 0.618·현실 0.911(CI 안), 등급 하한 0.0902/0.1805/0.5902, 위험 정밀도 0.70. 실측 이름만 0.530 → 셋 다 0.531. 도형계 이미지 계수는 제약이 정한 값(결정 대기 §6).  2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획). 2026-10-08~11 §4-1~§4-4 벤치마크·입력 정리. 2026-10-11 1차 학습(`feat/risk-model-v1`): 최종 라벨 351쌍, 변형 A/B × 쉬운 음성 가중치 {0, 0.25, 0.5} × C, 사건 단위 5겹×3반복 CV → 채택 B/w0.5/C0.3: 심결 AUC 0.625(0.57~0.68)·현실 분포 0.908(기준선 축 평균 0.593/0.908), 계수 x1 문자계 2.86·철자 0.95·상품 0.74·CLIP 0.07(0 과 구분 안 됨), 판례 검증 (i) 문자계 호칭 1.00 (ii) 도형계 외관 0.00 (iii) 상품 0.99 (iv) 요부 0.88, 등급 하한 0.093/0.187/0.740(위험 정밀도 0.80·검토 권장 재현율 0.90), 단독 임계값 전부 비활성(정밀도 0.9 미달). `risk_score(features) → (p, 등급, 기여도)`. v1.1(같은 날, `feat/risk-model-v1.1`): 유형 주효과·miss_x1·miss_x2text 제거(이름 없는 37행 제외, 314행), 결합 방법 비교(로지스틱 0.619 / 판례 사전분포+단조 0.618 / EBM 0.608 / 단조 GBM 0.626 — 전부 기준 CI 안) → 판례 사전분포(σ 0.5)+단조 로지스틱 채택, 판례 (i) 1.00 (ii) 0.01 (iii) 1.00 (iv) 1.00, 등급 하한 0.091/0.181/0.591(위험 정밀도 0.69), 단독 임계값(정밀도 0.7) x1_d 0.98·x2_text_d 0.75·x3_d 0.77 활성. v1.2(같은 날, `feat/risk-model-v1.2`): 절편 사전분포 제외(절편 −4.86, 요부 플래그 +0.88 로 교차표와 일치), 요부 플래그 → `any_no_distinctive` + x1_d×any_no_distinctive(−1.10, 판례 (iv) 0.92), 도형 보류 규칙(figure_caveat·x2_whole ≥ 0.9 검토 권장, 미검증), 쉬운 음성 표본 50건 혼동 가능 0 → 임계 0.8 유지; 심결 AUC 0.621·현실 0.895(CI 안), 위험 하한 0.899(정밀도 0.82, 11쌍). v1.2.1(같은 날, `chore/model-phase-wrapup`): "위험" 최소 지지 10 → 30(위험 하한 0.899 → 0.563 대체값, 정밀도 0.69·159쌍·재현율 0.05 → 0.58), σ CV 격자 → 1.0 고정(x1_d CI 0.56~3.59 → 1.01~2.71), 심결 AUC 0.619·현실 0.897(CI 안). 다음: "다음 단계" 절(서비스 연결, 11월 도형상표 수집) |
+| 프론트-9 통합 모델·재보정 | 다빈 | **v1.3 학습 완료(2026-10-25, PR #67) — 엔진 PR #65·API PR #69·화면 PR #72 연결 완료** | `ml/src/model/risk_model.py`, `ml/scripts/train_risk_model.py`, `ml/scripts/pairs_features.py`(`--fill-easy-images`), `ml/requirements-experiments.txt`, `shared/model/risk_model_v1.json`, `ml/tests/test_risk_model.py`(13)·`test_train_risk_model.py`(12)·`test_pairs_features.py`(9), `docs/MarkLens_통합모델_설계.md` §7~§7-3 | **v1.3(2026-10-25, 설계 §7-3)**: 결측 지시변수(miss_x2img +0.50 > 이미지 기여 ≤ +0.21 → 같은 쌍 이름만 0.579 → 이미지 추가 0.474) 대신 결측 패턴별 계수 집합(이미지×상품 관측 조합 4개, 각 집합은 그 축이 관측된 모든 행으로 적합) + 결합 제약(축을 하한 이상으로 더 관측하면 p 비감소, SLSQP 꼭짓점 192 제약·적재 검증), 쉬운 음성 700쌍 CLIP 이미지 축 채움(①만으로는 miss_x2img 0.56 으로 남음 — 구조를 바꿔야 풀림). 심결 AUC 0.618·현실 0.911(CI 안), 등급 하한 0.0902/0.1805/0.5902, 위험 정밀도 0.70. 실측 이름만 0.530 → 셋 다 0.531. 도형계 이미지 계수는 제약이 정한 값(결정 대기 §6).  2026-10-01 초안(판례 구조·로지스틱 회귀 입력·검증 계획). 2026-10-08~11 §4-1~§4-4 벤치마크·입력 정리. 2026-10-11 1차 학습(`feat/risk-model-v1`): 최종 라벨 351쌍, 변형 A/B × 쉬운 음성 가중치 {0, 0.25, 0.5} × C, 사건 단위 5겹×3반복 CV → 채택 B/w0.5/C0.3: 심결 AUC 0.625(0.57~0.68)·현실 분포 0.908(기준선 축 평균 0.593/0.908), 계수 x1 문자계 2.86·철자 0.95·상품 0.74·CLIP 0.07(0 과 구분 안 됨), 판례 검증 (i) 문자계 호칭 1.00 (ii) 도형계 외관 0.00 (iii) 상품 0.99 (iv) 요부 0.88, 등급 하한 0.093/0.187/0.740(위험 정밀도 0.80·검토 권장 재현율 0.90), 단독 임계값 전부 비활성(정밀도 0.9 미달). `risk_score(features) → (p, 등급, 기여도)`. v1.1(같은 날, `feat/risk-model-v1.1`): 유형 주효과·miss_x1·miss_x2text 제거(이름 없는 37행 제외, 314행), 결합 방법 비교(로지스틱 0.619 / 판례 사전분포+단조 0.618 / EBM 0.608 / 단조 GBM 0.626 — 전부 기준 CI 안) → 판례 사전분포(σ 0.5)+단조 로지스틱 채택, 판례 (i) 1.00 (ii) 0.01 (iii) 1.00 (iv) 1.00, 등급 하한 0.091/0.181/0.591(위험 정밀도 0.69), 단독 임계값(정밀도 0.7) x1_d 0.98·x2_text_d 0.75·x3_d 0.77 활성. v1.2(같은 날, `feat/risk-model-v1.2`): 절편 사전분포 제외(절편 −4.86, 요부 플래그 +0.88 로 교차표와 일치), 요부 플래그 → `any_no_distinctive` + x1_d×any_no_distinctive(−1.10, 판례 (iv) 0.92), 도형 보류 규칙(figure_caveat·x2_whole ≥ 0.9 검토 권장, 미검증), 쉬운 음성 표본 50건 혼동 가능 0 → 임계 0.8 유지; 심결 AUC 0.621·현실 0.895(CI 안), 위험 하한 0.899(정밀도 0.82, 11쌍). v1.2.1(같은 날, `chore/model-phase-wrapup`): "위험" 최소 지지 10 → 30(위험 하한 0.899 → 0.563 대체값, 정밀도 0.69·159쌍·재현율 0.05 → 0.58), σ CV 격자 → 1.0 고정(x1_d CI 0.56~3.59 → 1.01~2.71), 심결 AUC 0.619·현실 0.897(CI 안). 다음: "다음 단계" 절(서비스 연결, 11월 도형상표 수집) |
 | 서비스 연결 엔진 E-1~E-6(계약 v2) | 다빈 | **완료(2026-10-24 PR #65 + 유형 규칙 개정 2026-10-25 PR #66)** | `backend/src/core/multi_search.py`(`engine.multi_search` → `SearchV2Result.to_dict()`), `backend/src/core/ocr.py`, `ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`, 테스트 `backend/tests/test_multi_search.py`(20)·`test_ocr.py`(7)·`ml/tests/test_pair_axes.py`(16)·`test_mark_type.py`(21)·`test_precompute_types.py`(2) | 후보 풀(CLIP 20 ∪ 발음 20 ∪ 철자 20 ∪ 관념 5 ∪ 유사군 20, 출원번호 중복 제거) → 풀의 모든 후보에 x2_img → 쌍별 축(학습 `name_axes` 와 같은 식, 고시 명칭 접미 분리 E-3: 블루커피 → 블루·커피) → `risk_score`(기여도 X1~X4·요부, 결측은 missing_adjustment, 단독·도형 규칙 트리거) → 계약 §2 JSON. 유형은 type_override → easyocr(지연 로드, 2초 폴백) → fallback. 실측(실제 엔진, 2026-10-24): 이름 "블루커피"+카페 세트 96ms(풀 55, 첫 호출 230ms), 이미지만 128ms(첫 호출 1.8s = easyocr 로드 1.5s 포함, 풀 20), 셋 다 209~242ms(풀 74). 유형 사전 계산 1,100건: 결합 993·도형 107(상표구분 100·비엔나코드 1,000, OCR 폴백 0). 계수 JSON 에 `meta.grade_precision` 추가(E-6; v1.2.1 0.6855 → v1.3 0.7039). 유형 규칙 개정(PR #66): 이름이 있으면 항상 문자계, 도형계는 이름 없는 이미지 질의·`type_override` 만, 이름 없는 이미지 질의의 OCR 글자는 `overall.query_type.suggested_name` + caveat `NAME_SUGGESTED` 로 제안(이름 축 자동 계산 안 함) — 셋 다 실측 BLU hands p 0.08 → 0.47(위험 0.563 미달은 이미지 결측 보정이 실제 x2_img 기여보다 큰 v1.2.1 성질, 설계 §8) → v1.3 에서 이름만 0.530·셋 다 0.531(§7-3). `POST /search/v2` 엔드포인트·BFF·zod(B-1~B-5)와 화면(F-1~F-5)은 아래 진행 중 행 — 예외 매핑은 계약 §5-6 |
 | X2 외관 벤치마크(심결 이미지 쌍) | 다빈 | 부분(v0 기준선 + v1 ① 요부 분리) | `ml/scripts/trials_extract_images.py`, `ml/scripts/x2_benchmark.py`, `ml/scripts/x2_split.py`, `ml/scripts/x2_variants.py`, `ml/tests/test_trials_extract_images.py`·`test_x2_benchmark.py`·`test_x2_split.py`·`test_x2_variants.py`(52건), `docs/MarkLens_X2_외관_설계.md` | 2026-10-08 v0: 심결문 PDF에서 양쪽 표장 이미지를 뽑아 제목에 연결(QA 시트 30쌍 눈 확인) → LLM 라벨이 붙은 이미지 쌍 286/350행(82%). 현재 CLIP 코사인의 ROC AUC 전체 0.51 · 판단축 외관 0.62 — 섞은 라벨 0.50. v1 ①(같은 날): 소형 기준 32px → 306쌍, 결론 대신 **표장 라벨**(유사 189·비유사 95·제외 22), 부트스트랩 95% CI, easyocr로 문자·도형 영역 분리(유형 일치 76%, OCR 완전 일치 51%). 철자 유사(`x2_text_ortho`) 외관축 AUC 0.72(0.57~0.86), 전체 이미지 0.63, 도형 크롭은 쌍 80·도형 29로 판단 보류, 사진 표장에서는 역전. v1 ②(`x2_variants.py`): 전체 이미지 변형 5종(흑백·윤곽선·다중 해상도·DINOv2·앙상블) 모두 채택 없음(최대 외관축 +0.026, CI 겹침), OCR 노이즈 진단은 ±0.01(철자 신호 상한은 신호 자체), 유형 게이팅 `x2_gate` 외관축 0.70(잠정 후보). 서비스 반영은 "다음 단계"의 X2 v2 재설계(철자 축 `x2_text_d` + 전체 이미지 CLIP, 도형계 caveat)로 — X2 설계 §10 은 결정 대기. 데이터는 `ml/data/trials/`(비공개) |
 | 축별 벤치마크(심결례 4축 특징) | 다빈 | 완료(측정 v1 + 10-09·10-11 재측정 — 통합 모델 v1.2.1~v1.3 의 학습 입력; v1.3 은 쉬운 음성 700쌍에 CLIP 이미지 축 추가) | `ml/scripts/pairs_features.py`, `ml/scripts/axes_benchmark.py`, `ml/src/axes/x2_ortho.py`, `ml/tests/test_pairs_features.py`·`test_axes_benchmark.py`·`test_x2_ortho.py`(119건) | 2026-10-08(`feat/axes-benchmark`): 라벨 일치 350쌍에 X1·X2 문자(철자)·X2 CLIP(전체·도형 크롭)·X3(실제 모델)·X4 점수와 결측 플래그 → `pairs_features.csv`. 표장 라벨 ROC AUC (a) 전체 / (b) 판단축 포함: X1 0.54/0.54, X2 철자 0.50/0.65, X2 CLIP 전체 0.49/0.63, X3 0.50/0.53(게이트 켜짐 75쌍뿐), X4 0.60(최종 라벨, 거절결정불복 0.83). 정밀도 0.9 단독 임계값 없음, X1↔X2 철자 ρ 0.63. 낮은 원인: 식별력 없는 공통 부분(GATE/GATE 비유사)을 분리관찰이 1.0 으로, 본문·OCR 명칭 오추출, 경계 사례 편중 — [통합 모델 설계 §4-1](docs/MarkLens_통합모델_설계.md). 2026-10-09 세 원인 처리 후 재측정(§4-2): 상대 명칭 LLM 추출(176/183행, 기존과 불일치 116) → X1 0.60·X2 철자 외관축 0.73; 식별력 v0 `x1_d` 등 +0.01 안; 쉬운 음성 700쌍(교차 350·DB 350, `--easy-negatives`/`--with-easy-negatives`)을 더한 현실 분포에서 X1 0.90·X2 철자 0.83·X4 0.81. 2026-10-11 마감 재측정(§4-3, 355행 — `유사여부_확정` 기준, pass b 일치 불요): X1 0.59·X2 철자 0.56(외관축 0.73)·X3 0.50·X4 0.60, 식별력 v0.2 `_d` 축 CI 안, 현실 분포 X1 0.89·X2 철자 0.82·X4 0.81. 학습 전 입력 정리 뒤(§4-4, 351행): X1 0.59(`x1_d` 0.60)·X2 철자 0.56(`x2_text_d` 0.58, 외관축 0.73)·X3 0.50·X4 0.60(n 184), 현실 분포 X1 0.89·X2 철자 0.83·X3 0.58·X4 0.82 — 모두 CI 안 |
@@ -81,13 +81,13 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | 백엔드-7 상표명 실시간 확인 | 현수 | 완료 | `backend/src/api/namecheck.py` | |
 | 백엔드-8 다축 오케스트레이션 | — | **구현** | `backend/src/api/search.py`·`backend/src/schemas/search_v2.py` | `POST /search/v2`·문서용 Pydantic 스키마·공유 한도·로깅 구현(2026-10-26, PR #69). 실제 모델로 BFF까지 응답 계약 확인, 화면 연결은 별도 |
 | 백엔드-9 3입력·4축 응답 | — | **구현** | `frontend/app/api/search/v2/route.ts`·`frontend/lib/contracts.ts` | API 엔진 결과 그대로 반환·BFF 상태/본문 전달·zod 계약·gateway 연결 구현(2026-10-26). 화면·E2E v2 연결은 남음 |
-| 결과 화면 v2(F-1~F-5) | — | **진행 중** | — | 3층 결과 화면에 등급·위험도·근거 축·요부·caveat·질의 유형 고치기·"상표명으로 넣기"(제안 이름 → 확인 → 재요청) — 화면 문구 규약은 계약 v2 §4 |
+| 결과 화면 v2(F-1~F-5) | — | **완료(2026-10-27, PR #72; 발표 전 보완 2026-10-28 `feat/demo-polish`)** | `frontend/components/ResultViewV2.tsx`, `lib/api.ts` `searchV2`, `lib/searchV2Fixtures.ts`, 테스트 `ResultViewV2.test.tsx`(15) | 3층 결과 화면에 등급 배지 + 위험도 %·근거 축 바·요부 문장(제외 사유 원문은 툴팁·"자세히")·caveat·시각 4상태 문구(v1 과 같은 문구)·질의 유형 고치기·"상표명으로 넣기"(제안 이름 → 확인 → 재요청), 위험 등급 옆 "검증 데이터 기준 10건 중 N건"(`meta.grade_precision`) — 화면 문구 규약은 계약 v2 §4 |
 | DB 유사군 백필 | — | **시연 업종 완료·나머지 11월** | `backend/scripts/goods_backfill.py`(status·plan 호출 0 → run), 데이터 저장소 `kipris_metadata.json` | 시연 업종 류(43·30·35·29·25·3·42) 489건 보강(2026-10-26 400건 + 10-27 89건) → 유사군 보유 589/1,100건, 7개 류 전부. 나머지 511건(41·9·38·5류 등)은 `run --all` 로 11월에 KIPRIS 월 예산(950회)과 심결례 수집을 조율해 채운다 — 엔진은 기동 때 자동 반영, 백필 뒤 후보 대부분에 `x4` 가 붙음 |
-| E2E v2(세 입력 흐름) | — | 예정 | — | 현재 Playwright 15건은 v1 화면(스펙 5 × 뷰포트 3). 세 입력·결과 화면 v2 가 들어오면 스펙 추가 |
+| E2E v2(세 입력 흐름) | — | **완료(2026-10-27, PR #72)** | `frontend/e2e/marklens.spec.ts` | Playwright 15건(스펙 5 × 뷰포트 3)을 `/api/search/v2` 흐름으로 옮김 — 등급 배지·caveat·지정상품 `x4` 반영 확인. 2026-10-28 로컬 15 passed(16.5초) |
 
 네 가지를 분명히 해 둡니다.
 
-- v1 검색 입력은 **이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음). 세 입력은 `POST /search/v2`(API 계약 v2) — API·BFF·zod·gateway는 구현(PR #69), 화면·E2E 연결은 남아 있습니다.
+- v1 검색 입력은 **이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음). 세 입력은 `POST /search/v2`(API 계약 v2) — API·BFF·zod·gateway(PR #69)·결과 화면 v2(PR #72)·E2E v2 까지 연결됐습니다(2026-10-27).
 - 상표명 확인(`/name-check`)은 검색과 분리된 별도 기능이며 검색 점수에 영향을 주지 않습니다.
 - X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. v1 검색 점수·등급에는 반영되지 않고, v2 엔진에서 `x1` 축으로 위험도에 들어갑니다.
 - X3는 같은 방식으로 `POST /semantic-search`에 연결되어 같은 패널에 관념 유사 후보(최대 5건, 하한 0.55)를 보여 줍니다. 기동 시 DB 상표명 중 관념이 있는 515건을 임베딩해 캐시하며 `MARKLENS_X3_ENABLED=0`이면 이 엔드포인트만 503입니다.
@@ -97,12 +97,13 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 모델 단계(정답 데이터 → 축별 벤치마크 → 식별력 → 통합 모델 v1.2.1 → v1.3 결측 편향 제거)와 엔진 연결(계약 v2 E-1~E-6,
 유형 규칙)은 끝났습니다. 남은 일은 두 갈래입니다.
 
-1. **서비스 연결 잔여** — API·문서용 Pydantic 스키마·BFF `/api/search/v2`·zod·공유 한도·로깅·gateway는 구현했습니다
-   (2026-10-26, 계약 v2 §6 B-1~B-5, PR #69). 남은 일은 결과 화면 v2(F-1~F-5: 등급·위험도·근거 축·요부·caveat·질의 유형 고치기·"상표명으로 넣기"
-   → 확인 → 재요청, 진행 중), E2E v2(세 입력 흐름, 예정), DB 유사군 백필(589/1,100건 — 시연 업종 7개 류 완료, 나머지는 11월 KIPRIS 예산 조율 — 채워지면
-   후보 대부분에 `x4` 가 붙고 지정상품 입력(프론트-6 ③)이 결과를 바꿉니다). v1 엔드포인트와 BFF 는 최종 발표(2026-12-20)까지
-   유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은
-   [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md)에 사유와 함께 있습니다.
+1. **서비스 연결 마무리** — API·Pydantic 스키마·BFF `/api/search/v2`·zod·공유 한도·로깅·gateway(2026-10-26, PR #69), OCR 축소·워밍업
+   (PR #70), 결과 화면 v2(F-1~F-5, 2026-10-27, PR #72)와 E2E v2 15건까지 연결했고 2026-10-27 실제 모델로 시나리오 8종을 검산했습니다.
+   발표 전 보완(2026-10-28): 1층 위험도 %, 제외 사유 원문 "자세히", 시각 4상태 문구, 후보 카드 정밀도 문구. 남은 것은 DB 유사군
+   나머지 511건(11월, 수동 `plan → run`, 한 머신·한 카운터 — 아래 "운영"; 채워지면 후보 대부분에 `x4` 가 붙고 지정상품 입력(프론트-6 ③)이
+   결과를 더 바꿉니다)과 운영 배포 검증입니다. v1 엔드포인트와 BFF 는 최종 발표(2026-12-20)까지 유지하고 그 뒤 별도 PR 로
+   제거합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md)에 사유와
+   함께 있습니다.
 2. **11월(KIPRIS 예산 1,000회)** — 심결례 2차 수집은 도형·결합-도형요부 사건 우선(대기열 621건; 현재 이름 있는 도형계 쌍 17,
    x2_whole ≥ 0.9 는 0건) → 도형 외관 3방법 비교(전체 이미지 CLIP · 도형 요부 크롭 CLIP · 유형 게이팅, [X2 설계 §10](docs/MarkLens_X2_외관_설계.md))
    → 도형 규칙 τ 0.9·판례 조건 (ii) 검증 → 통합 모델 2차(접미 분리를 반영한 특징 재생성 뒤 재학습, 도형계 이미지 계수를 결합 제약이
@@ -113,7 +114,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 ```text
 Browser
-  -> Next.js same-origin BFF (/api/search, /api/name-check, /api/phonetic-search, /api/semantic-search, /api/goods/search, /api/goods/classes, /api/images, /api/health, /api/turnstile-config; /api/search/v2 진행 중)
+  -> Next.js same-origin BFF (/api/search, /api/name-check, /api/phonetic-search, /api/semantic-search, /api/goods/search, /api/goods/classes, /api/images, /api/health, /api/turnstile-config, /api/search/v2)
   -> private FastAPI
   -> OpenCLIP + FAISS index
   -> PostgreSQL / KIPRIS Plus
@@ -407,7 +408,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | 경로 | 용도 | 한도(백엔드 IP 기준 기본값) |
 |---|---|---|
 | `POST /api/search?top_k=5` | Turnstile 검증 후 이미지 검색 프록시(v1 — 2026-12-20 까지 유지) | 백엔드 한도 적용(아래) |
-| `POST /api/search/v2?top_k=` | **진행 중** — 세 입력 통합 검색 프록시(multipart `image`·`name`·`goods_codes[]`·`type_override`; 계약 v2 §1-1) | v1 `/api/search` 와 같은 버킷 |
+| `POST /api/search/v2?top_k=` | 세 입력 통합 검색 프록시(multipart `image`·`name`·`goods_codes[]`·`type_override`; 계약 v2 §1-1, PR #69) — Turnstile 검증 뒤 토큰을 떼고 전달 | v1 `/api/search` 와 같은 버킷 |
 | `POST /api/name-check` | `{ "name": "...", "turnstileToken": "..." }` 명칭 확인 프록시 | 〃 |
 | `POST /api/phonetic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..20 }` X1 발음 유사 후보 프록시 | 〃 |
 | `POST /api/semantic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..5 }` X3 관념 유사 후보 프록시 | 〃 |
@@ -418,7 +419,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | `GET /api/turnstile-config` | 위젯 사이트 키·dev bypass 설정 전달 | — |
 | `GET /health` | 내부 FastAPI 엔진·인덱스 상태 | 없음 |
 | `POST /search` | 내부 이미지 검색 API (`file`, `top_k`) — v1, 최종 발표까지 유지 | 10/minute (`MARKLENS_SEARCH_RATELIMIT`) |
-| `POST /search/v2` | **구현(2026-10-26, PR #69)** — 세 입력 통합 검색 API·BFF·zod·gateway. 응답은 계약 v2 §2. 화면·E2E 연결 남음 | v1 `/search` 와 같은 설정값·같은 버킷 |
+| `POST /search/v2` | 세 입력 통합 검색 API(2026-10-26, PR #69) — 응답은 계약 v2 §2 그대로, 결과 화면 v2(PR #72)가 소비 | v1 `/search` 와 같은 설정값·같은 버킷(한 IP 가 v1+v2 합쳐 10/minute) |
 | `POST /name-check` | 내부 명칭 확인 API(KIPRIS 실시간) | 30/minute (`MARKLENS_NAMECHECK_RATELIMIT`) + KIPRIS 월 예산 |
 | `POST /phonetic-search` | 내부 X1 호칭 유사도 검색 (`name`, `top_k` ≤ 20). 로컬 DB 계산, KIPRIS 무관 | 30/minute (`MARKLENS_PHONETIC_RATELIMIT`) |
 | `POST /semantic-search` | 내부 X3 관념 유사도 검색 (`name`, `top_k` ≤ 5). 기동 시 임베딩 캐시, `MARKLENS_X3_ENABLED=0`이면 503 | 30/minute (`MARKLENS_X3_RATELIMIT`) |
@@ -443,13 +444,15 @@ production compose의 gateway는 여기에 사용자별 검색 5회/분·명칭 
 [API 계약 v2](docs/MarkLens_API계약_v2.md)에 있습니다. v1 문서의 `GET /name-check` 호환 경로 서술은 낡았습니다 — 해당 라우트는 현재
 코드에 없습니다.
 
-## 서비스 — 세 입력 통합 검색 (API 계약 v2; 엔진·모델 완료, 엔드포인트·화면 진행 중)
+## 서비스 — 세 입력 통합 검색 (API 계약 v2; 엔진·모델·API·화면 연결 완료 2026-10-27)
 
 이미지·상표명·지정상품(유사군 코드) 중 하나 이상을 받아 후보마다 출처 혼동 위험도를 내는 흐름입니다. 엔진
 `engine.multi_search(image, name, goods_codes, type_override, top_k)`(`backend/src/core/multi_search.py`, PR #65·#66)가
 [API 계약 v2](docs/MarkLens_API계약_v2.md) §2 응답(`overall`·`candidates`·`meta`)을 그대로 만들고, 엔드포인트 `POST /search/v2`·
-BFF `/api/search/v2`·결과 화면 v2 는 진행 중입니다. 백엔드·프론트는 계약 v2 §3 예시 JSON 과 엔진 결과만으로 스텁·목업을 만들어 병렬로
-구현합니다.
+BFF `/api/search/v2`(PR #69)와 결과 화면 v2(`frontend/components/ResultViewV2.tsx`, PR #72)가 이를 소비합니다. 백엔드·프론트는 계약 v2 §3
+예시 JSON 과 엔진 결과만으로 스텁·목업을 만들어 병렬로 구현했고, 2026-10-27 실제 모델로 BFF 경유 시나리오 8종(이름+카페 세트, +로고,
+로고만 글자/도형, 제안 이름 재요청, 치킨 세트, 지정상품만, 유형 고치기)을 계약 규칙(pydantic·로짓 검산·등급 하한·규칙 트리거·caveat·정렬)로
+검산해 전부 통과했습니다. 응답 시간은 엔진 기준 이름+상품 125~353ms, 로고 포함 117~288ms, 4096px 이미지 945ms(OCR 포함)였습니다.
 
 후보 풀 → 축 → 모델 → 규칙 → 응답:
 
@@ -864,7 +867,13 @@ venv/bin/python scripts/review_labeling_pack.py --annotator-id "<stable-reviewer
 결정과 임계값을 고정한 뒤에만 단방향으로 열 수 있습니다. 상세 계약은
 [ML 평가·라벨링 가이드](ml/evaluation/README.md)를 참고하세요.
 
-## 운영 — 의존성 갱신과 보안 권고
+## 운영 — 의존성 갱신·보안 권고·유사군 백필
+
+- **유사군 백필**(PR #71, `backend/scripts/goods_backfill.py`): `status`·`plan` 은 호출 0, `run --max-calls N` 만 실호출. 실행 상한 =
+  min(`--max-calls`, 월 950 잔여, 일 `KIPRIS_DAILY_BUDGET` 잔여), 3회 연속 실패면 중단, 원본 XML 을 파싱 전에 저장해 부른 출원번호는 다시
+  부르지 않음(멱등), 메타 바이트 형식 보존·해시 연쇄 갱신. 2026-10-26~27 시연 업종 7개 류 489건 → **589/1,100**. 나머지 511건은 11월에
+  **수동으로** `plan` 을 보고 `run --all` 한다(자동 예약 없음). 호출 카운터 `ml/data/kipris_call_count.json` 은 머신 단위라 **한 머신·한
+  카운터**에서만 실행하고 그 머신 값을 정본으로 삼는다(이 Mac 카운터는 10월 148회, 백필 489회는 현수 머신).
 
 - **Dependabot 설정**(`.github/dependabot.yml`): pip `/`·npm `/frontend`·docker `/deploy`·github-actions `/` 네 생태계, 주간,
   모두 `target-branch: develop`(2026-10-11 `c5bd3f8` — Dependabot 이 리베이스 때 base 를 `main` 으로 되돌리던 문제), docker 는

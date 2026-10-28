@@ -10,6 +10,8 @@ import {
 } from "lucide-react";
 import { imageUrl } from "@/lib/api";
 import type { SearchV2Candidate, SearchV2Response } from "@/lib/contracts";
+// v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
+import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/ResultView";
 
 // API 계약 v2 §4-4
 const GRADE_VIEW: Record<
@@ -80,6 +82,12 @@ const RULE_TRIGGER_TEXT: Record<string, string> = {
   standalone_x2_text: "철자가 매우 비슷해 검토 권장으로 올렸습니다",
   standalone_x3: "뜻이 매우 비슷해 검토 권장으로 올렸습니다",
   figure_x2_img: "도형이 매우 비슷해 검토 권장으로 올렸습니다(검증 데이터 부족, 참고용)",
+};
+
+const SIDE_LABEL: Record<"query" | "candidate" | "both", string> = {
+  query: "입력",
+  candidate: "후보",
+  both: "양쪽",
 };
 
 const REASON_PHRASES: [prefix: string, phrase: string][] = [
@@ -271,15 +279,22 @@ function ContributionBars({ risk }: { risk: SearchV2Candidate["risk"] }) {
 function CandidateCard({
   candidate,
   hasQueryName,
+  gradePrecision,
 }: {
   candidate: SearchV2Candidate;
   hasQueryName: boolean;
+  /** meta.grade_precision — "위험" 등급 카드 옆 "검증 데이터 기준 10건 중 N건"(§4-3, 상수 금지). */
+  gradePrecision: number;
 }) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
   const view = GRADE_VIEW[candidate.risk.grade];
   const name = candidate.title ?? "이름 미등록 상표";
   const sentences = buildSalientSentences(candidate.salient, hasQueryName);
+  // §4-2: 제외 사유 원문(removed[].reason 그대로)은 툴팁과 "자세히" 토글로
+  const reasonTitle = candidate.salient.removed
+    .map((item) => `${item.token}: ${item.reason}`)
+    .join("\n");
 
   return (
     <li className="border-b border-line last:border-b-0">
@@ -319,8 +334,15 @@ function CandidateCard({
               <AxisValues axes={candidate.axes} />
             </span>
           </span>
-          <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-extrabold ${view.pill}`}>
-            {candidate.risk.grade}
+          <span className="flex shrink-0 flex-col items-end gap-1">
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${view.pill}`}>
+              {candidate.risk.grade}
+            </span>
+            {candidate.risk.grade === "위험" && (
+              <span className="tnum text-[10px] text-sub">
+                검증 데이터 기준 10건 중 {Math.round(gradePrecision * 10)}건
+              </span>
+            )}
           </span>
           <ChevronDown
             aria-hidden
@@ -359,11 +381,29 @@ function CandidateCard({
               {sentences.length > 0 && (
                 <ul className="mt-3 flex flex-col gap-1">
                   {sentences.map((sentence) => (
-                    <li key={sentence} className="text-[11.5px] leading-relaxed text-sub">
+                    <li
+                      key={sentence}
+                      title={reasonTitle || undefined}
+                      className="text-[11.5px] leading-relaxed text-sub"
+                    >
                       {sentence}
                     </li>
                   ))}
                 </ul>
+              )}
+              {candidate.salient.removed.length > 0 && (
+                <details className="mt-1.5">
+                  <summary className="cursor-pointer text-[10.5px] font-semibold text-sub">
+                    제외 사유 자세히
+                  </summary>
+                  <ul className="mt-1 flex flex-col gap-0.5 pl-1" aria-label="제외 토큰 사유 원문">
+                    {candidate.salient.removed.map((item) => (
+                      <li key={`${item.side}:${item.token}`} className="text-[10.5px] text-sub">
+                        &apos;{item.token}&apos;({SIDE_LABEL[item.side]}) — {item.reason}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
               )}
               {candidate.risk.figure_caveat && (
                 <p className="mt-3 rounded-sm bg-low-bg px-2.5 py-1.5 text-[10.5px] font-semibold text-sub">
@@ -424,11 +464,21 @@ export default function ResultViewV2({
           <div className="min-w-0 flex-1">
             {overall.grade ? (
               <>
-                <span
-                  data-testid="overall-grade"
-                  className={`inline-block rounded-full px-3 py-1 text-[13px] font-extrabold ${view!.pill}`}
-                >
-                  {overall.grade}
+                <span className="flex flex-wrap items-center gap-2">
+                  <span
+                    data-testid="overall-grade"
+                    className={`inline-block rounded-full px-3 py-1 text-[13px] font-extrabold ${view!.pill}`}
+                  >
+                    {overall.grade}
+                  </span>
+                  {overall.prob !== null && (
+                    <span
+                      data-testid="overall-prob"
+                      className={`tnum text-[13px] font-extrabold ${view!.text}`}
+                    >
+                      위험도 {toPercent(overall.prob)}%
+                    </span>
+                  )}
                 </span>
                 <p className={`mt-2 text-[13px] font-semibold ${view!.text}`}>{view!.description}</p>
                 {showPrecision && (
@@ -469,7 +519,7 @@ export default function ResultViewV2({
 
             {overall.visual_status && (
               <p className="mt-2 text-[11px] text-sub">
-                시각 유사 상태: {overall.visual_status}
+                시각 유사 상태: {VISUAL_STATUS_VIEW[overall.visual_status].headline}
               </p>
             )}
 
@@ -510,7 +560,12 @@ export default function ResultViewV2({
         {candidates.length > 0 ? (
           <ul>
             {candidates.map((candidate) => (
-              <CandidateCard key={candidate.id} candidate={candidate} hasQueryName={queryHasName} />
+              <CandidateCard
+                key={candidate.id}
+                candidate={candidate}
+                hasQueryName={queryHasName}
+                gradePrecision={meta.grade_precision}
+              />
             ))}
           </ul>
         ) : (

@@ -31,7 +31,7 @@ import type {
   SemanticSearchResponse,
 } from "@/lib/contracts";
 
-const GRADE_VIEW: Record<
+export const GRADE_VIEW: Record<
   StatusCode,
   {
     mark: string;
