@@ -1,9 +1,9 @@
-FROM node:22-alpine AS dependencies
+FROM node:25-alpine AS dependencies
 WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 
-FROM node:22-alpine AS builder
+FROM node:25-alpine AS builder
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY} \
     NEXT_TELEMETRY_DISABLED=1
@@ -12,7 +12,7 @@ COPY --from=dependencies /app/node_modules ./node_modules
 COPY frontend/ ./
 RUN npm run build
 
-FROM node:22-alpine AS runtime
+FROM node:25-alpine AS runtime
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
