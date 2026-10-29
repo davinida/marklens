@@ -3,7 +3,7 @@
 #   ml\venv\Scripts\python.exe -m pip install -r backend\requirements-dev.txt
 
 # 테스트 러너 (backend/tests)
-pytest>=9.0.3,<10.0.0
+pytest>=9.1.1,<10.0.0
 
 # Starlette 1.x TestClient runtime. 운영 KIPRIS 클라이언트의 httpx와 별도 설치한다.
 httpx2>=2.13.0,<3.0.0
