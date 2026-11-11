@@ -2013,3 +2013,129 @@ def test_status_counts_bundle_progress_and_regeneration_preserves_done(tmp_path,
     assert _rows(ab_path)[0]["처리"] == "확인 2026-10-09"
     assert _rows(ab_path)[1]["처리"] == ""
     assert tc.bundle_progress(tc.TrialPaths(tmp_path / "none")) == []
+
+
+# ---------------- 수집 회차(2026-11 2차 수집): sheet 병합·기존 행 불변·회차별 status·batch --------
+
+def _add_round_two(paths_: tc.TrialPaths) -> None:
+    """_curation_fixture 위에 2차 건을 얹는다 — A1: 권리범위확인, S2 와 같은 당사자·등록상표(family
+    중복)이고 번호는 1차 전부보다 앞선다. Z9: 거절결정불복, 새 family."""
+    list_rows = _rows(paths_.list_csv) + [
+        _list_row("A1", "권리범위확인(소극적)", "B2", "갑2"),
+        _list_row("Z9", "거절결정불복", "새상표", "주식회사 병정"),
+    ]
+    prefilter = _rows(paths_.prefilter_csv) + [
+        {"심판번호": "A1", **tc.analyze_text(TEXT_SCOPE)},
+        {"심판번호": "Z9", **tc.analyze_text(TEXT_2024)},
+    ]
+    tc._write_csv(paths_.list_csv, tc.LIST_COLUMNS, list_rows)
+    tc._write_csv(paths_.prefilter_csv, tc.PREFILTER_COLUMNS, prefilter)
+    (paths_.text_dir / "Z9.txt").write_text(TEXT_2024, encoding="utf-8")
+    tc._write_csv(paths_.round_queue(2), ["심판번호"], [{"심판번호": "A1"}, {"심판번호": "Z9"}])
+
+
+def test_sheet_merges_new_round_and_keeps_existing_rows_cell_for_cell(tmp_path, capsys):
+    paths_, kinds = _curation_fixture(tmp_path)
+    assert _label_cli(tmp_path, "label", "S2", "유사", "--axis", "호칭", "--source", "human",
+                      "--evidence", "호칭이 동일하므로", "--confidence", "high") == 0
+    # 2차 수집 전의 labels.csv·큐에는 round 열이 없다
+    legacy = [column for column in tc.LABEL_COLUMNS if column != tc.ROUND_COLUMN]
+    tc._write_csv(paths_.labels_csv, legacy, _rows(paths_.labels_csv))
+    legacy_queue = [column for column in tc.CURATION_COLUMNS if column != tc.ROUND_COLUMN]
+    tc._write_csv(paths_.curation_queue, legacy_queue, _rows(paths_.curation_queue))
+    before, before_queue = _rows(paths_.labels_csv), _rows(paths_.curation_queue)
+    assert tc.load_rounds(paths_) == {} and tc.ROUND_COLUMN not in before[0]
+
+    _add_round_two(paths_)
+    assert tc.load_rounds(paths_) == {"A1": "2", "Z9": "2"}
+    capsys.readouterr()
+    assert _label_cli(tmp_path, "sheet", "--verify-unchanged") == 0
+    out = capsys.readouterr().out
+    after = _rows(paths_.labels_csv)
+    old, new = after[:len(before)], after[len(before):]
+    # 기존 행: 같은 순서, 이전 열의 셀이 전부 그대로(사람 라벨 포함), 회차 1
+    assert [{column: row[column] for column in legacy} for row in old] == before
+    assert all(row["round"] == "1" for row in old)
+    by_number = {row["심판번호"]: row for row in after}
+    assert by_number["S2"]["유사여부_확정"] == "유사" and by_number["S2"]["확인여부"] == "Y"
+    assert by_number["S2"]["자동등급"] == "1" and "중복" not in by_number["S2"]["참고표시"]
+    # 2차 행: 맨 뒤, 회차 2. A1 은 번호가 앞서도 1차 S2 의 family 중복으로 표시된다
+    assert [(row["심판번호"], row["round"]) for row in new] == [("A1", "2"), ("Z9", "2")]
+    assert by_number["A1"]["자동등급"] == "2" and "family 첫 건 S2" in by_number["A1"]["참고표시"]
+    assert by_number["Z9"]["자동등급"] == "1" and by_number["Z9"]["유사여부_확정"] == ""
+    # 회차를 모르면(이전 동작) 번호가 앞선 A1 이 첫 건이 돼 기존 S2 행이 바뀐다
+    plain = {row["심판번호"]: row for row in tc.build_sheet_rows(
+        _rows(paths_.list_csv), _rows(paths_.prefilter_csv), kinds)}
+    assert plain["S2"]["자동등급"] == "2" and "family 첫 건 A1" in plain["S2"]["참고표시"]
+    # 큐: 기존 순번 그대로, 2차 1등급(Z9)이 뒤에 붙는다(family 중복 A1 은 빠진다)
+    queue = _rows(paths_.curation_queue)
+    assert [{column: item[column] for column in legacy_queue}
+            for item in queue[:len(before_queue)]] == before_queue
+    added = [(item["순번"], item["심판번호"], item["round"]) for item in queue[len(before_queue):]]
+    assert added == [(str(len(before_queue) + 1), "Z9", "2")]
+    assert f"기존 {len(before)}행 대조(이전 열 {len(legacy)}개, 셀 단위): 달라진 셀 0개" in out
+    assert f"회차별: 1차 {len(before)}행/7건" in out
+    assert "2차 2행/2건(1등급 1·2등급 1·3등급 0)" in out
+    assert "· 2차 큐 1건" in out
+    # 다시 돌려도 같다(회차는 큐 파일에서 읽는다)
+    snapshot = paths_.labels_csv.read_bytes()
+    assert _label_cli(tmp_path, "sheet", "--verify-unchanged") == 0
+    assert paths_.labels_csv.read_bytes() == snapshot
+
+
+def test_sheet_verify_unchanged_refuses_to_write_when_existing_rows_change(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    labels_bytes = paths_.labels_csv.read_bytes()
+    queue_bytes = paths_.curation_queue.read_bytes()
+    prefilter = _rows(paths_.prefilter_csv)
+    for row in prefilter:
+        if row["심판번호"] == "S2":
+            row["본문_저명주지_실질"] = "1"  # 기존 1등급 행이 2등급으로 바뀌는 입력 변화
+    tc._write_csv(paths_.prefilter_csv, tc.PREFILTER_COLUMNS, prefilter)
+    capsys.readouterr()
+    assert _label_cli(tmp_path, "sheet", "--verify-unchanged") == 6
+    err = capsys.readouterr().err
+    assert "[중단] --verify-unchanged" in err and "S2" in err and "자동등급: '1' → '2'" in err
+    assert paths_.labels_csv.read_bytes() == labels_bytes  # 아무것도 쓰지 않았다
+    assert paths_.curation_queue.read_bytes() == queue_bytes
+    # 플래그가 없으면 종전처럼 다시 쓰되 달라진 셀 수를 알린다
+    assert _label_cli(tmp_path, "sheet") == 0
+    out = capsys.readouterr().out
+    assert "달라진 셀" in out and "달라진 셀 0개" not in out
+    assert {row["심판번호"]: row for row in _rows(paths_.labels_csv)}["S2"]["자동등급"] == "2"
+    # 행 수가 달라져도(기존 건이 사라짐) 잡는다
+    count, notes = tc.unchanged_violations(["심판번호"], [{"심판번호": "X"}], [])
+    assert count == 1 and notes == ["행 수 1 → 0"]
+
+
+def test_status_and_batch_by_round(tmp_path, capsys):
+    paths_, _ = _curation_fixture(tmp_path)
+    for number in ("S2", "S5"):
+        assert _label_cli(tmp_path, "label", number, "유사", "--source", "llm",
+                          "--evidence", "소결 문장", "--confidence", "high") == 0
+    capsys.readouterr()
+    assert _label_cli(tmp_path, "status") == 0
+    assert "차: " not in capsys.readouterr().out  # 회차가 하나뿐이면 회차별 줄이 없다
+    _add_round_two(paths_)
+    assert _label_cli(tmp_path, "sheet", "--verify-unchanged") == 0
+    capsys.readouterr()
+    assert _label_cli(tmp_path, "status") == 0
+    out = capsys.readouterr().out
+    rows = len([row for row in _rows(paths_.labels_csv) if row["round"] == "1"])
+    assert f"- 1차: 7건·{rows}행 · 1등급 6건 · 라벨 2행 · 남은 큐 pass a 5/7 · pass b 7/7" in out
+    assert "- 2차: 2건·2행 · 1등급 1건 · 라벨 0행 · 남은 큐 pass a 1/1 · pass b 1/1" in out
+
+    assert _label_cli(tmp_path, "show", "--batch", "5", "--round", "2") == 0
+    out = capsys.readouterr().out
+    assert "2차 큐 pass a 라벨 없는 1건(남은 1/1)" in out and out.rstrip().endswith("- Z9")
+    batch = (tmp_path / "batch_1.md").read_text(encoding="utf-8")
+    assert "## 1. Z9 · 거절결정불복" in batch and "## 2." not in batch
+    assert _label_cli(tmp_path, "show", "--batch", "2") == 0  # 회차를 안 주면 전체 큐 순서
+    assert capsys.readouterr().out.rstrip().endswith("- S1, R1")
+    assert _label_cli(tmp_path, "label", "Z9", "비유사", "--source", "llm",
+                      "--evidence", "소결 문장", "--confidence", "high") == 0
+    capsys.readouterr()
+    assert _label_cli(tmp_path, "show", "--batch", "5", "--round", "2") == 0
+    assert "2차 큐 1건 모두 pass a 라벨이 있습니다" in capsys.readouterr().out
+    assert _label_cli(tmp_path, "show", "--batch", "5", "--round", "3") == 1
+    assert "3차 건이 없습니다" in capsys.readouterr().err

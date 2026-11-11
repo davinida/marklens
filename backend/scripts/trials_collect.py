@@ -4,16 +4,20 @@
     list     월별 항목별검색(getAdvancedSearch)으로 상표 심판 목록 → ml/data/trials/list.csv
     fetch    심판(결)문(getJudDocumentInfoSearch) 경로 조회 → 즉시 PDF 다운로드 → pdf/{심판번호}.pdf
     extract  PyMuPDF 텍스트 추출 + 정규식 선별 → text/{심판번호}.txt, prefilter.csv
-    sheet    사람 라벨링용 시트 초안 → labels.csv (재생성 때 사람 열 보존)
+    sheet    사람 라벨링용 시트 초안 → labels.csv (재생성 때 사람 열 보존. round 열 = 수집 회차,
+             --verify-unchanged: 이전 행의 셀이 하나라도 달라지면 쓰지 않고 중단)
     show     심판번호의 주문·판단 절·자동 판정 보기 (--next: curation_queue.csv 의 다음 미확정 건,
-             --batch n: 라벨 없는 다음 n건을 batch_<k>.md 로 — 정규식 추정은 넣지 않는다)
+             --batch n: 라벨 없는 다음 n건을 batch_<k>.md 로 — 정규식 추정은 넣지 않는다,
+             --round N: 그 회차 큐만)
     label    큐레이션 라벨 기록 (유사|비유사|제외, --source llm|human, --evidence, --confidence,
              --pass a|b). llm 은 사람이 확인한 행(확인여부=Y)을 덮어쓰지 못한다
     confirm  LLM 라벨을 그대로 승인 (확인여부=Y, 라벨출처=human-confirmed)
     review   재검토 큐 review_queue.csv (LLM≠추정 · 확신도 low · 메모 애매 · pass A≠B)
     sample   --n 40 --seed 0: 미확인 LLM 라벨에서 종류×판정 층화 표본 → verify_queue.csv
-    status   예산(quota.json)·건수·단계별 진행·큐레이션 진행률 요약
+    status   예산(quota.json)·건수·단계별 진행·큐레이션 진행률 요약(회차가 둘 이상이면 회차별)
     sample   층화 표본 CSV (호출 없음) · biblio 서지상세 (1회/건)
+    sample   --round 2 --total 460 --seed 0: 2차 수집 표본 → round2_queue.csv (근거 표·배분은
+             trials_round2.py, 호출 없음)
 
 실행 (project root 기준):
     ml/venv/bin/python -m backend.scripts.trials_collect list --kind refusal \\
@@ -223,6 +227,18 @@ class TrialPaths:
     def verify_queue(self) -> Path:
         return self.base / "verify_queue.csv"
 
+    @property
+    def image_parts_csv(self) -> Path:
+        return self.base / "image_parts.csv"
+
+    @property
+    def round_image_types_csv(self) -> Path:
+        return self.base / "round_image_types.csv"
+
+    def round_queue(self, round_no: int) -> Path:
+        """N차 수집 큐(sample --round N 산출물). 여기 있는 심판번호가 그 회차다(load_rounds)."""
+        return self.base / f"round{round_no}_queue.csv"
+
 
 DEFAULT_PATHS = TrialPaths(paths.ML_DATA_DIR / "trials")
 
@@ -246,11 +262,15 @@ ENRICH_COLUMNS = (
     "상대표장_명칭_llm",  # label --name-b: 판단 절에서 LLM 이 옮긴 문자 표기(도형만이면 빈 값)
 )
 PRESERVED_COLUMNS = HUMAN_COLUMNS + LABEL_META_COLUMNS + LLM_B_COLUMNS + ENRICH_COLUMNS
+# 수집 회차(2026-11 2차 수집): round<N>_queue.csv 에 있는 심판번호는 N, 나머지는 1(load_rounds).
+# 맨 끝 열이라 이전 labels.csv 의 기존 열 순서·값은 그대로다.
+ROUND_COLUMN = "round"
+FIRST_ROUND = "1"
 LABEL_COLUMNS = [
     "심판번호", "종류", "심판상태", "심결월", "상표A_번호", "상표A_명칭", "상표B_번호",
     "상대표장_번호_후보", "상대표장_유형", "지정상품_원문", "조문플래그", "결론조문", "신뢰도",
     "표장유사_소결", "자동등급", "등급사유", "등급_원규칙", "family", "참고표시", "유사여부_추정",
-    "추정근거", "결정축_추정", "상표유형_추정", *PRESERVED_COLUMNS,
+    "추정근거", "결정축_추정", "상표유형_추정", *PRESERVED_COLUMNS, ROUND_COLUMN,
 ]
 
 
@@ -508,6 +528,13 @@ def _read_csv(path: Path) -> list[dict]:
         return []
     with path.open(encoding="utf-8", newline="") as handle:
         return list(csv.DictReader(handle))
+
+
+def _csv_header(path: Path) -> list[str]:
+    if not path.exists():
+        return []
+    with path.open(encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle).fieldnames or [])
 
 
 def _append_csv(path: Path, columns: list[str], rows: list[dict]) -> None:
@@ -1857,18 +1884,57 @@ def _empty_human() -> dict[str, str]:
     return {column: "" for column in PRESERVED_COLUMNS}
 
 
+_ROUND_QUEUE_RE = re.compile(r"round(\d+)_queue\.csv")
+
+
+def load_rounds(paths_: TrialPaths) -> dict[str, str]:
+    """수집 회차: round<N>_queue.csv(sample --round N, N ≥ 2)에 있는 심판번호 → "N". 없는 건은 1차.
+
+    회차를 큐 파일에서 읽으므로 sheet 를 언제 다시 돌려도 같은 값이 나온다(labels.csv 상태에 기대지
+    않는다). 한 번호가 여러 큐에 있으면 낮은 회차.
+    """
+    found: list[tuple[int, Path]] = []
+    if paths_.base.exists():
+        for path in paths_.base.glob("round*_queue.csv"):
+            match = _ROUND_QUEUE_RE.fullmatch(path.name)
+            if match and int(match.group(1)) >= 2:
+                found.append((int(match.group(1)), path))
+    rounds: dict[str, str] = {}
+    for round_no, path in sorted(found):
+        for row in _read_csv(path):
+            number = (row.get("심판번호") or "").strip()
+            if number:
+                rounds.setdefault(number, str(round_no))
+    return rounds
+
+
+def row_round(row: dict) -> str:
+    """labels·큐 행의 회차(열이 없거나 비어 있으면 1차)."""
+    return (row.get(ROUND_COLUMN) or "").strip() or FIRST_ROUND
+
+
 def build_sheet_rows(
     list_rows: list[dict],
     prefilter_rows: list[dict],
     kinds: dict[str, dict],
     *,
     include_missing: bool = False,
+    rounds: dict[str, str] | None = None,
 ) -> list[dict]:
-    """labels.csv 행. 같은 family 는 첫 건(심판번호 순)만 1등급을 유지하고 나머지는 '중복'."""
+    """labels.csv 행. 같은 family 는 첫 건(심판번호 순)만 1등급을 유지하고 나머지는 '중복'.
+
+    rounds(심판번호 → 회차)가 있으면 앞 회차부터 처리한다 — 뒤 회차 사건의 번호가 앞서도 앞 회차의
+    행 순서와 family 첫 건(등급)이 바뀌지 않는다.
+    """
     analyses = {row["심판번호"]: row for row in prefilter_rows}
+    rounds = rounds or {}
     sheet: list[dict] = []
     first_of_family: dict[str, str] = {}
-    for row in sorted(list_rows, key=lambda r: r["심판번호"]):
+
+    def order(row: dict) -> tuple[int, str]:
+        return (int(rounds.get(row["심판번호"], FIRST_ROUND)), row["심판번호"])
+
+    for row in sorted(list_rows, key=order):
         number = row["심판번호"]
         analysis = analyses.get(number)
         kind = kind_for_trial_desc(row.get("종류", ""), kinds)
@@ -1879,6 +1945,7 @@ def build_sheet_rows(
             "심결월": row.get("심결월", ""),
             "상표A_명칭": row.get("상표명칭", ""),
             **_empty_human(),
+            ROUND_COLUMN: rounds.get(number, FIRST_ROUND),
         }
         if analysis is None:
             if include_missing:
@@ -1999,7 +2066,7 @@ def _grade_summary(rows: list[dict]) -> tuple[dict[str, int], int]:
 
 CURATION_COLUMNS = [
     "순번", "심판번호", "종류", "상표A_명칭", "상대표장_번호", "유사여부_추정", "신뢰도",
-    "등급사유",
+    "등급사유", ROUND_COLUMN,
 ]
 _CURATION_KIND_ORDER = {"scope": 0, "refusal": 1, "invalidation": 2}
 _CURATION_CONFIDENCE_ORDER = {"high": 0, "low": 1, "": 2}
@@ -2007,9 +2074,9 @@ _CURATION_SECOND_RE = re.compile(r"^권리범위: 표장 (?:유사|비유사) �
 
 
 def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]:
-    """큐레이션 순서: 1등급(권리범위확인 → 거절결정불복 → 무효, 각 안에서 신뢰도 high → low) 다음에
-    2등급 중 "권리범위 … 저명·주지 언급". family 중복은 제외. 심판번호당 한 줄(상대 표장 번호는 ; 로
-    잇고, 없으면 복구 후보)."""
+    """큐레이션 순서: 회차 순(앞 회차의 순번이 그대로 남는다), 회차 안에서 1등급(권리범위확인 →
+    거절결정불복 → 무효, 각 안에서 신뢰도 high → low) 다음에 2등급 중 "권리범위 … 저명·주지 언급".
+    family 중복은 제외. 심판번호당 한 줄(상대 표장 번호는 ; 로 잇고, 없으면 복구 후보)."""
     first: dict[str, dict] = {}
     numbers: dict[str, list[str]] = {}
     for row in rows:
@@ -2017,7 +2084,7 @@ def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]
         known = numbers.setdefault(row["심판번호"], [])
         if row.get("상표B_번호") and row["상표B_번호"] not in known:
             known.append(row["상표B_번호"])
-    picked: list[tuple[tuple[int, int, int, str], dict]] = []
+    picked: list[tuple[tuple[int, int, int, int, str], dict]] = []
     for number, row in first.items():
         reason = row.get("등급사유", "")
         if "중복" in row.get("참고표시", "") or reason.startswith("family 중복"):
@@ -2029,7 +2096,7 @@ def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]
         else:
             continue
         kind = kind_for_trial_desc(row.get("종류", ""), kinds)
-        key = (bucket, _CURATION_KIND_ORDER.get(kind, 3),
+        key = (int(row_round(row)), bucket, _CURATION_KIND_ORDER.get(kind, 3),
                _CURATION_CONFIDENCE_ORDER.get(row.get("신뢰도", ""), 2), number)
         picked.append((key, row))
     picked.sort(key=lambda item: item[0])
@@ -2044,9 +2111,39 @@ def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]
             "유사여부_추정": row.get("유사여부_추정", ""),
             "신뢰도": row.get("신뢰도", ""),
             "등급사유": row.get("등급사유", ""),
+            ROUND_COLUMN: row_round(row),
         }
         for index, (_, row) in enumerate(picked, start=1)
     ]
+
+
+def unchanged_violations(
+    previous_columns: list[str], previous: list[dict], rows: list[dict], *, limit: int = 20
+) -> tuple[int, list[str]]:
+    """이전 labels.csv 의 행이 새 행 목록 안에 같은 순서·같은 값으로 남아 있는지 본다.
+
+    새 행 중 이전 파일에 있던 심판번호의 행만 순서대로 뽑아 이전 행과 1:1 로 맞추고, 이전 파일의
+    열만 셀 단위로 비교한다(새로 생긴 열은 보지 않는다). (다른 셀 수 + 행 수 차이, 설명 몇 줄).
+    """
+    known = {row.get("심판번호", "") for row in previous}
+    kept = [row for row in rows if row.get("심판번호", "") in known]
+    count = abs(len(kept) - len(previous))
+    notes: list[str] = []
+    if count:
+        notes.append(f"행 수 {len(previous)} → {len(kept)}")
+    for index, (old, new) in enumerate(zip(previous, kept)):
+        for column in previous_columns:
+            before, after = old.get(column) or "", new.get(column) or ""
+            if before == after:
+                continue
+            count += 1
+            if len(notes) < limit:
+                notes.append(
+                    f"{index + 1}행 {old.get('심판번호', '')}"
+                    f"(상표B {old.get('상표B_번호') or '-'}) {column}: "
+                    f"{before[:40]!r} → {after[:40]!r}"
+                )
+    return count, notes
 
 
 def run_sheet(args: argparse.Namespace, session: Session) -> int:
@@ -2057,22 +2154,47 @@ def run_sheet(args: argparse.Namespace, session: Session) -> int:
     list_rows += [row for row in _read_csv(paths_.list_csv) if row["심판번호"] not in known]
     prefilter_rows = _read_csv(paths_.prefilter_csv)
     previous = _read_csv(paths_.labels_csv)
+    previous_columns = _csv_header(paths_.labels_csv)
     kinds = load_kinds(args.kinds_config)
-    rows = build_sheet_rows(list_rows, prefilter_rows, kinds)
+    rows = build_sheet_rows(list_rows, prefilter_rows, kinds, rounds=load_rounds(paths_))
     moved = merge_human_columns(rows, previous)
-    _write_csv(paths_.labels_csv, LABEL_COLUMNS, rows)
+    changed, notes = unchanged_violations(previous_columns, previous, rows)
+    if changed and getattr(args, "verify_unchanged", False):
+        print(f"[중단] --verify-unchanged: 기존 {len(previous)}행에서 셀 {changed}개가 달라져 "
+              f"{paths_.labels_csv.name}·{paths_.curation_queue.name} 를 쓰지 않았습니다",
+              file=sys.stderr)
+        for note in notes:
+            print("  " + note, file=sys.stderr)
+        return 6
+    _write_csv_atomic(paths_.labels_csv, LABEL_COLUMNS, rows)
     grades, trials = _grade_summary(rows)
     print(f"## sheet: {len(rows)}행/{trials}건 → {paths_.labels_csv} "
           f"(1등급 {grades['1']}, 2등급 {grades['2']}, 3등급 {grades['3']}) · "
           f"사람 열 보존 {moved}행(이전 {len(previous)}행)")
+    if previous:
+        print(f"- 기존 {len(previous)}행 대조(이전 열 {len(previous_columns)}개, 셀 단위): "
+              f"달라진 셀 {changed}개" + ("" if not changed else " — " + " / ".join(notes[:3])))
+    round_numbers = sorted({row_round(row) for row in rows}, key=int)
+    if len(round_numbers) > 1:
+        parts = []
+        for round_no in round_numbers:
+            subset = [row for row in rows if row_round(row) == round_no]
+            sub_grades, sub_trials = _grade_summary(subset)
+            parts.append(f"{round_no}차 {len(subset)}행/{sub_trials}건(1등급 {sub_grades['1']}·"
+                         f"2등급 {sub_grades['2']}·3등급 {sub_grades['3']})")
+        print("- 회차별: " + " · ".join(parts))
     queue = build_curation_queue(rows, kinds)
     _write_csv(paths_.curation_queue, CURATION_COLUMNS, queue)
     second = sum(1 for item in queue if _CURATION_SECOND_RE.match(item["등급사유"]))
     recovered = sum(1 for r in {row["심판번호"]: row for row in rows}.values()
                     if not r.get("상표B_번호") and r.get("상대표장_번호_후보"))
+    by_round = "".join(
+        f" · {round_no}차 큐 {sum(1 for item in queue if row_round(item) == round_no)}건"
+        for round_no in round_numbers
+    ) if len(round_numbers) > 1 else ""
     print(f"- 큐레이션 큐 {len(queue)}건(1등급 {len(queue) - second} · "
           f"권리범위 저명·주지 언급 {second}) → {paths_.curation_queue} · "
-          f"상대 표장 번호 후보 복구 {recovered}건")
+          f"상대 표장 번호 후보 복구 {recovered}건{by_round}")
     return 0
 
 
@@ -2589,19 +2711,25 @@ def run_batch(args: argparse.Namespace, session: Session) -> int:
     queue = _read_csv(paths_.curation_queue)
     if not queue:
         raise LabelError(f"{paths_.curation_queue} 가 없습니다 — sheet 먼저", 1)
+    round_no = int(getattr(args, "round", 0) or 0)
+    scope = f"{round_no}차 큐" if round_no else "큐"
+    if round_no:  # --round N: 그 회차 큐만(다음 단계인 LLM 이중 라벨링을 회차 단위로)
+        queue = [item for item in queue if row_round(item) == str(round_no)]
+        if not queue:
+            raise LabelError(f"{paths_.curation_queue} 에 {round_no}차 건이 없습니다", 1)
     label_rows = _read_csv(paths_.labels_csv)
     pending = unlabeled_queue(queue, label_rows, pass_)
     items = pending[: args.batch]
     if not items:
-        print(f"큐 {len(queue)}건 모두 pass {pass_} 라벨이 있습니다")
+        print(f"{scope} {len(queue)}건 모두 pass {pass_} 라벨이 있습니다")
         return 0
     index = next_batch_index(paths_.base)
     out = paths_.base / f"batch_{index}.md"
     out.write_text(
         render_batch(items, paths_, label_rows, index=index, pass_=pass_), encoding="utf-8"
     )
-    print(f"## batch {index}: pass {pass_} 라벨 없는 {len(items)}건"
-          f"(남은 {len(pending)}/{len(queue)}) → {out}")
+    print(f"## batch {index}: {scope + ' ' if round_no else ''}pass {pass_} 라벨 없는 "
+          f"{len(items)}건(남은 {len(pending)}/{len(queue)}) → {out}")
     print("- " + ", ".join(item["심판번호"] for item in items))
     return 0
 
@@ -3019,6 +3147,30 @@ def label_summary(label_rows: list[dict], queue: list[dict]) -> list[str]:
     return lines
 
 
+def round_progress(label_rows: list[dict], queue: list[dict]) -> list[str]:
+    """회차별 진행(건·행, 1등급, 라벨된 행, 남은 큐). 회차가 하나뿐이면 빈 목록."""
+    rounds = sorted({row_round(row) for row in label_rows}, key=int)
+    if len(rounds) < 2:
+        return []
+    lines: list[str] = []
+    for round_no in rounds:
+        rows = [row for row in label_rows if row_round(row) == round_no]
+        first: dict[str, dict] = {}
+        for row in rows:
+            first.setdefault(row["심판번호"], row)
+        grade_one = sum(1 for row in first.values() if row.get("자동등급") == "1")
+        labeled = sum(1 for row in rows if (row.get("유사여부_확정") or "").strip())
+        items = [item for item in queue if row_round(item) == round_no]
+        remaining_a = len(unlabeled_queue(items, label_rows, "a"))
+        remaining_b = len(unlabeled_queue(items, label_rows, "b"))
+        lines.append(
+            f"{round_no}차: {len(first)}건·{len(rows)}행 · 1등급 {grade_one}건 · "
+            f"라벨 {labeled}행 · "
+            f"남은 큐 pass a {remaining_a}/{len(items)} · pass b {remaining_b}/{len(items)}"
+        )
+    return lines
+
+
 # ====================================================================
 # sample — 층화 표본 (trialDecisionDoc=Y 만, 종류별 분산 규칙)
 # ====================================================================
@@ -3075,6 +3227,10 @@ def select_sample(
 
 
 def run_sample(args: argparse.Namespace, session: Session) -> int:
+    if getattr(args, "round", 0):
+        from backend.scripts import trials_round2  # 순환 import 방지(지연)
+
+        return trials_round2.run_sample_round(args, session)
     if getattr(args, "n", 0):
         return run_verify_sample(args, session)
     if not args.out:
@@ -3222,8 +3378,11 @@ def run_status(args: argparse.Namespace, session: Session) -> int:
     print(f"- list.csv {len(list_rows)}건 · PDF {pdfs}건 · 텍스트 {texts}건 · "
           f"prefilter {prefilter_count}행 · labels {len(label_rows)}행")
     if label_rows:
+        queue = _read_csv(paths_.curation_queue)
         print("- " + curation_progress(label_rows))
-        for line in label_summary(label_rows, _read_csv(paths_.curation_queue)):
+        for line in label_summary(label_rows, queue):
+            print("- " + line)
+        for line in round_progress(label_rows, queue):
             print("- " + line)
     progress_bundle = bundle_progress(paths_)
     if progress_bundle:
@@ -3296,6 +3455,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_sheet = sub.add_parser("sheet", help="labels.csv 초안(재생성 때 사람 열 보존)")
     common(p_sheet)
+    p_sheet.add_argument("--verify-unchanged", action="store_true",
+                         help="이전 labels.csv 행의 셀이 하나라도 달라지면 쓰지 않고 중단"
+                              "(exit 6) — 새 회차를 병합할 때")
     p_show = sub.add_parser("show", help="심판번호의 주문·판단 절·자동 판정 보기(호출 없음)")
     p_show.add_argument("trial", nargs="*", metavar="심판번호")
     p_show.add_argument("--next", action="store_true",
@@ -3303,6 +3465,8 @@ def build_parser() -> argparse.ArgumentParser:
     p_show.add_argument("--batch", type=int, default=0, metavar="N",
                         help="큐에서 라벨 없는 다음 N건을 batch_<k>.md 로(자동 판정은 넣지 않음)")
     p_show.add_argument("--pass", dest="pass_", default="a", help="--batch 기준 pass: a(기본)|b")
+    p_show.add_argument("--round", type=int, default=0, metavar="N",
+                        help="--batch 를 N차 수집 큐로만(기본 0 = 전체 큐)")
     p_show.add_argument("--ids", default="", metavar="FILE",
                         help="심판번호 목록 파일 → --batch N 건씩 상대 표장 명칭 추출 배치"
                              "(기초사실·판단 절, 라벨 여부 무관)")
@@ -3354,7 +3518,12 @@ def build_parser() -> argparse.ArgumentParser:
                           help="수집 표본 출력(필수) · 검증 표본은 기본 verify_queue.csv")
     p_sample.add_argument("--n", type=int, default=0,
                           help="검증 표본: 미확인 LLM 라벨에서 종류×판정 층화 무작위 N건")
-    p_sample.add_argument("--seed", type=int, default=0, help="검증 표본 난수 시드")
+    p_sample.add_argument("--seed", type=int, default=0, help="검증 표본·회차 표본 난수 시드")
+    p_sample.add_argument("--round", type=int, default=0, metavar="N",
+                          help="N차 수집 표본(N ≥ 2): 기존 수집분의 수율·도형 추정 근거로 미수집 "
+                               "목록에서 골라 round<N>_queue.csv 로(trials_round2, 호출 없음)")
+    p_sample.add_argument("--total", type=int, default=460,
+                          help="--round 의 총 건수(이미 받은 그 회차 건 포함, 기본 460)")
     p_biblio = sub.add_parser("biblio", help="서지상세 조회(1회/건) — 결과·주문 대조용")
     common(p_biblio)
     p_biblio.add_argument("--trial", action="append", required=True, metavar="심판번호")
