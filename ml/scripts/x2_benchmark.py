@@ -26,6 +26,7 @@ import csv
 import hashlib
 import json
 import random
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -64,14 +65,26 @@ MARK_AXES = ("외관", "호칭", "관념")
 FEATURES = ("x2_whole", "x2_fig", "x2_text_ortho", "x2_rule_auto", "x2_rule_llm")
 
 
+# 메모의 "표장 유사"가 유사 판단을 뜻할 때만 — 바로 뒤에 "여부"·"판단"·"미판단"이 오면
+# ("표장 유사 여부 판단 없음"·"표장 유사 여부 미판단"·"표장 유사 판단 없이") 판단이 없었다는 뜻이다.
+_MEMO_MARK_SIMILAR = re.compile(r"표장\s*유사(?!\s*(?:여부|판단|미판단))")
+
+
+def memo_says_mark_similar(memo: str) -> bool:
+    """메모가 '표장은 유사하다고 보았다'(상품 비유사로 끝난 건의 관례 문구)를 적고 있는가."""
+    return bool(_MEMO_MARK_SIMILAR.search(memo or ""))
+
+
 def mark_label(row: dict) -> str:
     """표장 라벨(v1). 유사 = 라벨 유사 또는 메모에 '표장 유사'(상품 비유사로 끝난 건).
     비유사 = 라벨 비유사이고 판단축에 외관·호칭·관념 중 하나 이상.
-    그 외(판단축 '상품'만·미상)는 "" — 벤치마크에서 뺀다."""
+    그 외(판단축 '상품'만·미상)는 "" — 벤치마크에서 뺀다.
+    메모의 '표장 유사 여부 판단 없음'·'표장 판단 없음'처럼 표장을 판단하지 않았다는 표기는 유사로
+    보지 않는다(2026-11-12 — 부분 문자열로 찾아 3행이 유사로 잡혔던 것을 고침)."""
     label = row.get("라벨", "")
     memo = row.get("메모", "") or ""
     axes = row.get("판단축", "") or ""
-    if label == "유사" or "표장 유사" in memo:
+    if label == "유사" or memo_says_mark_similar(memo):
         return "유사"
     if label == "비유사" and any(axis in axes for axis in MARK_AXES):
         return "비유사"

@@ -128,6 +128,32 @@ def test_mark_label_rule():
     assert x2b.mark_label({"라벨": "비유사", "판단축": "", "메모": ""}) == ""
 
 
+def test_mark_label_ignores_memos_that_say_the_marks_were_not_compared():
+    """메모의 '표장 유사'는 유사 판단을 적은 관례 문구일 때만 — '판단 없음' 표기는 유사가 아니다."""
+    def goods_only(memo: str) -> str:
+        return x2b.mark_label({"라벨": "비유사", "판단축": "상품", "메모": memo})
+
+    for memo in (  # 표장은 유사하다고 보았으나 상품 비유사로 끝난 건
+        "표장 유사", "표장 유사·상품 비유사", "표장 유사·상품 비유사; 선등록상표2=1390178",
+        "애매: 번호 대응 추정 · 표장 유사", "표장유사",
+        "표장 유사 여부 미판단(선등록상표 1) · 선등록상표 2 는 표장 유사",
+    ):
+        assert goods_only(memo) == "유사", memo
+    for memo in (  # 표장을 판단하지 않은 건 — 예전에는 앞의 셋이 부분 문자열로 유사가 됐다
+        "표장 유사 여부 판단 없음·상품 비유사로 부정",
+        "애매: 선등록 일부 상품 취소 후 잔여 상품과 비교해 상품 비유사, 표장 유사 여부 미판단",
+        "표장 유사 여부 미판단(청구인 불다툼)·상품 비유사",
+        "공존동의서로 결론, 표장 유사 판단 없음", "효력 제한으로 표장 유사 판단 없이 불속",
+        "표장 판단 없음·상품 비유사", "표장 미대비·상품 비유사", "상품 비유사·표장 미판단", "",
+    ):
+        assert goods_only(memo) == "", memo
+        assert not x2b.memo_says_mark_similar(memo)
+    # 판단축에 표장 축이 있으면 메모와 무관하게 비유사, 라벨이 유사면 유사
+    row = {"라벨": "비유사", "판단축": "외관|상품", "메모": "표장 유사 여부 판단 없음"}
+    assert x2b.mark_label(row) == "비유사"
+    assert x2b.mark_label({"라벨": "유사", "판단축": "", "메모": "표장 판단 없음"}) == "유사"
+
+
 def test_bootstrap_ci_and_photo_subset():
     labels = np.array([1, 1, 1, 0, 0, 0])
     separated = np.array([0.9, 0.8, 0.7, 0.3, 0.2, 0.1])
