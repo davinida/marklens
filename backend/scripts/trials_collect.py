@@ -10,8 +10,12 @@
              --batch n: 라벨 없는 다음 n건을 batch_<k>.md 로 — 정규식 추정은 넣지 않는다,
              --round N: 그 회차 큐만)
     label    큐레이션 라벨 기록 (유사|비유사|제외, --source llm|human, --evidence, --confidence,
-             --pass a|b). llm 은 사람이 확인한 행(확인여부=Y)을 덮어쓰지 못한다
+             --pass a|b). llm 은 사람이 확인한 행(확인여부=Y)을 덮어쓰지 못한다.
+             --from-file JSON: 한 배치의 판정을 한 번에(같은 검증, 하나라도 틀리면 쓰지 않음)
     confirm  LLM 라벨을 그대로 승인 (확인여부=Y, 라벨출처=human-confirmed)
+    dedupe   같은 표장 쌍(번호, 없으면 판정자가 적은 명칭)·같은 라벨인 행 목록 — 먼저 나온 행만
+             남긴다. 상품 열이 한쪽 행에만 있으면 "확인 필요"(견줄 수 없어 바꾸지 않는다).
+             --apply --ids FILE: 목록에 든 건만 제외(중복, 출처 rule)로 바꾼다(그 밖은 보고만)
     review   재검토 큐 review_queue.csv (LLM≠추정 · 확신도 low · 메모 애매 · pass A≠B)
     sample   --n 40 --seed 0: 미확인 LLM 라벨에서 종류×판정 층화 표본 → verify_queue.csv
     status   예산(quota.json)·건수·단계별 진행·큐레이션 진행률 요약(회차가 둘 이상이면 회차별)
@@ -85,7 +89,9 @@ import random
 import re
 import sys
 import time
+import unicodedata
 import xml.etree.ElementTree as ET
+from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -261,7 +267,11 @@ ENRICH_COLUMNS = (
     "goods_codes_this", "goods_codes_prior", "x4_goods",
     "상대표장_명칭_llm",  # label --name-b: 판단 절에서 LLM 이 옮긴 문자 표기(도형만이면 빈 값)
 )
-PRESERVED_COLUMNS = HUMAN_COLUMNS + LABEL_META_COLUMNS + LLM_B_COLUMNS + ENRICH_COLUMNS
+# pass b 가 본 이 사건 표장의 상표유형(2026-11 2차 라벨부터 — 1차는 pass a 만 유형을 적었다).
+# sheet 재생성 때 보존하되 열 위치는 맨 끝이다(기존 열 순서 유지).
+LLM_B_TYPE_COLUMN = "llm_b_상표유형"
+_PRESERVED_BEFORE_ROUND = HUMAN_COLUMNS + LABEL_META_COLUMNS + LLM_B_COLUMNS + ENRICH_COLUMNS
+PRESERVED_COLUMNS = _PRESERVED_BEFORE_ROUND + (LLM_B_TYPE_COLUMN,)
 # 수집 회차(2026-11 2차 수집): round<N>_queue.csv 에 있는 심판번호는 N, 나머지는 1(load_rounds).
 # 맨 끝 열이라 이전 labels.csv 의 기존 열 순서·값은 그대로다.
 ROUND_COLUMN = "round"
@@ -270,7 +280,8 @@ LABEL_COLUMNS = [
     "심판번호", "종류", "심판상태", "심결월", "상표A_번호", "상표A_명칭", "상표B_번호",
     "상대표장_번호_후보", "상대표장_유형", "지정상품_원문", "조문플래그", "결론조문", "신뢰도",
     "표장유사_소결", "자동등급", "등급사유", "등급_원규칙", "family", "참고표시", "유사여부_추정",
-    "추정근거", "결정축_추정", "상표유형_추정", *PRESERVED_COLUMNS, ROUND_COLUMN,
+    "추정근거", "결정축_추정", "상표유형_추정", *_PRESERVED_BEFORE_ROUND, ROUND_COLUMN,
+    LLM_B_TYPE_COLUMN,
 ]
 
 
@@ -2064,18 +2075,38 @@ def _grade_summary(rows: list[dict]) -> tuple[dict[str, int], int]:
     return {g: sum(1 for v in trials.values() if v == g) for g in ("1", "2", "3")}, len(trials)
 
 
+# 큐 보강(2026-11 2차 라벨): 2등급 가운데 사람이 읽으면 유사 판단이 나올 수 있는 건을 큐 뒤에
+# 붙인다. 등급(자동등급 2)은 그대로 두므로 나중에 따로 집계할 수 있다.
+AUGMENT_COLUMN = "보강"
+AUGMENT_FIGURE = "도형 추정"  # 목록 상표명칭이 비어 있는 건(도형상표)
+AUGMENT_NO_CONCLUSION = "결론 조문 추출 실패"  # 정규식이 결론 조문을 읽지 못한 건
 CURATION_COLUMNS = [
     "순번", "심판번호", "종류", "상표A_명칭", "상대표장_번호", "유사여부_추정", "신뢰도",
-    "등급사유", ROUND_COLUMN,
+    "등급사유", ROUND_COLUMN, AUGMENT_COLUMN,
 ]
 _CURATION_KIND_ORDER = {"scope": 0, "refusal": 1, "invalidation": 2}
 _CURATION_CONFIDENCE_ORDER = {"high": 0, "low": 1, "": 2}
 _CURATION_SECOND_RE = re.compile(r"^권리범위: 표장 (?:유사|비유사) 소결이나 저명·주지 언급")
 
 
-def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]:
+def augment_reason(row: dict) -> str:
+    """큐 보강 대상인 2등급 행이면 그 사유(둘 다면 '·' 로 잇는다), 아니면 ''."""
+    if row.get("자동등급") != "2":
+        return ""
+    reasons = []
+    if not (row.get("상표A_명칭") or "").strip():
+        reasons.append(AUGMENT_FIGURE)
+    if (row.get("등급사유") or "") == AUGMENT_NO_CONCLUSION:
+        reasons.append(AUGMENT_NO_CONCLUSION)
+    return "·".join(reasons)
+
+
+def build_curation_queue(
+    rows: list[dict], kinds: dict[str, dict], *, augment: bool = False
+) -> list[dict]:
     """큐레이션 순서: 회차 순(앞 회차의 순번이 그대로 남는다), 회차 안에서 1등급(권리범위확인 →
-    거절결정불복 → 무효, 각 안에서 신뢰도 high → low) 다음에 2등급 중 "권리범위 … 저명·주지 언급".
+    거절결정불복 → 무효, 각 안에서 신뢰도 high → low) 다음에 2등급 중 "권리범위 … 저명·주지 언급",
+    augment 면 그 뒤에 보강분(2등급 중 도형 추정·결론 조문 추출 실패 — 보강 열에 사유).
     family 중복은 제외. 심판번호당 한 줄(상대 표장 번호는 ; 로 잇고, 없으면 복구 후보)."""
     first: dict[str, dict] = {}
     numbers: dict[str, list[str]] = {}
@@ -2093,6 +2124,8 @@ def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]
             bucket = 0
         elif row.get("자동등급") == "2" and _CURATION_SECOND_RE.match(reason):
             bucket = 1
+        elif augment and augment_reason(row):
+            bucket = 2
         else:
             continue
         kind = kind_for_trial_desc(row.get("종류", ""), kinds)
@@ -2112,9 +2145,14 @@ def build_curation_queue(rows: list[dict], kinds: dict[str, dict]) -> list[dict]
             "신뢰도": row.get("신뢰도", ""),
             "등급사유": row.get("등급사유", ""),
             ROUND_COLUMN: row_round(row),
+            AUGMENT_COLUMN: augment_reason(row) if key[1] == 2 else "",
         }
-        for index, (_, row) in enumerate(picked, start=1)
+        for index, (key, row) in enumerate(picked, start=1)
     ]
+
+
+def augmented_items(queue: list[dict]) -> list[dict]:
+    return [item for item in queue if (item.get(AUGMENT_COLUMN) or "").strip()]
 
 
 def unchanged_violations(
@@ -2183,18 +2221,40 @@ def run_sheet(args: argparse.Namespace, session: Session) -> int:
             parts.append(f"{round_no}차 {len(subset)}행/{sub_trials}건(1등급 {sub_grades['1']}·"
                          f"2등급 {sub_grades['2']}·3등급 {sub_grades['3']})")
         print("- 회차별: " + " · ".join(parts))
-    queue = build_curation_queue(rows, kinds)
+    # 큐 보강은 한 번 켜면 유지한다 — 이전 큐에 보강분이 있으면 플래그 없이 다시 돌려도 남는다
+    augment = bool(getattr(args, "augment_queue", False)) or bool(
+        augmented_items(_read_csv(paths_.curation_queue))
+    )
+    queue = build_curation_queue(rows, kinds, augment=augment)
     _write_csv(paths_.curation_queue, CURATION_COLUMNS, queue)
-    second = sum(1 for item in queue if _CURATION_SECOND_RE.match(item["등급사유"]))
+    added = augmented_items(queue)
+    second = sum(1 for item in queue
+                 if not item[AUGMENT_COLUMN] and _CURATION_SECOND_RE.match(item["등급사유"]))
     recovered = sum(1 for r in {row["심판번호"]: row for row in rows}.values()
                     if not r.get("상표B_번호") and r.get("상대표장_번호_후보"))
     by_round = "".join(
         f" · {round_no}차 큐 {sum(1 for item in queue if row_round(item) == round_no)}건"
         for round_no in round_numbers
     ) if len(round_numbers) > 1 else ""
-    print(f"- 큐레이션 큐 {len(queue)}건(1등급 {len(queue) - second} · "
-          f"권리범위 저명·주지 언급 {second}) → {paths_.curation_queue} · "
-          f"상대 표장 번호 후보 복구 {recovered}건{by_round}")
+    print(f"- 큐레이션 큐 {len(queue)}건(1등급 {len(queue) - second - len(added)} · "
+          f"권리범위 저명·주지 언급 {second}"
+          + (f" · 2등급 보강 {len(added)}" if added else "")
+          + f") → {paths_.curation_queue} · 상대 표장 번호 후보 복구 {recovered}건{by_round}")
+    if added:
+        parts = []
+        for round_no in sorted({row_round(item) for item in added}, key=int):
+            subset = [item for item in added if row_round(item) == round_no]
+            counts: dict[str, int] = {}
+            for item in subset:
+                label = kinds.get(kind_for_trial_desc(item["종류"], kinds), {}).get("label", "?")
+                counts[label] = counts.get(label, 0) + 1
+            parts.append(f"{round_no}차 {len(subset)}건("
+                         + "·".join(f"{key} {value}" for key, value in sorted(counts.items()))
+                         + ")")
+        figure = sum(1 for item in added if AUGMENT_FIGURE in item[AUGMENT_COLUMN])
+        missing = sum(1 for item in added if AUGMENT_NO_CONCLUSION in item[AUGMENT_COLUMN])
+        print(f"- 큐 보강(2등급, 등급은 그대로): {' · '.join(parts)} — {AUGMENT_FIGURE} {figure}"
+              f" · {AUGMENT_NO_CONCLUSION} {missing}(겹침 {figure + missing - len(added)})")
     return 0
 
 
@@ -2283,6 +2343,10 @@ def run_show(args: argparse.Namespace, session: Session) -> int:
 VERDICTS = ("유사", "비유사", "제외")
 AXES = ("외관", "호칭", "관념", "상품")
 MARK_TYPES = ("문자", "도형", "결합-문자요부", "결합-도형요부")
+# 유형 묶음: 도형계 = 도형 + 결합-도형요부, 문자계 = 문자 + 결합-문자요부(통합 모델의 유형 구분)
+TYPE_GROUPS = {
+    "문자": "문자계", "결합-문자요부": "문자계", "도형": "도형계", "결합-도형요부": "도형계",
+}
 EXCLUDE_REASONS = ("인지도", "식별력", "소멸", "각하", "불특정", "비사용", "중복", "기타")
 LABEL_SOURCES = ("llm", "human")
 CONFIDENCES = ("high", "low")
@@ -2412,7 +2476,8 @@ def apply_label(
     확인여부.
     human 은 확인여부=Y. llm 은 확인여부=Y 인 행을 덮어쓰지 못한다(LabelError exit 3).
     사람이 LLM 라벨을 수정하면 이전 LLM 판정을 llm_판정_원본 에 남긴다(일치율용).
-    pass b: llm_b_* 열에만 기록(사람 열 그대로). --undo 는 해당 pass 의 열을 비운다.
+    pass b: llm_b_* 열에만 기록(사람 열 그대로, --type 은 llm_b_상표유형). --undo 는 해당 pass 의
+    열을 비운다.
     """
     if pass_ not in LABEL_PASSES:
         raise LabelError("--pass 는 a 또는 b 입니다")
@@ -2422,7 +2487,8 @@ def apply_label(
     if pass_ == "a" and source == "llm":
         _refuse_if_confirmed(targets)
     if undo:
-        columns = LLM_B_COLUMNS if pass_ == "b" else HUMAN_COLUMNS + LABEL_META_COLUMNS
+        columns = (LLM_B_COLUMNS + (LLM_B_TYPE_COLUMN,) if pass_ == "b"
+                   else HUMAN_COLUMNS + LABEL_META_COLUMNS)
         for row in targets:
             for column in columns:
                 row[column] = ""
@@ -2450,6 +2516,7 @@ def apply_label(
             row["llm_b_제외사유"] = reason
             row["llm_b_확신도"] = confidence
             row["llm_b_근거"] = evidence
+            row[LLM_B_TYPE_COLUMN] = mark_type
             continue
         previous_source = (row.get("라벨출처") or "").strip()
         previous_verdict = (row.get("유사여부_확정") or "").strip()
@@ -2525,8 +2592,146 @@ def apply_name_b(
     return targets
 
 
+LABEL_FILE_KEYS = (
+    "trial", "b", "verdict", "axis", "type", "reason", "evidence", "confidence", "memo",
+    "name_b", "name_b_memo",
+)
+LABEL_FILE_PASS_A_ONLY = ("memo", "name_b", "name_b_memo")
+
+
+def load_label_file(path: Path) -> list:
+    """label --from-file 의 판정 목록(JSON 배열)을 읽는다. 못 읽거나 배열이 아니면 LabelError."""
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        raise LabelError(f"--from-file {path} 가 없습니다") from None
+    except (OSError, ValueError) as exc:
+        raise LabelError(f"--from-file {path} 를 JSON 으로 읽지 못했습니다: {exc}") from None
+    if not isinstance(data, list) or not data:
+        raise LabelError("--from-file 은 판정 객체의 JSON 배열(1개 이상)이어야 합니다")
+    return data
+
+
+def _apply_label_entry(
+    rows: list[dict], entry: object, order: int, *, source: str, pass_: str, seen: dict[int, int]
+) -> list[dict]:
+    if not isinstance(entry, dict):
+        raise LabelError("판정 항목은 JSON 객체여야 합니다")
+    unknown = sorted(set(entry) - set(LABEL_FILE_KEYS))
+    if unknown:
+        raise LabelError(
+            f"모르는 키 {', '.join(unknown)} — 허용 키: {', '.join(LABEL_FILE_KEYS)}"
+        )
+    for key, value in entry.items():
+        if value is not None and not isinstance(value, str):
+            raise LabelError(f"{key} 값은 문자열이어야 합니다: {value!r}")
+    number = (entry.get("trial") or "").strip()
+    if not number:
+        raise LabelError("trial(심판번호)이 필요합니다")
+    if not (entry.get("verdict") or "").strip():
+        raise LabelError(f"verdict({'|'.join(VERDICTS)})가 필요합니다")
+    if pass_ == "b":
+        extra = [key for key in LABEL_FILE_PASS_A_ONLY if entry.get(key) is not None]
+        if extra:
+            raise LabelError(f"pass b 는 {'·'.join(extra)} 를 쓰지 않습니다(llm_b_* 열에만 기록)")
+    name_b = entry.get("name_b")
+    if entry.get("name_b_memo") is not None and name_b is None:
+        raise LabelError("name_b_memo 는 name_b 와 함께 씁니다")
+    b = entry.get("b")  # 없으면 label 의 --b 생략과 같다(그 심판번호의 전 행)
+    for row in _target_rows(rows, number, b):
+        if id(row) in seen:
+            raise LabelError(
+                f"항목 {seen[id(row)]} 과 같은 행입니다 — 한 파일에서 한 행은 한 번만 판정합니다"
+            )
+    changed = apply_label(
+        rows, number, entry["verdict"].strip(),
+        axis=entry.get("axis") or "", mark_type=entry.get("type") or "",
+        reason=entry.get("reason") or "", memo=entry.get("memo"), b=b, source=source,
+        evidence=entry.get("evidence") or "", confidence=entry.get("confidence") or "",
+        pass_=pass_,
+    )
+    if name_b is not None:
+        apply_name_b(rows, number, name_b, b=b, memo=entry.get("name_b_memo"), source=source)
+    for row in changed:
+        seen[id(row)] = order
+    return changed
+
+
+def apply_label_file(
+    rows: list[dict], entries: list, *, source: str, pass_: str
+) -> list[list[dict]]:
+    """판정 목록을 한 번에 적용하고 항목별로 바뀐 행을 돌려준다(label --from-file).
+
+    항목 하나 = label 한 번: 같은 검증(apply_label), 사람 열 보존(pass b 는 llm_b_* 만),
+    확인여부=Y 행 보호. name_b 는 판정 뒤 상대표장_명칭_llm 에, name_b_memo 는 메모 뒤에 덧붙인다.
+    하나라도 틀리면 모든 오류를 LabelError 하나에 모아 던진다 — 호출자는 아무것도 쓰지 않는다
+    (거부가 섞였으면 exit 3). 같은 행을 두 항목이 판정해도 오류다.
+    """
+    errors: list[tuple[int, str]] = []
+    seen: dict[int, int] = {}
+    applied: list[list[dict]] = []
+    for order, entry in enumerate(entries, start=1):
+        try:
+            applied.append(
+                _apply_label_entry(rows, entry, order, source=source, pass_=pass_, seen=seen)
+            )
+        except LabelError as exc:
+            where = ""
+            if isinstance(entry, dict) and isinstance(entry.get("trial"), str):
+                where = f" {entry['trial']}"
+                if isinstance(entry.get("b"), str):
+                    where += f" 상표B {entry['b'] or '(없음)'}"
+            errors.append((exc.exit_code, f"- 항목 {order}{where}: {exc}"))
+    if errors:
+        codes = {code for code, _ in errors}
+        code = next(c for c in (3, 2, 1) if c in codes) if codes & {1, 2, 3} else 2
+        head = (f"--from-file: 아무것도 기록하지 않았습니다 — 오류 {len(errors)}건"
+                f"(항목 {len(entries)}개)")
+        raise LabelError(
+            "\n".join([("[거부] " if code == 3 else "") + head, *(m for _, m in errors)]), code
+        )
+    return applied
+
+
+def run_label_file(args: argparse.Namespace, session: Session) -> int:
+    """label --from-file JSON: 한 배치의 판정을 한 번에 — 전부 맞을 때만 labels.csv 를 쓴다."""
+    paths_ = session.paths
+    given = {
+        "심판번호": args.trial, "판정": args.verdict, "--axis": args.axis,
+        "--type": args.mark_type, "--reason": args.reason, "--evidence": args.evidence,
+        "--confidence": args.confidence, "--memo": args.memo is not None,
+        "--b": args.b is not None, "--name-b": getattr(args, "name_b", None) is not None,
+        "--undo": args.undo,
+    }
+    extra = [name for name, value in given.items() if value]
+    if extra:
+        raise LabelError(
+            "--from-file 은 --source·--pass 만 함께 씁니다(판정은 파일에): " + ", ".join(extra)
+        )
+    entries = load_label_file(Path(args.from_file))
+    with _labels_lock(paths_):
+        fieldnames, rows = _load_labels(paths_)
+        applied = apply_label_file(rows, entries, source=args.source, pass_=args.pass_)
+        _write_csv_atomic(paths_.labels_csv, fieldnames, rows)
+    column = "llm_b_유사여부" if args.pass_ == "b" else "유사여부_확정"
+    counts = Counter(row[column] for changed in applied for row in changed)
+    named = sum(len(changed) for entry, changed in zip(entries, applied)
+                if entry.get("name_b") is not None)
+    parts = [f"출처 {args.source}", f"pass {args.pass_}"]
+    parts += [f"{verdict} {counts[verdict]}" for verdict in VERDICTS if counts[verdict]]
+    if named:
+        parts.append(f"상대 명칭 {named}")
+    print(f"## 라벨 일괄 기록: 항목 {len(entries)}개 · {sum(counts.values())}행 "
+          f"({' · '.join(parts)}) ← {args.from_file} → {paths_.labels_csv}")
+    return 0
+
+
 def run_label(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
+    if getattr(args, "from_file", ""):
+        return run_label_file(args, session)
+    if not args.trial:
+        raise LabelError("심판번호가 필요합니다(한 배치를 한 번에 기록하려면 --from-file JSON)")
     name_b = getattr(args, "name_b", None)
     with _labels_lock(paths_):
         fieldnames, rows = _load_labels(paths_)
@@ -2586,7 +2791,11 @@ BATCH_GUIDE = (
     "라벨 명령: `label <심판번호> <유사|비유사|제외> [--axis 외관,호칭,관념,상품] "
     "[--type 문자|도형|결합-문자요부|결합-도형요부] "
     "[--reason 인지도|식별력|소멸|각하|불특정|비사용|중복|기타] [--b 상대번호] "
-    "--source llm --evidence '<소결 문장 원문>' --confidence high|low --pass {pass_}`"
+    "--source llm --evidence '<소결 문장 원문>' --confidence high|low --pass {pass_}`\n\n"
+    "한 배치를 한 번에: 판정을 JSON 배열 파일 하나에 쓰고 "
+    "`label --from-file <판정.json> --source llm --pass {pass_}` — 항목 키 trial·b·verdict·axis·"
+    "type·reason·evidence·confidence(pass a 는 memo·name_b·name_b_memo 도), 하나라도 틀리면 "
+    "아무것도 기록하지 않는다."
 )
 
 
@@ -2719,9 +2928,13 @@ def run_batch(args: argparse.Namespace, session: Session) -> int:
             raise LabelError(f"{paths_.curation_queue} 에 {round_no}차 건이 없습니다", 1)
     label_rows = _read_csv(paths_.labels_csv)
     pending = unlabeled_queue(queue, label_rows, pass_)
-    items = pending[: args.batch]
+    offset = max(0, int(getattr(args, "offset", 0) or 0))
+    items = pending[offset: offset + args.batch]
     if not items:
-        print(f"{scope} {len(queue)}건 모두 pass {pass_} 라벨이 있습니다")
+        if offset and pending:
+            print(f"{scope}의 라벨 없는 {len(pending)}건을 넘어선 --offset {offset}")
+        else:
+            print(f"{scope} {len(queue)}건 모두 pass {pass_} 라벨이 있습니다")
         return 0
     index = next_batch_index(paths_.base)
     out = paths_.base / f"batch_{index}.md"
@@ -2731,6 +2944,151 @@ def run_batch(args: argparse.Namespace, session: Session) -> int:
     print(f"## batch {index}: {scope + ' ' if round_no else ''}pass {pass_} 라벨 없는 "
           f"{len(items)}건(남은 {len(pending)}/{len(queue)}) → {out}")
     print("- " + ", ".join(item["심판번호"] for item in items))
+    return 0
+
+
+# ---- dedupe: 같은 표장 쌍이 학습에서 두 번 세어지지 않게(마감 규칙) ----
+
+DEDUPE_SOURCE = "rule"
+DEDUPE_REASON = "중복"
+# 번호 없는 상대 표장의 명칭 키는 판정자가 적은 명칭(label --name-b)만 쓴다. 본문·OCR 추출 명칭에는
+# 표장 명칭이 아닌 낱말(입체상표의 '젤리' 등)이 섞여 다른 표장을 같은 쌍으로 묶는다.
+PAIR_NAME_COLUMN = "상대표장_명칭_llm"
+GOODS_TEXT_COLUMN = "지정상품_원문"
+GOODS_CODE_COLUMNS = ("goods_codes_this", "goods_codes_prior")
+
+
+def normalize_mark_name(name: str) -> str:
+    """표장 쌍 비교용 명칭: NFKC·소문자, 글자·숫자만 남긴다(띄어쓰기·기호 차이를 지운다)."""
+    return re.sub(r"[\W_]+", "", unicodedata.normalize("NFKC", name or "").casefold())
+
+
+def pair_key(row: dict) -> tuple[str, str] | None:
+    """표장 쌍 = (이 사건 표장, 상대 표장) — 번호가 있으면 번호, 없으면 정규화한 명칭. 상대 표장의
+    명칭은 판정자가 적은 명칭(상대표장_명칭_llm)만 본다 — 본문·OCR 추출 명칭은 쓰지 않는다.
+    한쪽이라도 번호도 명칭도 없으면 None(같은 쌍인지 알 수 없다)."""
+    number_a = (row.get("상표A_번호") or "").strip()
+    a = f"번호:{number_a}" if number_a else normalize_mark_name(row.get("상표A_명칭", ""))
+    number_b = (row.get("상표B_번호") or "").strip()
+    b = f"번호:{number_b}" if number_b else normalize_mark_name(row.get(PAIR_NAME_COLUMN, ""))
+    return (a, b) if a and b else None
+
+
+def _goods_values(row: dict) -> dict[str, object]:
+    """상품 비교값 — 지정상품 원문은 정규화한 문자열, 유사군 코드는 집합. 빈 값은 "모름"."""
+    values: dict[str, object] = {
+        GOODS_TEXT_COLUMN: normalize_mark_name(row.get(GOODS_TEXT_COLUMN, ""))
+    }
+    for column in GOODS_CODE_COLUMNS:
+        values[column] = frozenset(
+            code.strip() for code in (row.get(column) or "").split(";") if code.strip()
+        )
+    return values
+
+
+def goods_differ(first: dict, other: dict) -> bool:
+    """지정상품이 다른가 — 두 행 모두 값이 있는 열(지정상품 원문·유사군 코드)만 견준다."""
+    a, b = _goods_values(first), _goods_values(other)
+    return any(a[column] and b[column] and a[column] != b[column] for column in a)
+
+
+def goods_one_sided(first: dict, other: dict) -> list[str]:
+    """한쪽 행에만 값이 있는 상품 열 — 그 열로는 상품이 같은지 견줄 수 없다(확인 필요)."""
+    a, b = _goods_values(first), _goods_values(other)
+    return [column for column in a if bool(a[column]) != bool(b[column])]
+
+
+def dedupe_plan(rows: list[dict]) -> list[dict]:
+    """같은 표장 쌍(pair_key)·같은 최종 라벨(유사/비유사)·지정상품이 다르지 않은 행 가운데 먼저 나온
+    행만 남긴다 — 나머지를 [{"row": 중복 행, "kept": 남긴 행, "check": 한쪽 행에만 값이 있는
+    상품 열}] 로 돌려준다(행 순서 = 회차·심판번호 순). check 가 비어 있지 않으면 상품이 같은지
+    견줄 수 없는 "확인 필요" 행이다(apply_dedupe 가 바꾸지 않는다). 당사자가 같은지는 보지 않는다.
+    라벨이 다르거나 지정상품이 다르면 둘 다 남는다."""
+    kept: dict[tuple, list[dict]] = {}
+    plan: list[dict] = []
+    for row in rows:
+        verdict = (row.get("유사여부_확정") or "").strip()
+        key = pair_key(row)
+        if verdict not in ("유사", "비유사") or key is None:
+            continue
+        firsts = kept.setdefault((key, verdict), [])
+        first = next((item for item in firsts if not goods_differ(item, row)), None)
+        if first is None:
+            firsts.append(row)
+        else:
+            plan.append({"row": row, "kept": first, "check": goods_one_sided(first, row)})
+    return plan
+
+
+def apply_dedupe(plan: list[dict], allowed: set[str]) -> tuple[list[dict], list[dict]]:
+    """plan 의 중복 행 가운데 allowed(심판번호)에 든 것만 제외(중복)로 바꾼다 → (바꾼 항목,
+    목록으로만 남긴 항목). 출처 rule, 메모에 남긴 행의 심판번호, 규칙 전 판정은 llm_판정_원본 에.
+    사람이 확인한 행(확인여부=Y)과 "확인 필요" 행(check — 상품 열이 한쪽에만 있음)은 allowed 에
+    들어 있어도 바꾸지 않는다."""
+    changed: list[dict] = []
+    listed: list[dict] = []
+    for item in plan:
+        row, first = item["row"], item["kept"]
+        confirmed = (row.get("확인여부") or "").strip().upper() == "Y"
+        if row["심판번호"] not in allowed or confirmed or item.get("check"):
+            listed.append(item)
+            continue
+        row["llm_판정_원본"] = (row.get("llm_판정_원본") or "").strip() or row["유사여부_확정"]
+        row["유사여부_확정"] = "제외"
+        row["제외사유"] = DEDUPE_REASON
+        row["판단축_확정"] = ""
+        row["라벨출처"] = DEDUPE_SOURCE
+        note = f"중복: {first['심판번호']}"
+        previous = (row.get("메모") or "").strip()
+        row["메모"] = f"{previous} · {note}" if previous else note
+        changed.append(item)
+    return changed, listed
+
+
+def run_dedupe(args: argparse.Namespace, session: Session) -> int:
+    """dedupe: 같은 표장 쌍·같은 라벨 중복 목록. --apply --ids FILE 이면 목록에 든 건만 바꾼다 —
+    "확인 필요"(상품 열이 한쪽 행에만 있음) 행은 목록에 들어 있어도 바꾸지 않는다."""
+    paths_ = session.paths
+    ids_path = getattr(args, "ids", "") or ""
+    if args.apply and not ids_path:
+        raise LabelError(
+            "--apply 는 바꿀 건의 심판번호 목록 --ids FILE 과 함께 씁니다(목록 밖의 행은 보고만)"
+        )
+    allowed: set[str] = set()
+    if ids_path:
+        try:
+            lines = Path(ids_path).read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            raise LabelError(f"--ids {ids_path} 를 읽지 못했습니다: {exc}") from None
+        allowed = {line.strip() for line in lines if line.strip() and not line.startswith("#")}
+    with _labels_lock(paths_):
+        fieldnames, rows = _load_labels(paths_)
+        plan = dedupe_plan(rows)
+        before = [item["row"]["유사여부_확정"] for item in plan]
+        changed, listed = apply_dedupe(plan, allowed) if args.apply else ([], plan)
+        if changed:
+            _write_csv_atomic(paths_.labels_csv, fieldnames, rows)
+    applied = {id(item["row"]) for item in changed}
+    unchecked = sum(1 for item in plan if item.get("check"))
+    summary = (f"제외(중복, 출처 {DEDUPE_SOURCE}) {len(changed)}행 · 목록만 "
+               f"{len(listed) - unchecked}행"
+               if args.apply else "목록만(쓰지 않음 — 적용은 --apply --ids FILE)")
+    if unchecked:
+        summary += f" · 확인 필요 {unchecked}행"
+    print(f"## dedupe: 같은 표장 쌍·같은 라벨 중복 {len(plan)}행 — {summary}")
+    for item, verdict in zip(plan, before):
+        row, first = item["row"], item["kept"]
+        state = "적용" if id(row) in applied else "목록만"
+        if item.get("check"):
+            state = f"확인 필요(상품 열이 한쪽만: {', '.join(item['check'])})"
+        elif state == "목록만" and (row.get("확인여부") or "").strip().upper() == "Y":
+            state = "목록만(확인여부 Y)"
+        a, b = pair_key(first) or ("", "")
+        print(f"- {row['심판번호']} (상표B {row.get('상표B_번호') or '-'}) {verdict} → "
+              f"제외(중복) · 남긴 행 {first['심판번호']} · 쌍 {a} × {b} · {state}")
+    if unchecked:
+        print("- 확인 필요 행은 상품이 같은지 견줄 수 없어 --apply 로 바꾸지 않습니다 — 심결문으로 "
+              "확인한 뒤 중복이면 label --source human(제외, --reason 중복)으로 기록")
     return 0
 
 
@@ -2754,12 +3112,16 @@ def _llm_verdict(row: dict) -> str:
 
 def _passes_disagree(row: dict) -> bool:
     a = (row.get("유사여부_확정") or "").strip()
+    reason = row.get("제외사유") or ""
+    if (row.get("라벨출처") or "").strip() == DEDUPE_SOURCE:
+        # 규칙(dedupe)으로 제외된 행은 판정자의 판정이 아니다 — 규칙 전 판정으로 견준다
+        a, reason = (row.get("llm_판정_원본") or "").strip(), ""
     b = (row.get("llm_b_유사여부") or "").strip()
     if not a or not b:
         return False
     if a != b:
         return True
-    return a == "제외" and (row.get("제외사유") or "") != (row.get("llm_b_제외사유") or "")
+    return a == "제외" and reason != (row.get("llm_b_제외사유") or "")
 
 
 def build_review_queue(label_rows: list[dict]) -> list[dict]:
@@ -2926,9 +3288,21 @@ def _preserve_done(path: Path, rows: list[dict]) -> int:
 def build_review_bundle(
     paths_: TrialPaths, label_rows: list[dict], kinds: dict[str, dict], *,
     feature_rows: list[dict], weak_path: Path, ids: dict[str, str], seed: int = 0, n: int = 40,
+    round_no: str = "",
 ) -> dict[str, tuple[list[str], list[dict]]]:
+    """round_no 를 주면 verify_queue 는 그 회차 라벨의 유형 층화 표본(도형계·문자계 n/2 씩)이고,
+    다른 회차의 기존 verify_queue 행(처리 표시 포함)은 앞에 그대로 둔다."""
+    if round_no:
+        rounds = {row["심판번호"]: row_round(row) for row in label_rows}
+        kept = [dict(row) for row in _read_csv(paths_.review_bundle_dir / "verify_queue.csv")
+                if rounds.get(row.get("심판번호", ""), FIRST_ROUND) != round_no]
+        sample = kept + select_type_sample(label_rows, round_no, n, seed)
+        for index, row in enumerate(sample, start=1):
+            row["순번"] = index
+    else:
+        sample = select_verify_sample(label_rows, kinds, n, seed)
     bundles = {
-        "verify_queue": (VERIFY_COLUMNS, select_verify_sample(label_rows, kinds, n, seed)),
+        "verify_queue": (VERIFY_COLUMNS, sample),
         "ab_disagree": (AB_DISAGREE_COLUMNS, bundle_ab_disagree(label_rows)),
         "name_review": (NAME_REVIEW_COLUMNS, bundle_name_review(label_rows, ids)),
         "distinct_drop": (DISTINCT_DROP_COLUMNS, distinct_drop_rows(feature_rows)),
@@ -2988,9 +3362,10 @@ def run_review_bundle(args: argparse.Namespace, session: Session) -> int:
     ids_path = Path(args.name_review_ids) if args.name_review_ids else paths_.name_review_ids
     ids = read_name_review_ids(ids_path)
     weak_path = Path(args.weak_tokens) if args.weak_tokens else WEAK_TOKENS_PATH
+    round_no = str(getattr(args, "round", 0) or "")
     bundles = build_review_bundle(
         paths_, label_rows, load_kinds(args.kinds_config), feature_rows=feature_rows,
-        weak_path=weak_path, ids=ids, seed=args.seed, n=args.n,
+        weak_path=weak_path, ids=ids, seed=args.seed, n=args.n, round_no=round_no,
     )
     paths_.review_bundle_dir.mkdir(parents=True, exist_ok=True)
     parts = []
@@ -3004,6 +3379,18 @@ def run_review_bundle(args: argparse.Namespace, session: Session) -> int:
         notes.append(f"특징 파일 없음({features_path}) — distinct_drop 비어 있음")
     if not ids:
         notes.append(f"명칭 검토 목록 없음({ids_path}) — 메모의 '검토' 로 대체")
+    if round_no:
+        strata: dict[str, int] = {}
+        for row in bundles["verify_queue"][1]:
+            strata[row.get("층", "")] = strata.get(row.get("층", ""), 0) + 1
+        mine = {key: value for key, value in strata.items() if key.startswith(f"{round_no}차/")}
+        notes.append(
+            f"verify_queue: {round_no}차 유형 층화 표본 "
+            + (" · ".join(f"{key.split('/', 1)[1]} {value}" for key, value in sorted(mine.items()))
+               or "0건")
+            + f"(seed {args.seed}) + 다른 회차 기존 "
+            f"{sum(strata.values()) - sum(mine.values())}행 유지"
+        )
     print(f"## review --bundle → {paths_.review_bundle_dir}: " + " · ".join(parts))
     for note in notes:
         print(f"- {note}")
@@ -3086,6 +3473,38 @@ def select_verify_sample(
     return picked
 
 
+def select_type_sample(label_rows: list[dict], round_no: str, n: int, seed: int) -> list[dict]:
+    """그 회차의 미확인 LLM 라벨에서 이 사건 표장 유형 묶음(도형계·문자계)별로 n/2 행씩 무작위.
+
+    유형(상표유형_확정)이 적힌 행만 대상이다. 묶음에 행이 모자라면 있는 만큼만 뽑는다(다른 묶음으로
+    채우지 않는다). 층 = "<회차>차/도형계|문자계".
+    """
+    groups: dict[str, list[dict]] = {"도형계": [], "문자계": []}
+    for row in label_rows:
+        group = TYPE_GROUPS.get((row.get("상표유형_확정") or "").strip())
+        if (
+            group
+            and row_round(row) == round_no
+            and (row.get("라벨출처") or "").strip() == "llm"
+            and not (row.get("확인여부") or "").strip()
+            and (row.get("유사여부_확정") or "").strip()
+        ):
+            groups[group].append(row)
+    rng = random.Random(seed)
+    picked: list[dict] = []
+    for group in ("도형계", "문자계"):
+        rows = groups[group]
+        for row in rng.sample(rows, min(n // 2, len(rows))):
+            picked.append({
+                "순번": len(picked) + 1, "층": f"{round_no}차/{group}", "심판번호": row["심판번호"],
+                "상표B_번호": row.get("상표B_번호", ""), "종류": row.get("종류", ""),
+                "유사여부_확정": row["유사여부_확정"], "판단축_확정": row.get("판단축_확정", ""),
+                "제외사유": row.get("제외사유", ""), "확신도": row.get("확신도", ""),
+                "근거문장": row.get("근거문장", ""),
+            })
+    return picked
+
+
 def run_verify_sample(args: argparse.Namespace, session: Session) -> int:
     paths_ = session.paths
     _fieldnames, rows = _load_labels(paths_)
@@ -3138,6 +3557,14 @@ def label_summary(label_rows: list[dict], queue: list[dict]) -> list[str]:
         f"LLM↔추정 일치율 {_rate(estimate_agree, len(estimate_pairs))}",
         f"LLM A↔B 일치율 {_rate(ab_agree, len(both))}",
     ]
+    typed = [row for row in label_rows if (row.get("상표유형_확정") or "").strip()
+             and (row.get(LLM_B_TYPE_COLUMN) or "").strip()]
+    if typed:  # 2차 라벨부터 pass b 도 이 사건 표장 유형을 적는다
+        same = sum(1 for row in typed if row["상표유형_확정"] == row[LLM_B_TYPE_COLUMN])
+        grouped = sum(1 for row in typed if TYPE_GROUPS.get(row["상표유형_확정"])
+                      == TYPE_GROUPS.get(row[LLM_B_TYPE_COLUMN]))
+        lines.append(f"상표유형 A↔B 일치율 {_rate(same, len(typed))} · "
+                     f"도형계/문자계 구분 일치 {_rate(grouped, len(typed))}")
     if queue:
         remaining_a = len(unlabeled_queue(queue, label_rows, "a"))
         remaining_b = len(unlabeled_queue(queue, label_rows, "b"))
@@ -3145,6 +3572,23 @@ def label_summary(label_rows: list[dict], queue: list[dict]) -> list[str]:
             f"남은 큐: pass a {remaining_a}/{len(queue)} · pass b {remaining_b}/{len(queue)}"
         )
     return lines
+
+
+def augment_progress(label_rows: list[dict], queue: list[dict]) -> str:
+    """큐 보강분(2등급)의 진행: 건·행, 유사·비유사로 살아난 행, 제외 행, 남은 큐.
+    보강분이 없으면 ''."""
+    added = augmented_items(queue)
+    if not added:
+        return ""
+    numbers = {item["심판번호"] for item in added}
+    rows = [row for row in label_rows if row["심판번호"] in numbers]
+    alive = sum(1 for row in rows if (row.get("유사여부_확정") or "") in ("유사", "비유사"))
+    excluded = sum(1 for row in rows if (row.get("유사여부_확정") or "") == "제외")
+    remaining_a = len(unlabeled_queue(added, label_rows, "a"))
+    remaining_b = len(unlabeled_queue(added, label_rows, "b"))
+    return (f"큐 보강(2등급) {len(added)}건·{len(rows)}행: 유사·비유사 {alive}행 · "
+            f"제외 {excluded}행 · "
+            f"남은 큐 pass a {remaining_a}/{len(added)} · pass b {remaining_b}/{len(added)}")
 
 
 def round_progress(label_rows: list[dict], queue: list[dict]) -> list[str]:
@@ -3384,6 +3828,8 @@ def run_status(args: argparse.Namespace, session: Session) -> int:
             print("- " + line)
         for line in round_progress(label_rows, queue):
             print("- " + line)
+        if augment_progress(label_rows, queue):
+            print("- " + augment_progress(label_rows, queue))
     progress_bundle = bundle_progress(paths_)
     if progress_bundle:
         print("- 검토 묶음(처리/행): " + " · ".join(
@@ -3458,6 +3904,9 @@ def build_parser() -> argparse.ArgumentParser:
     p_sheet.add_argument("--verify-unchanged", action="store_true",
                          help="이전 labels.csv 행의 셀이 하나라도 달라지면 쓰지 않고 중단"
                               "(exit 6) — 새 회차를 병합할 때")
+    p_sheet.add_argument("--augment-queue", action="store_true",
+                         help="큐 보강: 2등급 중 도형 추정(목록 상표명칭 비어 있음)·결론 조문 추출 "
+                              "실패 건을 큐 뒤에 붙인다(보강 열, 등급은 그대로; 한 번 켜면 유지)")
     p_show = sub.add_parser("show", help="심판번호의 주문·판단 절·자동 판정 보기(호출 없음)")
     p_show.add_argument("trial", nargs="*", metavar="심판번호")
     p_show.add_argument("--next", action="store_true",
@@ -3467,11 +3916,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_show.add_argument("--pass", dest="pass_", default="a", help="--batch 기준 pass: a(기본)|b")
     p_show.add_argument("--round", type=int, default=0, metavar="N",
                         help="--batch 를 N차 수집 큐로만(기본 0 = 전체 큐)")
+    p_show.add_argument("--offset", type=int, default=0, metavar="K",
+                        help="--batch: 라벨 없는 건 중 앞 K건을 건너뛴다 — 라벨링 전에 배치 파일을 "
+                             "여러 개 미리 만들어 판정자들에게 나눠 줄 때")
     p_show.add_argument("--ids", default="", metavar="FILE",
                         help="심판번호 목록 파일 → --batch N 건씩 상대 표장 명칭 추출 배치"
                              "(기초사실·판단 절, 라벨 여부 무관)")
     p_label = sub.add_parser("label", help="큐레이션 라벨 기록(호출 없음)")
-    p_label.add_argument("trial", metavar="심판번호")
+    p_label.add_argument("trial", nargs="?", default="", metavar="심판번호")
     p_label.add_argument("verdict", nargs="?", default="", metavar="유사|비유사|제외")
     p_label.add_argument("--axis", default="", help="판단축: 외관,호칭,관념,상품 중 복수(쉼표)")
     p_label.add_argument("--type", dest="mark_type", default="",
@@ -3487,12 +3939,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_label.add_argument("--pass", dest="pass_", default="a",
                          help="a(기본, 판정 열)|b(llm_b_* 열, 이중 라벨링)")
     p_label.add_argument("--undo", action="store_true", help="해당 pass 의 라벨 열을 비운다")
+    p_label.add_argument("--from-file", dest="from_file", default="", metavar="JSON",
+                         help="한 배치의 판정을 한 번에: JSON 배열(항목 키 trial·b·verdict·axis·"
+                              "type·reason·evidence·confidence·memo·name_b·name_b_memo)을 "
+                              "--source·--pass 로 적용 — 검증·확인여부 Y 보호는 label 과 같고, "
+                              "하나라도 틀리면 아무것도 쓰지 않는다")
     p_label.add_argument("--name-b", dest="name_b", default=None, metavar="문자열",
                          help="상대 표장 문자 표기 → 상대표장_명칭_llm(판정 없이 단독 사용 가능, "
                               "도형만이면 \"\" + --memo 도형)")
     p_confirm = sub.add_parser("confirm", help="LLM 라벨을 그대로 승인(확인여부=Y)")
     p_confirm.add_argument("trial", metavar="심판번호")
     p_confirm.add_argument("--b", default=None, metavar="상대번호")
+    p_dedupe = sub.add_parser(
+        "dedupe", help="같은 표장 쌍·같은 라벨 중복 목록(먼저 나온 행만 남김, 호출 없음)"
+    )
+    p_dedupe.add_argument("--apply", action="store_true",
+                          help="--ids 목록에 든 건의 중복 행을 제외(중복, 출처 rule)로 바꾼다"
+                               "(확인 필요 행은 바꾸지 않음)")
+    p_dedupe.add_argument("--ids", default="", metavar="FILE",
+                          help="바꿔도 되는 심판번호 목록(줄마다 하나) — 목록 밖의 중복은 보고만")
     p_review = sub.add_parser(
         "review", help="재검토 큐 review_queue.csv(LLM≠추정·확신도 low·메모 애매·A≠B)"
     )
@@ -3500,6 +3965,9 @@ def build_parser() -> argparse.ArgumentParser:
                           help="사람 검토 묶음 5개 → review_bundle/*.csv(verify_queue·ab_disagree·"
                                "name_review·distinct_drop·weak_tokens_top200)")
     p_review.add_argument("--n", type=int, default=40, help="--bundle 의 verify_queue 표본 수")
+    p_review.add_argument("--round", type=int, default=0, metavar="N",
+                          help="--bundle 의 verify_queue 를 N차 라벨의 유형 층화 표본(도형계·"
+                               "문자계 n/2 씩)으로 — 다른 회차의 기존 행·처리 표시는 유지")
     p_review.add_argument("--seed", type=int, default=0, help="--bundle 의 verify_queue seed")
     p_review.add_argument("--features", default="", metavar="CSV",
                           help="distinct_drop 입력(기본 <data-dir>/pairs_features.csv)")
@@ -3540,6 +4008,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     runners = {"list": run_list, "fetch": run_fetch, "extract": run_extract,
                "sheet": run_sheet, "show": run_show, "label": run_label, "confirm": run_confirm,
+               "dedupe": run_dedupe,
                "review": run_review, "sample": run_sample, "biblio": run_biblio,
                "status": run_status}
     try:
