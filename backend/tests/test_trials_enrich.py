@@ -291,6 +291,29 @@ def test_lookup_one_parses_and_picks_matching_item(tmp_path):
         te.lookup_one("registration", "1", fetch=exhausted)
 
 
+XML_LIMITED = """<response>
+<header>
+<requestMsgID/>
+<responseTime>2026-11-19 15:33:19</responseTime>
+<successYN>N</successYN>
+<resultCode>22</resultCode>
+<resultMsg>LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR</resultMsg>
+</header>
+</response>"""
+
+
+def test_lookup_one_records_header_result_code_when_body_is_missing(tmp_path):
+    """요청 제한 초과 같은 오류 응답은 body 가 없다 — 오류 사유는 header 의 resultCode·resultMsg
+    (공용 envelope 검사의 "body가 없습니다"가 아니라). 원본 XML 은 그대로 남긴다."""
+    row = te.lookup_one("registration", "4011068290000", fetch=lambda n, k: XML_LIMITED,
+                        raw_dir=tmp_path)
+    assert row["결과"] == "오류"
+    assert row["오류"] == "resultCode=22 LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS_ERROR"
+    assert (tmp_path / "registration_4011068290000.xml").read_text(encoding="utf-8") == XML_LIMITED
+    assert te.header_error(XML_OK) == "" and te.header_error("not xml") == ""
+    assert te.header_error(XML_ERROR).startswith("resultCode=10 INVALID_REQUEST")
+
+
 def _write_labels(base, rows):
     columns = ["심판번호", "종류", "상표B_번호", "상대표장_번호_후보", "상대표장_유형",
                "유사여부_확정", "llm_b_유사여부", "판단축_확정", "메모", *tc.ENRICH_COLUMNS]
