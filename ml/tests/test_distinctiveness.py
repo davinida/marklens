@@ -421,3 +421,16 @@ def test_judge_cache_returns_same_result(model):
     assert model.judge("커피", None) is not first
     assert model.judge("커피").reasons == ("1호 보통명칭(전역)",)
 
+
+
+def test_famous_token_lines_reads_token_section_only():
+    """2026-11-19 확정본: [브랜드] 표(수집용)는 토큰이 아니고 [식별력 토큰] 절만 읽는다 —
+    브랜드 표를 바꿔도 식별력 출력은 그대로. 옛 형식은 주석 아닌 모든 줄(줄 끝 주석 제외)."""
+    text = ("# 머리\n[브랜드]\n갑커피 | 주식회사 갑 | cafe | 근거 https://example.com/a#b\n"
+            "[식별력 토큰]\n삼성전자주식회사\n오리온   # 주석\n")
+    assert dx.famous_token_lines(text) == ["삼성전자주식회사", "오리온"]
+    old = "주식회사 앤하우스  # 메가\n# x\n샤넬\n"
+    assert dx.famous_token_lines(old) == ["주식회사 앤하우스", "샤넬"]
+    famous = dx.famous_tokens()
+    assert len(famous) == 257  # 2026-10-12 목록 그대로
+    assert "앤하우스" in famous and "다이닝브랜즈그룹" not in famous

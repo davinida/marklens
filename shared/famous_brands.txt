@@ -1,24 +1,71 @@
-# 프론트-3. 유명 "로고" 브랜드 목록 (DRAFT — 팀 검토 전)
+# 유명 브랜드 목록(프론트-3) — 확정 2026-11-19
 #
-# 선정 기준: 시가총액/매출 순위가 아니라 "로고(도형)가 널리 알려졌는가".
-# 대상 대부분이 결합상표(문자+도형)이므로 문자만 유명한 브랜드보다
-# 그래픽 마크 자체가 눈에 익은 브랜드를 우선했다.
+# 용도: 비교 대상 DB 에 유명 브랜드 대표 상표를 더한다. backend/scripts/collect_pipeline.py
+#   --select-plan 이 [브랜드] 표의 출원인명을 읽는다(--applicants-file 도 이 열을 쓴다).
+#   [식별력 토큰] 절은 식별력 필터(ml/src/axes/distinctiveness.famous_tokens)가 읽는 2026-10-12
+#   목록 그대로다 — 브랜드 표를 바꿔도 식별력 출력은 바뀌지 않는다(토큰을 새 목록에 맞출지는
+#   통합 모델 재학습 때 결정).
 #
-# 용도: backend/scripts/collect_pipeline.py --applicants-file shared/famous_brands.txt
-#   (한 줄에 출원인명 1개, #으로 시작하는 줄은 주석, 빈 줄 무시 — 스크립트가 그대로 파싱)
+# 선정 기준(셋 다 만족):
+#   ① 업종 세트(shared/goods_map/business_presets.json) 25개 가운데 한 업종
+#   ② 그 업종의 가맹점 수 상위(공정위 가맹사업 정보공개서·가맹사업 현황 통계를 인용한 보도·정보공개서
+#      기재 가맹점 수, 편의점·세탁은 점포 수 보도) 또는 공개된 브랜드 가치 순위(인터브랜드 Best Global
+#      Brands 2026·베스트 코리아 브랜드 2025/2026, 스타벅스만 Brand Finance — 국내 직영이라 가맹점 수
+#      순위에 없어 카페의 예외)에 든 브랜드 — 브랜드마다 출처 URL. 브랜드평판 순위는 기준으로 쓰지 않는다.
+#   ③ KIPRIS 항목별검색(등록·도형/도형복합)에서 그 출원인명의 등록 도형·결합 상표가 나옴
+#      (2026-11-19 검색, 원본 목록 ml/data/staging/famous_brands.search.json)
+#   업종당 2~3개(근거를 찾은 브랜드가 하나뿐인 업종은 1개, 카페는 스타벅스 예외로 4개). 근거를 못 찾은
+#   업종(피자집·술집·미용실· 네일샵·헬스장·학원·부동산·꽃집·건강식품·반려동물용품·사진관·이사·청소)은 넣지 않았다.
+#   ②는 맞지만 ③에서 빠진 브랜드: 메가MGC커피(앤하우스 0건)·신전떡볶이(신전푸드시스 0건)·
+#   고봉민김밥인(케이비엠 표장이 고봉민김밥 아님)·성심당(로쏘 주식회사 1건, 성심당 표장 아님)·
+#   부킹닷컴(부킹닷컴 비.브이. 0건)·청년다방(0건).
 #
-# 출원인명은 KIPRIS 실제 조회로 확인·보정 완료(법인 등기명 기준). 이마트·
-#   휠라코리아·엘지생활건강은 검토 후 의도적으로 제외.
-# 검토 완료(2026-10-12)
+# 열: 브랜드(국문·영문 표기를 ' / ' 로, 첫 표기가 이름) | 출원인명(KIPRIS 표기, 같은 회사 표기가 둘이면
+#   ' / ') | 업종(세트 id) | 선정 근거
+# 수집 선택(collect_pipeline --select-plan)은 상표명에 브랜드 표기(국문·영문) 중 하나가 든 표장을 먼저
+#   고르고 모자라면 업종 세트 류 → 최근 등록 순으로 채운다. 브랜드명이 없는 표장은 스테이징 메타에
+#   메모 "같은 출원인의 다른 브랜드".
 
-# ---- 국내: 전자/IT ----
+[브랜드]
+컴포즈커피 / 컴포즈 / COMPOSE | 주식회사 컴포즈커피 | cafe | 커피 가맹점 수 2위 2,649개(공정위 가맹사업 현황 통계 인용) https://brunch.co.kr/@mobiinside/7515
+이디야커피 / 이디야 / EDIYA | 주식회사 이디야 | cafe | 커피 가맹점 수 3위 2,562개(같은 출처) https://brunch.co.kr/@mobiinside/7515
+빽다방 / PAIK'S | (주)더본코리아 | cafe | 커피 가맹점 수 4위 1,712개(같은 출처) https://brunch.co.kr/@mobiinside/7515
+스타벅스 / STARBUCKS | 스타벅스 코포레이션 | cafe | 카페 예외(국내 직영이라 가맹점 수 순위 밖): Brand Finance 브랜드 가치 순위 레스토랑 부문 2위, USD 38.8bn(2025-03) https://brandfinance.com/press-releases/mcdonalds-is-the-worlds-most-valuable-restaurant-brand-starbucks-drops-to-second-place
+BBQ / 비비큐 | 주식회사 제너시스비비큐 | chicken | 치킨 가맹점 수 1위 2,316개(2024년 말, 공정위 2026-04 발표 인용) https://www.mt.co.kr/article/2026041513573592080
+bhc / 비에이치씨 | 다이닝브랜즈그룹 주식회사 | chicken | 치킨 가맹점 수 2위 2,228개(같은 출처; 2024-08 비에이치씨에서 법인명 변경 https://www.smarttoday.co.kr/ko-kr/articles/58093) https://www.mt.co.kr/article/2026041513573592080
+교촌치킨 / 교촌 / KYOCHON | 교촌 에프 앤 비(주) | chicken | 치킨 가맹점 수 3위 1,361개(같은 출처) https://www.mt.co.kr/article/2026041513573592080
+동대문엽기떡볶이 / 엽기떡볶이 / 엽떡 / YUPDDUK | 주식회사 핫시즈너 | bunsik | 떡볶이 가맹점 수 2위 659개(2025-10 말 정보공개서) https://v.daum.net/v/F68011GhtJ
+김가네 / GIMGANE | 주식회사 김가네 | bunsik | 김밥 브랜드 가맹점 2위(2026년 335개) https://www.segye.com/newsView/20260830503261
+뚜레쥬르 / TOUS LES JOURS | 씨제이푸드빌 주식회사 | bakery | 정보공개서 가맹점 수 1,307개(2026년 등록 정보공개서, 2025년; 최종등록 2026-01-20) https://fchamall.com/franchise-info/%EB%9A%9C%EB%A0%88%EC%A5%AC%EB%A5%B4 · 제과제빵 가맹점 수 2위(공정위 2024 가맹사업현황 통계, 2023년 말 1,307개) https://www.newsis.com/view/NISX20251010_0003358438
+던킨 / DUNKIN | 비알코리아주식회사 | bakery | 정보공개서 가맹점 수 607개(2026년 등록 정보공개서, 2025년 말; 최종등록 2026-10-08) https://fchamall.com/franchise-info/%EB%8D%98%ED%82%A8-%EB%8D%98%ED%82%A8%EB%8F%84%EB%84%88%EC%B8%A0 · 공정위 2024 가맹사업현황 통계 2023년 말 631개(파리바게뜨·뚜레쥬르 다음으로 언급) https://www.newsis.com/view/NISX20251010_0003358438
+파리바게뜨 / PARIS BAGUETTE | 주식회사 파리크라상 | bakery | 정보공개서 가맹점 수 3,293개(2026년 등록 정보공개서, 2025년 말; 최종등록 2026-10-30) https://fchamall.com/franchise-info/%ED%8C%8C%EB%A6%AC%EB%B0%94%EA%B2%8C%EB%9C%A8 · 제과제빵 가맹점 수 1위(공정위 2024 가맹사업현황 통계, 2023년 말 3,389개) https://www.newsis.com/view/NISX20251010_0003358438
+CU / 씨유 | (주) 비지에프리테일 | convenience | 편의점 점포 수 1만8,711개(2025, 편의점 4사 비교 보도) https://www.ceoscoredaily.com/page/view/2026021115265521903
+GS25 / 지에스25 | 주식회사 지에스리테일 | convenience | 편의점 점포 수 1만8,112개(2024, 같은 보도) https://www.ceoscoredaily.com/page/view/2026021115265521903
+크린토피아 / CLEANTOPIA | 주식회사 크린토피아 | laundry | 점포 3,300여 개, "유일한 전국구 세탁 프랜차이즈"(2025-05 보도) https://news.bizwatch.co.kr/article/consumer/2025/05/29/0047
+본죽&비빔밥 / 본죽 / BONJUK | 본아이에프 주식회사 | korean_restaurant | 가맹점 1,000호점, "한식 프랜차이즈 단일 브랜드로는 유일"(2024-01 보도) https://view.asiae.co.kr/article/2024011509071254175
+마이크로소프트 / MICROSOFT | 마이크로소프트 코포레이션 | software | 인터브랜드 Best Global Brands 2026 2위 https://interbrand.com/best-global-brands/global/
+구글 / GOOGLE | 구글 엘엘씨 | software | 인터브랜드 Best Global Brands 2026 3위 https://interbrand.com/best-global-brands/global/
+네이버 / NAVER | 네이버 주식회사 | software | 인터브랜드 베스트 코리아 브랜드 2026 5위 https://www.newswire.co.kr/newsRead.php?no=1036230
+인스타그램 / INSTAGRAM | 인스타그램, 엘엘씨 | creator | 인터브랜드 Best Global Brands 2026 7위 https://interbrand.com/best-global-brands/global/
+넷플릭스 / NETFLIX | 넷플릭스, 인크. | creator | 인터브랜드 Best Global Brands 2026 23위 https://interbrand.com/best-global-brands/global/
+에르메스 / HERMES | 에르메스 앵떼르나씨오날 | clothing | 인터브랜드 Best Global Brands 2026 15위 https://interbrand.com/best-global-brands/global/
+루이비통 / LOUIS VUITTON | 루이비통 말레띠에 | clothing | 인터브랜드 Best Global Brands 2026 16위 https://interbrand.com/best-global-brands/global/
+샤넬 / CHANEL | 샤넬 | clothing | 인터브랜드 Best Global Brands 2026 24위 https://interbrand.com/best-global-brands/global/
+로레알 파리 / 로레알 / L'OREAL | 로레알 | cosmetics | 인터브랜드 Best Global Brands 2026 57위 https://interbrand.com/best-global-brands/global/
+올리브영 / OLIVE YOUNG | 씨제이올리브영 주식회사 | cosmetics | 인터브랜드 베스트 코리아 브랜드 2026 27위 https://www.newswire.co.kr/newsRead.php?no=1036230
+세포라 / SEPHORA | 세포라 / 세포라 쏘시에떼 아노님 | cosmetics | 인터브랜드 Best Global Brands 2026 92위 https://interbrand.com/best-global-brands/global/
+이케아 / IKEA | 인터 이케아 시스템 비. 브이. / 인터 이케아 시스템스 비. 브이. | interior | 인터브랜드 Best Global Brands 2026 46위 https://interbrand.com/best-global-brands/global/
+에어비앤비 / AIRBNB | 에어비앤비, 인크. | lodging | 인터브랜드 Best Global Brands 2026 44위 https://interbrand.com/best-global-brands/global/
+야놀자 / YANOLJA | 주식회사 야놀자 | lodging | 인터브랜드 베스트 코리아 브랜드 2025 50위 https://www.newswire.co.kr/newsRead.php?no=1013186
+
+# 식별력 필터의 유명 브랜드 토큰 원천 — 2026-10-12 검토 목록(출원인명 줄마다 첫 핵심 토큰)을 그대로
+# 옮겼다. 수집 대상이 아니다(collect_pipeline 은 이 절을 읽지 않는다).
+[식별력 토큰]
 삼성전자주식회사
 주식회사 엘지
 주식회사 카카오
 네이버 주식회사
 쿠팡 주식회사
-
-# ---- 국내: 식음료/프랜차이즈 ----
 주식회사농심
 (주)오리온홀딩스
 주식회사 빙그레
@@ -28,23 +75,15 @@
 주식회사 제너시스비비큐
 하이트진로 주식회사
 스타벅스 코포레이션
-
-# ---- 국내: 유통/패션/화장품 ----
 주식회사 신세계
 주식회사 무신사
 (주)아모레퍼시픽
 주식회사 이랜드
-
-# ---- 국내: 자동차/중공업 ----
 현대자동차주식회사
 기아 주식회사
 포스코홀딩스 주식회사
-
-# ---- 국내: 금융/플랫폼 ----
 (주)비바리퍼블리카
 주식회사 우아한형제들
-
-# ---- 해외 (한국 내 실제 등록 출원인명으로 조회·보정 완료) ----
 나이키 이노베이트 씨.브이.
 아디다스 악티엔게젤샤프트
 애플 인크.
@@ -61,41 +100,29 @@
 인두스트리아 데 디세노 텍스틸 에스.에이
 도요타지도샤가부시키가이샤
 바이에리셰 모토렌 베르케 악티엔게젤샤프트
-
-# ---- 식별력 요부 판단용 브랜드 토큰(2026-10-11, 식별력 v0.2) ----
-# 출원인명이 아니라 주지·저명 상표의 호칭 토큰(2017후2697 요부 판단의 첫 요소 — 주지·저명한 부분은
-# 요부). famous_tokens() 가 줄의 첫 핵심 토큰을 유명 브랜드 토큰(점수 1.0)으로 읽는다. 한글·영문을
-# 따로 적는다(줄당 토큰 하나). collect_pipeline 출원인 검색에는 쓰지 않는다.
 갤럭시
 GALAXY
 오리온
 ORION
-
-
-# ---- 국내: 소상공인 업종 프랜차이즈(2026-10-12 추가, 출원인명 KIPRIS 확인 필요) ----
-# 카페
-주식회사 앤하우스            # 메가MGC커피
+주식회사 앤하우스
 주식회사 컴포즈커피
 주식회사 이디야
 주식회사 투썸플레이스
 주식회사 할리스에프앤비
-비알코리아 주식회사          # 배스킨라빈스·던킨
-# 치킨·버거·분식
-주식회사 비에이치씨          # bhc
-지엔푸드 주식회사            # 굽네
-주식회사 해마로푸드서비스    # 맘스터치
-롯데지알에스 주식회사        # 롯데리아
-주식회사 더본코리아          # 빽다방·홍콩반점
-주식회사 죠스푸드            # 죠스떡볶이
-# 베이커리·편의점·생활
-주식회사 파리크라상          # 파리바게뜨
-씨제이푸드빌 주식회사        # 뚜레쥬르
-비지에프리테일 주식회사      # CU
-주식회사 지에스리테일        # GS25
-코리아세븐 주식회사          # 세븐일레븐
+비알코리아 주식회사
+주식회사 비에이치씨
+지엔푸드 주식회사
+주식회사 해마로푸드서비스
+롯데지알에스 주식회사
+주식회사 더본코리아
+주식회사 죠스푸드
+주식회사 파리크라상
+씨제이푸드빌 주식회사
+비지에프리테일 주식회사
+주식회사 지에스리테일
+코리아세븐 주식회사
 씨제이올리브영 주식회사
 주식회사 아성다이소
-# 플랫폼·그룹(로고 유명)
 롯데지주 주식회사
 에스케이 주식회사
 주식회사 케이티

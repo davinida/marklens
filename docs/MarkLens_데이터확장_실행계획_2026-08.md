@@ -312,3 +312,31 @@ ml\venv\Scripts\python.exe -m backend.scripts.quarantine_file_staging `
    두 파일을 바꾸는 동안에는 staging dirty marker가 모든 재수집·승격을 차단한다.
 6. 최종 무결성 검사를 통과해야 dirty marker를 제거한다. 중간 실패 시에는 marker와
    백업 및 이동된 이미지를 유지하며, 원인을 확인하기 전 수동으로 marker를 삭제하지 않는다.
+
+## 10. 유명 브랜드 스테이징(2026-11-19)
+
+`shared/famous_brands.txt` 확정본(30개 브랜드)의 출원인 대표 상표 283건을 파일 스테이징
+`ml/data/staging/famous_brands.json`(+ `famous_brands_images/`·`famous_brands.authoritative_keys.json`·
+`famous_brands.checkpoint.json`)에 받았다. 운영 메타·FAISS 색인·유형 사전은 바꾸지 않았다 — 운영 DB 모드는 기동 때 DB
+image_key 와 색인 authoritative key 가 같아야 하므로, 운영 반영은 §7 과 같은 승격(`promote_file_staging --plan` →
+`--apply`, 색인 재생성 포함)과 `precompute_types.py`·`migrate_json_to_db` 를 한 번에 하는 다음 단계다.
+
+- 흐름(`collect_pipeline`): `--search-only`(출원인 검색 원본 저장 + 검색 목록 `famous_brands.search.json`, 완전한 기존
+  원본은 재사용) → `--select-plan`(호출 0, `famous_brands.plan.json`, 출원인당 `--max-per-applicant` 10, 순서 = 상표명에
+  브랜드명(국문·영문)이 든 표장 → 업종 세트 류 → 최근 등록, 저장된 서지가 '등록'이 아닌 건은 뺌) →
+  `--run-plan`(브랜드 단위·`--industry-order` 순, 건마다 서지상세 1회 → 새 견본 링크로 즉시 다운로드·검증 → 스테이징
+  병합, 연속 오류 5회 중단). 다시 고른 계획을 실행할 때는 그 브랜드의 새 건을 다 받은 뒤에만 계획 밖 이전 건을 뺀다
+  (`--prune-archive` — 견본은 보관 폴더로, 레코드는 `removed_records.json`, 원본 XML 은 그대로; 멈추면 못 받은 브랜드는
+  이전 건 유지). 브랜드명이 없는 표장에는 메모 "같은 출원인의 다른 브랜드".
+  검색 응답의 견본 링크는 일회성이라 쓰지 않고 서지 응답의 링크를 쓴다. 서지 응답의 표장구분은 운영 메타 표기
+  (`도형복합`·`도형상표`)로 줄여 저장한다(`short_mark_kind` — 유형 판정 규칙이 정확히 이 두 값만 쓴다).
+- 키·카운터: 다른 팀원 키를 `--key-env` 로, 호출은 그 키 전용 카운터(`ml/data/kipris_counters/<팀원>/`)에 센다.
+  하드캡은 이 카운터(API 호출)로 센다. 1차: 출원인 검색 35 + 서지 273 = 308회, 견본 272장. 재선정: 스타벅스 검색 1 +
+  서지 139 = 140회, 견본 139장. 그 키 11월 148 → 596, 공용 카운터 변화 0.
+- 결과: 283건(1차 272 중 144 유지 + 새 139, 이전 건 128 뺌), 상표명에 브랜드명이 든 표장 215건(재선정 전 76/272),
+  서지 실패·견본 검증 실패 0, 운영 메타와 겹침 0, 유사군 283/283, `inspect_file_staging` 통과(메타 → authoritative keys →
+  이미지 해시). 뺀 128건의 견본·레코드는 `~/marklens-archive/famous-brands-pruned-20261119/`.
+- 수집 출처: 스테이징 레코드는 `수집_출처: "유명 브랜드"`, 운영 1,100건은 `goods_backfill mark-source --label "기존 수집"`
+  (출원인 검색 기반이라 무작위 표본이 아님 — 처음 붙인 "무작위 표본"을 `--replace` 로 고침)으로 표시하고 메타 →
+  authoritative keys(metadata_sha256) → manifest(source.sha256) 해시를 갱신했다(FAISS·이미지·generation 그대로, 엔진
+  manifest 검증 통과). 표시 전 사본은 `~/marklens-archive/famous-brands-backup-20261119/`.

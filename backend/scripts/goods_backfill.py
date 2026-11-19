@@ -4,6 +4,16 @@
     ml/venv/bin/python -m backend.scripts.goods_backfill status          # 류별 보유 현황(호출 0)
     ml/venv/bin/python -m backend.scripts.goods_backfill plan            # 계획표·예산(호출 0)
     KIPRIS_DAILY_BUDGET=400 ml/venv/bin/python -m backend.scripts.goods_backfill run --max-calls 100
+    ml/venv/bin/python -m backend.scripts.goods_backfill status \
+        --staging ml/data/staging/famous_brands.json                  # 스테이징 보유 현황
+    ml/venv/bin/python -m backend.scripts.goods_backfill mark-source --label "기존 수집"  # 호출 0
+
+키·카운터: plan·run 은 --key-env 환경변수이름 --counter 키별카운터.json 으로 다른 키와 그 키 전용
+카운터를 쓴다(collect_pipeline·trials_enrich lookup 과 같은 규약, 키 값은 출력·저장하지 않음).
+--staging: 파일 스테이징 메타(collect_pipeline --file-staging)를 대상으로 한다 — 해시 연결은 메타 →
+스테이징 authoritative keys(metadata_sha256)까지(스테이징에는 색인 manifest 가 없다).
+mark-source: 수집 출처 필드(수집_출처)가 없는(또는 --replace 값인) 레코드에 --label 값을 넣는다
+(평가에서 표본을 골라 쓰도록). 유사군 백필과 같은 메타 전용 쓰기·해시 연결 갱신을 쓴다.
 
 대상 = 파일 모드 상표 메타(ml/data/kipris_metadata.json)에서 유사군이 빈 레코드. 류 우선순위
 (--classes, 기본은 업종 세트가 쓰는 43·30·35·29·25·3·42)대로 — 레코드의 류 가운데 가장 앞선 순위,
@@ -44,7 +54,8 @@ SAVE_EVERY = 20
 MAX_FAILURE_STREAK = 3
 META_PATH: Path = paths.TRADEMARK_META_PATH
 AUTH_PATH: Path = paths.ML_DATA_DIR / "index" / "kipris_authoritative_keys.json"
-MANIFEST_PATH: Path = paths.INDEX_MANIFEST_PATH
+MANIFEST_PATH: Path | None = paths.INDEX_MANIFEST_PATH
+SOURCE_FIELD = collect.SOURCE_LABEL_FIELD  # "수집_출처"
 
 
 class BackfillError(RuntimeError):
@@ -81,12 +92,22 @@ def _atomic_write(path: Path, payload: bytes) -> None:
     os.replace(temporary, path)
 
 
+def use_staging(path: Path) -> None:
+    """대상을 파일 스테이징 메타로 바꾼다(--staging). 해시 연결은 스테이징 keys 까지."""
+    global META_PATH, AUTH_PATH, MANIFEST_PATH
+    META_PATH = Path(path)
+    AUTH_PATH = collect.staging_authoritative_path(META_PATH)
+    MANIFEST_PATH = None
+
+
 def check_chain() -> None:
-    """메타 → authoritative keys → manifest 해시 연결이 지금 맞는지 확인한다."""
+    """메타 → authoritative keys → manifest 해시 연결이 맞는지 확인한다(스테이징은 keys 까지)."""
     authoritative = json.loads(AUTH_PATH.read_bytes())
-    manifest = json.loads(MANIFEST_PATH.read_bytes())
     if authoritative.get("metadata_sha256") != collect._sha256_file(META_PATH):  # noqa: SLF001
         raise BackfillError("authoritative keys 의 metadata_sha256 이 상표 메타와 다릅니다 — 중단")
+    if MANIFEST_PATH is None:
+        return
+    manifest = json.loads(MANIFEST_PATH.read_bytes())
     if manifest.get("source", {}).get("sha256") != collect._sha256_file(AUTH_PATH):  # noqa: SLF001
         raise BackfillError("manifest 의 source.sha256 이 authoritative keys 와 다릅니다 — 중단")
 
@@ -104,7 +125,8 @@ def save(meta: MetaFile) -> None:
     old_auth = collect._sha256_file(AUTH_PATH)  # noqa: SLF001
     _atomic_write(META_PATH, meta.dumps())
     _replace_once(AUTH_PATH, old_meta, collect._sha256_file(META_PATH))  # noqa: SLF001
-    _replace_once(MANIFEST_PATH, old_auth, collect._sha256_file(AUTH_PATH))  # noqa: SLF001
+    if MANIFEST_PATH is not None:
+        _replace_once(MANIFEST_PATH, old_auth, collect._sha256_file(AUTH_PATH))  # noqa: SLF001
 
 
 def _attempted() -> set[str]:
@@ -159,7 +181,12 @@ def cmd_status(_args) -> int:
     meta = MetaFile.load(META_PATH)
     records = meta.data["trademarks"]
     filled = [record for record in records if record.get("유사군")]
-    print(f"유사군 보유 {len(filled)}/{len(records)}건")
+    print(f"유사군 보유 {len(filled)}/{len(records)}건 — {META_PATH}")
+    sources: dict[str, int] = {}
+    for record in records:
+        label = str(record.get(SOURCE_FIELD) or "(표시 없음)")
+        sources[label] = sources.get(label, 0) + 1
+    print("수집 출처: " + " · ".join(f"{key} {value}" for key, value in sorted(sources.items())))
     for nice in DEFAULT_CLASSES:
         group = [record for record in records if nice in (record.get("류") or [])]
         have = sum(1 for record in group if record.get("유사군"))
@@ -168,6 +195,9 @@ def cmd_status(_args) -> int:
 
 
 def _plan(args) -> tuple[MetaFile, list[dict], int]:
+    if args.key_env or args.counter:
+        info = collect.use_key_and_counter(key_env=args.key_env, counter=args.counter)
+        print("[키·카운터] " + json.dumps(info, ensure_ascii=False))
     check_chain()
     meta = MetaFile.load(META_PATH)
     queue = targets(meta, args.classes, args.all)
@@ -244,6 +274,26 @@ def cmd_run(args) -> int:
     return 1 if failed else 0
 
 
+def cmd_mark_source(args) -> int:
+    """수집 출처가 없는(또는 --replace 값인) 레코드에 --label 을 넣고 해시 연결을 잇는다(호출 0)."""
+    check_chain()
+    meta = MetaFile.load(META_PATH)
+    marked = 0
+    for record in meta.data["trademarks"]:
+        current = record.get(SOURCE_FIELD)
+        if not current or (args.replace is not None and current == args.replace):
+            if current != args.label:
+                record[SOURCE_FIELD] = args.label
+                marked += 1
+    if marked:
+        save(meta)
+        check_chain()
+    total = len(meta.data["trademarks"])
+    print(f"{SOURCE_FIELD} = {args.label!r}: {marked}건 표시(전체 {total}건) — 해시 연결 "
+          f"{'갱신·확인' if marked else '변경 없음'}")
+    return 0
+
+
 def _classes(value: str) -> tuple[int, ...]:
     items = tuple(int(part) for part in value.split(",") if part.strip())
     if not items or any(not 1 <= item <= 45 for item in items):
@@ -254,15 +304,31 @@ def _classes(value: str) -> tuple[int, ...]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("status", help="류별 유사군 보유 현황(호출 0)")
+    commands = {"status": sub.add_parser("status", help="류별 유사군 보유 현황(호출 0)")}
     for name in ("plan", "run"):
         command = sub.add_parser(name, help="계획표(호출 0)" if name == "plan" else "실호출")
         command.add_argument("--classes", type=_classes, default=DEFAULT_CLASSES,
                              help="류 우선순위(쉼표, 기본 43,30,35,29,25,3,42)")
         command.add_argument("--all", action="store_true", help="우선순위 밖 류도 뒤에 붙인다")
         command.add_argument("--max-calls", type=int, default=100, help="하드캡(기본 100)")
+        command.add_argument("--key-env", metavar="NAME",
+                             help="KIPRIS 키를 담은 환경변수 이름(값은 출력·저장하지 않음)")
+        command.add_argument("--counter", type=Path, metavar="PATH",
+                             help="이 키 전용 호출 카운터 파일(공용 카운터는 그대로)")
+        commands[name] = command
+    commands["mark-source"] = sub.add_parser(
+        "mark-source", help=f"{SOURCE_FIELD} 가 없는 레코드에 출처 표시(호출 0)")
+    commands["mark-source"].add_argument("--label", required=True, help="예: 기존 수집")
+    commands["mark-source"].add_argument("--replace", metavar="OLD",
+                                         help="이 값으로 표시된 레코드도 --label 로 바꾼다")
+    for command in commands.values():
+        command.add_argument("--staging", type=Path, metavar="PATH",
+                             help="파일 스테이징 메타(ml/data/staging/*.json)를 대상으로")
     args = parser.parse_args(argv)
-    handler = {"status": cmd_status, "plan": cmd_plan, "run": cmd_run}[args.command]
+    if args.staging:
+        use_staging(args.staging)
+    handler = {"status": cmd_status, "plan": cmd_plan, "run": cmd_run,
+               "mark-source": cmd_mark_source}[args.command]
     try:
         return handler(args)
     except (BackfillError, kc.KiprisConfigError) as exc:
