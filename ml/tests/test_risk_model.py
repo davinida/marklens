@@ -453,3 +453,158 @@ def test_v13_validate_patterns():
     assert rm.coupling_violations(loose) == []  # floors 없음 → 검사 대상 없음
     violations = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
     assert violations and all(v.startswith("base → x2_whole") for v in violations)
+
+
+# ---- v1.4 이름 없는 입력의 계수 집합 --------------------------------------------------------
+
+V14_NAME_FLOORS = {"x1_d": 0.25, "x2_text_d": 0.1, "x3_d": 0.0}
+
+
+def _nameless_block(coefficients: dict, intercept: float) -> dict:
+    return {"features": list(coefficients), "coefficients": dict(coefficients),
+            "intercept": intercept}
+
+
+def _model_v14(**overrides) -> dict:
+    """합성 v1.4 = 합성 v1.3 + 이름 없는 패턴 2벌. 이름 하한(호칭 0.25·철자 0.1·관념 0)에서 이름
+    있는 패턴의 로짓은 문자계 −2.95 + 0.3·이미지(요부 없음이면 +0.5), 도형계 −3.45 + 0.2·이미지 —
+    이름 없는 패턴(−3.5 + 0.2·이미지)이 모든 꼭짓점에서 그 이하다. 상품을 하한 0.03 으로 더 관측하면
+    +0.042."""
+    nameless = {
+        "x2_whole": _nameless_block({"x2_whole": 0.2, "x2_whole×도형계": 0.0}, -3.5),
+        "x2_whole+x4": _nameless_block({"x2_whole": 0.2, "x2_whole×도형계": 0.0, "x4": 1.4}, -3.5),
+    }
+    values = {"version": "risk_model_v1.4", "nameless_patterns": nameless,
+              "coupling": {"floors": dict(V13_FLOORS), "name_floors": dict(V14_NAME_FLOORS),
+                           "basis": "테스트"}}
+    values.update(overrides)
+    return _model_v13(**values)
+
+
+def test_v14_nameless_pattern_selection_and_score():
+    model = _model_v14()
+    image_only = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x4": None, "x2_whole": 0.8,
+                  "has_meaning_both": False, "has_distinctive_part_a": True,
+                  "has_distinctive_part_b": True, "mark_type": "도형"}
+    result = rm.risk_score(image_only, model)
+    assert result.pattern == "noname:x2_whole" and result.figure_caveat
+    assert set(result.contributions) == {"intercept", "miss_pattern", "x2_whole",
+                                         "x2_whole×도형계"}  # 이름 항이 없다
+    assert result.contributions["intercept"] == -3.94  # 기준 절편(이름·이미지·상품 모두 관측)
+    assert result.contributions["miss_pattern"] == pytest.approx(-3.5 + 3.94)
+    assert math.log(result.prob / (1 - result.prob)) == pytest.approx(-3.5 + 0.2 * 0.8)
+    with_goods = rm.risk_score({**image_only, "x4": 0.5}, model)
+    assert with_goods.pattern == "noname:x2_whole+x4"
+    assert math.log(with_goods.prob / (1 - with_goods.prob)) == pytest.approx(
+        -3.5 + 0.2 * 0.8 + 1.4 * 0.5)
+    # 이름도 이미지도 없는 입력(상품만·아무것도 없음)은 종전대로 이름 있는 패턴에 이름 항 0
+    goods_only = rm.risk_score({**image_only, "x2_whole": None, "x4": 0.5}, model)
+    assert goods_only.pattern == "x4" and goods_only.contributions["x1_d"] == 0.0
+    assert rm.risk_score({**image_only, "x2_whole": None}, model).pattern == "base"
+    # 이름 축이 하나라도 있으면 이름 있는 패턴(호칭만 결측인 입력 포함)
+    named = rm.risk_score({**image_only, "x1_d": 0.4, "x2_text_d": 0.3}, model)
+    assert named.pattern == "x2_whole" and "x1_d" in named.contributions
+    assert rm.risk_score({**image_only, "x2_text_d": 0.3}, model).pattern == "x2_whole"
+    assert rm.name_missing(rm.design_values(image_only))
+    assert not rm.name_missing(rm.design_values({**image_only, "x2_text_d": 0.3}))
+    # v1.3 JSON(nameless_patterns 없음)은 같은 입력을 종전대로 계산한다
+    old = rm.risk_score(image_only, _model_v13())
+    assert old.pattern == "x2_whole" and old.contributions["x1_d"] == 0.0
+    assert math.log(old.prob / (1 - old.prob)) == pytest.approx(-3.95 + (0.3 - 0.1) * 0.8)
+    # 한 벌만 있는 JSON: 없는 키의 입력은 이름 있는 패턴으로 내려간다
+    partial = _model_v14(nameless_patterns={
+        "x2_whole": _model_v14()["nameless_patterns"]["x2_whole"]})
+    assert rm.risk_score({**image_only, "x4": 0.5}, partial).pattern == "x2_whole+x4"
+    assert rm.risk_score(image_only, partial).pattern == "noname:x2_whole"
+
+
+def test_v14_observing_name_or_goods_never_lowers_probability():
+    """결합 제약(이름 쪽): 이름 없는 입력에 이름을 하한 이상으로 더 주거나 상품을 하한 이상으로 더
+    주면 어떤 유형·이미지 값에서도 p 가 내려가지 않는다."""
+    model = _model_v14()
+    assert rm.coupling_violations(model) == []
+    assert len(rm.nameless_vertices(["x2_whole", "x2_whole×도형계"])) == 4
+    assert len(rm.nameless_vertices(["x2_whole", "x2_whole×도형계", "x4"])) == 8
+    assert len(rm.name_coupling_vertices(["x2_whole", "x2_whole×도형계", "x4"])) == 16
+    for level in ("문자", "도형", "결합-문자요부", "결합-도형요부"):
+        for image in (0.0, 0.35, 0.7, 1.0):
+            for goods in (None, 0.03, 0.6, 1.0):
+                base = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x2_whole": image,
+                        "x4": goods, "has_meaning_both": False, "mark_type": level}
+                p0 = rm.risk_score(base, model).prob
+                assert rm.risk_score(base, model).pattern.startswith(rm.NAMELESS_PREFIX)
+                for x1 in (0.25, 0.6, 1.0):
+                    for x2_text in (0.1, 0.5, 1.0):
+                        for flag in (True, False):
+                            more = rm.risk_score(
+                                {**base, "x1_d": x1, "x2_text_d": x2_text, "x3_d": 0.0,
+                                 "has_meaning_both": True, "has_distinctive_part_b": flag},
+                                model)
+                            assert not more.pattern.startswith(rm.NAMELESS_PREFIX)
+                            assert more.prob >= p0 - 1e-12
+                if goods is None:
+                    for value in (0.03, 0.5, 1.0):
+                        assert rm.risk_score({**base, "x4": value}, model).prob >= p0 - 1e-12
+    # 하한 아래의 이름(쉬운 음성 평균보다 덜 비슷한 이름)은 내려갈 수 있다 — 음의 증거
+    image_only = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x4": None, "x2_whole": 1.0,
+                  "mark_type": "도형"}
+    low_name = {**image_only, "x1_d": 0.0, "x2_text_d": 0.0}
+    assert rm.risk_score(low_name, model).prob < rm.risk_score(image_only, model).prob
+
+
+def test_v14_validate_nameless_patterns():
+    good = _model_v14()["nameless_patterns"]
+    with pytest.raises(ValueError, match="nameless_patterns 의 키"):
+        _model_v14(nameless_patterns={"x9": good["x2_whole"]})
+    with pytest.raises(ValueError, match="nameless_patterns 의 키"):
+        _model_v14(nameless_patterns={})
+    with pytest.raises(ValueError, match="이름에서 나오는 항"):
+        _model_v14(nameless_patterns={**good, "x2_whole": _nameless_block(
+            {"x2_whole": 0.2, "x2_whole×도형계": 0.0, "x1_d": 0.1}, -3.5)})
+    with pytest.raises(ValueError, match="패턴 축이 키와 다릅니다"):
+        _model_v14(nameless_patterns={**good, "x2_whole": good["x2_whole+x4"]})
+    with pytest.raises(ValueError, match="단조 제약 위반"):
+        _model_v14(nameless_patterns={**good, "x2_whole": _nameless_block(
+            {"x2_whole": 0.2, "x2_whole×도형계": -0.5}, -3.5)})
+    with pytest.raises(ValueError, match="name_floors"):
+        _model_v14(coupling={"floors": dict(V13_FLOORS), "name_floors": {"x1_d": 1.5}})
+    with pytest.raises(ValueError, match="name_floors"):
+        _model_v14(coupling={"floors": dict(V13_FLOORS), "name_floors": {"x4": 0.1}})
+    # 이름 결합 위반: 이름 없는 패턴의 절편이 이름 하한에서의 이름 있는 패턴보다 높다
+    with pytest.raises(ValueError, match="결합 제약 위반"):
+        _model_v14(nameless_patterns={**good, "x2_whole": _nameless_block(
+            {"x2_whole": 0.2, "x2_whole×도형계": 0.0}, -3.0)})
+    # 이름 없는 패턴 사이: 상품을 하한으로 더 관측했는데 내려간다
+    with pytest.raises(ValueError, match="결합 제약 위반"):
+        _model_v14(nameless_patterns={**good, "x2_whole+x4": _nameless_block(
+            {"x2_whole": 0.2, "x2_whole×도형계": 0.0, "x4": 1.4}, -3.6)})
+    high = {**good, "x2_whole": _nameless_block({"x2_whole": 0.2, "x2_whole×도형계": 0.0}, -3.0)}
+    loose = _model_v14(coupling=None, nameless_patterns=high)  # coupling null → 검증 건너뜀
+    violations = rm.coupling_violations(
+        {**loose, "coupling": {"floors": V13_FLOORS, "name_floors": V14_NAME_FLOORS}})
+    assert any(v.startswith("noname:x2_whole → x2_whole (이름") for v in violations)
+    assert any(v.startswith("noname:x2_whole → noname:x2_whole+x4") for v in violations)
+    # name_floors 가 없는 v1.4 JSON 은 이름 결합을 검사하지 않는다(이름 없는 패턴 사이만)
+    without_floors = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
+    assert without_floors and all("(이름" not in v for v in without_floors)
+    assert rm.MODEL_VERSION == "risk_model_v1.3"  # 서비스 기본 모델은 v1.3 그대로
+    assert "risk_model_v1.4" in rm.SUPPORTED_VERSIONS
+
+
+def test_shipped_v13_scores_nameless_input_with_named_pattern():
+    """서비스 기본 모델(v1.3 JSON)의 계산은 v1.4 런타임에서도 달라지지 않는다 — 이름 없는 이미지
+    질의는 이름 있는 패턴에 이름 항 0(계약 v2 §3-2)."""
+    if not rm.DEFAULT_MODEL_PATH.exists():
+        pytest.skip("계수 파일 없음(학습 전)")
+    model = rm.load_model()
+    assert model["version"] == "risk_model_v1.3" and rm.NAMELESS_KEY not in model
+    features = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x4": None, "x2_whole": 0.9,
+                "has_meaning_both": False, "has_distinctive_part_a": True,
+                "has_distinctive_part_b": True, "mark_type": "도형"}
+    result = rm.risk_score(features, model)
+    block = model["patterns"]["x2_whole"]
+    expected = block["intercept"] + 0.9 * (block["coefficients"]["x2_whole"]
+                                          + block["coefficients"]["x2_whole×도형계"])
+    assert result.pattern == "x2_whole"
+    assert math.log(result.prob / (1 - result.prob)) == pytest.approx(expected)
+    assert result.prob == pytest.approx(0.0581, abs=5e-5)  # 설계 §7-4 "이미지만" 표의 v1.3 값

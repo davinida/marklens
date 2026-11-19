@@ -23,3 +23,24 @@
 재학습(프로젝트 루트, KIPRIS 호출 0, 기본 2방법 약 13초): `ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images`(쉬운 음성 이미지 축, 5초) →
 `ml/venv/bin/python ml/scripts/train_risk_model.py`. 런타임 `MODEL_VERSION` 은 risk_model_v1.3 이고 v1~v1.2.1 JSON 도 적재한다(패턴 없는 JSON 은 최상위
 계수 집합 하나로, 없는 키는 규칙 미적용).
+
+## v1.4 (2차 학습) — 채택 보류, 이 디렉터리에 파일 없음 (2026-11-19)
+
+1·2차 정답 데이터(566행 + 쉬운 음성 700)로 다시 학습한 v1.4 는 결과 전에 고정한 채택 기준 ①·②에 걸려 채택하지 않았다(통합 모델 설계 §7-4 — 1차 가중 AUC 짝 차이
+−0.074, 판례 (i)·(iv) 부트스트랩 성립 비율 하락; 원인은 이름 결합 제약). **`risk_model_v1.4.json` 은 만들지 않았고 서비스 기본 모델은 위 v1.3 파일 그대로다.** 후보
+계수·표는 비공개 데이터 저장소의 `ml/data/trials/risk_model_v1.4_{candidate.json,report.md,results.json}`.
+
+- 학습·평가: `ml/venv/bin/python ml/scripts/train_risk_model_v14.py`(약 40초, KIPRIS 호출 0). 채택 기준을 통과하면 `shared/model/risk_model_v1.4.json` 에 쓰고, 못
+  미치면 후보 파일만 쓰고 종료 코드 3(`--force-model` 은 사람이 채택을 정했을 때). 먼저 `pairs_features.py`(심결 특징) → `pairs_features.py --refresh-easy`(쉬운 음성).
+- 런타임은 v1.4 JSON 을 적재할 수 있다(version `risk_model_v1.4`): `nameless_patterns`(이름 없는 입력의 계수 집합 — 키 `x2_whole`·`x2_whole+x4`, 입력 항은 이미지·
+  상품뿐, `RiskResult.pattern` = "noname:" + 키)와 `coupling.name_floors`(이름을 이 값 이상으로 더 관측하면 로짓 비감소 — 적재 때 검증). 이 키가 없는 JSON(v1.3
+  이하)의 계산은 달라지지 않는다. `MODEL_VERSION`·`DEFAULT_MODEL_PATH` 는 v1.3 그대로.
+
+## `photo_direction_v1.json` — 사진 표장 판정 방향 벡터 (2026-11-19)
+
+`ml/src/photo_mark.py` 가 읽는다. 표장 이미지가 실물·장면을 찍은 사진(간판·제품·포장·입체물)인지 그래픽(평면 로고·문자·스캔)인지를 CLIP 이미지 임베딩 e 하나로
+가른다: `score = e · direction`, `score > threshold(0)` 이면 사진. direction = normalize(mean(사진 문장 8개의 텍스트 임베딩)) − normalize(mean(그래픽 문장 8개)) —
+문장은 파일의 `prompts` 에 있고, 모델·임베딩 계약(`ViT-B-32`·`laion2b_s34b_b79k`·`openclip-image-v2`)이 `ml/src/contracts.py` 와 다르면 적재하지 않는다. 판정에는 텍스트
+인코더가 필요 없다(numpy 내적). 눈으로 확인한 30쌍에서 쌍 27/30·이미지 55/60(통합 모델 설계 §7-4). 지금 쓰는 곳은 학습 특징의 `사진A`·`사진B` 열
+(`pairs_features.py`)뿐이고 서비스 연결은 다음 단계다. 재생성(문장을 바꿨을 때만 — 바꾸면 표본 확인도 다시): `cd ml && venv/bin/python -m src.photo_mark`. 경로는
+환경변수 `MARKLENS_PHOTO_DIRECTION` 으로 바꿀 수 있다.
