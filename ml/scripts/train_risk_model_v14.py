@@ -1,18 +1,22 @@
-"""통합 모델 v1.4 학습 — 1·2차 정답 데이터(`pairs_features.csv` 597행) + 쉬운 음성
-(`pairs_features_easy.csv` 700쌍)으로 v1.3 구조를 **이름 쪽으로 하나만** 넓혀 다시 학습하고, 기존
-v1.3(`shared/model/risk_model_v1.json`)과 같은 표·같은 방식으로 비교한다(통합 모델 설계 §7-4).
-KIPRIS 호출 0. 서비스가 쓰는 모델 파일은 건드리지 않는다 — 보고는
-`ml/data/trials/risk_model_v1.4_{report.md,results.json}`, 계수 JSON(version risk_model_v1.4)은
-미리 고정한 채택 기준(ADOPTION)을 통과하면 `shared/model/risk_model_v1.4.json`, 못 미치면
-`ml/data/trials/risk_model_v1.4_candidate.json`(후보로만 — 종료 코드 3).
+"""통합 모델 v1.4 **1차 시도**(채택되지 않음 — 재현용) — 1·2차 정답 데이터(`pairs_features.csv`
+597행) + 쉬운 음성(`pairs_features_easy.csv` 700쌍)으로 v1.3 구조를 **이름 쪽으로 하나만** 넓혀
+여섯 계수 집합을 모두 다시 학습하고, 기존 v1.3(`shared/model/risk_model_v1.json`)과 같은 표·같은
+방식으로 비교한다(통합 모델 설계 §7-4-1). 채택된 v1.4 는 2차 시도
+(`train_risk_model_v14_nameless.py` → `shared/model/risk_model_v1.4.json`)이고, 이 스크립트는 그
+파일을 건드리지 않는다. KIPRIS 호출 0. 보고는 `ml/data/trials/risk_model_v1.4_{report.md,
+results.json}`, 계수 JSON 은 미리 고정한 채택 기준(ADOPTION)을 통과하면 `--model` 경로(기본
+`ml/data/trials/risk_model_v1.4_attempt1.json`), 못 미치면
+`ml/data/trials/risk_model_v1.4_candidate.json`(후보로만 — 종료 코드 3). 데이터 적재·가중 지표·묶음
+부트스트랩 같은 도우미는 2차 시도 스크립트가 그대로 가져다 쓴다.
 
     ml/venv/bin/python ml/scripts/train_risk_model_v14.py                    # 전체(약 40초)
     ml/venv/bin/python ml/scripts/train_risk_model_v14.py --bootstrap 20 --metric-bootstrap 100 \\
         --repeats 1 --no-sensitivity --no-diagnostics                        # 빠른 확인
 
-2026-11-19 실행 결과: 채택 기준 ①·② 미달로 채택 보류(설계 §7-4) — 이름 결합 제약이 이름 있는 입력의
-변별력을 깎는다. --fit-mode sequential·name_coupling=False·--structure v1.3 은 그 원인을 확인한 사후
-진단이다(채택 판단 대상이 아니다).
+2026-11-19 실행 결과: 채택 기준 ①·② 미달로 채택 보류(설계 §7-4-1) — 이름 결합 제약이 이름 있는
+입력의 변별력을 깎는다. --fit-mode sequential·name_coupling=False·--structure v1.3 은 그 원인을
+확인한 사후 진단이다(채택 판단 대상이 아니다). 그 뒤 2차 시도가 이름 있는 쪽을 v1.3 으로 고정하고
+이름 결합을 "같은 이름" 하나로 바꿔 채택됐다.
 
 v1.3 과 같은 것: 판례 사전분포(μ·σ 1.0) + 단조 제약 로지스틱, 결측 패턴별 계수 집합(이미지 ×
 상품 4벌, 각 집합은 그 축들이 관측된 모든 행으로 적합), 결합 제약(축을 하한 이상으로 더 관측해도
@@ -61,7 +65,8 @@ from src.model import risk_model as rm  # noqa: E402
 from scripts import train_risk_model as tr  # noqa: E402  (v1.3 학습 도구 — numpy·scipy 만)
 
 MODEL_VERSION = "risk_model_v1.4"
-DEFAULT_MODEL = rm.REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"
+# 1차 시도의 계수 JSON 기본 경로 — shared/model/risk_model_v1.4.json(2차 시도의 채택분)이 아니다
+DEFAULT_MODEL = tr.DEFAULT_BASE / "risk_model_v1.4_attempt1.json"
 DEFAULT_V13 = rm.DEFAULT_MODEL_PATH
 DEFAULT_OUT_DIR = tr.DEFAULT_BASE
 REPORT_STEM = "risk_model_v1.4"
@@ -1834,8 +1839,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--easy", type=Path, default=tr.DEFAULT_EASY)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL,
-                        help="채택 기준을 통과하면 쓰는 계수 JSON 경로(서비스 기본 모델 경로가 "
-                             "아니다)")
+                        help="채택 기준을 통과하면 쓰는 계수 JSON 경로(기본은 데이터 디렉터리 — "
+                             "shared/model/risk_model_v1.4.json 은 2차 시도의 채택분이다)")
     parser.add_argument("--v13", type=Path, default=DEFAULT_V13, help="비교할 기존 v1.3 JSON")
     parser.add_argument("--structure", choices=("v1.4", "v1.3"), default="v1.4",
                         help="v1.3 = 이름 있는 행만(폴백 구조)")

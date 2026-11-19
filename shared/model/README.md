@@ -24,17 +24,28 @@
 `ml/venv/bin/python ml/scripts/train_risk_model.py`. 런타임 `MODEL_VERSION` 은 risk_model_v1.3 이고 v1~v1.2.1 JSON 도 적재한다(패턴 없는 JSON 은 최상위
 계수 집합 하나로, 없는 키는 규칙 미적용).
 
-## v1.4 (2차 학습) — 채택 보류, 이 디렉터리에 파일 없음 (2026-11-19)
+## `risk_model_v1.4.json` — v1.4 (2차 학습), 서비스 반영 전 (2026-11-19)
 
-1·2차 정답 데이터(566행 + 쉬운 음성 700)로 다시 학습한 v1.4 는 결과 전에 고정한 채택 기준 ①·②에 걸려 채택하지 않았다(통합 모델 설계 §7-4 — 1차 가중 AUC 짝 차이
-−0.074, 판례 (i)·(iv) 부트스트랩 성립 비율 하락; 원인은 이름 결합 제약). **`risk_model_v1.4.json` 은 만들지 않았고 서비스 기본 모델은 위 v1.3 파일 그대로다.** 후보
-계수·표는 비공개 데이터 저장소의 `ml/data/trials/risk_model_v1.4_{candidate.json,report.md,results.json}`.
+**서비스가 읽는 기본 모델은 위 `risk_model_v1.json`(v1.3) 그대로다.** `risk_model_v1.4.json`(version `risk_model_v1.4`)은 v1.3 JSON 에 이름 없는 입력용 계수 집합 2벌을
+덧붙인 것으로, `ml/scripts/train_risk_model_v14_nameless.py` 가 결과 전에 고정한 채택 기준 ①~④를 모두 채웠을 때만 쓴다(통합 모델 설계 §7-4-2). 반영하려면 먼저 이름 없는
+입력의 등급 하한을 정한다 — 등급 하한은 v1.3 값을 그대로 복사했는데, 이름을 가린 무관한 로고 쌍에 대 보면 97% 가 "검토 권장"이 된다(설계 §7-4-2 참고 진단·§6 맨 위).
 
-- 학습·평가: `ml/venv/bin/python ml/scripts/train_risk_model_v14.py`(약 40초, KIPRIS 호출 0). 채택 기준을 통과하면 `shared/model/risk_model_v1.4.json` 에 쓰고, 못
-  미치면 후보 파일만 쓰고 종료 코드 3(`--force-model` 은 사람이 채택을 정했을 때). 먼저 `pairs_features.py`(심결 특징) → `pairs_features.py --refresh-easy`(쉬운 음성).
-- 런타임은 v1.4 JSON 을 적재할 수 있다(version `risk_model_v1.4`): `nameless_patterns`(이름 없는 입력의 계수 집합 — 키 `x2_whole`·`x2_whole+x4`, 입력 항은 이미지·
-  상품뿐, `RiskResult.pattern` = "noname:" + 키)와 `coupling.name_floors`(이름을 이 값 이상으로 더 관측하면 로짓 비감소 — 적재 때 검증). 이 키가 없는 JSON(v1.3
-  이하)의 계산은 달라지지 않는다. `MODEL_VERSION`·`DEFAULT_MODEL_PATH` 는 v1.3 그대로.
+| 키 | 내용 |
+|---|---|
+| `patterns`·`features`·`coefficients`·`intercept`·`grade_thresholds`·`standalone_thresholds`·`figure_rule`·`meta.grade_precision` | **v1.3 JSON 을 그대로 복사**(재학습 없음). 이름 있는 입력(호칭·철자 중 하나라도 있음)과 이름도 이미지도 없는 입력의 출력은 v1.3 과 완전히 같다 — 무작위 입력 20,000개·학습에 쓴 이름 있는 491행에서 차이 0 |
+| `nameless_patterns` | 이름 없는 입력(호칭·철자 둘 다 결측)에 이미지가 있을 때 쓰는 계수 집합: `x2_whole`(이미지만 — 절편 −1.9187, x2_whole 2.1447, x2_whole×도형계 0.3229) / `x2_whole+x4`(이미지+상품 — 절편 −1.9572, 같은 이미지 계수, x4 1.5302). 입력 항은 이미지·상품뿐이고 `RiskResult.pattern` 은 "noname:" + 키. 이미지가 관측된 모든 학습 행(1,010·727행 — 이름이 있는 행도 이름을 가리고 참여)으로 적합, 사건 단위 가중, 사진이 낀 쌍 제외 |
+| `coupling.same_name` | 이름 없는 입력에 후보와 **같은 이름**(호칭·철자 1.0)을 더했을 때 이름 있는 패턴의 로짓 ≥ 이름 없는 패턴의 로짓 — 더한 뒤의 유형은 서비스 규칙대로 문자계, 요부 있음·없음 둘 다, 이미지·상품 값의 모든 꼭짓점. 적재 때 검증한다(어기면 ValueError). `coupling.floors` 는 v1.3 값 그대로이고 이름 없는 두 집합 사이의 축 결합(상품을 하한 이상으로 더하면 비감소)에도 쓴다 |
+| `meta.named_from`·`meta.nameless` | 이름 있는 쪽의 출처(v1.3, 2026-10-25)와 이름 없는 2벌의 학습 메타(행 수·사건 가중·사진 규칙·사전분포·OOF 지표·채택 판정). 최상위 `meta` 의 n·AUC·`grade_precision` 은 v1.3 학습 때의 값 |
+
+- 채택 판정(설계 §7-4-2): ① 이름 있는 입력 불변 ② 이름 없는 75행 Brier 0.529 → 0.213(짝 차이 −0.316, CI −0.423~−0.200)·AUC 0.758 → 0.797 ③ 쉬운 음성을 섞은 AUC 0.816 →
+  0.893(짝 차이 +0.077, CI +0.050~+0.104) ④ 단조성 위반 0. 이미지만 입력(도형계)의 위험도는 이미지 유사도 0.5 / 0.7 / 0.9 / 1.0 에서 0.335 / 0.452 / 0.575 / 0.634
+  (v1.3 은 0.038~0.065).
+- 재학습: `ml/venv/bin/python ml/scripts/pairs_features.py`(심결 특징) → `ml/venv/bin/python ml/scripts/pairs_features.py --refresh-easy`(쉬운 음성) →
+  `ml/venv/bin/python ml/scripts/train_risk_model_v14_nameless.py`(6초, KIPRIS 호출 0 — 기준을 하나라도 못 채우면 이 파일을 쓰지 않고 종료 코드 3). 보고는 비공개 데이터
+  저장소의 `ml/data/trials/risk_model_v1.4_attempt2_{report.md,results.json}`.
+- 1차 시도(`ml/scripts/train_risk_model_v14.py` — 여섯 집합을 모두 다시 학습 + `coupling.name_floors`)는 채택 기준 ①·② 미달로 채택하지 않았다(설계 §7-4-1). 런타임은 그
+  형식(`name_floors`)도 적재할 수 있지만 재현용이고, 이 디렉터리에 그 파일은 없다.
+- 런타임 `MODEL_VERSION`·`DEFAULT_MODEL_PATH` 는 v1.3 그대로다. v1.4 를 읽으려면 경로를 명시한다(`rm.load_model(path)` 또는 환경변수 `MARKLENS_RISK_MODEL`).
 
 ## `photo_direction_v1.json` — 사진 표장 판정 방향 벡터 (2026-11-19)
 

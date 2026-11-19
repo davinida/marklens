@@ -441,3 +441,239 @@ def test_run_v13_structure_has_no_nameless_patterns(data, tmp_path):
     assert model["meta"]["structure"] == "이름 있는 행만(v1.3 구조)"
     assert rm.risk_score({"x2_whole": 0.9, "mark_type": "도형"}, model).pattern == "x2_whole"
     assert rm.coupling_violations(model) == []
+
+
+# ---- 2차 시도: 이름 있는 4벌은 v1.3 그대로, 이름 없는 2벌만 학습 ------------------------------
+
+from scripts import train_risk_model_v14_nameless as t4n  # noqa: E402
+
+
+def test_attempt2_constraints_use_same_name_and_keep_named_blocks_fixed(data):
+    features, easy = data
+    model_old = rm.load_model()
+    rows = t4.load_dataset(features, easy).rows
+    a = t4.arrays(rows)
+    design = t4.Design(rows)
+    fixed = t4n.fixed_named(design, model_old)
+    assert set(fixed) == {"base", "x2_whole", "x4", "x2_whole+x4"}
+    for key, (coef, intercept) in fixed.items():  # v1.3 JSON 의 값 그대로
+        block = model_old["patterns"][key]
+        assert intercept == block["intercept"]
+        assert list(coef) == [block["coefficients"][name] for name in design.names[key]]
+    broken = {**model_old, "patterns": {**model_old["patterns"], "base": {
+        **model_old["patterns"]["base"], "features": ["x1_d"]}}}
+    with pytest.raises(ValueError, match="입력 항이 설계와 다릅니다"):
+        t4n.fixed_named(design, broken)
+    floors = model_old["coupling"]["floors"]
+    constraints = t4n.build_constraints(design, floors)
+    kinds = {kind: sum(1 for c in constraints if c.kind == kind)
+             for kind in {c.kind for c in constraints}}
+    # 같은 이름: (유형 2 × 이미지 2 [× 상품 2]) × 요부 2 = 8 + 16, 이름 하한 결합(1차 시도)은 없다
+    assert kinds == {"단조": 5, "결합(이름 없음, 축)": 4, "결합(같은 이름)": 24}
+    labels = [c.label for c in constraints if c.kind == "결합(같은 이름)"]
+    assert all("(같은 이름)" in label and "요부없음=" in label for label in labels)
+    # 이름 있는 블록의 매개변수에는 단조·축 결합 제약이 걸리지 않는다(같은 이름 제약에만 상수로)
+    named_columns = np.zeros(design.size, dtype=bool)
+    for key in design.named_keys:
+        start = design.offset[key]
+        named_columns[start:start + len(design.names[key]) + 1] = True
+    for constraint in constraints:
+        touches = bool(np.abs(constraint.row[named_columns]).sum() > 0)
+        assert touches == (constraint.kind == "결합(같은 이름)")
+    result = t4n.fit(design, a, np.arange(len(rows)), constraints, fixed)
+    assert result.success and result.min_slack >= -1e-6
+    for key, (coef, intercept) in fixed.items():  # 적합 뒤에도 이름 있는 4벌은 그대로
+        np.testing.assert_array_equal(result.blocks[key][0], coef)
+        assert result.blocks[key][1] == intercept
+    # 이름 없는 집합은 같은 이름을 더한 v1.3 로짓을 넘지 않는다(모든 꼭짓점)
+    theta = result.theta
+    assert min(float(c.row @ theta) for c in constraints) >= -1e-6
+
+
+def test_attempt2_random_inputs_and_identity_check():
+    inputs = t4n.random_inputs(500, seed=3)
+    assert inputs == t4n.random_inputs(500, seed=3) and inputs != t4n.random_inputs(500, seed=4)
+    assert all(f["x1_d"] is not None or f["x2_text_d"] is not None for f in inputs)  # 이름 있음
+    assert any(f["x1_d"] is None for f in inputs) and any(f["x2_whole"] is None for f in inputs)
+    assert any(f["x4"] is None for f in inputs) and len({f["mark_type"] for f in inputs}) == 6
+    model = rm.load_model()
+    assert t4n.count_differences(inputs, model, model) == 0
+    shifted = {**model, "patterns": {key: {**block, "intercept": block["intercept"] + 1e-4}
+                                     for key, block in model["patterns"].items()}}
+    assert t4n.count_differences(inputs, shifted, model) == len(inputs)  # 아주 작은 차이도 센다
+
+
+def test_attempt2_adoption_rules():
+    ok_identity = {"통과": True, "무작위_이름_있는_입력": {"n": 10, "차이": 0}}
+    ok_monotone = {"통과": True, "위반_합계": {"축_결합": 0, "같은_이름": 0},
+                   "런타임_결합_검증_위반": []}
+
+    def table(brier, auc, mixed):
+        return {"이름 없는 행": {t4n.NEW: {"n": 75}, "짝_차이_brier": {"차이": brier[0],
+                                                                  "ci95": list(brier[1:])},
+                             "짝_차이_auc": {"차이": auc[0], "ci95": list(auc[1:])}},
+                "심결+cross+db": {"짝_차이_auc": {"차이": mixed[0], "ci95": list(mixed[1:])}}}
+
+    good = table((-0.3, -0.4, -0.2), (0.03, -0.04, 0.09), (0.05, 0.02, 0.08))
+    passed = t4n.adoption_check(ok_identity, good, ok_monotone)
+    assert passed["채택"] is True and passed["판정"] == "v1.4 채택"
+    assert all(item["통과"] for item in passed["판정표"].values())
+    assert passed["기준"] == t4n.ADOPTION and set(passed["판정표"]) == {"①", "②", "③", "④"}
+
+    def verdict(identity=ok_identity, tab=good, monotone=ok_monotone):
+        result = t4n.adoption_check(identity, tab, monotone)
+        return result["채택"], [key for key, item in result["판정표"].items() if not item["통과"]]
+
+    assert verdict(identity={"통과": False}) == (False, ["①"])
+    # ② Brier 짝 차이(v1.4 − v1.3) CI 상한이 0 이상이면 미달
+    assert verdict(tab=table((-0.1, -0.2, 0.0), (0.03, -0.04, 0.09), (0.05, 0.02, 0.08))) == (
+        False, ["②"])
+    # ② AUC 짝 차이 CI 상한이 0 미만이면(유의하게 나빠짐) 미달 — 0 을 걸치면 통과
+    assert verdict(tab=table((-0.3, -0.4, -0.2), (-0.1, -0.2, -0.01), (0.05, 0.02, 0.08))) == (
+        False, ["②"])
+    assert verdict(tab=table((-0.3, -0.4, -0.2), (-0.05, -0.2, 0.0), (0.05, 0.02, 0.08)))[0]
+    # ③ 쉬운 음성 섞은 AUC 짝 차이 CI 하한이 0 이하면 미달
+    assert verdict(tab=table((-0.3, -0.4, -0.2), (0.03, -0.04, 0.09), (0.05, 0.0, 0.08))) == (
+        False, ["③"])
+    assert verdict(monotone={**ok_monotone, "통과": False}) == (False, ["④"])
+    failed = t4n.adoption_check({"통과": False}, {}, {"통과": False})
+    assert failed["채택"] is False and failed["판정"].startswith("v1.3 유지로 확정")
+    assert [k for k, item in failed["판정표"].items() if not item["통과"]] == ["①", "②", "③", "④"]
+    # Brier 부호 뒤집기: t4.paired_difference 는 옛 − 새, 기준은 새 − 옛
+    assert t4n.new_minus_old({"차이": 0.3, "ci95": [0.2, 0.4]}) == {"차이": -0.3,
+                                                                  "ci95": [-0.4, -0.2]}
+    assert t4n.new_minus_old({"차이": None, "ci95": [None, None]})["차이"] is None
+
+
+def test_attempt2_run_end_to_end_copies_v13_and_adds_nameless_blocks(data, tmp_path):
+    features, easy = data
+    out_dir = tmp_path / "out"
+    model_path = tmp_path / "model" / "risk_model_v1.4.json"
+    results = t4n.run(features, easy, out_dir=out_dir, model_path=model_path, folds=3, repeats=1,
+                      bootstrap=4, metric_bootstrap=30, seed=0, n_random=300,
+                      min_pattern_minority=5)
+    model_old = rm.load_model()
+    adoption = results["채택"]
+    assert set(adoption["판정표"]) == {"①", "②", "③", "④"} and adoption["기준"] == t4n.ADOPTION
+    # ① 이름 있는 입력의 출력은 v1.3 과 같다(구조상 언제나) · ④ 단조성도 제약이 보장한다
+    assert adoption["판정표"]["①"]["통과"] is True and adoption["판정표"]["④"]["통과"] is True
+    identity = adoption["판정표"]["①"]["근거"]
+    assert identity["무작위_이름_있는_입력"] == {"n": 300, "차이": 0}
+    assert identity["이름_있는_심결_행(원래 이미지 값)"]["차이"] == 0
+    assert identity["이름_있는_심결_행(원래 이미지 값)"]["n"] == results["데이터"]["이름_있는_행"]
+    assert identity["쉬운_음성(참고)"]["차이"] == 0
+    assert identity["이름도_이미지도_없는_입력(참고)"]["차이"] == 0
+    table = results["평가_2_OOF"]
+    assert table["이름 있는 행"]["짝_차이_auc"] == {"차이": 0.0, "ci95": [0.0, 0.0]}
+    assert table["이름 있는 행"][t4n.NEW] == table["이름 있는 행"][t4n.OLD]
+    assert table["이름 없는 행"][t4n.NEW]["n"] == results["데이터"]["이름_없는_행"]["n"]
+    assert set(table["이름 없는 행"]) == {t4n.OLD, t4n.NEW, "짝_차이_auc", "짝_차이_brier"}
+    assert results["쉬운_음성_평균_p"][t4n.NEW] == results["쉬운_음성_평균_p"][t4n.OLD]
+    monotone = results["단조성(행)"]
+    assert monotone["위반_합계"] == {"축_결합": 0, "같은_이름": 0}
+    assert "noname:x2_whole → noname:x2_whole+x4 (x4)" in monotone["축_결합"]
+    assert "base → x2_whole (x2_whole)" in monotone["축_결합"]
+    assert len(monotone["같은_이름"]) == 8  # 키 2 × 유형 보기 2 × 요부 2
+    assert set(results["계수"]) == {"noname:x2_whole", "noname:x2_whole+x4"}
+    boot = results["계수"]["noname:x2_whole"]["부트스트랩"]
+    assert "도형계 기울기(x2_whole + ×도형계)" in boot and boot["x2_whole"]["ci95"][0] >= -1e-9
+    assert [row["조건"] for row in results["평가_8_민감도"]] == [
+        "주 실행", "사건 2025101001193 제외", "사진 규칙 없음", "2등급에서 살아난 행 제외"]
+    assert set(results["등급(v1.3 하한 그대로)"]["표"]) == {"이름 없는 행", "도형계",
+                                                    "심결+cross+db"}
+    image_only = results["평가_6_이미지만_같은_이름"]
+    assert len(image_only) == 16 and [row["x2_whole"] for row in image_only[:4]] == [
+        0.5, 0.7, 0.9, 1.0]
+    for row in image_only:  # 같은 이름을 더하면(요부 유무 양쪽) 이미지만 입력보다 낮지 않다
+        assert row["v1.4"]["패턴"].startswith("noname:")
+        assert row["같은_이름(요부 있음)"]["p"] >= row["v1.4"]["p"]
+        assert row["같은_이름(요부 없음)"]["p"] >= row["v1.4"]["p"]
+        assert row["같은_이름(요부 있음)"]["패턴"] in ("x2_whole", "x2_whole+x4")
+    candidate = out_dir / "risk_model_v1.4_attempt2_candidate.json"
+    if adoption["채택"]:
+        assert results["모델_파일"] == str(model_path) and not candidate.exists()
+    else:  # 기준 미달이면 배포 경로에 쓰지 않는다(v1.3 유지)
+        assert results["모델_파일"] == str(candidate) and not model_path.exists()
+    model = rm.load_model(results["모델_파일"])
+    assert model["version"] == "risk_model_v1.4" and rm.coupling_violations(model) == []
+    # 이름 있는 4벌·등급 하한·단독 임계값·grade_precision·도형 규칙은 v1.3 을 그대로 복사
+    for key in ("patterns", "features", "coefficients", "intercept", "grade_thresholds",
+                "standalone_thresholds", "figure_rule", "pattern_axes", "reference_pattern"):
+        assert model[key] == model_old[key]
+    assert model["meta"]["grade_precision"] == model_old["meta"]["grade_precision"]
+    assert model["meta"]["n_trial"] == model_old["meta"]["n_trial"]
+    assert model["meta"]["named_from"]["version"] == "risk_model_v1.3"
+    assert model["coupling"]["floors"] == model_old["coupling"]["floors"]
+    assert model["coupling"]["same_name"]["x1_d"] == 1.0 and "name_floors" not in model["coupling"]
+    assert sorted(model[rm.NAMELESS_KEY]) == ["x2_whole", "x2_whole+x4"]
+    nameless_meta = model["meta"]["nameless"]
+    assert nameless_meta["adoption"]["채택"] is adoption["채택"]
+    assert nameless_meta["n_nameless"] == results["데이터"]["이름_없는_행"]["n"]
+    assert nameless_meta["case_weight"]["rule"] == "w = min(1, 3 / 그 사건의 행 수)"
+    assert rm.risk_score({"x2_whole": 0.9, "mark_type": "도형"}, model).pattern == "noname:x2_whole"
+    named = {"x1_d": 0.9, "x2_text_d": 0.8, "x2_whole": 0.9, "x4": 0.5, "mark_type": "문자"}
+    assert tuple(rm.risk_score(named, model)) == tuple(rm.risk_score(named, model_old))
+    report = (out_dir / "risk_model_v1.4_attempt2_report.md").read_text(encoding="utf-8")
+    for heading in ("## 채택 판단", "## 이름 없는 2벌", "## 평가 2", "## 등급별 건수",
+                    "## 평가 6", "## 단조성", "## 평가 8"):
+        assert heading in report
+    saved = json.loads((out_dir / "risk_model_v1.4_attempt2_results.json").read_text(
+        encoding="utf-8"))
+    assert saved["채택"]["채택"] is adoption["채택"]
+
+
+def test_attempt2_only_nameless_rows_change_and_minority_rule(data):
+    features, easy = data
+    model_old = rm.load_model()
+    rows = t4.load_dataset(features, easy).rows
+    result = t4n.train_once(rows, model_old, folds=3, repeats=1, min_minority=5)
+    a, design = result["arrays"], result["design"]
+    nameless_rows = a["trial"] & ~a["named"]
+    changed = result["prob_new"] != result["prob_old"]
+    assert changed[nameless_rows].all() and not changed[~nameless_rows].any()
+    np.testing.assert_array_equal(result["prob_old"], t4.v13_probabilities(rows, model_old))
+    assert set(design.own[changed]) <= {"noname:x2_whole", "noname:x2_whole+x4"}
+    assert result["floors"] == model_old["coupling"]["floors"]  # 하한은 v1.3 JSON 의 값
+    with pytest.raises(ValueError, match="소수 클래스 기준"):
+        t4n.train_once(rows, model_old, folds=3, repeats=1, min_minority=10_000)
+
+
+def test_attempt2_image_only_population_is_a_reference_diagnostic(data):
+    """판정 뒤에 덧붙인 참고 진단: 이름 없는 심결 행 + 이름을 가린 쉬운 음성 이미지 쌍을 도형계
+    입력으로 본 집합의 지표·등급. 채택 판정표에는 들어가지 않는다."""
+    features, easy = data
+    model_old = rm.load_model()
+    rows = t4.load_dataset(features, easy).rows
+    result = t4n.train_once(rows, model_old, folds=3, repeats=1, min_minority=5)
+    a, design = result["arrays"], result["design"]
+    block = "noname:x2_whole"
+    index = np.arange(len(rows))
+    # 도형계로 본 로짓 = 기울기에 ×도형계 계수를 더한 것
+    coef, intercept = result["final"].blocks[block]
+    x2_whole = design.X[block][:, design.names[block].index("x2_whole")]
+    np.testing.assert_allclose(t4n.figure_logit(design, result["final"].blocks, block, index),
+                               intercept + (coef[0] + coef[1]) * x2_whole)
+    assert set(result["cv"]["per_block_figure"]) == set(result["cv"]["per_block"])
+    boot = t4.Bootstrap(a["groups"], 20, seed=0)
+    extra = t4n.image_only_population(rows, a, design, result["cv"], model_old, boot)
+    image = design.mask[block]
+    assert extra["이름_없는_심결_행"] == int((a["trial"] & ~a["named"] & image).sum())
+    assert extra["쉬운_음성(이름 가림)"] == int((a["easy"] & image).sum())
+    assert extra["n"] == extra["이름_없는_심결_행"] + extra["쉬운_음성(이름 가림)"]
+    assert {t4n.OLD, t4n.NEW, "등급", "짝_차이_auc", "짝_차이_brier"} <= set(extra)
+    for label in (t4n.OLD, t4n.NEW):
+        assert sum(row["n"] for row in extra["등급"][label]) == extra["n"]
+        grades = extra["쉬운_음성(이름 가림)_등급"][label]
+        assert sum(grades[grade] for grade in rm.GRADES) == extra["쉬운_음성(이름 가림)"]
+    model = t4n.build_model(model_old, design, result["final"], {"집합": {
+        "noname:x2_whole": {}, "noname:x2_whole+x4": {}}})
+    bounds = t4n.grade_boundaries(model)
+    assert set(bounds) == {"문자계", "도형계"} and set(bounds["도형계"]) == {"주의", "검토 권장",
+                                                                     "위험"}
+    assert bounds["도형계"]["위험"] <= bounds["문자계"]["위험"]  # 도형계 기울기가 같거나 더 크다
+    assert t4n.grade_boundaries(model_old) == {}
+    full = t4n.run(features, easy, out_dir=features.parent / "o", model_path=features.parent / "m",
+                   folds=3, repeats=1, bootstrap=0, metric_bootstrap=10, n_random=50,
+                   sensitivity=False, min_pattern_minority=5)
+    assert "참고_이미지만_질의_가정(판정 뒤 추가)" in full and "평가_8_민감도" not in full
+    assert "이미지만_질의" not in json.dumps(full["채택"], ensure_ascii=False)  # 판정과 무관

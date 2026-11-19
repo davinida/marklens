@@ -608,3 +608,192 @@ def test_shipped_v13_scores_nameless_input_with_named_pattern():
     assert result.pattern == "x2_whole"
     assert math.log(result.prob / (1 - result.prob)) == pytest.approx(expected)
     assert result.prob == pytest.approx(0.0581, abs=5e-5)  # 설계 §7-4 "이미지만" 표의 v1.3 값
+
+
+# ---- v1.4 2차 시도: 이름 없는 집합 + "같은 이름" 결합 ------------------------------------------
+
+def _model_v14_same_name(**overrides) -> dict:
+    """합성 v1.4(2차 시도 형식) = 합성 v1.3 그대로 + 이름 없는 2벌 + coupling.same_name. 같은 이름을
+    더한 입력(문자계, 호칭·철자 1.0)의 이름 있는 패턴 로짓은 이미지 패턴 0.65 + 0.3·이미지(요부
+    없음이면 −0.1), 이미지+상품 패턴 0.66 + 0.3·이미지 + 1.4·상품(요부 없음 −0.1) — 이름 없는
+    집합(−1.0 + 1.2·이미지 + 0.6·이미지·도형계 [+ 1.4·상품])이 모든 꼭짓점에서 그 이하다."""
+    nameless = {
+        "x2_whole": _nameless_block({"x2_whole": 1.2, "x2_whole×도형계": 0.6}, -1.0),
+        "x2_whole+x4": _nameless_block({"x2_whole": 1.2, "x2_whole×도형계": 0.6, "x4": 1.4}, -1.0),
+    }
+    values = {"version": "risk_model_v1.4", "nameless_patterns": nameless,
+              "coupling": {"floors": dict(V13_FLOORS), "basis": "테스트",
+                           "same_name": {"x1_d": 1.0, "x2_text_d": 1.0}}}
+    values.update(overrides)
+    return _model_v13(**values)
+
+
+def test_type_with_name_follows_service_rule():
+    """이름이 생기면 항상 문자계(계약 v2 §2-4 5항) — 도형계였던 입력은 결합-문자요부."""
+    assert rm.type_with_name("도형") == "결합-문자요부"
+    assert rm.type_with_name("결합-도형요부") == "결합-문자요부"
+    assert rm.type_with_name("문자") == "문자"
+    assert rm.type_with_name("결합-문자요부") == "결합-문자요부"
+    assert rm.type_with_name("") == "문자" and rm.type_with_name(None) == "문자"
+    base = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x2_whole": 0.7, "x4": 0.2,
+            "has_meaning_both": False, "mark_type": "도형"}
+    added = rm.same_name_input(base, distinctive=False)
+    assert added["x1_d"] == added["x2_text_d"] == 1.0 and added["mark_type"] == "결합-문자요부"
+    assert added["x3_d"] is None and added["has_meaning_both"] is False  # 관념은 가장 낮은 경우로
+    assert added["has_distinctive_part_a"] is True and added["has_distinctive_part_b"] is False
+    assert added["x2_whole"] == 0.7 and added["x4"] == 0.2 and base["x1_d"] is None  # 원본 불변
+    assert rm.same_name_input(base, {"x1_d": 0.9})["x1_d"] == 0.9
+    # 문자·결합-문자요부는 모델에 같은 값이다(둘 다 문자계)
+    model = _model_v13()
+    for level in ("문자", "결합-문자요부"):
+        assert rm.risk_score({**added, "mark_type": level}, model).prob == pytest.approx(
+            rm.risk_score(added, model).prob)
+
+
+def test_v14_same_name_never_lowers_probability_and_named_outputs_unchanged():
+    model, old = _model_v14_same_name(), _model_v13()
+    assert rm.coupling_violations(model) == []
+    grid = (0.0, 0.2, 0.5, 0.9, 1.0)
+    for level in ("도형", "결합-도형요부", "문자", "결합-문자요부"):
+        for image in grid:
+            for goods in (None, 0.0, 0.03, 0.5, 1.0):
+                base = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x2_whole": image,
+                        "x4": goods, "has_meaning_both": False, "mark_type": level}
+                nameless = rm.risk_score(base, model)
+                assert nameless.pattern == "noname:" + ("x2_whole" if goods is None
+                                                        else "x2_whole+x4")
+                for distinctive in (True, False):
+                    same = rm.risk_score(rm.same_name_input(base, distinctive=distinctive), model)
+                    assert same.pattern in ("x2_whole", "x2_whole+x4")
+                    assert same.prob >= nameless.prob - 1e-12  # 같은 이름을 더해도 내려가지 않는다
+                    with_meaning = rm.risk_score(
+                        {**rm.same_name_input(base, distinctive=distinctive), "x3_d": 1.0,
+                         "has_meaning_both": True}, model)
+                    assert with_meaning.prob >= same.prob - 1e-12  # 관념이 켜지면 더 높거나 같다
+                if goods is None:  # 상품을 하한 이상으로 더해도 내려가지 않는다
+                    assert rm.risk_score({**base, "x4": 0.03}, model).prob >= nameless.prob - 1e-12
+    # 다른 이름(호칭·철자가 낮음)은 내려갈 수 있다 — 제약의 대상이 아니다(음의 증거)
+    image_only = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x4": None, "x2_whole": 1.0,
+                  "mark_type": "도형"}
+    different = {**image_only, "x1_d": 0.1, "x2_text_d": 0.1, "mark_type": "결합-문자요부"}
+    assert rm.risk_score(different, model).prob < rm.risk_score(image_only, model).prob
+    # 이름 있는 입력·이름도 이미지도 없는 입력의 출력은 v1.3 과 완전히 같다
+    for x1 in (None, 0.0, 0.6, 1.0):
+        for x2_text in (None, 0.4):
+            for image in (None, 0.5):
+                for goods in (None, 0.7):
+                    for level in ("문자", "도형"):
+                        features = {"x1_d": x1, "x2_text_d": x2_text, "x3_d": 0.3,
+                                    "x2_whole": image, "x4": goods, "has_meaning_both": True,
+                                    "has_distinctive_part_b": False, "mark_type": level}
+                        new_result = rm.risk_score(features, model)
+                        if x1 is None and x2_text is None and image is not None:
+                            assert new_result.pattern.startswith("noname:")
+                        else:
+                            assert tuple(new_result) == tuple(rm.risk_score(features, old))
+
+
+def test_v14_same_name_validation():
+    good = _model_v14_same_name()["nameless_patterns"]
+    floors = {"floors": dict(V13_FLOORS)}
+    # 이름 없는 집합이 같은 이름을 더한 v1.3 로짓보다 높으면 적재 거부
+    high = {**good, "x2_whole": _nameless_block({"x2_whole": 1.2, "x2_whole×도형계": 0.6}, -0.2)}
+    with pytest.raises(ValueError, match="결합 제약 위반"):
+        _model_v14_same_name(nameless_patterns=high)
+    loose = _model_v14_same_name(nameless_patterns=high, coupling=None)  # coupling null → 건너뜀
+    violations = rm.coupling_violations(
+        {**loose, "coupling": {**floors, "same_name": {"x1_d": 1.0, "x2_text_d": 1.0}}})
+    same = [v for v in violations if "(같은 이름)" in v]
+    assert same and all(v.startswith("noname:x2_whole → x2_whole (같은 이름)") for v in same)
+    assert any("요부없음=True" in v for v in same)  # 요부 없는 이름 쪽이 더 낮아 먼저 걸린다
+    assert any("mark_type=도형, x2_whole=1.0" in v for v in same)
+    assert not any("x2_whole=0.0" in v for v in same)  # 이미지 0 에서는 −0.2 ≤ 0.55
+    # same_name 이 없는 JSON 은 이 검사를 하지 않는다(이름 없는 집합 사이의 축 결합만)
+    assert all("(같은 이름)" not in v
+               for v in rm.coupling_violations({**loose, "coupling": floors}))
+    # 기준점이 낮으면(같은 이름이 아니라 0.5) 같은 집합도 걸린다 — 기준점은 JSON 의 값을 쓴다
+    weaker = rm.coupling_violations(
+        {**_model_v14_same_name(), "coupling": {**floors,
+                                               "same_name": {"x1_d": 0.5, "x2_text_d": 0.5}}})
+    assert any("(같은 이름)" in v for v in weaker)
+    with pytest.raises(ValueError, match="coupling.same_name"):
+        _model_v14_same_name(coupling={**floors, "same_name": {"x1_d": 1.5}})
+    with pytest.raises(ValueError, match="coupling.same_name"):
+        _model_v14_same_name(coupling={**floors, "same_name": [1.0, 1.0]})
+    # 값을 생략하면 1.0(같은 이름)
+    assert rm.coupling_violations(
+        {**_model_v14_same_name(), "coupling": {**floors, "same_name": {}}}) == []
+
+
+V14_MODEL_PATH = rm.REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"
+
+
+def test_shipped_v14_adds_nameless_blocks_without_changing_named_outputs():
+    """채택된 v1.4(2차 시도, 설계 §7-4): 이름 있는 4벌·등급 하한·단독 임계값·grade_precision 은 v1.3
+    그대로, 이름 없는 2벌만 더했다. 서비스 기본 모델 경로는 v1.3 그대로다."""
+    if not V14_MODEL_PATH.exists() or not rm.DEFAULT_MODEL_PATH.exists():
+        pytest.skip("v1.4 계수 파일 없음")
+    old = rm.load_model()
+    new = rm.load_model(V14_MODEL_PATH)
+    assert old["version"] == "risk_model_v1.3"
+    assert rm.DEFAULT_MODEL_PATH.name == "risk_model_v1.json"
+    assert new["version"] == "risk_model_v1.4" and rm.coupling_violations(new) == []
+    for key in ("patterns", "features", "coefficients", "intercept", "grade_thresholds",
+                "standalone_thresholds", "standalone_precision", "figure_rule", "pattern_axes",
+                "reference_pattern", "prior", "monotone", "removed_terms"):
+        assert new[key] == old[key], key
+    assert new["meta"]["grade_precision"] == old["meta"]["grade_precision"]
+    assert new["coupling"]["floors"] == old["coupling"]["floors"]
+    assert new["coupling"]["same_name"]["x1_d"] == new["coupling"]["same_name"]["x2_text_d"] == 1.0
+    assert "name_floors" not in new["coupling"]  # 1차 시도의 이름 하한 결합은 쓰지 않는다
+    assert sorted(new[rm.NAMELESS_KEY]) == ["x2_whole", "x2_whole+x4"]
+    assert new["meta"]["named_from"]["version"] == "risk_model_v1.3"
+    assert new["meta"]["nameless"]["adoption"]["채택"] is True
+    for block in new[rm.NAMELESS_KEY].values():
+        assert set(block["features"]) <= {"x2_whole", "x2_whole×도형계", "x4"}
+        assert rm.monotone_violations(block["coefficients"]) == []
+    # 이름 있는 입력(호칭·철자 중 하나라도 있음)과 이름도 이미지도 없는 입력의 출력은 v1.3 과 같다
+    import random
+
+    rng = random.Random(7)
+    levels = (*rm.TYPE_LEVELS, "미상", "")
+
+    def maybe(probability: float):
+        return None if rng.random() < probability else rng.random()
+
+    for _ in range(3000):
+        features = {"x1_d": maybe(0.2), "x2_text_d": maybe(0.2), "x3_d": maybe(0.4),
+                    "x2_whole": maybe(0.3), "x4": maybe(0.4),
+                    "has_meaning_both": rng.random() < 0.5,
+                    "has_distinctive_part_a": rng.random() < 0.8,
+                    "has_distinctive_part_b": rng.random() < 0.8,
+                    "mark_type": rng.choice(levels)}
+        nameless_image = (features["x1_d"] is None and features["x2_text_d"] is None
+                          and features["x2_whole"] is not None)
+        result = rm.risk_score(features, new)
+        if nameless_image:
+            assert result.pattern.startswith(rm.NAMELESS_PREFIX)
+        else:
+            assert tuple(result) == tuple(rm.risk_score(features, old))
+    # 같은 이름을 더하면(문자계로, 요부 유무 양쪽) 어떤 이미지·상품 값에서도 내려가지 않는다
+    for level in rm.TYPE_LEVELS:
+        for image in (0.0, 0.2, 0.5, 0.8, 0.95, 1.0):
+            for goods in (None, 0.0, 0.0252, 0.5, 1.0):
+                base = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x2_whole": image,
+                        "x4": goods, "has_meaning_both": False, "mark_type": level}
+                nameless = rm.risk_score(base, new)
+                for distinctive in (True, False):
+                    same = rm.risk_score(rm.same_name_input(
+                        base, new["coupling"]["same_name"], distinctive=distinctive), new)
+                    assert same.prob >= nameless.prob - 1e-9
+                if goods is None:
+                    assert rm.risk_score({**base, "x4": 0.0252}, new).prob >= nameless.prob - 1e-9
+    # 설계 §7-4 "이미지만 입력" 표의 값(도형계)
+    image_only = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x4": None,
+                  "has_meaning_both": False, "mark_type": "도형"}
+    for image, expected_new, expected_old in ((0.5, 0.3352, 0.0376), (1.0, 0.6339, 0.0646)):
+        features = {**image_only, "x2_whole": image}
+        result = rm.risk_score(features, new)
+        assert result.pattern == "noname:x2_whole" and result.figure_caveat  # 참고용 표시는 그대로
+        assert result.prob == pytest.approx(expected_new, abs=5e-5)
+        assert rm.risk_score(features, old).prob == pytest.approx(expected_old, abs=5e-5)
