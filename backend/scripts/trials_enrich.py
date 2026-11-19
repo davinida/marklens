@@ -38,6 +38,7 @@ import json
 import re
 import sys
 import unicodedata
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -494,6 +495,26 @@ def pick_item(items: list[dict], kind: str, number: str) -> dict | None:
     return items[0] if items else None
 
 
+def header_error(xml_text: str) -> str:
+    """응답 header 의 resultCode 가 정상(00)이 아니면 "resultCode=22 LIMITED_…" 처럼 코드와
+    resultMsg 를, 정상이거나 읽을 수 없으면 "" 를 돌려준다. 공용 kipris_client.check_result_code 는
+    envelope 의 body 부터 검사해, body 없이 오는 오류 응답(2026-11-19 resultCode 22)을
+    "KIPRIS 응답에 body가 없습니다"로 기록하게 했다."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return ""
+    found: dict[str, str] = {}
+    for element in root.iter():
+        tag = element.tag.rsplit("}", 1)[-1]
+        if tag in ("resultCode", "resultMsg") and tag not in found:
+            found[tag] = (element.text or "").strip()
+    code = found.get("resultCode", "")
+    if not code or code == kc.RESULT_CODE_OK:
+        return ""
+    return f"resultCode={code} {found.get('resultMsg', '')}".strip()
+
+
 def lookup_one(kind: str, number: str, *, fetch=kc.advanced_search_by_number_raw,
                raw_dir: Path | None = None, send_as: str | None = None) -> dict:
     """번호 1건 조회 → prior_marks.csv 행. 오류는 사유와 함께 행으로 남긴다(호출은 소비됨).
@@ -510,6 +531,10 @@ def lookup_one(kind: str, number: str, *, fetch=kc.advanced_search_by_number_raw
     if raw_dir is not None:
         raw_dir.mkdir(parents=True, exist_ok=True)
         (raw_dir / f"{kind}_{number}.xml").write_text(xml_text, encoding="utf-8")
+    refused = header_error(xml_text)
+    if refused:  # 오류 응답은 body 가 없어 공용 검사가 "body가 없습니다"로 원래 사유를 가린다
+        row.update({"결과": "오류", "오류": refused[:200]})
+        return row
     try:
         kc.check_result_code(xml_text)
         items = [kc.normalize_advanced_item(it) for it in kc.parse_items(xml_text)]
