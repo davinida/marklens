@@ -479,6 +479,50 @@ def test_run_lookup_stops_after_consecutive_errors(tmp_path):
     assert retry["예상_호출"] == len(numbers) - 2  # 오류 행 + 부르지 않은 번호
 
 
+def test_use_key_and_counter_switches_key_and_per_key_counter(tmp_path, monkeypatch):
+    """--key-env·--counter: 키는 지정한 환경변수에서 읽어 클라이언트에만 넣고(돌려주는 정보에 값이
+    없다), 호출은 그 키 전용 카운터 파일에 세며 공용 카운터 파일은 그대로 둔다."""
+    shared = tmp_path / "kipris_call_count.json"
+    month, day = kc.RateLimiter._month_key(), kc.RateLimiter._day_key()
+    shared.write_text(json.dumps({month: 688, day: 177}), encoding="utf-8")
+    monkeypatch.setattr(kc, "limiter", kc.RateLimiter(counter_path=shared, min_interval=0.0))
+    monkeypatch.setattr(kc, "ACCESS_KEY", "")
+    monkeypatch.setenv("TEST_TEAM_KEY", "  secret-value-123  ")
+    own = tmp_path / "counters" / "team" / "kipris_call_count.json"
+    own.parent.mkdir(parents=True)
+    own.write_text(json.dumps({month: 3, day: 3}), encoding="utf-8")  # 오늘 시험 3회
+
+    info = te.use_key_and_counter(key_env="TEST_TEAM_KEY", counter=own)
+    assert kc.ACCESS_KEY == "secret-value-123"
+    assert "secret" not in json.dumps(info, ensure_ascii=False)
+    assert info == {"키": "환경변수 TEST_TEAM_KEY", "카운터": str(own), "이번_달": 3, "오늘": 3}
+    kc.limiter.min_interval = 0.0
+    kc.limiter.acquire()
+    assert json.loads(own.read_text(encoding="utf-8"))[month] == 4
+    assert json.loads(shared.read_text(encoding="utf-8")) == {month: 688, day: 177}  # 그대로
+    monkeypatch.setenv("TEST_TEAM_KEY", "")
+    with pytest.raises(SystemExit):
+        te.use_key_and_counter(key_env="TEST_TEAM_KEY")
+
+
+def test_lookup_plan_retry_only_skips_never_called_numbers():
+    """--retry-only: 0건·오류였던 번호만 다시 부르고, 아직 부른 적 없는 번호는 뺀다."""
+    targets = [
+        {"번호종류": "registration", "번호_정규화": n, "후보번호": ""}
+        for n in ("4000000010000", "4000000020000", "4000000030000")
+    ] + [{"번호종류": "international", "번호_정규화": n, "후보번호": ""} for n in ("1111", "2222")]
+    existing = [
+        {"번호종류": "registration", "번호_정규화": "4000000010000", "결과": "오류"},
+        {"번호종류": "registration", "번호_정규화": "4000000020000", "결과": "ok"},
+        {"번호종류": "international", "번호_정규화": "1111", "결과": "오류"},
+    ]
+    only = te.lookup_plan(targets, existing, retry_only=True)
+    assert only["registration"]["호출"] == ["4000000010000"]
+    assert only["international"]["호출"] == ["1111"] and only["예상_호출"] == 2
+    every = te.lookup_plan(targets, existing, retry_empty=True)
+    assert every["예상_호출"] == 4  # 부른 적 없는 4000000030000·2222 도
+
+
 def test_merge_into_labels_preserves_other_columns(tmp_path):
     base = tmp_path / "trials"
     paths_ = tc.TrialPaths(base)

@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import unicodedata
@@ -434,7 +435,14 @@ def format_variants(kind: str, number: str) -> list[str]:
 
 
 def lookup_plan(targets: list[dict], existing: list[dict], *,
-                include_candidates: bool = False, retry_empty: bool = False) -> dict:
+                include_candidates: bool = False, retry_empty: bool = False,
+                retry_only: bool = False) -> dict:
+    """번호 종류별 부를 번호. retry_empty 면 0건·오류였던 번호도 다시 부르고, retry_only 면 그
+    번호만 부른다(아직 부른 적 없는 번호는 빼고 — 2026-11-19: 국제등록 8건을 남겨 두고 오류
+    144건만)."""
+    retry_empty = retry_empty or retry_only
+    failed = {(r["번호종류"], r["번호_정규화"]) for r in existing
+              if r.get("결과") in ("0건", "오류")}
     done = {
         (r["번호종류"], r["번호_정규화"]) for r in existing
         if not (retry_empty and r.get("결과") in ("0건", "오류"))
@@ -451,7 +459,8 @@ def lookup_plan(targets: list[dict], existing: list[dict], *,
                     wanted[c_kind].append(c_number)
     plan = {}
     for kind, numbers in wanted.items():
-        to_call = [n for n in numbers if (kind, n) not in done]
+        to_call = [n for n in numbers if (kind, n) not in done
+                   and (not retry_only or (kind, n) in failed)]
         plan[kind] = {
             "고유": len(numbers), "이미_있음": len(numbers) - len(to_call), "호출": to_call,
         }
@@ -557,9 +566,37 @@ def lookup_one(kind: str, number: str, *, fetch=kc.advanced_search_by_number_raw
     return row
 
 
+def use_key_and_counter(*, key_env: str | None = None, counter: Path | None = None) -> dict:
+    """이 실행에서 쓸 출원속보 키와 호출 카운터를 바꾼다(lookup --key-env·--counter).
+
+    key_env: 키를 담은 환경변수 이름 — 값은 kipris_client.ACCESS_KEY 에만 넣고 출력·저장하지 않는다
+    (.env 는 그대로). counter: 그 키 전용 카운터 파일 — 공용 카운터
+    (ml/data/kipris_call_count.json)는 건드리지 않고, 월·일 예산(KIPRIS_MONTHLY_BUDGET·
+    KIPRIS_DAILY_BUDGET)은 그 파일에 적용한다.
+    돌려주는 사전에는 키 값이 없다(키 출처·카운터 경로·이번 달·오늘 사용량)."""
+    info: dict = {}
+    if key_env:
+        value = os.environ.get(key_env, "").strip()
+        if not value:
+            raise SystemExit(f"환경변수 {key_env} 가 비어 있습니다 — 키를 넣은 셸에서 "
+                             "실행하세요")
+        kc.ACCESS_KEY = value
+        info["키"] = f"환경변수 {key_env}"
+    if counter:
+        kc.limiter = kc.RateLimiter(
+            counter_path=Path(counter), monthly_budget=kc.MONTHLY_CALL_BUDGET,
+            min_interval=kc.limiter.min_interval, daily_budget=kc.DAILY_CALL_BUDGET,
+        )
+        info["카운터"] = str(counter)
+    info["이번_달"] = kc.limiter.used_this_month()
+    info["오늘"] = kc.limiter.used_today()
+    return info
+
+
 def run_lookup(paths_: tc.TrialPaths, *, max_calls: int = HARD_CAP, dry_run: bool = True,
                fetch=kc.advanced_search_by_number_raw, include_candidates: bool = False,
-               retry_empty: bool = False, limit: int | None = None) -> dict:
+               retry_empty: bool = False, limit: int | None = None,
+               retry_only: bool = False) -> dict:
     """limit 이 있으면 이번 실행은 계획의 앞 limit 개 번호만 부른다(하드캡 검사도 그 수로)."""
     targets_path = paths_.base / "enrich_targets.csv"
     if not targets_path.exists():
@@ -567,7 +604,7 @@ def run_lookup(paths_: tc.TrialPaths, *, max_calls: int = HARD_CAP, dry_run: boo
     targets = tc._read_csv(targets_path)
     existing = load_prior_marks(paths_)
     plan = lookup_plan(targets, existing, include_candidates=include_candidates,
-                       retry_empty=retry_empty)
+                       retry_empty=retry_empty, retry_only=retry_only)
     report: dict = {
         "계획": {
             k: {"고유": v["고유"], "이미_있음": v["이미_있음"], "호출": len(v["호출"])}
@@ -1049,6 +1086,12 @@ def main(argv: list[str] | None = None) -> int:
     lookup.add_argument("--retry-empty", action="store_true", help="0건·오류였던 번호 다시 조회")
     lookup.add_argument("--limit", type=int, default=None,
                         help="이번 실행은 계획의 앞 N개 번호만(처음 몇 건으로 응답·저장 확인)")
+    lookup.add_argument("--retry-only", action="store_true",
+                        help="0건·오류였던 번호만(아직 부르지 않은 번호는 빼고)")
+    lookup.add_argument("--key-env", default=None, metavar="NAME",
+                        help="출원속보 키를 이 환경변수에서 읽는다(값은 출력·저장하지 않음)")
+    lookup.add_argument("--counter", type=Path, default=None,
+                        help="그 키 전용 호출 카운터 파일(공용 카운터는 그대로)")
     goods_cmd = sub.add_parser("goods", help="C. 지정상품 → 유사군 → X4(호출 0)")
     goods_cmd.add_argument("--ids", type=Path, default=None, help=ids_help)
     sub.add_parser("status", help="집계")
@@ -1057,10 +1100,16 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "targets":
         report = run_targets(paths_, ids=read_ids(args.ids))
     elif args.command == "lookup":
+        before = use_key_and_counter(key_env=args.key_env, counter=args.counter)
         report = run_lookup(paths_, max_calls=min(args.max_calls, HARD_CAP), dry_run=args.dry_run,
                             include_candidates=args.include_candidates,
-                            retry_empty=args.retry_empty, limit=args.limit)
+                            retry_empty=args.retry_empty, limit=args.limit,
+                            retry_only=args.retry_only)
+        report["카운터"] = {**before, "이번_달_뒤": kc.limiter.used_this_month(),
+                         "오늘_뒤": kc.limiter.used_today()}
         if args.dry_run:
+            print(f"카운터 {report['카운터'].get('카운터', '공용')}: 이번 달 {before['이번_달']} · "
+                  f"오늘 {before['오늘']}")
             print(plan_table(report["계획"]))
             calls = report.get("이번_실행_번호", report["예상_호출"])
             if "이번_실행_번호" in report:
