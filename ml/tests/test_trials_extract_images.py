@@ -201,15 +201,18 @@ def test_inline_text_ignores_remarks():
     assert tei.inline_text("ZOO BOUNCE") == "ZOO BOUNCE"
 
 
-def test_target_trials_filters_agreeing_rows():
+def test_target_trials_uses_final_label_like_features():
+    """대상은 유사여부_확정 기준(pairs_features·trials_enrich 와 같음) — pass b 가 달라도(재판정·
+    규칙 처리로 확정된 행) 들어가고, 확정이 제외면 pass b 가 유사여도 빠진다."""
     rows = [
         {"심판번호": "1", "유사여부_확정": "유사", "llm_b_유사여부": "유사"},
         {"심판번호": "2", "유사여부_확정": "유사", "llm_b_유사여부": "제외"},
-        {"심판번호": "3", "유사여부_확정": "제외", "llm_b_유사여부": "제외"},
-        {"심판번호": "4", "유사여부_확정": "비유사", "llm_b_유사여부": "비유사"},
+        {"심판번호": "3", "유사여부_확정": "제외", "llm_b_유사여부": "유사"},
+        {"심판번호": "4", "유사여부_확정": "비유사", "llm_b_유사여부": ""},
+        {"심판번호": "5", "유사여부_확정": "", "llm_b_유사여부": "비유사"},
     ]
     trials, kept = tei.target_trials(rows)
-    assert trials == ["1", "4"] and [r["심판번호"] for r in kept] == ["1", "4"]
+    assert trials == ["1", "2", "4"] and [r["심판번호"] for r in kept] == ["1", "2", "4"]
 
 
 def _label_row(number: str, kind: str, counterpart: str, verdict: str = "유사", **extra) -> dict:

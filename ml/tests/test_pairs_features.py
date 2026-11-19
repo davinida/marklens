@@ -130,6 +130,36 @@ def test_build_features_scores_flags_and_image_join():
     assert r5["has_meaning_a"] == 0 and r5["x3"] == "0.0000" and r5["x3_raw"] == "1.0000"
 
 
+def test_label_rounds_puts_augmented_items_in_last_round(tmp_path):
+    """회차 = 라벨링 회차: 큐의 round, 보강 열이 찬 항목은 큐의 마지막 회차(1차 수집분이라도 2차
+    라벨링). 큐에 없는 사건은 labels.csv 의 round, 둘 다 없으면 빈 값."""
+    queue = [
+        {"심판번호": "R1", "round": "1", "보강": ""},
+        {"심판번호": "R2", "round": "1", "보강": "도형 추정"},
+        {"심판번호": "R4", "round": "2", "보강": ""},
+    ]
+    rounds = pf.label_rounds(queue)
+    assert rounds == {"R1": "1", "R2": "2", "R4": "2"}
+    assert pf.label_rounds([]) == {}
+    labels = [dict(row) for row in LABELS]
+    labels[2]["round"] = "1"  # R3: 큐에 없음 → labels 의 round
+    features = {f["심판번호"]: f for f in pf.build_features(labels, IMAGE_PAIRS, rounds=rounds)}
+    assert {k: f["회차"] for k, f in features.items()} == {
+        "R1": "1", "R2": "2", "R3": "1", "R4": "2", "R5": "",
+    }
+    labels_path = tmp_path / "labels.csv"
+    with labels_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=LABEL_COLUMNS)
+        writer.writeheader()
+        writer.writerows(LABELS)
+    with (tmp_path / "curation_queue.csv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=["심판번호", "round", "보강"])
+        writer.writeheader()
+        writer.writerows(queue)
+    report = pf.run(labels_path, tmp_path / "none.csv", tmp_path / "pairs_features.csv")
+    assert report["회차"] == {"(없음)": 2, "2": 2, "1": 1}  # run 은 labels 옆 큐를 읽는다
+
+
 def test_x3_raw_matches_gated_when_gate_is_on():
     gated, raw = pf.x3_scores("왕", "KING")
     assert raw is not None and gated == pytest.approx(raw)

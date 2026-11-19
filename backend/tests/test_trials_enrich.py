@@ -387,6 +387,75 @@ def test_run_lookup_dry_run_idempotent_and_hard_cap(tmp_path):
     assert {m["결과"] for m in te.load_prior_marks(capped)} == {"ok"}
 
 
+def test_run_lookup_limit_calls_first_numbers_then_resumes(tmp_path):
+    """--limit N: 이번 실행은 계획의 앞 N개 번호만 부르고(하드캡 검사도 N 으로), 다음 실행은 조회된
+    번호를 건너뛰어 나머지를 부른다."""
+    base = tmp_path / "trials"
+    paths_ = tc.TrialPaths(base)
+    _write_labels(base, [])
+    targets = []
+    for index, (kind, number) in enumerate([
+        ("registration", "4000000010000"), ("registration", "4000000020000"),
+        ("registration", "4000000030000"), ("international", "344173"),
+    ]):
+        targets.append({
+            "심판번호": f"T{index}", "종류": "무효", "상표B_번호": number[-7:],
+            "상대표장_유형": "선등록",
+            "범주": te.CATEGORY_INTL if kind == "international" else te.CATEGORY_NUMBERED,
+            "번호종류": kind, "번호_정규화": number, "문구": "", "명칭_본문": "", "명칭_ocr": "",
+            "후보번호": "",
+        })
+    tc._write_csv(base / "enrich_targets.csv", te.TARGET_COLUMNS, targets)
+    calls: list[str] = []
+
+    def fetch(number, kind):
+        calls.append(number)
+        return XML_OK.replace("4001234560000", number)
+
+    dry = te.run_lookup(paths_, max_calls=2, dry_run=True, fetch=fetch, limit=2)
+    assert dry["예상_호출"] == 4 and dry["이번_실행_번호"] == 2 and calls == []
+    first = te.run_lookup(paths_, max_calls=2, dry_run=False, fetch=fetch, limit=2)
+    assert calls == ["4000000010000", "4000000020000"] and first["이번_실행"]["호출"] == 2
+    assert first["이번_실행"]["중단"] == ""
+    rest = te.run_lookup(paths_, max_calls=400, dry_run=False, fetch=fetch)
+    assert rest["예상_호출"] == 2 and calls[2:] == ["4000000030000", "344173"]
+    assert len(te.load_prior_marks(paths_)) == 4
+    log = json.loads((base / "enrich_calls.json").read_text(encoding="utf-8"))
+    assert log["합계_호출"] == 4 and len(log["runs"]) == 2
+    plan = te.lookup_plan(targets, [])
+    assert te.limit_plan(plan, 0)["예상_호출"] == 0
+    assert te.limit_plan(plan, 10)["예상_호출"] == 4
+    assert te.limit_plan(plan, 3)["international"]["호출"] == []
+
+
+def test_run_lookup_stops_after_consecutive_errors(tmp_path):
+    """서버가 계속 거절하면(resultCode 22 등) 연속 오류 ERROR_STREAK_STOP 회에서 멈춘다 — 나머지
+    번호는 부르지 않고, 오류 행은 남아 --retry-empty 로 다시 부를 수 있다."""
+    base = tmp_path / "trials"
+    paths_ = tc.TrialPaths(base)
+    _write_labels(base, [])
+    numbers = [f"40{index:07d}0000" for index in range(1, 13)]
+    targets = [{
+        "심판번호": f"T{index}", "종류": "무효", "상표B_번호": number[2:9],
+        "상대표장_유형": "선등록", "범주": te.CATEGORY_NUMBERED, "번호종류": "registration",
+        "번호_정규화": number, "문구": "", "명칭_본문": "", "명칭_ocr": "", "후보번호": "",
+    } for index, number in enumerate(numbers)]
+    tc._write_csv(base / "enrich_targets.csv", te.TARGET_COLUMNS, targets)
+    calls: list[str] = []
+
+    def flaky(number, kind):
+        calls.append(number)
+        return XML_OK.replace("4001234560000", number) if len(calls) <= 2 else XML_ERROR
+
+    report = te.run_lookup(paths_, max_calls=400, dry_run=False, fetch=flaky)
+    tally = report["이번_실행"]
+    assert len(calls) == 2 + te.ERROR_STREAK_STOP and tally["오류"] == te.ERROR_STREAK_STOP
+    assert tally["중단"].startswith(f"연속 오류 {te.ERROR_STREAK_STOP}회")
+    calls.clear()
+    retry = te.run_lookup(paths_, max_calls=400, dry_run=True, fetch=flaky, retry_empty=True)
+    assert retry["예상_호출"] == len(numbers) - 2  # 오류 행 + 부르지 않은 번호
+
+
 def test_merge_into_labels_preserves_other_columns(tmp_path):
     base = tmp_path / "trials"
     paths_ = tc.TrialPaths(base)
@@ -457,3 +526,38 @@ def test_run_targets_and_goods_end_to_end(tmp_path):
     assert report["x4"]["유사"]["n"] == 2 and report["x4"]["비유사"]["n"] == 1
     status = te.run_status(paths_)
     assert status["상표명_확보"]["행"] == 1 and status["x4_있음"] == 3
+
+
+def test_targets_and_goods_with_ids_touch_only_listed_trials(tmp_path):
+    """--ids: 목록의 심판번호 행만 정리·매핑하고, 다른 대상 행(앞 회차)의 셀은 그대로 둔다."""
+    base = tmp_path / "trials"
+    paths_ = tc.TrialPaths(base)
+    _write_labels(base, [
+        {"심판번호": "R1", "종류": "거절결정불복", "상표B_번호": "80250", "상대표장_유형": "선등록",
+         "유사여부_확정": "유사", "llm_b_유사여부": "유사", "판단축_확정": "호칭"},
+        {"심판번호": "S1", "종류": "권리범위확인(소극적)", "상표B_번호": "",
+         "상대표장_유형": "확인대상표장", "유사여부_확정": "유사", "llm_b_유사여부": "유사",
+         "판단축_확정": "호칭"},
+    ])
+    (base / "text").mkdir()
+    (base / "text" / "R1.txt").write_text(FACTS_REFUSAL, encoding="utf-8")
+    (base / "text" / "S1.txt").write_text(FACTS_SCOPE, encoding="utf-8")
+    ids_file = base / "round2_ids.txt"
+    ids_file.write_text("# 2차\nS1\n\n", encoding="utf-8")
+    ids = te.read_ids(ids_file)
+    assert ids == {"S1"} and te.read_ids(None) is None
+
+    summary = te.run_targets(paths_, ids=ids)
+    assert summary["대상_행"] == 1 and summary["범위_심판번호"] == 1
+    assert [t["심판번호"] for t in tc._read_csv(base / "enrich_targets.csv")] == ["S1"]
+    report = te.run_goods(paths_, goods_map=FakeGoodsMap(), ids=ids,
+                          report_name="enrich_goods_report_round2_ids.json")
+    assert report["대상_행"] == 1 and report["범위_심판번호"] == 1
+    assert (base / "enrich_goods_report_round2_ids.json").exists()
+    assert not (base / "enrich_goods_report.json").exists()
+    labels = {(r["심판번호"], r["상표B_번호"]): r for r in tc._read_csv(base / "labels.csv")}
+    assert labels[("S1", "")]["상대표장_명칭_본문"] == "모래알"
+    assert labels[("S1", "")]["goods_codes_prior"] == "G270101"
+    untouched = labels[("R1", "80250")]
+    assert untouched["상대표장_번호_정규화"] == "" and untouched["goods_codes_this"] == ""
+    assert te.main(["--base", str(base), "targets", "--ids", str(ids_file)]) == 0

@@ -5,8 +5,8 @@
     ml/venv/bin/python ml/scripts/trials_extract_images.py --numbers 2014100002294 --no-qa
     ml/venv/bin/python ml/scripts/trials_extract_images.py --min-size 40   # v0 기준(40px)
 
-대상: labels.csv 에서 pass a(유사여부_확정)와 pass b(llm_b_유사여부)가 일치하고 둘 다 유사·비유사인
-행의 심판번호(제외·불일치 행은 뺀다).
+대상: labels.csv 에서 유사여부_확정이 유사·비유사인 행의 심판번호(제외 행은 뺀다 — 특징·보강과
+같은 기준. 2026-10-08 v0·v1 은 pass a·b 일치 행만 봤다).
 
 추출·연결(문서마다, backend/scripts/trials_collect.py 의 기초사실 제목·등록번호 패턴 재사용):
   1. 쪽마다 텍스트 줄(get_text("dict"))과 이미지(get_images(full=True) + get_image_rects)의 bbox 를
@@ -172,11 +172,10 @@ class MarkBlock:
 
 
 def target_trials(label_rows: list[dict]) -> tuple[list[str], list[dict]]:
-    """pass a·b 가 일치하고 둘 다 유사/비유사인 행과 그 심판번호(정렬)."""
-    rows = [
-        r for r in label_rows
-        if r.get("유사여부_확정") in POSITIVE and r.get("유사여부_확정") == r.get("llm_b_유사여부")
-    ]
+    """유사여부_확정이 유사·비유사인 행과 그 심판번호(정렬) — trials_enrich.target_rows·
+    pairs_features.target_rows 와 같은 기준(2026-10-11 통일; 이 스크립트는 2026-11-19 에 맞췄다 —
+    그전에는 pass a·b 일치 행만 봤다)."""
+    rows = [r for r in label_rows if r.get("유사여부_확정") in POSITIVE]
     return sorted({r["심판번호"] for r in rows}), rows
 
 

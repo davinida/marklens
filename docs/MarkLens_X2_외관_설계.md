@@ -227,6 +227,29 @@ v0 라벨 기준(306쌍, 제외 없음)도 같은 그림이다: whole 전체 0.5
   않은 값, 요부 판단은 면적 비율로 불가, 사진 표장은 분리 자체가 성립하지 않음, 도형 표본 35·크롭 쌍
   80 으로 작음, 라벨은 LLM 이중 라벨(사람 검증 전). easyocr 는 실험 전용 의존성(서비스 미사용).
 
+### 7.6 2차 보강 뒤 — 현재 값(2026-11-19, `feat/trials-round2-enrich`, 통합 모델 설계 §4-5)
+
+- **추출 대상**: `trials_extract_images.target_trials` 를 특징·보강과 같은 `유사여부_확정` 유사·비유사 기준으로 맞췄다(§2 의 v0·v1 은
+  pass a·b 일치 350행). 다시 돌려도 1차 이미지는 PNG 바이트까지 같았고 색인에서 빠진 것은 제외로 바뀐 4건(사람 결정 2·중복 2)뿐이다.
+  쌍 306 → **540**(1차 306·2차 232; 표장 라벨 유사 342·비유사 157·제외 41), 탈락 57행(상대 소형 24·상대 문자 17·상대 연결 실패 8·
+  this 소형 6·this 연결 실패 2). 새 쌍 QA 시트 30쌍(seed 0·1)을 눈으로 확인했고 모두 맞았다. `x2_split.py` 는 새 이미지만 OCR 했다
+  (1차 `image_parts`·특징 값 그대로, 표장 라벨은 §7.1 2026-11-12 수정대로 2쌍만 바뀜). `x2_benchmark_v1.json` 도 540쌍으로 다시 쓰였다.
+- **도형계 표본**: 유형 라벨(`상표유형_확정`)이 도형·결합-도형요부인 유사·비유사 110행 중 **양쪽 이미지 106행**(1차 34/36·2차 72/74),
+  양쪽 도형 크롭 89행. 도형 외관 3방법 비교(§10 5)의 표본이다.
+- **기준선**(`axes_benchmark.py`, 표장 라벨, 사건 단위 부트스트랩 1,000회, 가중 = 한 사건의 가중 합 상한 3):
+
+| 도형계 | (a) 가중 없음 | (a) 가중 | (b) 판단축 외관 |
+|---|---|---|---|
+| `x2_whole` 1차 | 0.49 (0.29~0.69) n 35 | 0.49 | 0.48 n 33 |
+| `x2_whole` 1+2차 | **0.73 (0.61~0.83)** n 103 (53/50, 사건 76) | 0.69 (0.58~0.80) | 0.74 (0.59~0.85) n 101 |
+| `x2_fig` 1차 | 0.57 (0.31~0.78) n 29 | 0.57 | 0.54 n 28 |
+| `x2_fig` 1+2차 | **0.73 (0.60~0.83)** n 85 (50/35, 사건 69) | 0.73 (0.60~0.83) | 0.73 (0.60~0.83) n 84 |
+
+  전체 쌍에서는 `x2_whole` (a) 0.56 (0.48~0.62, n 498; 가중 0.53)·(b) 외관축 0.72 (0.64~0.78, n 246), `x2_fig` (a) 0.47 (n 213)·
+  (b) 0.63 (n 118), 현실 분포(쉬운 음성 700쌍의 `x2_whole` — 통합 모델 v1.3 때 채운 값) 0.72 (0.68~0.76). 문자계에서 `x2_fig` 는 0.35(n 122)로
+  글자 크롭끼리라 신호가 없다(§7.5 와 같은 결론). 2차만으로는 도형계 `x2_whole` 0.83 (0.63~0.93, n 68)·`x2_fig` 0.81 (n 56) —
+  1차의 도형계 쌍(35)보다 나아 보이지만 CI 가 넓고 겹친다. 유형 게이팅 `x2_gate`(§8.3)는 이번에 재지 않았다.
+
 ## 8. v1 ② — 전체 이미지 변형·OCR 노이즈 진단·게이팅(2026-10-08, `ml/scripts/x2_variants.py`)
 
 ① 의 결론을 반영해 **도형 크롭(`x2_fig`) 변형은 하지 않았다**(크롭 쌍 80, 사진에서 역전). 판정 기준은
@@ -328,7 +351,8 @@ this 쪽을 OCR 대신 labels 의 상표A_명칭(참값)으로 바꾸고 상대 
    입력) · 도형 요부 크롭 CLIP(`x2_fig`, 표본 80 → 확대 뒤) · 유형 게이팅(`x2_gate`, 문자계는 철자·도형계는 이미지)을 같은
    표장 라벨·부트스트랩 CI 로 재고, 통합 모델 2차 재학습의 X2 이미지 입력을 정한다. 현재 서비스는 전체 이미지 CLIP 을 v2 엔진의
    `x2_img` 로 쓰고(계약 v2), 통합 모델 v1.3 의 도형계 이미지 계수(x2_whole×도형계 +0.36/+0.64)는 결합 제약이 정한 값이라 이
-   비교로 데이터 근거를 대신 세운다(통합 모델 설계 §7-3·§6).
+   비교로 데이터 근거를 대신 세운다(통합 모델 설계 §7-3·§6). 2026-11-19 2차 보강으로 도형계 양쪽 이미지 106행·크롭 89행이
+   생겼고, 앞의 두 방법의 기준선은 §7.6 에 있다(남은 것: `x2_gate` 를 같은 표본·사건 단위 CI 로 재는 것과 세 방법 비교).
 
 ## 11. 파일·명령
 
@@ -343,9 +367,9 @@ ml/venv/bin/python ml/scripts/x2_benchmark.py --features --pairs ml/data/trials/
 ml/venv/bin/python ml/scripts/x2_variants.py                         # v1 ②: 변형 5종·OCR 진단·게이팅 → x2_variants_v1.json (DINOv2 첫 실행 다운로드)
 ml/venv/bin/python ml/scripts/x2_variants.py --skip-dino             # CLIP 변형만
 MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_trials_extract_images.py ml/tests/test_x2_benchmark.py ml/tests/test_x2_split.py ml/tests/test_x2_variants.py   # 52건
-ml/venv/bin/python ml/scripts/pairs_features.py                      # §9·통합 모델 §4-1: 350쌍 4축 특징(실제 X3 모델) → pairs_features.csv
-ml/venv/bin/python ml/scripts/axes_benchmark.py                      # 축별 AUC·상관·임계값·게이트 효과 → axes_benchmark_v1.json, axes_hist_v1_<축>.png
-MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_ortho.py ml/tests/test_pairs_features.py ml/tests/test_axes_benchmark.py   # 119건
+ml/venv/bin/python ml/scripts/pairs_features.py                      # §9·통합 모델 §4-1·§4-5: 4축 특징(실제 X3 모델) → pairs_features.csv(2026-11-19 597행)
+ml/venv/bin/python ml/scripts/axes_benchmark.py --with-easy-negatives   # 축별 AUC·상관·임계값·게이트 효과·회차×유형 분할(사건 단위 CI·가중) → axes_benchmark_v1.json, axes_hist_v1_<축>.png
+MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_ortho.py ml/tests/test_pairs_features.py ml/tests/test_axes_benchmark.py   # 130건(2026-10-08 작성 때 119건)
 ```
 
 - `ml/scripts/trials_extract_images.py` — 추출·연결·쌍·QA 시트·coverage(함수 `extract_document`,
@@ -389,3 +413,5 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_ortho.py ml/
 - 2026-11-12 §7.1 — 표장 라벨 규칙 수정: 메모의 "표장 유사 여부 판단 없음"·"표장 유사 여부 미판단" 같은 표기를 유사로
   잡던 부분 문자열 검사를 고쳤다(`x2_benchmark.memo_says_mark_similar`, 테스트 1건). 특징 351행 중 3행의 표장 라벨이
   유사 → 없음으로 바뀐다. 수치 재측정은 하지 않았다.
+- 2026-11-19 §7.6 — 추출 대상을 `유사여부_확정` 기준으로(테스트 1건 교체), 2차 보강으로 쌍 540·도형계 양쪽 이미지 106행. 도형계 이미지 축
+  기준선(사건 단위 CI): `x2_whole` 0.73 (n 103)·`x2_fig` 0.73 (n 85). 서비스 코드 변경 없음.
