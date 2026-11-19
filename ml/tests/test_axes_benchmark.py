@@ -219,3 +219,111 @@ def test_distinctiveness_effect_and_realistic_distribution(features_with_d, tmp_
     assert "식별력 v0 전후" in text and "현실 분포" in text and "| x1 |" in text
     no_easy = ab.run(path, out_path=tmp_path / "out2.json", hist_dir=None, bootstrap=10)
     assert "현실_분포" not in no_easy and "쉬운 음성 없음" in ab.report_text(no_easy)
+
+
+# ---- 사건 단위 가중·부트스트랩·분할(2026-11-19) ------------------------------------------------
+
+
+def test_weighted_auc_matches_rank_auc_and_duplication():
+    rng = np.random.default_rng(3)
+    scores = np.round(rng.random(40), 1)  # 동점이 많다
+    labels = (rng.random(40) > 0.4).astype(int)
+    assert ab.weighted_auc(scores, labels) == pytest.approx(ab.x2b.roc_auc(scores, labels))
+    weights = rng.integers(1, 4, 40).astype(float)
+    repeated = np.repeat(np.arange(40), weights.astype(int))
+    assert ab.weighted_auc(scores, labels, weights) == pytest.approx(
+        ab.x2b.roc_auc(scores[repeated], labels[repeated]))  # 정수 가중 = 행을 되풀이
+    assert ab.weighted_auc(scores, np.ones(40, int)) is None
+    assert ab.weighted_auc(np.array([]), np.array([])) is None
+
+
+def test_pair_bootstrap_reproduces_x2_benchmark_and_case_bootstrap_groups():
+    rng = np.random.default_rng(5)
+    scores = np.round(rng.random(60), 2)
+    labels = (rng.random(60) > 0.5).astype(int)
+    old = ab.x2b.bootstrap_auc(scores, labels, rounds=200, seed=0)
+    new = ab.bootstrap_auc_grouped(scores, labels, rounds=200, seed=0)
+    assert new == pytest.approx(old, abs=1e-4)  # 같은 난수열 → 2026-10 측정과 같은 CI
+    groups = np.repeat(np.arange(15), 4).astype(str)
+    low, high = ab.bootstrap_auc_grouped(scores, labels, groups=groups, rounds=200, seed=0)
+    auc = ab.x2b.roc_auc(scores, labels)
+    assert low <= auc <= high and (low, high) != tuple(old)
+    assert ab.bootstrap_auc_grouped(scores, labels, groups=groups, rounds=200, seed=0) == (
+        low, high)  # 결정적
+    assert ab.bootstrap_auc_grouped(scores, np.zeros(60, int), rounds=10) == (None, None)
+
+
+def test_case_weights_cap_sum_per_case():
+    rows = ([{"심판번호": "BIG", "pair_source": "trial"}] * 40
+            + [{"심판번호": "S1", "pair_source": "trial"}]
+            + [{"심판번호": "S2", "pair_source": "trial"}] * 2
+            + [{"심판번호": "cross:1|2", "pair_source": "cross"}])
+    weights = ab.case_weights(rows)
+    assert weights[:40] == pytest.approx(np.full(40, 3 / 40)) and weights[:40].sum() == 3
+    assert list(weights[40:]) == [1.0, 1.0, 1.0, 1.0]  # 3행 이하 사건·쉬운 음성은 1
+    assert ab.case_weights(rows, cap=0).tolist() == [1.0] * 44
+    assert ab.case_weights(rows, cap=1)[41] == 0.5
+
+
+def _split_rows() -> list[dict]:
+    """회차 1: 문자계 사건 20개(행 1개씩, x1 이 라벨을 가른다). 회차 2: 도형계 한 사건 BIG 에
+    유사 12행(x1·x2_whole 은 낮음 — 라벨과 반대)과 도형계 사건 10개(행 1개씩, 라벨을 가른다)."""
+    rows = []
+
+    def add(number, round_, kind, similar, x1, whole):
+        row = {column: "" for column in pf.COLUMNS}
+        row.update({
+            "심판번호": number, "회차": round_, "상표유형": kind, "종류": "무효",
+            "최종라벨": "유사" if similar else "비유사",
+            "표장라벨": "유사" if similar else "비유사",
+            "판단축": "외관|호칭", "이름A": "a", "이름B": "b", "pair_source": "trial",
+            "x1": f"{x1:.4f}", "x2_text": f"{x1:.4f}", "x2_whole": f"{whole:.4f}",
+            "has_names": 1, "has_pron_a": 1, "has_pron_b": 1, "has_meaning_a": 1,
+            "has_meaning_b": 1, "has_spelling_a": 1, "has_spelling_b": 1, "has_image": 1,
+        })
+        rows.append(row)
+
+    for i in range(20):
+        add(f"A{i}", "1", "문자" if i % 2 else "결합-문자요부", i % 2 == 0,
+            0.9 if i % 2 == 0 else 0.1, 0.5)
+    for i in range(12):
+        add("BIG", "2", "도형", True, 0.05, 0.05)
+    for i in range(10):
+        add(f"F{i}", "2", "결합-도형요부" if i % 2 else "도형", i % 2 == 0,
+            0.9 if i % 2 == 0 else 0.1, 0.9 if i % 2 == 0 else 0.1)
+    return rows
+
+
+def test_split_results_by_round_type_and_case_weight(tmp_path):
+    path = tmp_path / "pairs_features.csv"
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=pf.COLUMNS)
+        writer.writeheader()
+        writer.writerows(_split_rows())
+    result = ab.run(path, out_path=tmp_path / "out.json", hist_dir=None, bootstrap=50)
+    assert result["부트스트랩"]["단위"] == "case"
+    assert result["사건가중"] == {"상한": 3.0, "사건": 31, "가중_합": 33.0, "1보다_작은_행": 12}
+    split = result["분할"]
+    assert set(split) == {"1차", "2차", "1+2차"}
+    assert split["1차"]["행"] == 20 and split["2차"]["사건"] == 11
+    first = split["1차"]["유형"]
+    assert first["문자계"]["행"] == 20 and first["도형계"]["행"] == 0
+    assert split["2차"]["유형"]["도형계"]["사건"] == 11 and first["문자계"]["사건"] == 20
+    assert first["문자계"]["축"]["x1"]["a_전체"]["auc"] == 1.0
+    assert first["도형계"]["축"]["x1"]["a_전체"]["auc"] is None
+    figure = split["2차"]["유형"]["도형계"]["축"]["x2_whole"]["a_전체"]
+    # BIG 의 유사 12행(점수 최저)이 가중 없이는 AUC 를 끌어내리고, 가중(합 3)이면 덜 끌어내린다
+    assert figure["n"] == 22 and figure["n_사건"] == 11 and figure["n_가중"] == 13.0
+    assert figure["auc"] == pytest.approx(5 / 17, abs=1e-4)
+    assert figure["auc_w"] == pytest.approx(5 / 8, abs=1e-4)
+    assert figure["auc_w"] > figure["auc"]
+    both = split["1+2차"]["유형"]["전체"]["축"]["x1"]["a_전체"]
+    assert both["n"] == 42 and both["n_사건"] == 31
+    text = ab.report_text(result)
+    assert "## 분할" in text and "### 2차 · 도형계" in text and "도형 외관 비교 기준선" in text
+    saved = json.loads((tmp_path / "out.json").read_text(encoding="utf-8"))
+    assert "분할" in saved and saved["분할"]["1차"]["유형"]["전체"]["행"] == 20
+    pair = ab.run(path, out_path=tmp_path / "pair.json", hist_dir=None, bootstrap=50,
+                  unit="pair", case_cap=0)
+    sub = pair["축"]["x1"]["부분집합"]["a_전체"]
+    assert "n_사건" not in sub and "auc_w" not in sub  # 행 단위·가중 없음(2026-10 방식)

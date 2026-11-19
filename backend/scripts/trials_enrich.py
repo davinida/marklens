@@ -5,10 +5,13 @@
     ml/venv/bin/python -m backend.scripts.trials_enrich lookup --dry-run    # B. 계획표(호출 0)
     KIPRIS_DAILY_BUDGET=400 ml/venv/bin/python -m backend.scripts.trials_enrich lookup \
         --max-calls 400                                                      # 실호출(사람이 결정)
+        (--limit N: 이번 실행은 계획의 앞 N개 번호만 — 처음 몇 건으로 응답·저장 확인)
     ml/venv/bin/python -m backend.scripts.trials_enrich goods     # C. 지정상품→유사군→X4(호출 0)
+    (targets·goods --ids FILE: 그 심판번호의 행만 — 새 회차만 보강하고 앞 회차 행의 셀은 그대로)
     ml/venv/bin/python -m backend.scripts.trials_enrich status              # 집계
 
-A. 대상 = labels.csv 에서 pass a·b 가 일치하고 유사·비유사인 행. 상대 표장을 범주로 나눈다:
+A. 대상 = labels.csv 에서 유사여부_확정이 유사·비유사인 행(target_rows — 2026-10-11 부터 특징과 같은
+   기준, 그전에는 pass a·b 일치). 상대 표장을 범주로 나눈다:
    선등록·선출원(번호 있음) / 국제등록 / 선사용(번호 없음) / 확인대상표장(번호 없음). 번호는
    kipris_metadata.json 형식(13자리, 하이픈 없음: 등록 40+7자리+0000, 출원 40+연도+7자리)으로 정규화
    하고 심결문 문구(상표등록/서비스표등록/국제등록)로 접두 40·41·45·국제를 정한다. 번호가 없는
@@ -56,6 +59,10 @@ from src.axes.x4_goods import goods_similarity  # noqa: E402
 
 POSITIVE = ("유사", "비유사")
 HARD_CAP = 400
+# 연속 오류가 이 횟수면 lookup 을 멈춘다(2026-11-19: 서버가 resultCode 22 "요청 제한 초과"로
+# 거절하는 동안 멈추지 않고 144회를 더 불렀다 — trials_collect fetch 의 연속 오류 5회 중단과 같은
+# 값)
+ERROR_STREAK_STOP = 5
 CATEGORY_NUMBERED = "선등록·선출원(번호 있음)"
 CATEGORY_INTL = "국제등록"
 CATEGORY_USE = "선사용(번호 없음)"
@@ -115,10 +122,19 @@ def now_text() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def target_rows(rows: list[dict]) -> list[dict]:
+def target_rows(rows: list[dict], ids: set[str] | None = None) -> list[dict]:
     """유사여부_확정이 유사·비유사인 행(labels.csv 순서) — pairs_features.target_rows 와 같은 기준
-    (2026-10-11 부터 pass b 일치를 요구하지 않는다)."""
-    return [r for r in rows if r.get("유사여부_확정") in POSITIVE]
+    (2026-10-11 부터 pass b 일치를 요구하지 않는다). ids 가 있으면 그 심판번호의 행만(--ids)."""
+    return [r for r in rows if r.get("유사여부_확정") in POSITIVE
+            and (ids is None or r["심판번호"] in ids)]
+
+
+def read_ids(path: Path | str | None) -> set[str] | None:
+    """--ids 파일(줄마다 심판번호, # 주석·빈 줄 무시) → 집합. 경로가 없으면 None(전체)."""
+    if not path:
+        return None
+    lines = Path(path).read_text(encoding="utf-8").splitlines()
+    return {line.strip() for line in lines if line.strip() and not line.strip().startswith("#")}
 
 
 # ---- A. 번호 정규화·범주 ----
@@ -376,9 +392,12 @@ def merge_into_labels(paths_: tc.TrialPaths, updates: dict[tuple[str, str], dict
     return changed
 
 
-def run_targets(paths_: tc.TrialPaths) -> dict:
+def run_targets(paths_: tc.TrialPaths, ids: set[str] | None = None) -> dict:
+    """ids 가 있으면 그 심판번호의 대상 행만 정리하고 labels.csv 도 그 행만 고친다 —
+    enrich_targets.csv(lookup 의 입력)도 그 범위가 된다(새 회차만 보강할 때, 앞 회차 행의 셀은
+    그대로)."""
     labels = tc._read_csv(paths_.labels_csv)
-    rows = target_rows(labels)
+    rows = target_rows(labels, ids)
     targets = build_targets(paths_, rows)
     tc._write_csv(paths_.base / "enrich_targets.csv", TARGET_COLUMNS, targets)
     updates = {
@@ -391,6 +410,8 @@ def run_targets(paths_: tc.TrialPaths) -> dict:
     changed = merge_into_labels(paths_, updates)
     summary = targets_summary(targets)
     summary["labels_갱신_칸"] = changed
+    if ids is not None:
+        summary["범위_심판번호"] = len(ids)
     return summary
 
 
@@ -435,6 +456,21 @@ def lookup_plan(targets: list[dict], existing: list[dict], *,
         }
     plan["예상_호출"] = sum(len(plan[k]["호출"]) for k in wanted)
     return plan
+
+
+def limit_plan(plan: dict, limit: int) -> dict:
+    """계획에서 앞 limit 개 번호만 남긴다(종류 순 registration → application → international, 종류
+    안에서는 계획 순서). 처음 몇 건으로 응답·저장을 확인할 때 쓴다 — 나머지는 다음 실행이 이어
+    부른다(조회된 번호는 건너뛰므로)."""
+    left = max(0, limit)
+    limited: dict = {}
+    for kind in ("registration", "application", "international"):
+        numbers = plan[kind]["호출"][:left]
+        left -= len(numbers)
+        limited[kind] = {**plan[kind], "호출": numbers}
+    limited["예상_호출"] = sum(len(limited[k]["호출"]) for k in
+                           ("registration", "application", "international"))
+    return limited
 
 
 def plan_table(plan: dict) -> str:
@@ -498,7 +534,8 @@ def lookup_one(kind: str, number: str, *, fetch=kc.advanced_search_by_number_raw
 
 def run_lookup(paths_: tc.TrialPaths, *, max_calls: int = HARD_CAP, dry_run: bool = True,
                fetch=kc.advanced_search_by_number_raw, include_candidates: bool = False,
-               retry_empty: bool = False) -> dict:
+               retry_empty: bool = False, limit: int | None = None) -> dict:
+    """limit 이 있으면 이번 실행은 계획의 앞 limit 개 번호만 부른다(하드캡 검사도 그 수로)."""
     targets_path = paths_.base / "enrich_targets.csv"
     if not targets_path.exists():
         raise SystemExit("enrich_targets.csv 가 없습니다 — targets 먼저")
@@ -513,6 +550,9 @@ def run_lookup(paths_: tc.TrialPaths, *, max_calls: int = HARD_CAP, dry_run: boo
         },
         "예상_호출": plan["예상_호출"], "하드캡": max_calls, "dry_run": dry_run,
     }
+    if limit is not None:
+        plan = limit_plan(plan, limit)
+        report["이번_실행_번호"] = plan["예상_호출"]
     if dry_run:
         return report
     if plan["예상_호출"] > max_calls:
@@ -544,6 +584,7 @@ def run_lookup(paths_: tc.TrialPaths, *, max_calls: int = HARD_CAP, dry_run: boo
                 tally["검증"][kind] = f"실패({first['결과']}) — 나머지 {len(numbers) - 1}건 건너뜀"
                 continue
             tally["검증"][kind] = "ok" + ("(하이픈 형식)" if send_as.get("hyphen") else "")
+            streak = 0
             for number in numbers[1:]:
                 if tally["호출"] >= max_calls:
                     tally["중단"] = f"하드캡 {max_calls} 도달"
@@ -553,6 +594,11 @@ def run_lookup(paths_: tc.TrialPaths, *, max_calls: int = HARD_CAP, dry_run: boo
                 tally["호출"] += 1
                 tally[row["결과"] if row["결과"] in ("ok", "0건", "오류") else "오류"] += 1
                 new_rows.append(row)
+                streak = streak + 1 if row["결과"] == "오류" else 0
+                if streak >= ERROR_STREAK_STOP:
+                    tally["중단"] = (f"연속 오류 {ERROR_STREAK_STOP}회 — 중단(마지막: "
+                                   f"{row['오류'][:80]})")
+                    break
             if tally["중단"]:
                 break
     except kc.CallBudgetExceeded as exc:
@@ -837,11 +883,13 @@ def counterpart_block(row: dict, blocks: list[dict], ordinal: int) -> dict | Non
     return priors[0] if ordinal == 1 and len(priors) == 1 else None
 
 
-def run_goods(paths_: tc.TrialPaths, goods_map=None) -> dict:
+def run_goods(paths_: tc.TrialPaths, goods_map=None, ids: set[str] | None = None,
+              report_name: str = "enrich_goods_report.json") -> dict:
+    """ids 가 있으면 그 심판번호의 대상 행만 매핑·기록한다(다른 행은 그대로)."""
     goods_map = goods_map or load_goods_map()
     matcher = GoodsMatcher(goods_map)
     labels = tc._read_csv(paths_.labels_csv)
-    rows = target_rows(labels)
+    rows = target_rows(labels, ids)
     cache: dict[str, tuple[str, list[dict]]] = {}
     ordinal: dict[str, int] = {}
     updates: dict[tuple[str, str], dict[str, str]] = {}
@@ -915,7 +963,9 @@ def run_goods(paths_: tc.TrialPaths, goods_map=None) -> dict:
         "x4": {label: _dist(values) for label, values in x4_by_label.items()},
         "labels_갱신_칸": changed,
     }
-    (paths_.base / "enrich_goods_report.json").write_text(
+    if ids is not None:
+        report["범위_심판번호"] = len(ids)
+    (paths_.base / report_name).write_text(
         json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
     )
     return report
@@ -963,29 +1013,40 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--base", type=Path, default=tc.DEFAULT_PATHS.base)
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("targets", help="A. 대상 정리(호출 0)")
+    ids_help = ("이 심판번호 목록(줄마다 하나)의 행만 — 새 회차만 보강하고 앞 회차 행은 그대로 "
+                "(goods 보고는 enrich_goods_report_<파일 이름>.json)")
+    targets_cmd = sub.add_parser("targets", help="A. 대상 정리(호출 0)")
+    targets_cmd.add_argument("--ids", type=Path, default=None, help=ids_help)
     lookup = sub.add_parser("lookup", help="B. KIPRIS 번호 조회")
     lookup.add_argument("--dry-run", action="store_true", help="계획표만(호출 0)")
     lookup.add_argument("--max-calls", type=int, default=HARD_CAP, help=f"하드캡(기본 {HARD_CAP})")
     lookup.add_argument("--include-candidates", action="store_true", help="후보 번호도 조회")
     lookup.add_argument("--retry-empty", action="store_true", help="0건·오류였던 번호 다시 조회")
-    sub.add_parser("goods", help="C. 지정상품 → 유사군 → X4(호출 0)")
+    lookup.add_argument("--limit", type=int, default=None,
+                        help="이번 실행은 계획의 앞 N개 번호만(처음 몇 건으로 응답·저장 확인)")
+    goods_cmd = sub.add_parser("goods", help="C. 지정상품 → 유사군 → X4(호출 0)")
+    goods_cmd.add_argument("--ids", type=Path, default=None, help=ids_help)
     sub.add_parser("status", help="집계")
     args = parser.parse_args(argv)
     paths_ = tc.TrialPaths(args.base)
     if args.command == "targets":
-        report = run_targets(paths_)
+        report = run_targets(paths_, ids=read_ids(args.ids))
     elif args.command == "lookup":
         report = run_lookup(paths_, max_calls=min(args.max_calls, HARD_CAP), dry_run=args.dry_run,
                             include_candidates=args.include_candidates,
-                            retry_empty=args.retry_empty)
+                            retry_empty=args.retry_empty, limit=args.limit)
         if args.dry_run:
             print(plan_table(report["계획"]))
+            calls = report.get("이번_실행_번호", report["예상_호출"])
+            if "이번_실행_번호" in report:
+                print(f"--limit {args.limit}: 이번 실행 번호 {calls}개")
             print("호출 0회(dry-run). 예상 호출이 하드캡 이하일 때만 실호출:",
-                  "가능" if report["예상_호출"] <= report["하드캡"] else "초과 — 중단")
+                  "가능" if calls <= report["하드캡"] else "초과 — 중단")
             return 0
     elif args.command == "goods":
-        report = run_goods(paths_)
+        name = (f"enrich_goods_report_{args.ids.stem}.json" if args.ids
+                else "enrich_goods_report.json")
+        report = run_goods(paths_, ids=read_ids(args.ids), report_name=name)
     else:
         report = run_status(paths_)
     print(json.dumps(report, ensure_ascii=False, indent=2))

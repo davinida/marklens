@@ -6,8 +6,8 @@
     ml/venv/bin/python ml/scripts/pairs_features.py [--labels ml/data/trials/labels.csv]
         [--image-pairs ml/data/trials/image_pairs_v1.csv] [--out ml/data/trials/pairs_features.csv]
 
-대상: labels.csv 에서 LLM pass a·b 판정이 일치한 유사·비유사 행(backend/scripts/trials_enrich.py
-      target_rows 와 같은 규칙, 350행).
+대상: labels.csv 에서 유사여부_확정이 유사·비유사인 행(backend/scripts/trials_enrich.py
+      target_rows 와 같은 규칙 — 2026-10-11 부터 pass b 일치를 요구하지 않는다).
 이름: A = 상표A_명칭. B = 상대표장_명칭_kipris > llm(label --name-b) > 본문 > ocr(`이름B_출처`).
       LLM 이 "도형만" 이라고 적은 행(메모 도형, llm 빈 값)은 본문·OCR 로 내려가지 않고 이름 없음
       (출처 "도형"). 이름이 없으면 이름 기반 축(x1·x2_text·x3)은 결측(빈 칸).
@@ -33,7 +33,9 @@
       has_fig (1/0).
 메타: 심판번호, 종류, 상대번호, 최종라벨(유사여부_확정), 표장라벨(x2_benchmark.mark_label —
       상품만으로 결론 난 비유사는 ""), 판단축(판단축_확정, 비면 llm_b_판단축),
-      상표유형(확정 > 추정), 이름A, 이름B, 이름B_출처, 메모.
+      상표유형(확정 > 추정), 이름A, 이름B, 이름B_출처, 메모, 회차(라벨링 회차 — curation_queue.csv
+      의 round, 보강 열이 찬 항목(sheet --augment-queue)은 큐의 마지막 회차: 1차 수집분이라도 2차
+      라벨링에서 넣었다. 큐가 없으면 labels.csv 의 round. 쉬운 음성은 빈 값).
 보고: 축별 결측 수, 이름B 출처 분포, 종류·유형 분포(stdout JSON + pairs_features_report.json).
 """
 
@@ -77,8 +79,9 @@ NAME_B_SOURCES = (("kipris", "상대표장_명칭_kipris"), ("llm", "상대표�
 FIGURE_MEMO = "도형"  # label --name-b "" --memo 도형 이 메모에 남기는 표시
 META_COLUMNS = [
     "심판번호", "종류", "상대번호", "최종라벨", "표장라벨", "판단축", "판단축_출처", "상표유형",
-    "상표유형_출처", "이름A", "이름B", "이름B_출처", "메모", "pair_source",
+    "상표유형_출처", "이름A", "이름B", "이름B_출처", "메모", "pair_source", "회차",
 ]
+DEFAULT_QUEUE_NAME = "curation_queue.csv"  # labels.csv 옆 — 라벨링 회차(회차 열)
 AXIS_COLUMNS = [
     "x1", "x2_text", "x2_fig", "x2_whole", "x3", "x3_raw", "x4", "x1_d", "x2_text_d", "x3_d",
 ]
@@ -98,9 +101,24 @@ def read_csv(path: Path) -> list[dict]:
 def target_rows(rows: list[dict]) -> list[dict]:
     """유사여부_확정이 유사·비유사인 행(labels.csv 순서). 2026-10-11 부터 pass b 일치를 요구하지
     않는다 — A≠B 16행이 사람 검증·규칙으로 전부 처리돼 유사여부_확정(사람 라벨 우선)이 최종이다.
-    새 불일치는 `review --bundle` 의 ab_disagree 로 드러난다. (trials_enrich.target_rows 는 아직
-    A·B 일치 기준.)"""
+    새 불일치는 `review --bundle` 의 ab_disagree 로 드러난다. trials_enrich.target_rows·
+    trials_extract_images.target_trials 도 같은 기준이다."""
     return [r for r in rows if r.get("유사여부_확정") in POSITIVE]
+
+
+def label_rounds(queue_rows: list[dict]) -> dict[str, str]:
+    """심판번호 → 라벨링 회차. 큐(curation_queue.csv)의 round 를 쓰되, 보강 열이 찬 항목(sheet
+    --augment-queue 로 넣은 2등급)은 큐의 마지막 회차다 — 보강은 그 회차 라벨링에서 큐에 들어가므로
+    1차 수집분이라도 2차 라벨링 행이다(2026-11-12 2차 라벨링: 1차 수집분 11건)."""
+    rounds = [int(r["round"]) for r in queue_rows if (r.get("round") or "").isdigit()]
+    last = str(max(rounds)) if rounds else ""
+    out: dict[str, str] = {}
+    for row in queue_rows:
+        number = row.get("심판번호", "")
+        if not number:
+            continue
+        out[number] = last if (row.get("보강") or "").strip() else (row.get("round") or "")
+    return out
 
 
 def _memo_says_figure(row: dict) -> bool:
@@ -220,7 +238,8 @@ def name_axes(name_a: str, name_b_: str, goods: frozenset[str], model: Distincti
     return out
 
 
-def build_row(row: dict, image_row: dict | None, model: Distinctiveness) -> dict:
+def build_row(row: dict, image_row: dict | None, model: Distinctiveness,
+              rounds: dict[str, str] | None = None) -> dict:
     name_a = (row.get("상표A_명칭") or "").strip()
     name_b_, source_b = name_b(row)
     axes, axes_source = judging_axes(row)
@@ -242,6 +261,7 @@ def build_row(row: dict, image_row: dict | None, model: Distinctiveness) -> dict
         "판단축": axes, "판단축_출처": axes_source, "상표유형": kind, "상표유형_출처": kind_source,
         "이름A": name_a, "이름B": name_b_, "이름B_출처": source_b, "메모": memo,
         "pair_source": "trial",
+        "회차": (rounds or {}).get(row["심판번호"]) or row.get("round", "") or "",
         "x2_fig": _fmt(x2_fig), "x2_whole": _fmt(x2_whole), "x4": _fmt(x4),
         "has_names": int(has_names),
         "has_pron_a": int(has_pronunciation(name_a)), "has_pron_b": int(has_pronunciation(name_b_)),
@@ -255,10 +275,11 @@ def build_row(row: dict, image_row: dict | None, model: Distinctiveness) -> dict
 
 
 def build_features(label_rows: list[dict], image_rows: list[dict], *,
-                   model: Distinctiveness | None = None) -> list[dict]:
+                   model: Distinctiveness | None = None,
+                   rounds: dict[str, str] | None = None) -> list[dict]:
     model = model or load_distinctiveness()
     by_key, by_case = image_index(image_rows)
-    return [build_row(row, find_image_row(row, by_key, by_case), model)
+    return [build_row(row, find_image_row(row, by_key, by_case), model, rounds)
             for row in target_rows(label_rows)]
 
 
@@ -541,6 +562,7 @@ def summarize(features: list[dict]) -> dict:
             axis: sum(1 for f in features if f[axis] and f[axis] != f[f"{axis}_d"])
             for axis in ("x1", "x2_text", "x3")
         },
+        "회차": _count(features, "회차"),
         "종류": _count(features, "종류"), "상표유형": _count(features, "상표유형"),
         "상표유형_출처": _count(features, "상표유형_출처"),
         "판단축_출처": _count(features, "판단축_출처"),
@@ -561,7 +583,9 @@ def run(labels_path: Path, image_pairs_path: Path, out_path: Path, *,
     model = model or load_distinctiveness()
     label_rows = read_csv(labels_path)
     image_rows = read_csv(image_pairs_path) if Path(image_pairs_path).exists() else []
-    features = build_features(label_rows, image_rows, model=model)
+    queue_path = Path(labels_path).with_name(DEFAULT_QUEUE_NAME)
+    rounds = label_rounds(read_csv(queue_path)) if queue_path.exists() else {}
+    features = build_features(label_rows, image_rows, model=model, rounds=rounds)
     write_csv(out_path, features)
     report = summarize(features)
     report["식별력"] = {"theta": model.theta, "theta_a": model.theta_a, "theta_n": model.theta_n,
