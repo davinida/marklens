@@ -340,3 +340,10 @@ image_key 와 색인 authoritative key 가 같아야 하므로, 운영 반영은
   (출원인 검색 기반이라 무작위 표본이 아님 — 처음 붙인 "무작위 표본"을 `--replace` 로 고침)으로 표시하고 메타 →
   authoritative keys(metadata_sha256) → manifest(source.sha256) 해시를 갱신했다(FAISS·이미지·generation 그대로, 엔진
   manifest 검증 통과). 표시 전 사본은 `~/marklens-archive/famous-brands-backup-20261119/`.
+- 운영 승격(2026-11-19, `chore/promote-famous-brands`): `promote_file_staging --staging ml/data/staging/famous_brands.json
+  --plan`(신규 283·그대로 0·이미지 복사 283·병합 후 1,383) → `--apply`(40초 — 이미지 검증 복사·메타 원자 병합·authoritative
+  keys → `build_index.py` 원자 publish, generation `20261119T111642Z-3b0759a08391`, 1,383 벡터·미등재 이미지 0, dirty marker
+  해제) → `precompute_types.py`(1,383건 결합 1,246·도형 137; 새 283건 결합 253·도형 30 전부 상표구분 근거, OCR 폴백 0; 기존
+  1,100건 유형 변화 0). 메타·keys·색인·색인 메타·이미지·manifest 1,383 일치, 해시 연결 메타 → keys → manifest 일치, 엔진
+  manifest 검증 통과. 이 Mac 은 파일 모드라 `migrate_json_to_db` 는 하지 않았다(DB 모드 배포 때 먼저 실행).
+  승격 전 운영 파일 사본 `~/marklens-archive/db-before-promote-2026-11-19/`(색인 6파일·메타·types.json).
