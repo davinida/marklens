@@ -152,3 +152,59 @@ def test_missing_key_reports_config_error(data, monkeypatch, capsys):
     assert gb.main(["run", "--all"]) == 2
     assert "KIPRIS_ACCESS_KEY" in capsys.readouterr().err
     gb.check_chain()  # 아무것도 쓰지 않았다
+
+
+def test_mark_source_labels_missing_records_and_rechains_hashes(data, capsys):
+    """mark-source: 수집_출처가 없는 레코드에만 표시하고 메타 → keys → manifest 해시를 잇는다."""
+    tmp_path, calls = data
+    assert gb.main(["mark-source", "--label", "무작위 표본"]) == 0
+    records = _meta(tmp_path)["trademarks"]
+    assert {r["수집_출처"] for r in records} == {"무작위 표본"}
+    assert b"\r\n" in (tmp_path / "kipris_metadata.json").read_bytes()  # 형식 그대로
+    gb.check_chain()
+    assert calls == [] and "4건 표시" in capsys.readouterr().out
+    before = (tmp_path / "kipris_metadata.json").read_bytes()
+    assert gb.main(["mark-source", "--label", "다른 값"]) == 0  # 이미 있으면 바꾸지 않는다
+    assert (tmp_path / "kipris_metadata.json").read_bytes() == before
+    # --replace: 지정한 이전 값만 새 값으로(다른 값은 그대로)
+    assert gb.main(["mark-source", "--label", "기존 수집", "--replace", "무작위 표본"]) == 0
+    assert {r["수집_출처"] for r in _meta(tmp_path)["trademarks"]} == {"기존 수집"}
+    gb.check_chain()
+
+
+def test_staging_target_fills_codes_and_chains_to_staging_keys(data, monkeypatch, capsys):
+    """--staging: 스테이징 메타의 빈 유사군을 채우고 스테이징 keys 의 metadata_sha256 만 잇는다
+    (운영 메타·manifest 는 그대로)."""
+    tmp_path, calls = data
+    production = (tmp_path / "kipris_metadata.json").read_bytes()
+    manifest = (tmp_path / "kipris_manifest.json").read_bytes()
+    stage = tmp_path / "staging" / "famous.json"
+    collect._atomic_write_json(stage, {"dataset_info": {}, "trademarks": [  # noqa: SLF001
+        {**_record("4020200000003", [25]), "수집_출처": "유명 브랜드"}]})
+    collect._atomic_write_json(collect.staging_authoritative_path(stage), {  # noqa: SLF001
+        "schema_version": 1, "metadata_sha256": collect._sha256_file(stage),  # noqa: SLF001
+        "image_keys": []})
+    assert gb.main(["status", "--staging", str(stage)]) == 0
+    assert "수집 출처: 유명 브랜드 1" in capsys.readouterr().out
+    assert gb.main(["run", "--all", "--staging", str(stage), "--max-calls", "5"]) == 0
+    assert calls == ["4020200000003"]
+    assert json.loads(stage.read_text("utf-8"))["trademarks"][0]["유사군"] == ["G2701", "G4503"]
+    keys = json.loads(collect.staging_authoritative_path(stage).read_text("utf-8"))
+    assert keys["metadata_sha256"] == collect._sha256_file(stage)  # noqa: SLF001
+    assert (tmp_path / "kipris_metadata.json").read_bytes() == production
+    assert (tmp_path / "kipris_manifest.json").read_bytes() == manifest
+
+
+def test_plan_key_env_and_counter_use_per_key_counter(data, monkeypatch, capsys):
+    """plan --key-env·--counter: 키는 환경변수에서만, 예산은 그 키 전용 카운터로(호출 0)."""
+    tmp_path, calls = data
+    monkeypatch.setattr(kc, "ACCESS_KEY", "")
+    monkeypatch.setenv("TEST_TEAM_KEY", "secret-value-9")
+    own = tmp_path / "jiwon" / "kipris_call_count.json"
+    own.parent.mkdir()
+    own.write_text(json.dumps({kc.limiter._month_key(): 148}), "utf-8")  # noqa: SLF001
+    assert gb.main(["plan", "--all", "--key-env", "TEST_TEAM_KEY", "--counter", str(own)]) == 0
+    out = capsys.readouterr().out
+    assert kc.ACCESS_KEY == "secret-value-9" and "secret" not in out
+    assert f"카운터 {own} — 이번 달 148/950회" in out
+    assert calls == []

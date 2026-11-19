@@ -435,15 +435,38 @@ def goods_index(goods_map) -> tuple[GoodsNameIndex, dict[str, frozenset[int]]]:
     )
 
 
+FAMOUS_TOKEN_SECTION = "[식별력 토큰]"
+
+
+def famous_token_lines(text: str) -> list[str]:
+    """famous_brands.txt 에서 유명 브랜드 토큰을 뽑을 줄.
+
+    절 머리(`[…]` 한 줄)가 있는 파일(2026-11-19 확정본: [브랜드] 표 + [식별력 토큰])은
+    [식별력 토큰] 절만 읽는다 — 수집용 브랜드 표를 바꿔도 식별력 출력이 바뀌지 않게.
+    절 머리가 없는 옛 형식은 주석이 아닌 모든 줄. 줄 끝 ' # 주석'은 뗀다."""
+    section: str | None = None
+    sectioned = False
+    lines: list[tuple[str | None, str]] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        line = re.sub(r"\s+#.*$", "", line).strip()
+        if line.startswith("[") and line.endswith("]"):
+            section, sectioned = line, True
+            continue
+        lines.append((section, line))
+    if sectioned:
+        return [line for name, line in lines if name == FAMOUS_TOKEN_SECTION]
+    return [line for _, line in lines]
+
+
 def famous_tokens(path: Path | None = DEFAULT_FAMOUS_PATH) -> frozenset[str]:
     """유명 브랜드 토큰: 브랜드표 키·값 + famous_brands.txt 출원인명의 상호 핵심 토큰(첫 토큰,
-    회사 형태·국적 표기는 건너뜀)."""
+    회사 형태·국적 표기는 건너뜀). 읽는 줄은 famous_token_lines."""
     tokens: set[str] = set(KOREAN_BRAND_ROMANIZATION) | set(KOREAN_BRAND_ROMANIZATION.values())
     if path is not None and Path(path).exists():
-        for line in Path(path).read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
+        for line in famous_token_lines(Path(path).read_text(encoding="utf-8")):
             core = [t for t in normalize_name(line) if t not in _FAMOUS_SKIP and len(t) >= 2]
             if core:
                 tokens.add(core[0])

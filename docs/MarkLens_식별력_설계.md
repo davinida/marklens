@@ -175,7 +175,7 @@
 
 ## 5. 유명 브랜드 예외·3호 확장 슬롯
 
-- 유명 브랜드: `famous_tokens()` = `korean_brands.KOREAN_BRAND_ROMANIZATION` 키·값(101) + `shared/famous_brands.txt`(DRAFT 39개 출원인명 + 2026-10-11 브랜드 토큰 줄 4: 갤럭시·GALAXY·오리온·ORION — 주지·저명 상표의 호칭, 한글·영문을 줄 하나씩) 각 줄을 X1 정규화한 첫 토큰(회사 형태·국적·법인 표기 토큰은 `_FAMOUS_SKIP` 으로 건너뜀) → 235개. 목록 파일이 바뀌면 다음 적재 때 반영된다. 유명 브랜드 토큰은 다수 등록·일반어 계수와 무관하게 1.0 이다(삼성·현대처럼 A 가 큰 하우스마크 보호). 브랜드 토큰 줄은 출원인명이 아니므로 `collect_pipeline --applicants-file` 에는 쓰지 않는다(파일 주석).
+- 유명 브랜드: `famous_tokens()` = `korean_brands.KOREAN_BRAND_ROMANIZATION` 키·값(101) + `shared/famous_brands.txt`(DRAFT 39개 출원인명 + 2026-10-11 브랜드 토큰 줄 4: 갤럭시·GALAXY·오리온·ORION — 주지·저명 상표의 호칭, 한글·영문을 줄 하나씩) 각 줄을 X1 정규화한 첫 토큰(회사 형태·국적·법인 표기 토큰은 `_FAMOUS_SKIP` 으로 건너뜀) → 235개. 목록 파일이 바뀌면 다음 적재 때 반영된다. 2026-11-19 확정본부터 파일은 `[브랜드]` 표(수집용) + `[식별력 토큰]` 절로 나뉘고 `famous_token_lines` 가 토큰 절만 읽는다 — 토큰 절은 2026-10-12 목록 그대로라 토큰은 257개 그대로다(브랜드 표를 바꿔도 식별력 출력은 그대로, 새 목록에 맞출지는 재학습 때 결정; 절 머리가 없는 옛 형식은 주석 아닌 모든 줄). 유명 브랜드 토큰은 다수 등록·일반어 계수와 무관하게 1.0 이다(삼성·현대처럼 A 가 큰 하우스마크 보호). 브랜드 토큰 줄은 출원인명이 아니므로 `collect_pipeline --applicants-file` 에는 쓰지 않는다(파일 주석).
 - 3호: v0.1 부터 `shared/distinctiveness/descriptive_terms.json` 을 적재한다(§3-3). 항목 `DescriptiveTerm(kind, absolute, classes, note, approved)`, 세부 유형 `DESCRIPTIVE_KINDS`(산지·품질·원재료·효능·용도·수량·형상·가격·생산방법·가공방법·사용방법·시기). 2026-10-11 사람 승인 완료(449항목: 승인 437·해제 12, 미승인 0) — 해제(`rejected`) 항목은 로더가 건너뛴다.
 - 사람 검토 제외(`weak_token_overrides.json`): v0.2 부터 법정 사유(1·3·4·5·6호) 뒤에서 통계 약화만 건너뛴다(§2 2-1).
 
