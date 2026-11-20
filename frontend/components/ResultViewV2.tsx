@@ -9,7 +9,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { imageUrl } from "@/lib/api";
-import type { SearchV2Candidate, SearchV2Response } from "@/lib/contracts";
+import type { SearchV2Candidate, SearchV2Grade, SearchV2Response } from "@/lib/contracts";
 // v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
 import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/ResultView";
 
@@ -82,7 +82,91 @@ const RULE_TRIGGER_TEXT: Record<string, string> = {
   standalone_x2_text: "철자가 매우 비슷해 검토 권장으로 올렸습니다",
   standalone_x3: "뜻이 매우 비슷해 검토 권장으로 올렸습니다",
   figure_x2_img: "도형이 매우 비슷해 검토 권장으로 올렸습니다(검증 데이터 부족, 참고용)",
+  nameless_floor: "도형으로 고친 질의라 로고만으로 본 판단의 등급을 썼습니다",
+  goods_floor: "업종이 겹쳐 로고만으로 본 등급을 유지했어요",
 };
+
+// API 계약 v2 §2-5 FIGURE_LOW_DATA·§4-5 — 후보 카드의 도형 참고 문구(응답 caveat 과 같은 문장)
+const FIGURE_CAVEAT_TEXT =
+  "로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요";
+// API 계약 v2 §4-4 — 이름 없는 질의 안내
+const NAMELESS_GUIDANCE = "상표명·업종을 넣으면 더 정확하게 판단해요";
+
+// 이름 없는 판단 = risk.pattern(또는 overall.pattern)이 "noname:" 으로 시작(계약 v2 §2-2). 요청에
+// 이름을 넣었는지와 상관없이 응답의 계수 집합으로 판별한다 — 이름 있는 질의도 이름 없는 후보와는
+// 이름 없는 판단이 된다. 이름 있는·없는 판단은 위험도 % 눈금이 달라 %를 보이지 않는다.
+const NAMELESS_PREFIX = "noname:";
+
+type GradeCuts = { 주의: number | null; "검토 권장": number | null; 위험: number | null };
+
+export function isNamelessPattern(pattern: string | null | undefined): boolean {
+  return typeof pattern === "string" && pattern.startsWith(NAMELESS_PREFIX);
+}
+
+/** 그 판단의 등급 하한 — 이름 없는 판단은 meta.thresholds.nameless[pattern], 그 밖은 grade. */
+export function thresholdsFor(
+  meta: SearchV2Response["meta"],
+  pattern: string | null | undefined,
+): GradeCuts {
+  if (isNamelessPattern(pattern)) {
+    const cuts = meta.thresholds.nameless[pattern as string];
+    if (cuts) return cuts;
+  }
+  return meta.thresholds.grade;
+}
+
+const SCALE_GRADES: SearchV2Grade[] = ["안전", "주의", "검토 권장", "위험"];
+
+/** 등급 눈금(§4-4) — 구간 폭은 그 판단의 하한. 하한이 null 인 등급은 위험도로는 닿지 않아 구간이
+ *  없다. 이름 있는 판단만 위험도 위치(표식)를 보인다. */
+function GradeScale({
+  cuts,
+  grade,
+  prob,
+}: {
+  cuts: GradeCuts;
+  grade: SearchV2Grade;
+  prob: number | null;
+}) {
+  const bands: { grade: SearchV2Grade; start: number; end: number }[] = [];
+  let start = 0;
+  let current: SearchV2Grade = "안전";
+  for (const next of SCALE_GRADES.slice(1)) {
+    const cut = cuts[next as keyof GradeCuts];
+    if (cut === null) continue;
+    bands.push({ grade: current, start, end: cut });
+    start = cut;
+    current = next;
+  }
+  bands.push({ grade: current, start, end: 1 });
+  const label = bands.map((band) => band.grade).join(" · ");
+  return (
+    <div data-testid="grade-scale" className="relative mt-2 h-2 w-full max-w-[240px]">
+      <div
+        className="flex h-full w-full overflow-hidden rounded-full"
+        role="img"
+        aria-label={`등급 눈금: ${label}${grade ? ` — 지금 ${grade}` : ""}`}
+      >
+        {bands.map((band) => (
+          <span
+            key={band.grade}
+            data-grade={band.grade}
+            className={`h-full ${GRADE_VIEW[band.grade].bar} ${band.grade === grade ? "" : "opacity-30"}`}
+            style={{ width: `${Math.max(0, band.end - band.start) * 100}%` }}
+          />
+        ))}
+      </div>
+      {prob !== null && (
+        <span
+          data-testid="grade-scale-marker"
+          aria-hidden
+          className="absolute -top-0.5 h-3 w-0.5 rounded-full bg-ink"
+          style={{ left: `${Math.min(1, Math.max(0, prob)) * 100}%` }}
+        />
+      )}
+    </div>
+  );
+}
 
 const SIDE_LABEL: Record<"query" | "candidate" | "both", string> = {
   query: "입력",
@@ -280,15 +364,19 @@ function CandidateCard({
   candidate,
   hasQueryName,
   gradePrecision,
+  cuts,
 }: {
   candidate: SearchV2Candidate;
   hasQueryName: boolean;
   /** meta.grade_precision — "위험" 등급 카드 옆 "검증 데이터 기준 10건 중 N건"(§4-3, 상수 금지). */
   gradePrecision: number;
+  /** 이 판단의 등급 하한(thresholdsFor) — 눈금용. */
+  cuts: GradeCuts;
 }) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
   const view = GRADE_VIEW[candidate.risk.grade];
+  const nameless = isNamelessPattern(candidate.risk.pattern);
   const name = candidate.title ?? "이름 미등록 상표";
   const sentences = buildSalientSentences(candidate.salient, hasQueryName);
   // §4-2: 제외 사유 원문(removed[].reason 그대로)은 툴팁과 "자세히" 토글로
@@ -338,7 +426,7 @@ function CandidateCard({
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${view.pill}`}>
               {candidate.risk.grade}
             </span>
-            {candidate.risk.grade === "위험" && (
+            {candidate.risk.grade === "위험" && !nameless && (
               <span className="tnum text-[10px] text-sub">
                 검증 데이터 기준 10건 중 {Math.round(gradePrecision * 10)}건
               </span>
@@ -361,7 +449,18 @@ function CandidateCard({
               className="aspect-square w-full max-w-[168px] rounded-sm border border-line"
             />
             <div className="min-w-0">
-              <h4 className="text-[11px] font-semibold text-sub">등급 근거 축</h4>
+              <GradeScale
+                cuts={cuts}
+                grade={candidate.risk.grade}
+                prob={nameless ? null : candidate.risk.prob}
+              />
+              {nameless && (
+                <p className="mt-1.5 text-[10.5px] text-sub" data-testid="nameless-judgment">
+                  이름 없이 로고{candidate.axes.x4 !== null ? "·지정상품" : ""}만으로 본 판단이라
+                  위험도 %는 보이지 않아요
+                </p>
+              )}
+              <h4 className="mt-3 text-[11px] font-semibold text-sub">등급 근거 축</h4>
               <div className="mt-2">
                 <ContributionBars risk={candidate.risk} />
               </div>
@@ -407,7 +506,7 @@ function CandidateCard({
               )}
               {candidate.risk.figure_caveat && (
                 <p className="mt-3 rounded-sm bg-low-bg px-2.5 py-1.5 text-[10.5px] font-semibold text-sub">
-                  도형 유사는 검증 데이터가 적어 참고용
+                  {FIGURE_CAVEAT_TEXT}
                 </p>
               )}
               {candidate.goods.codes.length > 0 && (
@@ -445,7 +544,9 @@ export default function ResultViewV2({
 }) {
   const { overall, candidates, meta } = result;
   const view = overall.grade ? GRADE_VIEW[overall.grade] : null;
-  const showPrecision = overall.grade === "위험";
+  // 전체 등급이 이름 없는 판단에서 나왔으면 전체 위험도 %·정밀도 문구를 숨긴다(§4-3·§4-4)
+  const overallNameless = isNamelessPattern(overall.pattern);
+  const showPrecision = overall.grade === "위험" && !overallNameless;
   // "결합-문자요부"·"결합-도형요부" 는 사용자에게는 "결합"으로 보여 주고, 고치기 버튼도 그 기준으로 제외한다.
   const displayType = overall.query_type.type.startsWith("결합") ? "결합" : overall.query_type.type;
 
@@ -471,7 +572,7 @@ export default function ResultViewV2({
                   >
                     {overall.grade}
                   </span>
-                  {overall.prob !== null && (
+                  {overall.prob !== null && !overallNameless && (
                     <span
                       data-testid="overall-prob"
                       className={`tnum text-[13px] font-extrabold ${view!.text}`}
@@ -480,7 +581,17 @@ export default function ResultViewV2({
                     </span>
                   )}
                 </span>
+                <GradeScale
+                  cuts={thresholdsFor(meta, overall.pattern)}
+                  grade={overall.grade}
+                  prob={overallNameless ? null : overall.prob}
+                />
                 <p className={`mt-2 text-[13px] font-semibold ${view!.text}`}>{view!.description}</p>
+                {!queryHasName && (
+                  <p data-testid="nameless-guidance" className="mt-1 text-[11.5px] text-sub">
+                    {NAMELESS_GUIDANCE}
+                  </p>
+                )}
                 {showPrecision && (
                   <p className="mt-1 text-[11.5px] text-sub">
                     &apos;위험&apos;으로 분류된 상표 쌍은 검증 데이터 기준 10건 중{" "}
@@ -565,6 +676,7 @@ export default function ResultViewV2({
                 candidate={candidate}
                 hasQueryName={queryHasName}
                 gradePrecision={meta.grade_precision}
+                cuts={thresholdsFor(meta, candidate.risk.pattern)}
               />
             ))}
           </ul>

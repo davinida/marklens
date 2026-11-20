@@ -76,8 +76,10 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.3"
+    assert ms.state.model["version"] == "risk_model_v1.4"  # 서비스 기본 모델(2026-11-20)
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
+    # 가짜 ML 은 사진 판정을 끈다(임베딩이 의미 없음)
+    assert ms.state.goods_ignored == 0 and ms.state.photo_direction is None
 
 
 def test_name_only(client, ocr_on):
@@ -136,18 +138,21 @@ def test_image_only_uses_fake_ocr_and_figure_rule(client, ocr_on):
     top = data["candidates"][0]
     assert top["id"] == "4020210000001" and top["axes"]["x2_img"] == 1.0
     assert top["risk"]["figure_caveat"] is True
-    assert top["risk"]["rule_triggers"] == ["figure_x2_img"] and top["risk"]["grade"] == "검토 권장"
+    # 이미지가 같으면(1.0) 이름 없는 판단 p 0.634 ≥ 위험 하한 0.5724(v1.4, 설계 §7-4-4) — 도형
+    # 규칙도 걸린다
+    assert top["risk"]["rule_triggers"] == ["figure_x2_img"] and top["risk"]["grade"] == "위험"
+    assert top["risk"]["pattern"] == "noname:x2_whole" == data["overall"]["pattern"]
     for candidate in data["candidates"]:
         assert all(candidate["axes"][key] is None for key in ("x1", "x2_text", "x3", "x4"))
         assert candidate["salient"]["query_tokens"] == [] and candidate["salient"]["removed"] == []
-        # 도형계 이미지만 → 결측 패턴 x2_whole 의 계수 집합(설계 §7-3):
+        # 도형계 이미지만 → 이름 없는 계수 집합 noname:x2_whole(설계 §7-4):
         # X2 = (x2_whole + x2_whole×도형계)·x2_img
-        block = ms.state.model["patterns"]["x2_whole"]["coefficients"]
+        block = ms.state.model["nameless_patterns"]["x2_whole"]["coefficients"]
         expected = (block["x2_whole"] + block["x2_whole×도형계"]) * candidate["axes"]["x2_img"]
         assert candidate["risk"]["contributions"]["X2"] == pytest.approx(expected, abs=1e-3)
-        assert candidate["risk"]["missing_adjustment"] == pytest.approx(
-            ms.state.model["patterns"]["x2_whole"]["intercept"] - ms.state.model["intercept"],
-            abs=1e-3)
+        assert candidate["risk"]["missing_adjustment"] == pytest.approx(  # 그 집합 절편 − 기준 절편
+            ms.state.model["nameless_patterns"]["x2_whole"]["intercept"]
+            - ms.state.model["intercept"], abs=1e-3)
         _assert_logit(candidate, ms.state.model["intercept"])
     x2 = [c["axes"]["x2_img"] for c in data["candidates"]]
     assert x2 == sorted(x2, reverse=True)  # 동점 p 는 x2_img 내림차순
@@ -258,8 +263,9 @@ def test_caveat_texts_match_contract_table():
     assert table["X3_DISABLED"] == ms.CAVEAT_X3_DISABLED
     suggested = ms.CAVEAT_NAME_SUGGESTED.format(text="BLU")
     assert table["NAME_SUGGESTED"].replace("{텍스트}", "BLU") == suggested
-    coverage = ms.CAVEAT_GOODS_COVERAGE.format(with_goods="100", total="1,100")
+    coverage = ms.CAVEAT_GOODS_COVERAGE.format(with_goods="{보유}", total="{전체}")
     assert table["GOODS_COVERAGE"] == coverage
+    assert table["PHOTO_QUERY"] == ms.CAVEAT_PHOTO_QUERY
     assert table["OCR_FALLBACK"].replace("{도형|문자}(으)로", "도형으로") == (
         ms.CAVEAT_OCR_FALLBACK.format(type="도형", ro="으로")
     )
@@ -416,7 +422,7 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     from src.axes.x2_ortho import orthographic_similarity
 
     query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
-    assert ms.state.model["version"] == "risk_model_v1.3"
+    assert ms.state.model["version"] == "risk_model_v1.4"
     results = {}
     for version in (1, 2):
         monkeypatch.setattr(ms.state, "model", _spelling_model(version))
@@ -440,3 +446,140 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     top = default["candidates"][0]
     assert top["axes"]["x2_text"] == 1.0
     assert "standalone_x2_text" in top["risk"]["rule_triggers"]
+
+
+def _ranked(pattern: str, prob: float, *, grade: str, x2_img: float | None, appno: str,
+            model: dict) -> ms.CandidateResult:
+    return ms.CandidateResult(
+        id=appno, title=None, image_url=None, type=None, applicant=None, nice_classes=(),
+        axes={"x1": None, "x2_text": None, "x2_img": x2_img, "x3": None, "x4": None},
+        prob=prob, grade=grade, contributions={}, missing_adjustment=0.0, figure_caveat=False,
+        rule_triggers=(), query_tokens=(), candidate_tokens=(), removed=(), goods_codes=(),
+        jaccard=None, pattern=pattern, rank=ms.rank_position(prob, model, pattern))
+
+
+@pytest.mark.parametrize("pattern", ["x2_whole+x4", "x4", "base", "noname:x2_whole",
+                                     "noname:x2_whole+x4"])
+def test_same_basis_order_equals_risk_order(pattern):
+    """같은 계수 집합만 있는 응답은 예전 정렬(위험도 내림차순 → x2_img → 출원번호)과 같다 — 단독·
+    도형 규칙으로 표시 등급만 올라간 후보도 p 자리에 둔다(정렬 키는 p 로 정한 등급·등급 안 위치)."""
+    import random
+
+    from src.model import risk_model as rm
+
+    model = rm.load_model()
+    cuts = [value for value in rm.grade_thresholds_for(model, pattern).values() if value]
+    rng = random.Random(7)
+    for _ in range(50):
+        values = [rng.random() for _ in range(25)]
+        values += [cut + delta for cut in cuts for delta in (-1e-7, 0.0, 1e-7)]  # 경계·동점
+        values += values[:3]  # p 가 똑같은 후보 → x2_img·출원번호로
+        candidates = []
+        for i, prob in enumerate(values):
+            grade = rm.grade_for(prob, rm.grade_thresholds_for(model, pattern))
+            if rng.random() < 0.3:  # 단독·도형 규칙으로 표시 등급만 올라간 후보
+                grade = rm.GRADES[max(rm.GRADES.index(grade), 2)]
+            x2_img = None if rng.random() < 0.2 else round(rng.random(), 4)
+            candidates.append(_ranked(pattern, prob, grade=grade, x2_img=x2_img,
+                                      appno=f"40{i:011d}", model=model))
+        old = sorted(candidates, key=lambda c: (
+            -round(c.prob, 6), -(c.axes["x2_img"] if c.axes["x2_img"] is not None else -1.0),
+            c.id))
+        assert [c.id for c in sorted(candidates, key=ms._candidate_sort_key)] == [
+            c.id for c in old]
+
+
+def test_mixed_basis_orders_by_grade_position_not_raw_risk():
+    """이름 있는 판단과 이름 없는 판단이 섞이면 p 대신 (p 로 정한 등급, 등급 안 위치)로 견준다 —
+    이름 있는 "검토 권장" 바로 위 후보가 이름 없는 "주의" 맨 위 후보보다 앞(p 는 반대일 수 있다)."""
+    from src.model import risk_model as rm
+
+    model = rm.load_model()
+    named = rm.grade_thresholds_for(model, "x2_whole+x4")
+    nameless = rm.grade_thresholds_for(model, "noname:x2_whole")
+    assert nameless["주의"] is not None
+    top_of_caution = (nameless["검토 권장"] or 1.0) - 0.001
+    first = _ranked("x2_whole+x4", named["검토 권장"] + 0.001, grade="검토 권장", x2_img=0.5,
+                    appno="4000000000001", model=model)
+    second = _ranked("noname:x2_whole", top_of_caution, grade="주의", x2_img=0.9,
+                     appno="4000000000002", model=model)
+    assert first.rank[0] == 2 and second.rank[0] == 1
+    ordered = sorted([second, first], key=ms._candidate_sort_key)
+    assert [c.id for c in ordered] == ["4000000000001", "4000000000002"]
+    assert second.prob > first.prob  # 위험도만으로 줄 세우면 반대 순서
+
+
+def test_type_override_figure_uses_higher_nameless_grade(client, ocr_on):
+    """유형을 도형계로 고친 질의(이름 + 이미지)는 이름을 뺀 판단의 등급이 더 높으면 그쪽을 쓴다
+    (계약 v2 §2-4 6항, rule_triggers 에 nameless_floor). 자동 유형(이름 있으면 문자계)에는 없다."""
+    data = engine.multi_search(image=_image(), name="블루커피", type_override="도형",
+                               top_k=9).to_dict()
+    assert data["overall"]["query_type"] == {**data["overall"]["query_type"], "type": "도형",
+                                              "source": "user"}
+    top = data["candidates"][0]
+    assert top["axes"]["x2_img"] == 1.0  # 가짜 CLIP — 1번 레코드와 같은 이미지
+    assert "nameless_floor" in top["risk"]["rule_triggers"]
+    assert top["risk"]["pattern"] == "noname:x2_whole" and top["risk"]["grade"] == "위험"
+    assert top["axes"]["x1"] is not None  # 표시 축은 그대로(이름 축도 계산했다)
+    for candidate in data["candidates"]:
+        if "nameless_floor" in candidate["risk"]["rule_triggers"]:
+            assert candidate["risk"]["pattern"].startswith("noname:")
+        else:
+            assert not candidate["risk"]["pattern"].startswith("noname:")
+    auto = engine.multi_search(image=_image(), name="블루커피", top_k=9).to_dict()
+    assert auto["overall"]["query_type"]["source"] != "user"
+    assert all("nameless_floor" not in c["risk"]["rule_triggers"] for c in auto["candidates"])
+    assert all(not c["risk"]["pattern"].startswith("noname:") for c in auto["candidates"])
+
+
+def test_goods_floor_boundary_on_shipped_model():
+    """업종 하한(계약 v2 §2-4 8항): 이름 없는 이미지+상품 판단은 상품 겹침 x4 가 결합 하한(0.0252)
+    이상이면 상품을 가린 이미지만 판단과 견줘 등급이 높은 쪽 — 하한 바로 아래면 그대로."""
+    from src.model import risk_model as rm
+
+    model = rm.load_model()
+    assert ms.goods_floor_value(model) == 0.0252
+    base = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x2_whole": 1.0,
+            "has_meaning_both": False, "has_distinctive_part_a": True,
+            "has_distinctive_part_b": True, "mark_type": "도형"}
+    at, at_rank = ms._nameless_judgment({**base, "x4": 0.0252}, model, "도형")
+    assert at.result.pattern == "noname:x2_whole" and at.result.grade == "위험"
+    assert at.triggers == ("figure_x2_img", "goods_floor")
+    plain = rm.risk_score({**base, "x4": 0.0252}, model)  # 이미지+상품 판단만이면 검토 권장
+    assert plain.pattern == "noname:x2_whole+x4" and plain.grade == "검토 권장"
+    assert at_rank == max(at.rank, ms.rank_position(plain.prob, model, plain.pattern))
+    below, _ = ms._nameless_judgment({**base, "x4": 0.0251}, model, "도형")
+    assert below.result.pattern == "noname:x2_whole+x4" and below.result.grade == "검토 권장"
+    assert "goods_floor" not in below.triggers
+    # 겹침이 크면 이미지+상품 판단이 이미 더 높거나 같다 — 같으면 이미지+상품 쪽
+    high, _ = ms._nameless_judgment({**base, "x4": 1.0}, model, "도형")
+    assert high.result.pattern == "noname:x2_whole+x4" and high.result.grade == "위험"
+    assert "goods_floor" not in high.triggers
+
+
+def _goods_for_jaccard(denominator: int) -> list[str]:
+    """가짜 DB 레코드의 유사군은 {S0101} — 질의 유사군을 S0101 + (denominator − 1)개로 주면
+    자카드 = 1 / denominator."""
+    return ["S0101"] + [f"G{index:04d}" for index in range(1, denominator)]
+
+
+def test_goods_floor_in_engine_and_with_nameless_floor(client, ocr_on):
+    """이미지+상품 이름 없는 질의 — 겹침 1/39(0.0256 ≥ 0.0252)면 goods_floor, 1/40(0.025)면 그대로.
+    유형을 도형으로 고친 질의의 이름 없는 판단도 업종 하한을 적용한 뒤의 판단이다."""
+    applied = engine.multi_search(image=_image(), goods_codes=_goods_for_jaccard(39),
+                                  top_k=3).to_dict()
+    top = applied["candidates"][0]
+    assert top["axes"]["x2_img"] == 1.0 and top["axes"]["x4"] == 0.0256  # 표시 축은 관측값 그대로
+    assert "goods_floor" in top["risk"]["rule_triggers"]
+    assert top["risk"]["pattern"] == "noname:x2_whole" and top["risk"]["grade"] == "위험"
+    assert top["risk"]["contributions"]["X4"] == 0.0  # 기여도는 쓰인 판단(이미지만)의 것
+    kept = engine.multi_search(image=_image(), goods_codes=_goods_for_jaccard(40),
+                               top_k=3).to_dict()
+    top = kept["candidates"][0]
+    assert top["axes"]["x4"] == 0.025 and "goods_floor" not in top["risk"]["rule_triggers"]
+    assert top["risk"]["pattern"] == "noname:x2_whole+x4" and top["risk"]["grade"] == "검토 권장"
+    both = engine.multi_search(image=_image(), name="블루커피", type_override="도형",
+                               goods_codes=_goods_for_jaccard(39), top_k=3).to_dict()
+    top = both["candidates"][0]
+    assert {"goods_floor", "nameless_floor"} <= set(top["risk"]["rule_triggers"])
+    assert top["risk"]["pattern"] == "noname:x2_whole" and top["risk"]["grade"] == "위험"

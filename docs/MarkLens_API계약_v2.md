@@ -1,13 +1,14 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
-- 기준일: 2026-10-24 · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1~E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+- 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1~E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
-  §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
+  §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약)·§7-4(v1.4 이름 없는 계수 집합, §7-4-4 실제 검색 기준 하한), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
   README "다음 단계"(서비스 연결 범위).
 - 코드 근거(2026-10-24 현재): 런타임 `ml/src/model/risk_model.py`(`risk_score → RiskResult(prob, grade, contributions, figure_caveat)`),
-  계수 `shared/model/risk_model_v1.json`(version `risk_model_v1.3`), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
+  계수 `shared/model/risk_model_v1.4.json`(version `risk_model_v1.4`, 2026-11-20 부터 — 이름 있는 판단은 v1.3 `risk_model_v1.json` 과 같음), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
   `pair_generic`·`judge`), 축 함수 X1 `phonetic_similarity`·X2 철자 `orthographic_similarity`·X3 `semantic_similarity`·X4
   `goods_similarity`, 프론트-6 선택 지정상품 `frontend/lib/goods.ts`(`SelectedGood`·`goodsCodeUnion`).
 - §3 의 숫자는 위 코드로 **실제 계산한 값**이다(모델 한계도 그대로 드러난다 — §3-2, §5-3).
@@ -61,15 +62,21 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 | 입력 | 계산되는 축 | 후보 풀(합집합, 출원번호로 중복 제거) | `query_type.source` |
 |---|---|---|---|
-| 이미지만 | `x2_img` | CLIP 코사인 상위 20(v1 `scoring_k`) | `ocr`(도형계: 글자 영역 ≥ 0.05 면 결합-도형요부, 읽은 글자는 `suggested_name`; 실패 시 `fallback` → 도형) |
+| 이미지만 | `x2_img` | CLIP 코사인 상위 20(v1 `scoring_k`) | `ocr`(도형계: 글자 영역 ≥ 0.05 면 결합-도형요부, 읽은 글자는 `suggested_name`; 실패 시 `fallback` → 도형). 이름 없는 판단(`risk.pattern` `noname:x2_whole`, v1.4) |
+| 이미지 + 지정상품 | `x2_img`·`x4` | 위 ∪ 유사군이 겹치는 DB 상표 상위 20 | 위와 같음. 이름 없는 판단(`noname:x2_whole+x4`) |
 | 이름만 | `x1`·`x2_text`·`x3`(게이트) | 발음 상위 20 ∪ 철자 상위 20 ∪ 관념 상위 5(하한 0.55) | `fallback` → 문자 |
 | 이름 + 지정상품 | 위 + `x4` | 위 ∪ 유사군이 겹치는 DB 상표 상위 20(자카드 순) | `fallback` → 문자 |
-| 이미지 + 이름(+ 지정상품) | 전부 | 위 전부 | `ocr`(fig_ratio 로 문자/결합-문자요부 — 이름이 있으면 항상 문자계; 실패 시 `fallback` → 문자) |
+| 이미지 + 이름(+ 지정상품) | 전부 | 위 전부 | `ocr`(fig_ratio 로 문자/결합-문자요부 — 이름이 있으면 항상 문자계; 실패 시 `fallback` → 문자). 질의 이미지가 사진이면 이름 있는 판단의 `x2_img` 를 관측 없음으로(§2-4 7항) |
 | 지정상품만 | `x4` | 유사군이 겹치는 DB 상표 상위 20 | `fallback` → 문자 (caveat `GOODS_ONLY`) |
 
 후보 풀의 크기는 `meta.pool` 로 돌려준다. 풀을 합친 뒤 후보마다 축을 계산하고(§2-2 `axes`), `risk_score` 로 위험도를 낸 다음
-**위험도 내림차순**(동점은 `x2_img` 내림차순 → 출원번호 오름차순 — 이미지만 넣으면 p 가 모두 같아 시각 유사가 순서를 정한다)으로
-정렬해 `top_k` 개를 돌려준다. 정렬 기준은 CLIP 유사도가 아니라 `risk.prob` 다. 발음·철자 풀은 유사도 0 인 후보를 넣지 않는다.
+**정렬 위치 내림차순**(동점은 `x2_img` 내림차순 → 출원번호 오름차순)으로 정렬해 `top_k` 개를 돌려준다. 정렬 위치 = (위험도 p 로
+정한 등급, 그 등급 안 위치 (p − 그 등급 하한) ÷ (다음 하한 − 그 등급 하한)) — 하한은 그 판단의 계수 집합 것(이름 없는 판단은
+`meta.thresholds.nameless[pattern]`). 같은 계수 집합만 있는 응답에서는 **위험도 내림차순과 같다**(2026-11-20 전 정렬과 같음 —
+엔진 테스트로 고정). 이름 있는 판단과 이름 없는 판단(이름 없는 후보·`nameless_floor`·`goods_floor`)이 섞이면 위험도 눈금이 달라
+p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameless_floor`·`goods_floor` 비교)는 그 가운데 높은 위치에 둔다. 단독·도형
+규칙으로 표시 등급만 올라간 후보도 p 자리에 둔다. 정렬 기준은 CLIP 유사도가 아니다. 발음·철자 풀은
+유사도 0 인 후보를 넣지 않는다.
 
 ## 2. 응답 스키마
 
@@ -81,10 +88,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `research_beta` | `true` | 아니오 | v1 과 같음 |
 | `legal_conclusion` | `false` | 아니오 | 법적 판단이 아님 |
 | `overall` | object | 아니오 | §2-1 |
-| `candidates` | array | 아니오(빈 배열 가능) | §2-2, 위험도 내림차순 |
+| `candidates` | array | 아니오(빈 배열 가능) | §2-2, 정렬 위치 내림차순(§1-3) |
 | `meta` | object | 아니오 | §2-3 |
 | `dataset_info` | object | 아니오 | v1 과 같음(`총_상표수`·`출원일자_범위`·`데이터_기준`·`생성일자`) |
-| `index_size` | int | 아니오 | 비교 대상 DB 레코드 수(현재 1,100) |
+| `index_size` | int | 아니오 | 비교 대상 DB 레코드 수(현재 1,383) |
 | `top_k_requested` / `top_k_returned` | int | 아니오 | 요청·반환 수 |
 
 ### 2-1. `overall`
@@ -92,13 +99,14 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | 필드 | 형식 | null | 뜻 |
 |---|---|---|---|
 | `grade` | `"안전"` \| `"주의"` \| `"검토 권장"` \| `"위험"` | 후보 0건이면 null | 후보 중 **가장 높은 등급**(규칙 하한 적용 뒤). 등급 순서는 안전 < 주의 < 검토 권장 < 위험 |
-| `prob` | 0~1 | 후보 0건이면 null | 후보 `risk.prob` 의 최댓값(소수 3자리) |
+| `prob` | 0~1 | 후보 0건이면 null | 전체 등급을 정한 판단과 **같은 종류**(이름 있는·없는)인 후보 `risk.prob` 의 최댓값(소수 3자리) — 두 종류는 위험도 눈금이 달라 섞지 않는다. 화면은 `pattern` 이 이름 없는 판단이면 이 값을 보이지 않는다(§4-4) |
+| `pattern` | string | 후보 0건이면 null | 전체 등급을 정한 판단(정렬 순서로 그 등급의 첫 후보)의 계수 집합 — `risk.pattern` 과 같은 값. `noname:` 으로 시작하면 이름 없는 판단 |
 | `caveats` | string[] | 아니오(빈 배열 가능) | 사용자에게 **그대로** 보여 줄 주의 문구. 문구는 §2-5 표의 것만 쓴다(프론트가 문자열 비교로 아이콘을 고를 수 있게) |
 | `query_type.type` | `"문자"` \| `"도형"` \| `"결합-문자요부"` \| `"결합-도형요부"` | 아니오 | 모델이 쓴 유형(교호작용 `x1×문자계`·`x2_img×도형계` 와 도형 규칙의 기준). **이름이 있으면 항상 문자계**, 도형계는 이름 없는 이미지 질의·사용자 선택만(§2-4 5항) |
 | `query_type.suggested_name` | string | 읽은 글자가 없으면 null(이름이 있거나 이미지가 없으면 항상 null) | 이름 없는 이미지 질의에서 OCR 이 읽은 글자(확신도 ≥ 0.5 박스만, 읽기 순서, 최대 60자). 화면이 "상표명으로 넣기"를 제안하고 사용자 확인 뒤 `name` 으로 재요청한다(이 요청에서 이름 축은 계산하지 않음 — 토큰 1회용) |
 | `query_type.source` | `"ocr"` \| `"fallback"` \| `"user"` | 아니오 | `ocr` 이미지 글자 면적으로 판정, `fallback` OCR 없음·실패라 입력 구성으로 정함, `user` `type_override` |
 | `query_type.detail` | `{ "text_ratio": 0~1, "fig_ratio": 0~1 }` | `ocr` 가 아니면 null | OCR 글자 박스 면적 비율·글자를 지운 뒤 남은 면적 비율(판정 근거, 디버그·툴팁용) |
-| `visual_status` | v1 `status_code`(`STRONG_MATCH`…`NO_CLOSE_MATCH`) | 이미지가 없으면 null | **제안(선택)**: 이미지 입력에 대한 v1 시각 4상태(임계 0.75/0.55/0.45). 모델이 도형계에서 CLIP 효과를 0 으로 학습해(§3-2) 이미지만 넣으면 `prob` 가 0.02 안팎이므로, 화면이 시각 유사 자체를 계속 보여 주기 위해 둔다. 받아들이지 않으면 필드를 뺀다 |
+| `visual_status` | v1 `status_code`(`STRONG_MATCH`…`NO_CLOSE_MATCH`) | 이미지가 없으면 null | **제안(선택)**: 이미지 입력에 대한 v1 시각 4상태(임계 0.75/0.55/0.45). v1.3 까지는 이미지만 넣으면 `prob` 가 0.02~0.06 이라 화면이 시각 유사 자체를 보여 주려고 두었다. v1.4 는 이름 없는 계수 집합으로 이미지 유사도가 등급에 들어가지만 이 4상태는 그대로 둔다 |
 
 ### 2-2. `candidates[]`
 
@@ -112,43 +120,53 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 | `nice_classes` | int[] | 아니오(빈 배열 가능) | **제안(선택)**: 류(v1 `류`) |
 | `axes.x1` | 0~1 | 이름 없음·어느 쪽이든 호칭 없음(`has_pronunciation` false)이면 null | X1 호칭 `phonetic_similarity(query, title, extra_generic=removed)` — 학습의 `x1_d` |
 | `axes.x2_text` | 0~1 | 이름 없음·어느 쪽이든 글자 토큰 없음(`has_spelling` false)이면 null | X2 철자 `orthographic_similarity(…, extra_generic=removed)` — `x2_text_d` |
-| `axes.x2_img` | 0~1 | 이미지 없음·후보 이미지 없음이면 null | X2 전체 이미지 CLIP 코사인(v1 `similarity`, 음수는 0 으로 자른다) — `x2_whole` |
+| `axes.x2_img` | 0~1 | 이미지 없음·후보 이미지 없음, 그리고 사진 질의의 이름 있는 판단(§2-4 7항)이면 null | X2 전체 이미지 CLIP 코사인(v1 `similarity`, 음수는 0 으로 자른다) — `x2_whole`. 모델에 들어간 값 그대로 |
 | `axes.x3` | 0~1 | 이름 없음·어느 쪽이든 관념 없음(`has_meaning` false — 조어·기호)이면 null | X3 관념 `semantic_similarity(…, extra_generic=removed)` — `x3_d`. 두 이름 모두 사전어가 있어야 값이 있다(게이트) |
 | `axes.x4` | 0~1 | `goods_codes` 없음·후보에 유사군 없음이면 null | X4 `goods_similarity(goods_codes, candidate.goods.codes)` 자카드 |
-| `risk.prob` | 0~1 | 아니오 | 통합 모델 위험도(소수 3자리). v1.3: null 인 이미지·상품 축은 지시변수가 아니라 **결측 패턴별 계수 집합**으로 — 관측된 축 조합(base / x2_whole / x4 / x2_whole+x4)마다 계수·절편이 따로 있고 런타임이 입력에 맞는 집합을 고른다(설계 §7-3). 관념 축이 null 이면 값 0 |
+| `risk.prob` | 0~1 | 아니오 | 통합 모델 위험도(소수 3자리). 이름 있는 판단(v1.3 그대로): null 인 이미지·상품 축은 지시변수가 아니라 **결측 패턴별 계수 집합**으로 — 관측된 축 조합(base / x2_whole / x4 / x2_whole+x4)마다 계수·절편이 따로 있고 런타임이 입력에 맞는 집합을 고른다(설계 §7-3). 관념 축이 null 이면 값 0. 이름 없는 판단(v1.4, 설계 §7-4): 호칭·철자가 둘 다 결측이고 이미지가 있으면 이름 없는 계수 집합(`noname:x2_whole`·`noname:x2_whole+x4`) — 위험도 눈금이 이름 있는 판단과 달라 등급은 그 집합의 하한으로 매긴다 |
 | `risk.grade` | 4등급 | 아니오 | §2-4 규칙 적용 뒤 등급 |
 | `risk.contributions` | `{ "X1": n, "X2": n, "X3": n, "X4": n, "요부": n }` | 아니오 | 축별 **로짓 기여도**(계수×값, 양·음 가능). 점수 항만 모은다 — `x1`·`x1×문자계`·`x1×요부없음` → X1, `x2_text`·`x2_img`·`x2_img×도형계` → X2, `x3` → X3, `x4` → X4, `any_no_distinctive` → 요부. 결측 보정(`miss_pattern`)은 넣지 않는다(아래 `missing_adjustment`). 런타임 `axis_contributions()` 는 결측 항을 포함하므로 엔진이 `miss_` 항을 떼어 낸다 |
 | `risk.missing_adjustment` | number | 아니오 | 결측 패턴 절편 보정 = 쓰인 패턴의 절편 − 기준 절편(기준 = 이미지·상품 모두 관측한 패턴 `x2_whole+x4`, 절편 -3.4712). v1.3 패턴 절편: base -3.6361·x2_whole -3.8103·x4 -3.4535 → 보정 -0.165·-0.339·0.018·0(음수 가능, 결측 지시변수 아님). `intercept(-3.4712) + Σcontributions + missing_adjustment = logit(prob)` 가 성립해야 한다(엔진 테스트 조건; §3 예시는 소수 3자리로 반올림했으므로 되계산한 p 는 ±0.001 안) |
 | `risk.figure_caveat` | bool | 아니오 | 유형이 도형계(도형·결합-도형요부)면 true — `RiskResult.figure_caveat` |
-| `risk.rule_triggers` | string[] | 아니오(빈 배열 가능) | 등급 하한을 "검토 권장"으로 올린 규칙: `standalone_x1`(x1 ≥ 0.98), `standalone_x2_text`(≥ 0.75), `standalone_x3`(≥ 0.7707), `figure_x2_img`(도형계이고 x2_img ≥ 0.9). `x2_img`·`x4` 의 단독 임계값은 null(비활성)이라 없다. 규칙이 걸려도 `prob` 는 바뀌지 않는다 |
+| `risk.rule_triggers` | string[] | 아니오(빈 배열 가능) | 등급 하한을 "검토 권장"으로 올린 규칙: `standalone_x1`(x1 ≥ 0.98), `standalone_x2_text`(≥ 0.75), `standalone_x3`(≥ 0.7707), `figure_x2_img`(도형계이고 x2_img ≥ 0.9). `x2_img`·`x4` 의 단독 임계값은 null(비활성)이라 없다. 규칙이 걸려도 `prob` 는 바뀌지 않는다. `nameless_floor`(v1.4): 유형을 도형계로 고친 질의(`type_override`)에서 이름 없는 판단의 등급이 더 높아 그쪽을 썼다(§2-4 6항 — 이때 `prob`·기여도·`pattern` 은 이름 없는 판단의 것). `goods_floor`(v1.4): 이름 없는 이미지+상품 판단에서 상품 겹침이 결합 하한 이상이라 상품을 가린 이미지만 판단과 견줘 그 등급이 더 높아 그쪽을 썼다(§2-4 8항 — `prob`·기여도·`pattern`(`noname:x2_whole`)·등급 눈금은 이미지만 판단의 것, `axes.x4` 는 관측값 그대로). 값은 자유 문자열 목록이다(스키마는 열거하지 않는다) |
+| `risk.pattern` | string | 아니오 | 쓰인 계수 집합: 이름 있는 판단 `base`·`x2_whole`·`x4`·`x2_whole+x4`, 이름 없는 판단 `noname:x2_whole`·`noname:x2_whole+x4`. 이름 있는 질의도 상표명이 없는 후보(순수 도형)와는 이름 없는 판단이 된다 — 화면은 요청 상태가 아니라 이 값으로 판별한다(§4-4) |
 | `salient.query_tokens` | string[] | 아니오 | 입력 상표명의 **요부 후보**(식별력 점수 ≥ θ 0.5, 이름 순서, NFKC·소문자 정규화). 이름이 없으면 빈 배열. 비어 있고 이름이 있으면 "요부 없음 → 전체 대비"(2000후2453) |
 | `salient.candidate_tokens` | string[] | 아니오 | 후보 상표명의 요부 후보(같은 규칙) |
 | `salient.removed[]` | `{ "token": s, "reason": s, "side": "query" \| "candidate" \| "both" }` | 아니오(빈 배열 가능) | 이 쌍의 비교에서 **실제로 뺀 토큰**(`pair_generic(query, title, goods_codes)` 결과)과 판정 사유(`judge().reasons` 를 `·` 로 이음: `1호 보통명칭`, `3호 기술적 표장:원재료(류 30,35,43)`, `4호 지명`, `5호 흔한 성`, `6호 간단 표장`, `일반어(zipf 4.6)`, `다수 등록(A=53, N=54)`). 결합 규칙 v0.2·v0.3 이 요부로 되돌린 토큰은 여기 없다(비교에 쓰였으므로) |
-| `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`). DB 보유 1,100/1,100 건(2026-11-02) — 없으면 빈 배열이고 `x4` 는 null |
+| `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`) — 형식(G/S + 숫자 4~6자리)에 맞는 코드만(수집 원본의 형식이 다른 코드는 무시, 2026-11-20 기준 7건 108개). DB 보유 1,383/1,383건 — 없으면 빈 배열이고 `x4` 는 null |
 | `goods.jaccard` | 0~1 | `x4` 와 같은 조건으로 null | `axes.x4` 와 같은 값(지정상품 요약 영역용 중복 제공) |
 
 ### 2-3. `meta`
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.3"` |
+| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4"`(2026-11-20 부터; 이름 있는 판단의 계수·하한은 v1.3 그대로) |
 | `grade_precision` | 0~1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF, 행마다 자기 결측 패턴)에서 "위험"으로 분류된 152쌍 중 심결이 유사로 본 107쌍 → 0.7039 ≈ **0.70**(v1.3, 설계 §7-3; v1.2.1 은 159쌍 중 109 → 0.6855). 엔진은 JSON `meta.grade_precision` 을 읽는다(E-6) |
-| `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 }` | 등급 하한 p(JSON `grade_thresholds`, v1.3). 안전은 0~0.0902 |
+| `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 }` | **이름 있는 판단**의 등급 하한 p(JSON `grade_thresholds`, v1.3 그대로). 안전은 0~0.0902. 위험 0.5902 는 "정밀도 0.8 이상인 가장 낮은 p(지지 30)" 규칙이 미달해 쓴 대체값(검토 권장 하한과 1.0 의 중간) |
+| `thresholds.nameless` | `{ "noname:x2_whole": { "주의": 0.3677, "검토 권장": 0.491, "위험": 0.5724 }, "noname:x2_whole+x4": { "주의": 0.2944, "검토 권장": 0.4441, "위험": 0.7892 } }` | **이름 없는 판단**의 계수 집합(`risk.pattern`)별 등급 하한(JSON `nameless_patterns[키].grade_thresholds`). null 인 등급은 위험도로는 닿지 않는다. 값과 산출 방법은 §2-4 2항 |
 | `thresholds.standalone` | `{ "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null }` | 단독 임계값 τ(JSON `standalone_thresholds`, 정밀도 ≥ 0.7 지점). null 은 비활성 |
 | `thresholds.figure` | 0.9 | 도형 규칙 τ(JSON `figure_rule.threshold`, 미검증) |
 | `pool` | `{ "image": n, "phonetic": n, "spelling": n, "semantic": n, "goods": n, "total": n }` | 후보 풀 크기(§1-3). 입력이 없는 축은 0 |
 | `elapsed_ms` | int | 서버 처리 시간(임베딩·축 계산·모델 포함, 네트워크 제외) |
 
 임계값은 **응답의 `meta.thresholds` 가 단일 소스**다. 프론트는 상수를 두지 않고 이 값으로 등급 경계·바 눈금을 그린다(v1 `grade.thresholds` 와
-같은 원칙).
+같은 원칙). 판단마다 그 판단의 하한을 쓴다 — `risk.pattern`(전체는 `overall.pattern`)이 `noname:` 이면 `thresholds.nameless[pattern]`,
+그 밖은 `thresholds.grade`.
 
 ### 2-4. 등급 규칙(요약 — 정본은 통합 모델 설계 §7-2)
 
 1. `prob = sigmoid(intercept + Σ 계수×값)`. 계수 집합은 입력의 결측 패턴(이미지 유무 × 상품 유무, v1.3 §7-3)에 따라 넷 중 하나 —
    관측된 축만 입력에 있고 결측 지시변수는 없다(관념 축이 null 이면 값 0). 축 하나를 하한값(현실 분포 비유사 쌍 평균: 이미지
    0.3487·상품 0.0252) 이상으로 더 관측하면 `prob` 는 내려가지 않는다(결합 제약, 적재 때 검증). 유형은 `overall.query_type.type`
-   하나를 쌍 전체에 쓴다(학습이 이 사건 표장의 유형으로 했으므로).
-2. `grade` 는 `meta.thresholds.grade` 의 하한으로 — 0.5902 이상 위험, 0.1805 이상 검토 권장, 0.0902 이상 주의, 그 아래 안전(v1.3).
+   하나를 쌍 전체에 쓴다(학습이 이 사건 표장의 유형으로 했으므로). v1.4: 호칭·철자가 둘 다 결측이고 이미지가 있으면 이름 없는
+   계수 집합(이미지만 `noname:x2_whole` / 이미지+상품 `noname:x2_whole+x4`, 설계 §7-4) — 이름 없는 입력에 후보와 같은 이름을
+   더하면 위험도가 내려가지 않는다(결합 제약 `same_name`, 적재 때 검증).
+2. `grade` 는 그 판단의 하한으로. 이름 있는 판단은 `meta.thresholds.grade` — 0.5902 이상 위험, 0.1805 이상 검토 권장, 0.0902
+   이상 주의, 그 아래 안전(v1.3 그대로; 위험은 정밀도 0.8 목표 미달 대체값). 이름 없는 판단은
+   `meta.thresholds.nameless[pattern]` — 실제 검색 기준(2026-11-20, 설계 §7-4-4): 심사를 거치지 않은 표장(정답 데이터의
+   거절결정불복 출원 표장·권리범위확인 확인대상표장 중 DB 에 없는 것)으로 검색한 후보 쌍에서, 이름 없는 판단이 그 등급 이상인
+   비율이 같은 쌍을 이름을 알고 채점했을 때 그 등급 이상인 비율과 같아지는 위험도 — 이미지만 0.3677 / 0.491 / 0.5724(이미지
+   유사도로 0.558 / 0.763 / 0.896), 이미지+상품 0.2944 / 0.4441 / 0.7892. null 인 등급은 위험도로는 닿지 않는다(지금은 없음).
 3. **단독 규칙**(97후3050 후단): 어느 축이든 τ 이상이면 등급 하한 "검토 권장"(자동 "위험" 아님) → `rule_triggers`.
 4. **도형 규칙**(미검증 제품 규칙): 도형계 유형이면 `figure_caveat = true` + `caveats` 에 도형 문구, `x2_img ≥ 0.9` 면 등급 하한 "검토 권장".
 5. 유형 규칙(2026-10-24 개정 — OCR 은 유형의 최종 결정자가 아니라 이름이 없을 때 글자를 찾아 주는 도우미):
@@ -171,18 +189,34 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
      실제 x2_img 0.36 의 기여(+0.08, 1.0 이어도 +0.21)보다 큰 v1.2.1 모델 성질이었다 → **통합 모델 v1.3(2026-10-25, 설계
      §7-3)** 이 결측 지시변수를 결측 패턴별 계수 집합 + 결합 제약으로 바꿔 닫았다: 같은 쌍 이름만 p 0.530, 셋 다(x2_img 0.36)
      0.531 — 입력을 더 주면 위험도가 내려가지 않는다(둘 다 검토 권장; 위험 하한 0.5902).
+6. **이름 없는 판단과 견주기**(v1.4, 2026-11-20): `type_override` 로 유형을 도형계로 고친 질의에 이름과 이미지가 있으면, 후보마다
+   이름 있는 판단과 **같은 입력에서 이름을 뺀 판단**(이름 없는 계수 집합)의 등급을 견주어 높은 쪽을 쓴다(같으면 이름 있는 쪽).
+   이름 없는 쪽이 쓰이면 `rule_triggers` 에 `nameless_floor`, `prob`·기여도·`pattern` 은 그쪽 것. 이름을 뺀 판단은 8항(업종 하한)을
+   적용한 뒤의 판단이다. 자동 유형(이름이 있으면 문자계)에는 적용하지 않는다 — 사용자가 "도형이 요부"라고 고친 경우에만 로고만의 판단이
+   등급을 끌어올릴 수 있다.
+7. **사진 질의**(v1.4): 질의 이미지가 사진(실물·간판·장면)으로 판정되면(`src.photo_mark` — CLIP 임베딩의 사진·그래픽 방향,
+   학습 특징의 사진 판정과 같음) caveat `PHOTO_QUERY`. 이름 있는 판단은 이미지 축을 관측 없음으로 계산한다(학습에서 사진 쌍의
+   이미지를 뺀 것과 같게 — `axes.x2_img` null). 이름 없는 판단은 계산을 바꾸지 않는다(이미지밖에 없으므로). 판정은 질의 쪽만
+   한다(DB 등록 상표 1,383건 중 사진 판정 24건 = 1.7%, X2 설계 §7.6).
+8. **업종 하한**(v1.4, 2026-11-20, `goods_floor`): 이름 없는 이미지+상품 판단(`noname:x2_whole+x4` — 이름 없는 질의, 이름 있는 질의의
+   상표명 없는 후보, 6항의 이름을 뺀 판단)은 후보의 상품 겹침 `x4` 가 결합 하한(`coupling.floors.x4` = 0.0252, v1.3 JSON 그대로)
+   이상이면 상품을 가린 이미지만 판단(`noname:x2_whole`)으로도 채점해 등급이 높은 쪽을 쓴다(같으면 이미지+상품 쪽). 겹침이 하한
+   아래면 그대로 둔다 — 업종이 다르면 등급이 내려가도 된다. 이유: 이름 없는 하한을 방식마다 실제 검색에서 맞춰 이미지+상품의 위험
+   하한(0.7892)이 이미지만(0.5724)보다 높아, 같은 로고에 업종이 조금 겹치는 업종 세트를 더하면 위험도는 오르는데(결합 제약) 등급은
+   위험 → 검토 권장으로 내려갔다(설계 §7-4-4). 이미지만 쪽이 쓰이면 `rule_triggers` 에 `goods_floor`.
 
 ### 2-5. `caveats` 문구 표(응답은 문구 문자열만 싣는다)
 
 | 코드(구현 참고) | 문구(그대로) | 언제 |
 |---|---|---|
-| `FIGURE_LOW_DATA` | 도형 유사는 검증 데이터가 적어 참고용 | `query_type.type` 이 도형계(JSON `figure_rule.caveat` 와 같은 문자열) |
+| `FIGURE_LOW_DATA` | 로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요 | `query_type.type` 이 도형계(JSON `figure_rule.caveat` 와 같은 문자열 — v1.4 JSON 부터. v1.3 JSON 은 "도형 유사는 검증 데이터가 적어 참고용") |
+| `PHOTO_QUERY` | 사진으로 보여요 — 로고 파일을 올리면 외관 비교가 더 정확해요 | 질의 이미지가 사진으로 판정됨(§2-4 7항) |
 | `NO_IMAGE` | 이미지가 없어 외관(이미지) 축은 비교하지 않았습니다 | `image` 없음 |
 | `NO_NAME` | 상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다 | `name` 없음 |
 | `NO_PRONUNCIATION` | 입력 상표명에 호칭이 없어(기호·한자만) 호칭 축은 비교하지 않았습니다 | `name` 은 있으나 `has_pronunciation` false |
 | `NO_MEANING` | 입력 상표명에 사전적 의미가 없어(조어) 관념 축은 비교하지 않았습니다 | `name` 은 있으나 `has_meaning` false |
 | `NO_GOODS` | 지정상품이 없어 상품 견련성은 비교하지 않았습니다 | `goods_codes` 없음 |
-| `GOODS_COVERAGE` | 비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다 | `goods_codes` 있음(수치는 유사군 보유 수·`index_size` 로 서버가 채움 — 2026-11-02 백필 뒤 1,100/1,100. 아래 §3-1 예시는 백필 전 값) |
+| `GOODS_COVERAGE` | 비교 대상 중 지정상품 정보가 있는 상표는 {보유}/{전체}건입니다 | `goods_codes` 있음 **그리고** 유사군 보유 수 < `index_size`(전건 보유면 내지 않는다 — 지금 1,383/1,383 이라 나오지 않음). 수치는 서버가 채움 |
 | `GOODS_ONLY` | 지정상품만으로는 유사군이 겹치는 상표를 나열할 뿐 표장 유사는 비교하지 않았습니다 | 지정상품만 입력 |
 | `OCR_FALLBACK` | 이미지에서 글자를 읽지 못해 유형을 {도형\|문자}(으)로 두었습니다. 아니면 유형을 고쳐 주세요 | `image` 있고 `source = fallback` |
 | `NO_CANDIDATES` | 비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다 | `candidates` 0건 |
@@ -191,9 +225,10 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 ## 3. 예시 JSON
 
-두 예시 모두 2026-10-25 현재 코드로 계산한 값이다(식별력 v0.3, X1 v1.6, X2 철자, X3 MiniLM 재보정, X4 자카드, 모델 v1.3 — 축
-값은 2026-10-24 와 같고 `risk.*`·`meta` 만 v1.3 으로 다시 계산).
-후보의 출원번호·출원인은 가짜고 상표명·유사군만 의미가 있다. 프론트는 이 두 응답을 Vitest 픽스처로, 백엔드는 스텁 응답으로 그대로 쓴다.
+두 예시 모두 2026-11-20 현재 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,383건, 통합 모델 v1.4)이 낸 응답 그대로다
+(`engine.multi_search`, 첫 호출 준비를 한 번 한 뒤의 호출 — `elapsed_ms` 는 그때 값). `image_url` 만 브라우저 측 값(`/api/images/…`)으로
+바꿨다. 프론트는 이 두 응답을 Vitest 픽스처(`frontend/test/fixtures/search-v2-{text,image}.json`, 블록과 바이트 단위로 같음)로,
+백엔드는 스키마·키 집합 시험에 그대로 쓴다.
 
 ### 3-1. 문자상표 — 이름 "블루커피" + 카페 세트, 이미지 없음
 
@@ -201,162 +236,11 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 `name=블루커피`, `goods_codes=G0301`, `goods_codes=G0502`, `goods_codes=S120602`, `goods_codes=S2005`
 (업종 세트 "카페" = 커피전문점업 43류·커피 30류·커피 소매업 35류의 유사군 합집합).
 
-판정 흐름: 입력 토큰 `블루`(0.62 — 일반어 zipf 4.6·다수 등록 A=4, 요부 후보로 남음)·`커피`(0.0 — 1호 보통명칭·3호 기술적 표장
-원재료 → 제외). 후보 쪽에서는 `blue`(일반어·다수 등록 A=53), `cafe`(3호 용도 류 35·43)가 제외된다. 네 후보 중 위험 2·검토 권장 2.
-
-```json
-{
-  "api_version": "2026-10-24",
-  "research_beta": true,
-  "legal_conclusion": false,
-  "overall": {
-    "grade": "위험",
-    "prob": 0.604,
-    "caveats": [
-      "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
-      "비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다"
-    ],
-    "query_type": { "type": "문자", "source": "fallback", "detail": null, "suggested_name": null },
-    "visual_status": null
-  },
-  "candidates": [
-    {
-      "id": "4020230001001",
-      "title": "BLUE CAFE 블루카페",
-      "image_url": "/api/images/4020230001001.png",
-      "type": "결합",
-      "applicant": "예시 출원인 1",
-      "nice_classes": [43],
-      "axes": { "x1": 0.891, "x2_text": 0.556, "x2_img": null, "x3": 0.548, "x4": 0.25 },
-      "risk": {
-        "prob": 0.604,
-        "grade": "위험",
-        "contributions": { "X1": 3.162, "X2": 0.475, "X3": 0.0, "X4": 0.24, "요부": 0.0 },
-        "missing_adjustment": 0.018,
-        "figure_caveat": false,
-        "rule_triggers": []
-      },
-      "salient": {
-        "query_tokens": ["블루"],
-        "candidate_tokens": ["블루카페"],
-        "removed": [
-          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "query" },
-          { "token": "blue", "reason": "일반어(zipf 5.1)·다수 등록(A=53, N=54)", "side": "candidate" },
-          { "token": "cafe", "reason": "3호 기술적 표장:용도(류 35,43)", "side": "candidate" }
-        ]
-      },
-      "goods": { "codes": ["S120602"], "jaccard": 0.25 }
-    },
-    {
-      "id": "4020220000777",
-      "title": "블루보틀 BLUE BOTTLE",
-      "image_url": "/api/images/4020220000777.png",
-      "type": "결합",
-      "applicant": "예시 출원인 2",
-      "nice_classes": [30, 43],
-      "axes": { "x1": 0.673, "x2_text": 0.5, "x2_img": null, "x3": 0.52, "x4": 0.75 },
-      "risk": {
-        "prob": 0.52,
-        "grade": "검토 권장",
-        "contributions": { "X1": 2.388, "X2": 0.427, "X3": 0.0, "X4": 0.719, "요부": 0.0 },
-        "missing_adjustment": 0.018,
-        "figure_caveat": false,
-        "rule_triggers": []
-      },
-      "salient": {
-        "query_tokens": ["블루"],
-        "candidate_tokens": ["블루보틀", "bottle"],
-        "removed": [
-          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "query" },
-          { "token": "blue", "reason": "일반어(zipf 5.1)·다수 등록(A=53, N=54)", "side": "candidate" }
-        ]
-      },
-      "goods": { "codes": ["G0301", "G0502", "S120602"], "jaccard": 0.75 }
-    },
-    {
-      "id": "4020210000333",
-      "title": "블루밍 BLOOMING",
-      "image_url": null,
-      "type": "결합",
-      "applicant": "예시 출원인 3",
-      "nice_classes": [3],
-      "axes": { "x1": 0.778, "x2_text": 0.625, "x2_img": null, "x3": 0.539, "x4": 0.0 },
-      "risk": {
-        "prob": 0.46,
-        "grade": "검토 권장",
-        "contributions": { "X1": 2.761, "X2": 0.534, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": 0.018,
-        "figure_caveat": false,
-        "rule_triggers": []
-      },
-      "salient": {
-        "query_tokens": ["블루"],
-        "candidate_tokens": ["블루밍", "blooming"],
-        "removed": [
-          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "query" }
-        ]
-      },
-      "goods": { "codes": ["G1201"], "jaccard": 0.0 }
-    },
-    {
-      "id": "4020200002222",
-      "title": "레드커피",
-      "image_url": "/api/images/4020200002222.png",
-      "type": "결합",
-      "applicant": "예시 출원인 4",
-      "nice_classes": [30, 43],
-      "axes": { "x1": 0.473, "x2_text": 0.0, "x2_img": null, "x3": 0.0, "x4": 0.5 },
-      "risk": {
-        "prob": 0.215,
-        "grade": "검토 권장",
-        "contributions": { "X1": 1.679, "X2": 0.0, "X3": 0.0, "X4": 0.479, "요부": 0.0 },
-        "missing_adjustment": 0.018,
-        "figure_caveat": false,
-        "rule_triggers": []
-      },
-      "salient": {
-        "query_tokens": ["블루"],
-        "candidate_tokens": ["레드"],
-        "removed": [
-          { "token": "커피", "reason": "1호 보통명칭·3호 기술적 표장:원재료(류 30,35,43)", "side": "both" }
-        ]
-      },
-      "goods": { "codes": ["G0502", "S120602"], "jaccard": 0.5 }
-    }
-  ],
-  "meta": {
-    "model_version": "risk_model_v1.3",
-    "grade_precision": 0.7039,
-    "thresholds": {
-      "grade": { "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 },
-      "standalone": { "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null },
-      "figure": 0.9
-    },
-    "pool": { "image": 0, "phonetic": 20, "spelling": 20, "semantic": 5, "goods": 20, "total": 41 },
-    "elapsed_ms": 180
-  },
-  "dataset_info": {
-    "총_상표수": 1100,
-    "출원일자_범위": "2021-01-05 ~ 2026-08-20",
-    "데이터_기준": "KIPRIS Plus 등록상표, generation 20260827T035002Z-25f84a6eeb26",
-    "생성일자": "2026-08-27"
-  },
-  "index_size": 1100,
-  "top_k_requested": 4,
-  "top_k_returned": 4
-}
-```
-
-검산(v1.3, 이미지 없음·상품 있음 → 패턴 `x4`, 절편 -3.4535): 후보 1 의 로짓 = -3.4712(기준 절편) + 3.162 + 0.475 + 0.0 + 0.24 +
-0.018(패턴 절편 보정) = 0.424 → sigmoid 0.604. 후보 2 는 0.52 로 "위험" 하한 0.5902 아래의 "검토 권장"(v1.2.1 에서는 0.564 위험 — 결측
-지시변수 +0.5 가 빠진 만큼 내려갔다). X3 기여가 0 인 것은 v1.3 관념 계수가 0(단조 하한)이기 때문. "레드커피"는 `커피`를 양쪽에서 떼면 `블루` 대 `레드`라 철자 0·관념 0(재보정 뒤
-0 으로 잘림)이고 호칭 0.473(제거 전 전체 결합음 "블루커피/레드커피"가 X1 후보에 남아 0 이 아니다).
-
-### 3-2. 도형상표 — 이미지만, 상표명·지정상품 없음
-
-요청: `POST /api/search/v2?top_k=3`, multipart `image=<png>`. OCR 글자 면적 0.01 → 도형(`source: ocr`). 후보는 CLIP 상위 20 중 위험도
-순 3건. 호칭·철자·관념·상품 축은 전부 null 이라 패턴 `x2_whole`(절편 -3.8103)의 이미지 항만 남고(`prob` 0.06·0.053·0.043), 1위는
-`x2_img 0.93 ≥ 0.9` 도형 규칙으로 "검토 권장", 2·3위는 "안전"이다. `visual_status` 는 같은 이미지의 v1 판정(top-1 0.93 ≥ 0.75 → `STRONG_MATCH`).
+판정 흐름: 입력 토큰 `블루`는 요부 후보로 남고 `커피`(3호 기술적 표장 원재료·1호 보통명칭)는 제외된다. 이미지가 없고 상품이 있어
+이름 있는 계수 집합 `x4`(절편 -3.4535 → `missing_adjustment` 0.018)를 쓴다. 1·2위 BLU hands(같은 출원인의 두 등록)는 후보 쪽 `hands`
+(일반어·다수 등록)가 빠져 `블루` ↔ `blu` 로 비교되고 호칭 1.0·관념 0.9186 이라 단독 규칙(`standalone_x1`·`standalone_x3`)이 걸린다 —
+위험도 0.524(정밀도 0.8 목표 미달 대체값인 위험 하한 0.5902 아래)라 "검토 권장". 3·4위는 지정상품이 겹치는(자카드 0.6·0.75) 커피
+관련 상표로 위험도 0.378·0.339 "검토 권장". 유사군 보유가 1,383/1,383건이라 `GOODS_COVERAGE` 는 나오지 않는다(§2-5).
 
 ```json
 {
@@ -365,103 +249,566 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
   "legal_conclusion": false,
   "overall": {
     "grade": "검토 권장",
-    "prob": 0.06,
+    "prob": 0.524,
+    "pattern": "x4",
     "caveats": [
-      "도형 유사는 검증 데이터가 적어 참고용",
+      "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"
+    ],
+    "query_type": {
+      "type": "문자",
+      "source": "fallback",
+      "detail": null,
+      "suggested_name": null
+    },
+    "visual_status": null
+  },
+  "candidates": [
+    {
+      "id": "4020050047425",
+      "title": "BLU hands",
+      "image_url": "/api/images/4020050047425.png",
+      "type": "결합",
+      "applicant": "현대자동차주식회사",
+      "nice_classes": [
+        12
+      ],
+      "axes": {
+        "x1": 1.0,
+        "x2_text": 0.0,
+        "x2_img": null,
+        "x3": 0.9186,
+        "x4": 0.0
+      },
+      "risk": {
+        "prob": 0.524,
+        "grade": "검토 권장",
+        "contributions": {
+          "X1": 3.549,
+          "X2": 0.0,
+          "X3": 0.0,
+          "X4": 0.0,
+          "요부": 0.0
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [
+          "standalone_x1",
+          "standalone_x3"
+        ],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [
+          "블루"
+        ],
+        "candidate_tokens": [
+          "blu"
+        ],
+        "removed": [
+          {
+            "token": "커피",
+            "reason": "3호 기술적 표장:원재료(류 30,35,43)·1호 보통명칭",
+            "side": "query"
+          },
+          {
+            "token": "hands",
+            "reason": "일반어(zipf 5.2)·다수 등록(A=8, N=9)",
+            "side": "candidate"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "G3705",
+          "G3706",
+          "G370701"
+        ],
+        "jaccard": 0.0
+      }
+    },
+    {
+      "id": "4120050023092",
+      "title": "BLU hands",
+      "image_url": "/api/images/4120050023092.png",
+      "type": "결합",
+      "applicant": "현대자동차주식회사",
+      "nice_classes": [
+        35
+      ],
+      "axes": {
+        "x1": 1.0,
+        "x2_text": 0.0,
+        "x2_img": null,
+        "x3": 0.9186,
+        "x4": 0.0
+      },
+      "risk": {
+        "prob": 0.524,
+        "grade": "검토 권장",
+        "contributions": {
+          "X1": 3.549,
+          "X2": 0.0,
+          "X3": 0.0,
+          "X4": 0.0,
+          "요부": 0.0
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [
+          "standalone_x1",
+          "standalone_x3"
+        ],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [
+          "블루"
+        ],
+        "candidate_tokens": [
+          "blu"
+        ],
+        "removed": [
+          {
+            "token": "커피",
+            "reason": "3호 기술적 표장:원재료(류 30,35,43)·1호 보통명칭",
+            "side": "query"
+          },
+          {
+            "token": "hands",
+            "reason": "일반어(zipf 5.2)·다수 등록(A=8, N=9)",
+            "side": "candidate"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "S2037"
+        ],
+        "jaccard": 0.0
+      }
+    },
+    {
+      "id": "4020220160252",
+      "title": "내림 BREWING COFFEE",
+      "image_url": "/api/images/4020220160252.png",
+      "type": "결합",
+      "applicant": "박기현",
+      "nice_classes": [
+        43
+      ],
+      "axes": {
+        "x1": 0.6222,
+        "x2_text": 0.2,
+        "x2_img": null,
+        "x3": 0.0,
+        "x4": 0.6
+      },
+      "risk": {
+        "prob": 0.378,
+        "grade": "검토 권장",
+        "contributions": {
+          "X1": 2.208,
+          "X2": 0.171,
+          "X3": 0.0,
+          "X4": 0.575,
+          "요부": 0.0
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [
+          "블루"
+        ],
+        "candidate_tokens": [
+          "내림",
+          "brewing"
+        ],
+        "removed": [
+          {
+            "token": "커피",
+            "reason": "3호 기술적 표장:원재료(류 30,35,43)·1호 보통명칭",
+            "side": "query"
+          },
+          {
+            "token": "coffee",
+            "reason": "3호 기술적 표장:원재료(류 30,35,43)",
+            "side": "candidate"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "G0301",
+          "G0502",
+          "S120602",
+          "S120603"
+        ],
+        "jaccard": 0.6
+      }
+    },
+    {
+      "id": "4020240059822",
+      "title": "HELLO EGG",
+      "image_url": "/api/images/4020240059822.png",
+      "type": "결합",
+      "applicant": "이왕근",
+      "nice_classes": [
+        43
+      ],
+      "axes": {
+        "x1": 0.4,
+        "x2_text": 0.0,
+        "x2_img": null,
+        "x3": 0.0874,
+        "x4": 0.75
+      },
+      "risk": {
+        "prob": 0.339,
+        "grade": "검토 권장",
+        "contributions": {
+          "X1": 0.858,
+          "X2": 0.0,
+          "X3": 0.0,
+          "X4": 0.719,
+          "요부": 1.21
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [
+          "블루"
+        ],
+        "candidate_tokens": [],
+        "removed": [
+          {
+            "token": "커피",
+            "reason": "3호 기술적 표장:원재료(류 30,35,43)·1호 보통명칭",
+            "side": "query"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "G0301",
+          "G0502",
+          "S120602"
+        ],
+        "jaccard": 0.75
+      }
+    }
+  ],
+  "meta": {
+    "model_version": "risk_model_v1.4",
+    "grade_precision": 0.7039,
+    "thresholds": {
+      "grade": {
+        "주의": 0.0902,
+        "검토 권장": 0.1805,
+        "위험": 0.5902
+      },
+      "nameless": {
+        "noname:x2_whole": {
+          "주의": 0.3677,
+          "검토 권장": 0.491,
+          "위험": 0.5724
+        },
+        "noname:x2_whole+x4": {
+          "주의": 0.2944,
+          "검토 권장": 0.4441,
+          "위험": 0.7892
+        }
+      },
+      "standalone": {
+        "x1": 0.98,
+        "x2_text": 0.75,
+        "x2_img": null,
+        "x3": 0.7707,
+        "x4": null
+      },
+      "figure": 0.9
+    },
+    "pool": {
+      "image": 0,
+      "phonetic": 20,
+      "spelling": 20,
+      "semantic": 5,
+      "goods": 20,
+      "total": 64
+    },
+    "elapsed_ms": 139
+  },
+  "dataset_info": {
+    "총_상표수": 1383,
+    "출원일자_범위": "1962 ~ 2026",
+    "데이터_기준": "KIPRIS 등록 상태 도형·복합상표, 출원인 검색 기반 연구용 표본",
+    "생성일자": "2026-11-19"
+  },
+  "index_size": 1383,
+  "top_k_requested": 4,
+  "top_k_returned": 4
+}
+```
+
+### 3-2. 도형상표 — 이미지만, 상표명·지정상품 없음
+
+요청: `POST /api/search/v2?top_k=3`, multipart `image=<png>`(DB 도형상표 4020240111417 의 이미지를 그대로 올림). OCR 글자 면적 0.0 →
+도형(`source: ocr`). 후보는 CLIP 상위 20 중 정렬 위치 순 3건. 호칭·철자·관념·상품 축은 전부 null 이라 **이름 없는 계수 집합**
+`noname:x2_whole`(절편 -1.9187 → `missing_adjustment` 1.552, 이미지 기울기 2.1447 + ×도형계 0.3229)을 쓰고 등급은 그 집합의 하한
+(`meta.thresholds.nameless`, 주의 0.3677·검토 권장 0.491·위험 0.5724)으로 매긴다. 1위는 같은 이미지(x2_img 1.0 → 위험도 0.634 ≥
+0.5724)라 "위험" — 도형 규칙(`figure_x2_img`)도 걸린다. 2·3위(x2_img 0.647·0.645 → 0.42)는 "주의". 화면은 이 판단들이 이름 없는
+판단(`pattern` `noname:…`)이라 위험도 %를 보이지 않고 등급과 이미지 유사도를 보인다(§4-4). `visual_status` 는 같은 이미지의 v1 판정
+(top-1 1.0 ≥ 0.75 → `STRONG_MATCH`).
+
+```json
+{
+  "api_version": "2026-10-24",
+  "research_beta": true,
+  "legal_conclusion": false,
+  "overall": {
+    "grade": "위험",
+    "prob": 0.634,
+    "pattern": "noname:x2_whole",
+    "caveats": [
+      "로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요",
       "상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다",
       "지정상품이 없어 상품 견련성은 비교하지 않았습니다"
     ],
     "query_type": {
-      "type": "도형", "source": "ocr", "detail": { "text_ratio": 0.01, "fig_ratio": 0.62 }, "suggested_name": null
+      "type": "도형",
+      "source": "ocr",
+      "detail": {
+        "text_ratio": 0.0,
+        "fig_ratio": 0.717
+      },
+      "suggested_name": null
     },
     "visual_status": "STRONG_MATCH"
   },
   "candidates": [
     {
-      "id": "4020190004444",
+      "id": "4020240111417",
       "title": null,
-      "image_url": "/api/images/4020190004444.png",
+      "image_url": "/api/images/4020240111417.png",
       "type": "도형",
-      "applicant": "예시 출원인 5",
-      "nice_classes": [25],
-      "axes": { "x1": null, "x2_text": null, "x2_img": 0.93, "x3": null, "x4": null },
-      "risk": {
-        "prob": 0.06,
-        "grade": "검토 권장",
-        "contributions": { "X1": 0.0, "X2": 1.059, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": -0.339,
-        "figure_caveat": true,
-        "rule_triggers": ["figure_x2_img"]
+      "applicant": "정봉실",
+      "nice_classes": [
+        41
+      ],
+      "axes": {
+        "x1": null,
+        "x2_text": null,
+        "x2_img": 1.0,
+        "x3": null,
+        "x4": null
       },
-      "salient": { "query_tokens": [], "candidate_tokens": [], "removed": [] },
-      "goods": { "codes": [], "jaccard": null }
+      "risk": {
+        "prob": 0.634,
+        "grade": "위험",
+        "contributions": {
+          "X1": 0.0,
+          "X2": 2.468,
+          "X3": 0.0,
+          "X4": 0.0,
+          "요부": 0.0
+        },
+        "missing_adjustment": 1.552,
+        "figure_caveat": true,
+        "rule_triggers": [
+          "figure_x2_img"
+        ],
+        "pattern": "noname:x2_whole"
+      },
+      "salient": {
+        "query_tokens": [],
+        "candidate_tokens": [],
+        "removed": []
+      },
+      "goods": {
+        "codes": [
+          "G5206",
+          "S1202",
+          "S120903",
+          "S120904",
+          "S120905",
+          "S120907",
+          "S120999",
+          "S121001",
+          "S121002"
+        ],
+        "jaccard": null
+      }
     },
     {
-      "id": "4020210005555",
-      "title": "뫼비우스 MOBIUS",
-      "image_url": "/api/images/4020210005555.png",
-      "type": "결합",
-      "applicant": "예시 출원인 6",
-      "nice_classes": [9, 42],
-      "axes": { "x1": null, "x2_text": null, "x2_img": 0.81, "x3": null, "x4": null },
-      "risk": {
-        "prob": 0.053,
-        "grade": "안전",
-        "contributions": { "X1": 0.0, "X2": 0.922, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": -0.339,
-        "figure_caveat": true,
-        "rule_triggers": []
+      "id": "4020230004502",
+      "title": null,
+      "image_url": "/api/images/4020230004502.png",
+      "type": "도형",
+      "applicant": "네이버 주식회사",
+      "nice_classes": [
+        9,
+        35,
+        38,
+        42
+      ],
+      "axes": {
+        "x1": null,
+        "x2_text": null,
+        "x2_img": 0.6472,
+        "x3": null,
+        "x4": null
       },
-      "salient": { "query_tokens": [], "candidate_tokens": ["뫼비우스", "mobius"], "removed": [] },
-      "goods": { "codes": ["G390802"], "jaccard": null }
+      "risk": {
+        "prob": 0.42,
+        "grade": "주의",
+        "contributions": {
+          "X1": 0.0,
+          "X2": 1.597,
+          "X3": 0.0,
+          "X4": 0.0,
+          "요부": 0.0
+        },
+        "missing_adjustment": 1.552,
+        "figure_caveat": true,
+        "rule_triggers": [],
+        "pattern": "noname:x2_whole"
+      },
+      "salient": {
+        "query_tokens": [],
+        "candidate_tokens": [],
+        "removed": []
+      },
+      "goods": {
+        "codes": [
+          "G3402",
+          "G390701",
+          "G390702",
+          "G390799",
+          "G390802",
+          "G390803",
+          "G510101",
+          "G520101",
+          "G5206",
+          "S0101",
+          "S0601",
+          "S0701",
+          "S123101",
+          "S123301",
+          "S173599",
+          "S2034",
+          "S2039",
+          "S2051",
+          "S2052"
+        ],
+        "jaccard": null
+      }
     },
     {
-      "id": "4020220006666",
-      "title": "INFINITY",
-      "image_url": null,
-      "type": "결합",
-      "applicant": "예시 출원인 7",
-      "nice_classes": [35],
-      "axes": { "x1": null, "x2_text": null, "x2_img": 0.62, "x3": null, "x4": null },
-      "risk": {
-        "prob": 0.043,
-        "grade": "안전",
-        "contributions": { "X1": 0.0, "X2": 0.706, "X3": 0.0, "X4": 0.0, "요부": 0.0 },
-        "missing_adjustment": -0.339,
-        "figure_caveat": true,
-        "rule_triggers": []
+      "id": "4020250039189",
+      "title": null,
+      "image_url": "/api/images/4020250039189.png",
+      "type": "도형",
+      "applicant": "이현주",
+      "nice_classes": [
+        14
+      ],
+      "axes": {
+        "x1": null,
+        "x2_text": null,
+        "x2_img": 0.6453,
+        "x3": null,
+        "x4": null
       },
-      "salient": { "query_tokens": [], "candidate_tokens": ["infinity"], "removed": [] },
-      "goods": { "codes": [], "jaccard": null }
+      "risk": {
+        "prob": 0.419,
+        "grade": "주의",
+        "contributions": {
+          "X1": 0.0,
+          "X2": 1.592,
+          "X3": 0.0,
+          "X4": 0.0,
+          "요부": 0.0
+        },
+        "missing_adjustment": 1.552,
+        "figure_caveat": true,
+        "rule_triggers": [],
+        "pattern": "noname:x2_whole"
+      },
+      "salient": {
+        "query_tokens": [],
+        "candidate_tokens": [],
+        "removed": []
+      },
+      "goods": {
+        "codes": [
+          "G1810",
+          "G2601",
+          "G3002",
+          "G4401",
+          "G4402",
+          "G4509",
+          "G4510"
+        ],
+        "jaccard": null
+      }
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.3",
+    "model_version": "risk_model_v1.4",
     "grade_precision": 0.7039,
     "thresholds": {
-      "grade": { "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 },
-      "standalone": { "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null },
+      "grade": {
+        "주의": 0.0902,
+        "검토 권장": 0.1805,
+        "위험": 0.5902
+      },
+      "nameless": {
+        "noname:x2_whole": {
+          "주의": 0.3677,
+          "검토 권장": 0.491,
+          "위험": 0.5724
+        },
+        "noname:x2_whole+x4": {
+          "주의": 0.2944,
+          "검토 권장": 0.4441,
+          "위험": 0.7892
+        }
+      },
+      "standalone": {
+        "x1": 0.98,
+        "x2_text": 0.75,
+        "x2_img": null,
+        "x3": 0.7707,
+        "x4": null
+      },
       "figure": 0.9
     },
-    "pool": { "image": 20, "phonetic": 0, "spelling": 0, "semantic": 0, "goods": 0, "total": 20 },
-    "elapsed_ms": 410
+    "pool": {
+      "image": 20,
+      "phonetic": 0,
+      "spelling": 0,
+      "semantic": 0,
+      "goods": 0,
+      "total": 20
+    },
+    "elapsed_ms": 215
   },
   "dataset_info": {
-    "총_상표수": 1100,
-    "출원일자_범위": "2021-01-05 ~ 2026-08-20",
-    "데이터_기준": "KIPRIS Plus 등록상표, generation 20260827T035002Z-25f84a6eeb26",
-    "생성일자": "2026-08-27"
+    "총_상표수": 1383,
+    "출원일자_범위": "1962 ~ 2026",
+    "데이터_기준": "KIPRIS 등록 상태 도형·복합상표, 출원인 검색 기반 연구용 표본",
+    "생성일자": "2026-11-19"
   },
-  "index_size": 1100,
+  "index_size": 1383,
   "top_k_requested": 3,
   "top_k_returned": 3
 }
 ```
-
-검산(v1.3): 도형계에서 패턴 `x2_whole` 의 `x2_img` 계수 0.5 + 교호작용 `x2_img×도형계` 0.6382 → 1위 X2 = 1.059, 로짓 = -3.4712 +
--0.339(패턴 절편 보정) + 1.059 = -2.751 → 0.06. 도형계 이미지 계수는 결합 제약이 정한 값이지 심결 데이터의 증거가 아니다(설계
-§7-3 — 도형계 쌍 37 뿐, 판례 조건 (ii) 불성립 그대로). 이미지만 넣은 질의는 모델이 아니라 **도형 규칙과 `visual_status`** 로 읽어야
-하며 화면은 `axes.x2_img` 값과 caveat 를 함께 보여 준다(§4-5).
 
 ## 4. 화면 문구 규약(프론트가 그대로 구현)
 
@@ -473,7 +820,8 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 - 바 길이 = 해당 축 기여도 ÷ 양수 기여도 합(예 3-1 후보 1: X1 3.628/4.688 = 77%, X2 13%, X4 8%, X3 2%).
 - 축 값 표기는 `axes.*` 를 백분율 정수로("호칭 89%"), 바는 기여도로 — 둘을 섞지 않는다(점수가 높아도 계수가 작으면 기여도가 작다: X3).
 - `rule_triggers` 가 있으면 등급 옆에 한 줄: `standalone_x1` "호칭이 거의 같아 검토 권장으로 올렸습니다", `standalone_x2_text` "철자가
-  매우 비슷해 …", `standalone_x3` "뜻이 매우 비슷해 …", `figure_x2_img` "도형이 매우 비슷해 …(검증 데이터 부족, 참고용)".
+  매우 비슷해 …", `standalone_x3` "뜻이 매우 비슷해 …", `figure_x2_img` "도형이 매우 비슷해 …(검증 데이터 부족, 참고용)", `nameless_floor` "도형으로 고친 질의라 로고만으로 본 판단의 등급을
+  썼습니다", `goods_floor` "업종이 겹쳐 로고만으로 본 등급을 유지했어요".
 
 ### 4-2. 요부·제외 토큰(`salient`)
 
@@ -505,8 +853,8 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 - 문구: **"검증 데이터 기준 10건 중 {round(grade_precision × 10)}건"** → 0.69 → "검증 데이터 기준 10건 중 7건". 전체 문장:
   "'위험'으로 분류된 상표 쌍은 검증 데이터 기준 10건 중 7건이 심결에서 유사로 판단됐습니다".
-- 표시 위치: `overall.grade` 또는 후보 `risk.grade` 가 **"위험"** 일 때 등급 배지 옆 한 줄. 다른 등급에는 쓰지 않는다(정밀도 값이 위험
-  등급의 것이므로).
+- 표시 위치: `overall.grade` 또는 후보 `risk.grade` 가 **"위험"** 이고 **이름 있는 판단**(`pattern` 이 `noname:` 이 아님)일 때 등급 배지
+  옆 한 줄. 다른 등급·이름 없는 판단에는 쓰지 않는다(정밀도 값이 이름 있는 판단의 위험 등급 것이므로).
 - 값은 응답에서 읽는다(상수 금지). 모델이 재학습되면 숫자가 바뀐다.
 
 ### 4-4. 등급 표기
@@ -520,11 +868,19 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 `overall.grade` 가 null(후보 0건)이면 등급 배지 대신 `caveats` 의 "비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다"를 1층에 둔다.
 
+이름 없는 판단(v1.4) — `risk.pattern`(전체는 `overall.pattern`)으로 판별하고 요청 상태(이름을 넣었는지)에 기대지 않는다:
+
+- 이름 없는 판단은 **위험도 %를 보이지 않고** 등급과 이미지 유사도(`axes.x2_img`)를 보인다. 전체 등급이 이름 없는 판단에서 나왔으면
+  전체 위험도 %(`overall.prob`)도 숨긴다. 이유: 이름 있는 입력과 이름 없는 입력의 % 눈금이 달라 섞어 보면 오해한다.
+- 등급 눈금은 그 판단의 하한으로 그린다(§2-3). 이름 있는 판단만 위험도 위치 표식을 둔다.
+- 이름 없는 질의(`name` 없음)에는 1층에 한 줄: **"상표명·업종을 넣으면 더 정확하게 판단해요"**.
+
 ### 4-5. 도형 caveat·시각 상태
 
-- `risk.figure_caveat` 가 true 인 카드와 `overall` 에 "도형 유사는 검증 데이터가 적어 참고용" 배지. 이미지 입력이면 `axes.x2_img` 를
-  "이미지 유사 93%"로 항상 표시하고, `visual_status`(있으면)를 v1 과 같은 4상태 문구로 1층에 함께 둔다 — 이미지만 넣었을 때 모델
-  위험도(0.02 안팎)만 보여 주면 사용자가 "안전"으로 오독한다(§3-2).
+- `risk.figure_caveat` 가 true 인 카드와 `overall` 에 "로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요"
+  배지(§2-5 `FIGURE_LOW_DATA` 와 같은 문장). 이미지 입력이면 `axes.x2_img` 를 "이미지 유사 93%"로 항상 표시하고, `visual_status`(있으면)를
+  v1 과 같은 4상태 문구로 1층에 함께 둔다.
+- 사진 질의는 `caveats` 의 `PHOTO_QUERY` 문구("사진으로 보여요 — 로고 파일을 올리면 외관 비교가 더 정확해요")를 그대로 보인다.
 - `query_type` 은 1층에 "유형: 도형(이미지에서 판정)" 식으로 보여 주고 "유형 고치기" 버튼 → `type_override` 로 재요청(토큰 새로 발급).
   `source: fallback` 이면 caveat 의 `OCR_FALLBACK` 문구를 버튼 옆에 둔다.
 - `query_type.suggested_name` 이 있으면(이름 없는 이미지 질의) 1층에 "이미지에서 '…'를 읽었습니다" + **"상표명으로 넣기"**
@@ -553,9 +909,12 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 - 이미지·상품 축이 null 이면 모델은 그 축 없이 학습한 계수 집합(결측 패턴, v1.3 §7-3)으로 계산한다(결측은 비유사가 아니다). 축을
   하한값(현실 분포 비유사 평균) 이상으로 더 관측하면 `prob` 는 내려가지 않고, 하한 아래(비유사 평균보다 덜 비슷한 이미지·겹치지 않는
   상품)면 내려갈 수 있다 — 음의 증거. v1.2.1 의 "입력을 더 주면 내려가는" 결측 지시변수 편향은 없다.
-- 이미지만 입력하면 `prob` 는 0.05 안팎이고 등급은 도형 규칙으로만 오른다(§3-2). 지정상품만 입력하면 `x4` 뿐이라 `prob` 는 최대
-  0.08 안팎(패턴 `x4` 절편 -3.4535 + x4 0.9583) → "안전"이 상한이다. 두 경우 모두 `caveats` 로 알린다.
-- "위험" 정밀도 0.70(v1.3; v1.2.1 0.69) 은 검증 데이터(경계 사례 심결 + 쉬운 음성) 기준이며 서비스 분포의 정확도가 아니다(README "경계 사례 데이터").
+- 이미지만(또는 이미지+지정상품) 입력하면 이름 없는 계수 집합이 이미지 유사도로 위험도를 내고(v1.4, §2-4 1·2항), 등급은 그 집합의
+  하한으로 매긴다 — 같은 로고(이미지 1.0)는 0.634 로 "위험"(§3-2). v1.3 까지는 이미지만 넣으면 `prob` 0.05 안팎이라 등급이 도형 규칙으로만
+  올랐다. 지정상품만 입력하면 `x4` 뿐이라 `prob` 는 최대 0.08 안팎(패턴 `x4` 절편 -3.4535 + x4 0.9583) → "안전"이 상한이다. 두 경우 모두
+  `caveats` 로 알린다.
+- "위험" 정밀도 0.70(이름 있는 판단, v1.3; v1.2.1 0.69) 은 검증 데이터(경계 사례 심결 + 쉬운 음성) 기준이며 서비스 분포의 정확도가 아니다(README "경계 사례 데이터").
+  이름 없는 판단에는 이 정밀도 문구를 쓰지 않는다(§4-3).
 
 ### 5-4. 후보 0건
 

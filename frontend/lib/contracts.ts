@@ -157,6 +157,8 @@ export const SearchV2CandidateSchema = z
         missing_adjustment: z.number().finite(),
         figure_caveat: z.boolean(),
         rule_triggers: z.array(z.string()),
+        // 계수 집합 — "noname:…" 은 이름 없는 판단(계약 v2 §2-2; 화면은 위험도 %를 숨긴다)
+        pattern: z.string(),
       })
       .passthrough(),
     salient: z
@@ -189,6 +191,8 @@ export const SearchV2ResponseSchema = z
       .object({
         grade: SearchV2GradeSchema.nullable(),
         prob: NullableUnitScore,
+        // 전체 등급을 정한 판단의 계수 집합(후보 0건이면 null, 계약 v2 §2-1)
+        pattern: z.string().nullable(),
         caveats: z.array(z.string()),
         query_type: SearchV2QueryTypeSchema,
         visual_status: StatusCodeSchema.nullable(),
@@ -204,6 +208,17 @@ export const SearchV2ResponseSchema = z
             grade: z
               .object({ 주의: UnitScore, "검토 권장": UnitScore, 위험: UnitScore })
               .passthrough(),
+            // 이름 없는 계수 집합(risk.pattern 키)별 하한 — null 은 위험도로는 닿지 않는 등급
+            nameless: z.record(
+              z.string(),
+              z
+                .object({
+                  주의: NullableUnitScore,
+                  "검토 권장": NullableUnitScore,
+                  위험: NullableUnitScore,
+                })
+                .passthrough(),
+            ),
             standalone: z
               .object({
                 x1: NullableUnitScore,

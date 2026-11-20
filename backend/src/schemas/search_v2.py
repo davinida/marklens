@@ -29,6 +29,8 @@ class QueryType(ContractModel):
 class Overall(ContractModel):
     grade: Grade | None
     prob: Score | None
+    # 전체 등급을 정한 판단의 계수 집합("noname:…" = 이름 없는 판단 — 화면은 위험도 %를 숨긴다)
+    pattern: str | None
     caveats: list[str]
     query_type: QueryType
     visual_status: Literal[
@@ -59,6 +61,8 @@ class Risk(ContractModel):
     missing_adjustment: FiniteFloat
     figure_caveat: bool
     rule_triggers: list[str]
+    # 계수 집합: base·x2_whole·x4·x2_whole+x4(이름 있는 판단) / noname:x2_whole·noname:x2_whole+x4
+    pattern: str
 
 
 class RemovedToken(ContractModel):
@@ -97,8 +101,17 @@ class GradeThresholds(ContractModel):
     위험: Score
 
 
+class NamelessGradeThresholds(ContractModel):
+    """이름 없는 계수 집합의 등급 하한 — null 이면 위험도로는 그 등급에 닿지 않는다."""
+
+    주의: Score | None
+    검토_권장: Score | None = Field(alias="검토 권장")
+    위험: Score | None
+
+
 class Thresholds(ContractModel):
     grade: GradeThresholds
+    nameless: dict[str, NamelessGradeThresholds]  # 키 = risk.pattern("noname:…")
     standalone: Axes
     figure: Score
 

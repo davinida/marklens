@@ -1,0 +1,18 @@
+{
+  "version": "applicant_aliases_v1",
+  "purpose": "출원인 별칭 표 — 같은 회사의 표기 차이·계열사를 한 출원인으로 본다. 쓰는 곳: ml/scripts/nameless_search_thresholds.py 의 '같은 출원인(형제) 후보 빼기'(이름 없는 입력의 등급 하한, 통합 모델 설계 §7-4-4). 출원인 정규화(NFKC, '주식회사'·'(주)' 제거, 공백·문장부호 제거, 소문자) 뒤에 대조한다. 묶음 추가는 사람 결정만.",
+  "groups": [
+    {
+      "names": ["인터 이케아 시스템 비. 브이.", "인터 이케아 시스템스 비. 브이."],
+      "kind": "같은 회사 표기 차이",
+      "source": "사전 점검 ml/data/trials/nameless_search_ab_precheck.md(2026-11-20) — 표본 B 같은 이름·다른 출원인 쌍 IKEA 3쌍",
+      "decided": "사람 결정 2026-11-20"
+    },
+    {
+      "names": ["에스케이텔레콤", "에스케이텔레콤씨에스티원"],
+      "kind": "계열사",
+      "source": "사전 점검 ml/data/trials/nameless_search_ab_precheck.md(2026-11-20) — 표본 B 같은 이름·다른 출원인 쌍 T1 2쌍",
+      "decided": "사람 결정 2026-11-20"
+    }
+  ]
+}

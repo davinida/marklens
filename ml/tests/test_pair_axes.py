@@ -152,7 +152,7 @@ def test_runtime_rejects_spelling_version_mismatch(small_model):
     받는다."""
     import copy
 
-    v13 = rm.load_model()
+    v13 = rm.load_model(rm.V13_MODEL_PATH)
     assert rm.spelling_version(v13) == 1
     axes_v1 = pa.compute_pair_axes("블루커피", "레드커피", model=small_model)
     axes_v2 = pa.compute_pair_axes("블루커피", "레드커피", model=small_model, spelling_version=2)

@@ -9,6 +9,8 @@ const LOGO_PNG = Buffer.from(
 // 요청에 goods_codes 가 있으면 그 축(x4)만 채워서 돌려준다(아래 handler 가 조립).
 function buildSearchV2Result(options: { x4?: number | null; nice_classes?: number[] } = {}) {
   const x4 = options.x4 ?? null;
+  // 이름 있는 판단의 계수 집합(계약 v2 §2-2) — 이미지 없음, 상품이 있으면 x4
+  const pattern = x4 !== null ? "x4" : "base";
   return {
     api_version: "2026-10-24",
     research_beta: true,
@@ -16,6 +18,7 @@ function buildSearchV2Result(options: { x4?: number | null; nice_classes?: numbe
     overall: {
       grade: "안전",
       prob: 0.04,
+      pattern,
       caveats: ["이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"],
       query_type: { type: "문자", source: "fallback", detail: null, suggested_name: null },
       visual_status: null,
@@ -36,6 +39,7 @@ function buildSearchV2Result(options: { x4?: number | null; nice_classes?: numbe
           missing_adjustment: 0.0,
           figure_caveat: false,
           rule_triggers: [],
+          pattern,
         },
         salient: { query_tokens: [], candidate_tokens: [], removed: [] },
         goods: { codes: x4 !== null ? ["G0502"] : [], jaccard: x4 },
@@ -46,6 +50,10 @@ function buildSearchV2Result(options: { x4?: number | null; nice_classes?: numbe
       grade_precision: 0.7,
       thresholds: {
         grade: { 주의: 0.09, "검토 권장": 0.18, 위험: 0.59 },
+        nameless: {
+          "noname:x2_whole": { 주의: 0.37, "검토 권장": 0.49, 위험: 0.57 },
+          "noname:x2_whole+x4": { 주의: 0.29, "검토 권장": 0.44, 위험: 0.79 },
+        },
         standalone: { x1: 0.98, x2_text: 0.75, x2_img: null, x3: 0.77, x4: null },
         figure: 0.9,
       },

@@ -270,7 +270,9 @@ def test_versions_accepted():
     assert _model(version="risk_model_v1.1")["version"] == "risk_model_v1.1"
     assert _model(version="risk_model_v1.2")["version"] == "risk_model_v1.2"
     assert _model(version="risk_model_v1.2.1")["version"] == "risk_model_v1.2.1"
-    assert rm.MODEL_VERSION == "risk_model_v1.3"
+    assert rm.MODEL_VERSION == "risk_model_v1.4"  # 서비스 기본 모델(2026-11-20 부터)
+    assert rm.DEFAULT_MODEL_PATH == rm.V14_MODEL_PATH
+    assert rm.V13_MODEL_PATH.name == "risk_model_v1.json"
     with pytest.raises(ValueError):
         _model(version="risk_model_v2")
 
@@ -587,16 +589,16 @@ def test_v14_validate_nameless_patterns():
     # name_floors 가 없는 v1.4 JSON 은 이름 결합을 검사하지 않는다(이름 없는 패턴 사이만)
     without_floors = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
     assert without_floors and all("(이름" not in v for v in without_floors)
-    assert rm.MODEL_VERSION == "risk_model_v1.3"  # 서비스 기본 모델은 v1.3 그대로
+    assert rm.MODEL_VERSION == "risk_model_v1.4"  # 서비스 기본 모델(2026-11-20 부터 v1.4)
     assert "risk_model_v1.4" in rm.SUPPORTED_VERSIONS
 
 
 def test_shipped_v13_scores_nameless_input_with_named_pattern():
-    """서비스 기본 모델(v1.3 JSON)의 계산은 v1.4 런타임에서도 달라지지 않는다 — 이름 없는 이미지
-    질의는 이름 있는 패턴에 이름 항 0(계약 v2 §3-2)."""
-    if not rm.DEFAULT_MODEL_PATH.exists():
+    """v1.3 JSON 의 계산은 v1.4 런타임에서도 달라지지 않는다 — 이름 없는 이미지 질의는 이름 있는
+    패턴에 이름 항 0(v1.3 때의 계약 v2 §3-2)."""
+    if not rm.V13_MODEL_PATH.exists():
         pytest.skip("계수 파일 없음(학습 전)")
-    model = rm.load_model()
+    model = rm.load_model(rm.V13_MODEL_PATH)
     assert model["version"] == "risk_model_v1.3" and rm.NAMELESS_KEY not in model
     features = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x4": None, "x2_whole": 0.9,
                 "has_meaning_both": False, "has_distinctive_part_a": True,
@@ -731,17 +733,23 @@ V14_MODEL_PATH = rm.REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"
 def test_shipped_v14_adds_nameless_blocks_without_changing_named_outputs():
     """채택된 v1.4(2차 시도, 설계 §7-4): 이름 있는 4벌·등급 하한·단독 임계값·grade_precision 은 v1.3
     그대로, 이름 없는 2벌만 더했다. 서비스 기본 모델 경로는 v1.3 그대로다."""
-    if not V14_MODEL_PATH.exists() or not rm.DEFAULT_MODEL_PATH.exists():
+    if not V14_MODEL_PATH.exists() or not rm.V13_MODEL_PATH.exists():
         pytest.skip("v1.4 계수 파일 없음")
-    old = rm.load_model()
+    old = rm.load_model(rm.V13_MODEL_PATH)
     new = rm.load_model(V14_MODEL_PATH)
     assert old["version"] == "risk_model_v1.3"
-    assert rm.DEFAULT_MODEL_PATH.name == "risk_model_v1.json"
+    assert rm.DEFAULT_MODEL_PATH == V14_MODEL_PATH  # 2026-11-20 부터 서비스 기본 모델
     assert new["version"] == "risk_model_v1.4" and rm.coupling_violations(new) == []
     for key in ("patterns", "features", "coefficients", "intercept", "grade_thresholds",
-                "standalone_thresholds", "standalone_precision", "figure_rule", "pattern_axes",
+                "standalone_thresholds", "standalone_precision", "pattern_axes",
                 "reference_pattern", "prior", "monotone", "removed_terms"):
         assert new[key] == old[key], key
+    # 도형 규칙은 τ·검증 표시 그대로, 화면 문구만 서비스 문구로(2026-11-20, 계약 v2 §2-5)
+    assert {k: v for k, v in new["figure_rule"].items() if k != "caveat"} == {
+        k: v for k, v in old["figure_rule"].items() if k != "caveat"}
+    assert new["figure_rule"]["caveat"] == ("로고 파일끼리 비교한 결과예요. 도형 유사는 검증 "
+                                            "데이터가 적어 참고용이에요")
+    assert new["meta"]["figure_caveat_history"][0]["이전"] == old["figure_rule"]["caveat"]
     assert new["meta"]["grade_precision"] == old["meta"]["grade_precision"]
     assert new["coupling"]["floors"] == old["coupling"]["floors"]
     assert new["coupling"]["same_name"]["x1_d"] == new["coupling"]["same_name"]["x2_text_d"] == 1.0
@@ -797,31 +805,34 @@ def test_shipped_v14_adds_nameless_blocks_without_changing_named_outputs():
         assert result.pattern == "noname:x2_whole" and result.figure_caveat  # 참고용 표시는 그대로
         assert result.prob == pytest.approx(expected_new, abs=5e-5)
         assert rm.risk_score(features, old).prob == pytest.approx(expected_old, abs=5e-5)
-    # 이름 없는 입력의 등급 하한(§7-4-3) — 무관한 쌍이 그 등급 이상을 받는 비율을 이름 있는 입력과
-    # 맞춘 값. 위험은 두 입력 종류 모두 위험도로는 닿지 않는다(null — 이름 있는 입력에서 무관한 쌍의
-    # 위험이 0).
+    # 이름 없는 입력의 등급 하한(§7-4-4, 2026-11-20) — 실제 검색(표본 A: 심사를 거치지 않은 표장)
+    # 에서 이름 없는 판단이 그 등급 이상인 비율을 같은 쌍을 이름을 알고 채점했을 때와 맞춘 값
     assert new[rm.NAMELESS_KEY]["x2_whole"]["grade_thresholds"] == {
-        "주의": 0.279, "검토 권장": 0.4258, "위험": None}
+        "주의": 0.3677, "검토 권장": 0.491, "위험": 0.5724}
     assert new[rm.NAMELESS_KEY]["x2_whole+x4"]["grade_thresholds"] == {
-        "주의": 0.2221, "검토 권장": 0.3709, "위험": None}
+        "주의": 0.2944, "검토 권장": 0.4441, "위험": 0.7892}
     assert new["grade_thresholds"] == old["grade_thresholds"]  # 이름 있는 입력의 하한은 그대로
     assert rm.grade_thresholds_for(new, "x2_whole+x4") == old["grade_thresholds"]
-    kinds = new["meta"]["nameless"]["grade_thresholds"]["kinds"]
-    assert kinds["이미지만"]["n"] == 557 and kinds["이미지+상품"]["n"] == 449
-    for item in kinds.values():
-        for grade in ("주의", "검토 권장"):  # 무관한 쌍 수가 이름 있는 입력과 같다
-            entry = item["grades"][grade]
-            assert entry["named_at_or_above"] == entry["nameless_at_or_above"] > 0
-            assert entry["threshold"] == entry["matched"]
-        risk = item["grades"]["위험"]
-        assert risk["named_at_or_above"] == 0 and risk["threshold"] is None
+    meta = new["meta"]["nameless"]["grade_thresholds"]
+    assert meta["method"].startswith("실제 검색 기준 — 표본 A")
+    assert [entry["thresholds"] for entry in meta["history"]][0] == {  # 쉬운 음성 기준(§7-4-3)
+        "x2_whole": {"주의": 0.279, "검토 권장": 0.4258, "위험": None},
+        "x2_whole+x4": {"주의": 0.2221, "검토 권장": 0.3709, "위험": None}}
+    assert meta["history"][1]["thresholds"] is None  # 1차 시도(순서 실패 — 쓰지 않음)
+    assert set(meta["validation_B"]) == {"이미지만", "이미지+상품"}
+    for label, key in (("이미지만", "x2_whole"), ("이미지+상품", "x2_whole+x4")):
+        grades = meta["kinds"][label]["grades"]
+        assert {g: grades[g]["하한"] for g in grades} == new[rm.NAMELESS_KEY][key][
+            "grade_thresholds"]
+        assert grades["위험"]["이름_알_때_이상"] > 0  # 이름 알 때도 위험이 있어 null 이 아니다
     grades = [rm.risk_score({**image_only, "x2_whole": image}, new).grade
               for image in (0.2, 0.36, 0.5, 0.7, 0.89, 1.0)]
-    assert grades == ["안전", "안전", "주의", "검토 권장", "검토 권장", "검토 권장"]
-    # 상품이 겹치면(1.0) 이미지 유사도와 상관없이 검토 권장, 겹치지 않으면(0.0) 이미지만일 때와 비슷
+    assert grades == ["안전", "안전", "안전", "주의", "검토 권장", "위험"]  # 위험 = 이미지 ≥ 0.896
+    # 상품이 겹치면(1.0) 이미지가 낮아도 검토 권장, 이미지 0.8 이상이면 위험(하한 0.7892 ↔ 0.708)
     assert rm.risk_score({**image_only, "x2_whole": 0.2, "x4": 1.0}, new).grade == "검토 권장"
+    assert rm.risk_score({**image_only, "x2_whole": 0.8, "x4": 1.0}, new).grade == "위험"
     assert [rm.risk_score({**image_only, "x2_whole": image, "x4": 0.0}, new).grade
-            for image in (0.2, 0.36, 0.7)] == ["안전", "주의", "검토 권장"]
+            for image in (0.2, 0.36, 0.7)] == ["안전", "안전", "주의"]
     # 하한을 떼면(2차 시도 채택 때의 판정) 같은 입력이 v1.3 하한으로 매겨진다
     plain = json.loads(json.dumps(new))
     for block in plain[rm.NAMELESS_KEY].values():

@@ -704,7 +704,7 @@ def run(features_path: Path, easy_path: Path, *, out_dir: Path, model_path: Path
         v13_path: Path = DEFAULT_V13, folds: int = t4.FOLDS, repeats: int = t4.REPEATS,
         bootstrap: int = t4.BOOTSTRAP, metric_bootstrap: int = t4.METRIC_BOOTSTRAP,
         seed: int = 0, n_random: int = RANDOM_INPUTS, sensitivity: bool = True,
-        min_pattern_minority: int = tr.MIN_PATTERN_MINORITY) -> dict:
+        min_pattern_minority: int = tr.MIN_PATTERN_MINORITY, force: bool = False) -> dict:
     model_old = rm.validate_model(json.loads(Path(v13_path).read_text(encoding="utf-8")))
     dataset = t4.load_dataset(features_path, easy_path)
     rows, summary = dataset.rows, dataset.summary
@@ -779,16 +779,26 @@ def run(features_path: Path, easy_path: Path, *, out_dir: Path, model_path: Path
     out_dir.mkdir(parents=True, exist_ok=True)
     model_path = Path(model_path)
     written = model_path if adoption["채택"] else out_dir / f"{REPORT_STEM}_candidate.json"
-    written.parent.mkdir(parents=True, exist_ok=True)
-    written.write_text(json.dumps(model, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    write_model(written, model, guard=adoption["채택"], force=force)
     results["모델_파일"] = str(written)
-    results["모델_파일_설명"] = ("채택 — 배포 경로(서비스 기본 모델 경로는 v1.3 그대로)"
+    results["모델_파일_설명"] = ("채택 — 배포 경로(2026-11-20 부터 서비스 기본 모델)"
                             if adoption["채택"] else
                             "채택 기준 미달 — 후보로만 저장(배포 경로에는 쓰지 않음), v1.3 유지")
     (out_dir / f"{REPORT_STEM}_results.json").write_text(
         json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
     (out_dir / f"{REPORT_STEM}_report.md").write_text(report_text(results), encoding="utf-8")
     return results
+
+
+def write_model(path: Path, model: dict, *, guard: bool, force: bool = False) -> None:
+    """계수 JSON 쓰기. 배포 경로(guard)에 쓸 때는 실제 검색 기준 하한(§7-4-4)이 있으면 force 없이는
+    rm.OverwriteRefused — 이 스크립트가 붙이는 하한은 쉬운 음성 기준(§7-4-3)이라 덮어쓰면 서비스
+    하한이 바뀐다."""
+    path = Path(path)
+    if guard:
+        rm.check_nameless_overwrite(path, force=force)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(model, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 
 
 # ---- 보고서 ------------------------------------------------------------------------------------
@@ -962,8 +972,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--easy", type=Path, default=tr.DEFAULT_EASY)
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL,
-                        help="채택 기준을 모두 채우면 쓰는 계수 JSON 경로(서비스 기본 모델 경로가 "
-                             "아니다)")
+                        help="채택 기준을 모두 채우면 쓰는 계수 JSON 경로(2026-11-20 부터 서비스 "
+                             "기본 모델 — 실제 검색 기준 하한이 있으면 --force 없이는 쓰지 않는다)")
+    parser.add_argument("--force", action="store_true",
+                        help="실제 검색 기준 하한(§7-4-4)이 있는 JSON 도 덮어쓴다")
     parser.add_argument("--v13", type=Path, default=DEFAULT_V13,
                         help="이름 있는 4벌을 복사해 올 v1.3 JSON")
     parser.add_argument("--folds", type=int, default=t4.FOLDS)
@@ -975,11 +987,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--random-inputs", type=int, default=RANDOM_INPUTS)
     parser.add_argument("--no-sensitivity", action="store_true")
     args = parser.parse_args(argv)
-    results = run(args.features, args.easy, out_dir=args.out_dir, model_path=args.model,
-                  v13_path=args.v13, folds=args.folds, repeats=args.repeats,
-                  bootstrap=args.bootstrap, metric_bootstrap=args.metric_bootstrap,
-                  seed=args.seed, n_random=args.random_inputs,
-                  sensitivity=not args.no_sensitivity)
+    try:
+        results = run(args.features, args.easy, out_dir=args.out_dir, model_path=args.model,
+                      v13_path=args.v13, folds=args.folds, repeats=args.repeats,
+                      bootstrap=args.bootstrap, metric_bootstrap=args.metric_bootstrap,
+                      seed=args.seed, n_random=args.random_inputs,
+                      sensitivity=not args.no_sensitivity, force=args.force)
+    except rm.OverwriteRefused as exc:
+        print(f"쓰지 않음: {exc}", file=sys.stderr)
+        return 4
     print(report_text(results))
     return 0 if results["채택"]["채택"] else 3
 

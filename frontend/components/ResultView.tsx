@@ -741,7 +741,7 @@ export default function ResultView({
             className="mt-3 border-t border-current/10 pt-3 text-[12px] leading-relaxed text-sub"
           >
             <span className="font-bold text-ink">선택한 지정상품:</span> {goodsSummaryText(goods)}
-            <span className="ml-1">· 검색 점수에는 아직 반영되지 않아요(유사군 백필 후)</span>
+            <span className="ml-1">· 이 화면의 검색 점수(이미지 유사도)에는 반영되지 않아요</span>
           </p>
         )}
 

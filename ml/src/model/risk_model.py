@@ -46,8 +46,11 @@ v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·�
 더했을 때의 이름 있는 패턴 로짓 ≥ 이름 없는 패턴 로짓; 더한 뒤의 유형은 서비스 규칙대로 문자계
 `type_with_name`, 요부 유무 양쪽, 이미지·상품 값의 모든 꼭짓점) 또는 `coupling.name_floors`(1차
 시도 — 이름을 쉬운 음성 평균 이상으로 더 관측하면 비감소; 채택되지 않은 형식이고 그 학습 스크립트의
-재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다. 서비스 기본
-모델(DEFAULT_MODEL_PATH)은 v1.3 그대로다.
+재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다.
+
+서비스 기본 모델(2026-11-20, §7-4-4): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.json`
+(MODEL_VERSION risk_model_v1.4). v1.3 파일(`risk_model_v1.json`)은 V13_MODEL_PATH 로 남는다 — v1.3
+학습 스크립트와 v1.4 비교·학습 스크립트가 그 경로를 쓴다(기본 경로를 덮어쓰지 않게).
 
 이름 없는 입력의 등급 하한(§7-4-3): 이름 없는 계수 집합은 `grade_thresholds` 를 따로 둘 수 있고,
 그 집합이 쓰인 입력의 등급은 그 하한으로 매긴다(`grade_thresholds_for`; 없으면 최상위 하한). 하한이
@@ -75,7 +78,9 @@ __all__ = [
     "grade_for", "axis_contributions", "mark_type_level", "monotone_violations",
     "coupling_violations", "coupling_vertices", "select_pattern", "pattern_key", "pattern_keys",
     "block_logit", "GRADES", "TYPE_LEVELS", "AXIS_INPUTS", "FIGURE_FAMILY", "PATTERN_BASE_KEY",
-    "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH", "NAMELESS_KEY", "NAMELESS_PREFIX", "NAME_AXES",
+    "DEFAULT_MODEL_PATH", "V13_MODEL_PATH", "V14_MODEL_PATH", "ENV_MODEL_PATH", "NAMELESS_KEY",
+    "NAMELESS_PREFIX", "NAME_AXES", "is_nameless_pattern", "nameless_grade_thresholds",
+    "SEARCH_THRESHOLDS_METHOD", "OverwriteRefused", "search_calibrated", "check_nameless_overwrite",
     "NAME_FLOOR_AXES", "NAME_DERIVED_TERMS", "name_missing", "nameless_vertices",
     "name_coupling_vertices", "SAME_NAME_KEY", "type_with_name", "same_name_input",
     "grade_thresholds_for", "AXIS_VERSIONS_KEY", "SPELLING_AXIS", "SPELLING_VERSION_INPUT",
@@ -83,9 +88,11 @@ __all__ = [
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"
+V13_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"  # v1.3(이름 있는 계수)
+V14_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"
+DEFAULT_MODEL_PATH = V14_MODEL_PATH  # 서비스 기본 모델(2026-11-20 부터 v1.4)
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1.3"  # 서비스 기본 모델(train_risk_model.py 가 쓰는 버전)
+MODEL_VERSION = "risk_model_v1.4"  # 서비스 기본 모델의 버전
 SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2", "risk_model_v1.2.1",
                       "risk_model_v1.3", "risk_model_v1.4", "risk_model_v1.5")
 AXIS_VERSIONS_KEY = "axis_versions"  # 계수가 학습된 축 정의의 버전(없으면 모두 1)
@@ -655,8 +662,8 @@ def _load_cached(path_text: str) -> dict:
 
 
 def load_model(path: str | os.PathLike[str] | None = None) -> dict:
-    """계수 JSON 적재(경로: 인자 > MARKLENS_RISK_MODEL > shared/model/risk_model_v1.json). 프로세스
-    캐시."""
+    """계수 JSON 적재(경로: 인자 > MARKLENS_RISK_MODEL > DEFAULT_MODEL_PATH = shared/model/
+    risk_model_v1.4.json). 프로세스 캐시 — 파일을 바꾸면 서버를 다시 띄운다."""
     return _load_cached(str(resolve_model_path(path)))
 
 
@@ -669,6 +676,55 @@ def grade_for(prob: float, thresholds: dict) -> str:
         if cut is not None and prob >= float(cut):
             grade = key
     return grade
+
+
+# nameless_search_thresholds.py 가 쓴 이름 없는 하한의 meta method 접두
+SEARCH_THRESHOLDS_METHOD = "실제 검색 기준"
+
+
+class OverwriteRefused(RuntimeError):
+    """이름 없는 입력의 실제 검색 기준 하한을 다른 방식으로 덮어쓰려 했다(--force 로만 허용)."""
+
+
+def search_calibrated(model: dict) -> bool:
+    """계수 JSON 의 이름 없는 하한이 실제 검색 기준(§7-4-4)으로 쓰였는가
+    (meta.nameless.grade_thresholds.method)."""
+    meta = ((model.get("meta") or {}).get("nameless") or {}).get("grade_thresholds") or {}
+    return str(meta.get("method") or "").startswith(SEARCH_THRESHOLDS_METHOD)
+
+
+def check_nameless_overwrite(path: str | os.PathLike[str], *, force: bool = False) -> None:
+    """이름 없는 하한을 옛 방식으로 쓰는 스크립트(학습·쉬운 음성 기준 하한)가 쓰기 전에 부른다 —
+    대상 JSON 의 meta 에 실제 검색 기준 하한이 있으면 force 없이는 OverwriteRefused. 검색 기준
+    스크립트(nameless_search_thresholds.py)는 부르지 않는다."""
+    target = Path(path)
+    if force or not target.exists():
+        return
+    try:
+        existing = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return
+    if isinstance(existing, dict) and search_calibrated(existing):
+        raise OverwriteRefused(
+            f"{target} 의 이름 없는 하한은 실제 검색 기준(nameless_search_thresholds.py)으로 "
+            "쓰였다 — 덮어쓰려면 --force(그 뒤 nameless_search_thresholds.py 를 다시 돌린다)")
+
+
+def is_nameless_pattern(pattern: str | None) -> bool:
+    """RiskResult.pattern 이 이름 없는 계수 집합("noname:…")인가."""
+    return bool(pattern) and str(pattern).startswith(NAMELESS_PREFIX)
+
+
+def nameless_grade_thresholds(model: dict) -> dict[str, dict]:
+    """이름 없는 계수 집합의 등급 하한 — {"noname:x2_whole": {"주의": p, "검토 권장": p, "위험": p
+    또는 None}, …}. 자기 하한이 없는 집합은 최상위 하한을 쓰므로 그 값을 싣는다."""
+    out = {}
+    for key, block in (model.get(NAMELESS_KEY) or {}).items():
+        thresholds = block.get("grade_thresholds") or model["grade_thresholds"]
+        out[NAMELESS_PREFIX + key] = {
+            grade: None if thresholds[grade] is None else float(thresholds[grade])
+            for grade in GRADE_THRESHOLD_KEYS}
+    return out
 
 
 def grade_thresholds_for(model: dict, pattern: str = "") -> dict:
