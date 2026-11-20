@@ -613,6 +613,99 @@
    "adoption": {
     "채택": true,
     "판정": "v1.4 채택"
+   },
+   "grade_thresholds": {
+    "calibrated_at": "2026-11-20",
+    "rule": {
+     "뜻": "등급의 뜻 = 무관한 상표 쌍이 그 등급 이상을 받는 비율 — 이름 있는 입력과 맞춘다",
+     "기준_집합": "U = 이미지가 있는 쉬운 음성 쌍(cross·db, 사진 규칙 뒤). 이미지+상품용은 상품도 관측된 쌍",
+     "이름_있는_채점": "v1.3(= v1.4 의 이름 있는 쪽)으로 같은 축만(이미지만용은 상품을 가린다), 행의 유형(쉬운 음성은 문자), 등급은 risk_score 의 최종 등급(단독 규칙 포함)",
+     "이름_없는_채점": "이름을 가린 도형계 입력을 v1.4 의 이름 없는 집합(배포 계수)으로",
+     "하한": "U 에서 이름 있는 등급이 그 등급 이상인 쌍 수 k → 이름 없는 위험도의 k 번째로 큰 값(소수 4자리 내림). 주의·검토 권장",
+     "위험": "max(기존 위험 하한, 같은 방식으로 맞춘 값)",
+     "예외": "비율이 0 이거나 하한이 표본 최댓값(U 의 이름 없는 위험도 최댓값)을 넘으면 그 등급은 그 입력 종류에서 '단독 규칙으로만 도달'(하한 null). 다른 규칙은 시도하지 않는다"
+    },
+    "kinds": {
+     "이미지만": {
+      "pattern": "noname:x2_whole",
+      "n": 557,
+      "pairs": {
+       "cross": 221,
+       "db": 336
+      },
+      "nameless_prob": {
+       "최댓값": 0.5442,
+       "최솟값": 0.1335,
+       "평균": 0.267
+      },
+      "grades": {
+       "주의": {
+        "named_at_or_above": 186,
+        "share": 0.3339,
+        "matched": 0.279,
+        "threshold": 0.279,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 186
+       },
+       "검토 권장": {
+        "named_at_or_above": 25,
+        "share": 0.0449,
+        "matched": 0.4258,
+        "threshold": 0.4258,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 25
+       },
+       "위험": {
+        "named_at_or_above": 0,
+        "share": 0.0,
+        "matched": null,
+        "threshold": null,
+        "reason": "비율 0 — 단독 규칙으로만 도달",
+        "nameless_at_or_above": 0
+       }
+      }
+     },
+     "이미지+상품": {
+      "pattern": "noname:x2_whole+x4",
+      "n": 449,
+      "pairs": {
+       "cross": 113,
+       "db": 336
+      },
+      "nameless_prob": {
+       "최댓값": 0.7295,
+       "최솟값": 0.1291,
+       "평균": 0.2641
+      },
+      "grades": {
+       "주의": {
+        "named_at_or_above": 270,
+        "share": 0.6013,
+        "matched": 0.2221,
+        "threshold": 0.2221,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 270
+       },
+       "검토 권장": {
+        "named_at_or_above": 48,
+        "share": 0.1069,
+        "matched": 0.3709,
+        "threshold": 0.3709,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 48
+       },
+       "위험": {
+        "named_at_or_above": 0,
+        "share": 0.0,
+        "matched": null,
+        "threshold": null,
+        "reason": "비율 0 — 단독 규칙으로만 도달",
+        "nameless_at_or_above": 0
+       }
+      }
+     }
+    },
+    "note": "null = 그 등급은 그 입력 종류에서 위험도로는 닿지 않는다(단독 규칙으로만). 이름 있는 입력은 최상위 grade_thresholds 그대로"
    }
   }
  },
@@ -640,6 +733,11 @@
     "가중_비유사": 439.5,
     "자기_패턴_행": 31,
     "자기_패턴_심결": 31
+   },
+   "grade_thresholds": {
+    "주의": 0.279,
+    "검토 권장": 0.4258,
+    "위험": null
    }
   },
   "x2_whole+x4": {
@@ -668,6 +766,11 @@
     "가중_비유사": 317.8,
     "자기_패턴_행": 44,
     "자기_패턴_심결": 44
+   },
+   "grade_thresholds": {
+    "주의": 0.2221,
+    "검토 권장": 0.3709,
+    "위험": null
    }
   }
  }

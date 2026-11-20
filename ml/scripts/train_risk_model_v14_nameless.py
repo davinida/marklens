@@ -53,6 +53,7 @@ if str(ML_ROOT) not in sys.path:
 from scipy.special import expit  # noqa: E402
 from src.model import risk_model as rm  # noqa: E402
 
+from scripts import nameless_grade_thresholds as ngt  # noqa: E402  (이름 없는 입력의 등급 하한)
 from scripts import train_risk_model as tr  # noqa: E402
 from scripts import train_risk_model_v14 as t4  # noqa: E402  (1차 시도 — 데이터·지표 도우미)
 
@@ -767,6 +768,13 @@ def run(features_path: Path, easy_path: Path, *, out_dir: Path, model_path: Path
                             model_old, metric_bootstrap=metric_bootstrap,
                             min_minority=min_pattern_minority, **common)
             for label, options in variants]
+    if adoption["채택"]:
+        # 채택된 모델에는 이름 없는 입력의 등급 하한을 붙여서 쓴다(계수와 위 표들은 그대로 — 위 표의
+        # 등급은 하한을 정하기 전, v1.3 하한 기준이다). 규칙·보고는 nameless_grade_thresholds.
+        calibration = ngt.calibrate(rows, model_old, model)
+        before, model = model, ngt.apply_thresholds(model, calibration)
+        results["등급_하한(이름 없는 입력)"] = ngt.evaluate(
+            rows, model_old, before, model, calibration, prob_new, design.own, a)
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     model_path = Path(model_path)
@@ -919,6 +927,15 @@ def report_text(results: dict) -> str:
                   "- 무관한 상표(이름을 가린 쉬운 음성)의 등급: "
                   f"{extra['쉬운_음성(이름 가림)_등급']}",
                   f"- 등급 하한에 닿는 이미지 유사도: {extra['등급_하한에_닿는_이미지_유사도']}"]
+    thresholds = results.get("등급_하한(이름 없는 입력)")
+    if thresholds:
+        lines += ["",
+                  "## 이름 없는 입력의 등급 하한(채택 뒤에 붙임 — 위 표의 등급은 v1.3 하한 기준)",
+                  "", f"- 새 하한: {thresholds['새_하한']}",
+                  f"- 해당하는 이미지 유사도(도형계): "
+                  f"{thresholds['새_하한에_해당하는_이미지_유사도(도형계)']}",
+                  "- 규칙·무관한 쌍의 등급 분포·전후 표: "
+                  "`ml/scripts/nameless_grade_thresholds.py`(설계 §7-4-3)"]
     if "평가_8_민감도" in results:
         lines += ["", "## 평가 8 — 민감도(이름 없는 2벌을 조건을 바꿔 다시 학습)", "",
                   "| 조건 | 심결 행(이름 없는·제외) | 이름 없는 행 AUC v1.3 → v1.4 [짝 차이] | "

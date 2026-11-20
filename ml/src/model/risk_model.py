@@ -48,6 +48,11 @@ v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·�
 시도 — 이름을 쉬운 음성 평균 이상으로 더 관측하면 비감소; 채택되지 않은 형식이고 그 학습 스크립트의
 재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다. 서비스 기본
 모델(DEFAULT_MODEL_PATH)은 v1.3 그대로다.
+
+이름 없는 입력의 등급 하한(§7-4-3): 이름 없는 계수 집합은 `grade_thresholds` 를 따로 둘 수 있고,
+그 집합이 쓰인 입력의 등급은 그 하한으로 매긴다(`grade_thresholds_for`; 없으면 최상위 하한). 하한이
+null 인 등급은 위험도 p 로는 닿지 않는다 — 단독 규칙(도형 규칙 τ)으로만 닿는다. 이름 있는 입력과
+v1.3 이하 JSON 의 등급 판정은 달라지지 않는다.
 """
 
 from __future__ import annotations
@@ -68,6 +73,7 @@ __all__ = [
     "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH", "NAMELESS_KEY", "NAMELESS_PREFIX", "NAME_AXES",
     "NAME_FLOOR_AXES", "NAME_DERIVED_TERMS", "name_missing", "nameless_vertices",
     "name_coupling_vertices", "SAME_NAME_KEY", "type_with_name", "same_name_input",
+    "grade_thresholds_for",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -521,6 +527,17 @@ def _validate_nameless(data: dict, nameless: object, known: dict) -> None:
         if data.get("monotone"):
             for violation in monotone_violations(block["coefficients"]):
                 raise ValueError(f"{label}: 단조 제약 위반 — {violation}")
+        thresholds = block.get("grade_thresholds")
+        if thresholds is not None:
+            if not isinstance(thresholds, dict) or set(thresholds) != set(GRADE_THRESHOLD_KEYS):
+                raise ValueError(f"{label}: grade_thresholds 키는 {GRADE_THRESHOLD_KEYS} 여야 "
+                                 "합니다")
+            cuts = [thresholds[grade] for grade in GRADE_THRESHOLD_KEYS
+                    if thresholds[grade] is not None]
+            if any(not isinstance(cut, (int, float)) or not 0.0 < float(cut) <= 1.0
+                   for cut in cuts) or any(a > b for a, b in zip(cuts, cuts[1:])):
+                raise ValueError(f"{label}: grade_thresholds 는 null 또는 (0, 1] 안의 값이고 "
+                                 "오름차순이어야 합니다")
 
 
 def validate_model(data: dict) -> dict:
@@ -609,12 +626,24 @@ def load_model(path: str | os.PathLike[str] | None = None) -> dict:
 
 
 def grade_for(prob: float, thresholds: dict) -> str:
-    """p 를 4단계로: 하한 이상이면 그 등급(위험 하한 이상 → 위험)."""
+    """p 를 4단계로: 하한 이상이면 그 등급(위험 하한 이상 → 위험). 하한이 null 인 등급은 p 로는 닿지
+    않는다(이름 없는 입력의 계수 집합에서만 — 그 등급은 단독 규칙으로만 닿는다)."""
     grade = GRADES[0]
     for key in GRADE_THRESHOLD_KEYS:
-        if prob >= float(thresholds[key]):
+        cut = thresholds[key]
+        if cut is not None and prob >= float(cut):
             grade = key
     return grade
+
+
+def grade_thresholds_for(model: dict, pattern: str = "") -> dict:
+    """그 계수 집합이 쓰인 입력의 등급 하한. `pattern` 은 RiskResult.pattern("x4"·"noname:x2_whole"
+    등). 이름 없는 집합에 자기 `grade_thresholds` 가 있으면 그것, 아니면 최상위 하한."""
+    if pattern.startswith(NAMELESS_PREFIX):
+        block = (model.get(NAMELESS_KEY) or {}).get(pattern[len(NAMELESS_PREFIX):]) or {}
+        if block.get("grade_thresholds"):
+            return block["grade_thresholds"]
+    return model["grade_thresholds"]
 
 
 def risk_score(features: dict, model: dict | None = None) -> RiskResult:
@@ -642,7 +671,7 @@ def risk_score(features: dict, model: dict | None = None) -> RiskResult:
         contributions[name] = term
         logit += term
     prob = 1.0 / (1.0 + math.exp(-logit)) if logit > -700 else 0.0
-    grade = grade_for(prob, model["grade_thresholds"])
+    grade = grade_for(prob, grade_thresholds_for(model, key))
     for axis, tau in (model.get("standalone_thresholds") or {}).items():
         if tau is None:
             continue

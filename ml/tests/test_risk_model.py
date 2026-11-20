@@ -797,3 +797,121 @@ def test_shipped_v14_adds_nameless_blocks_without_changing_named_outputs():
         assert result.pattern == "noname:x2_whole" and result.figure_caveat  # 참고용 표시는 그대로
         assert result.prob == pytest.approx(expected_new, abs=5e-5)
         assert rm.risk_score(features, old).prob == pytest.approx(expected_old, abs=5e-5)
+    # 이름 없는 입력의 등급 하한(§7-4-3) — 무관한 쌍이 그 등급 이상을 받는 비율을 이름 있는 입력과
+    # 맞춘 값. 위험은 두 입력 종류 모두 위험도로는 닿지 않는다(null — 이름 있는 입력에서 무관한 쌍의
+    # 위험이 0).
+    assert new[rm.NAMELESS_KEY]["x2_whole"]["grade_thresholds"] == {
+        "주의": 0.279, "검토 권장": 0.4258, "위험": None}
+    assert new[rm.NAMELESS_KEY]["x2_whole+x4"]["grade_thresholds"] == {
+        "주의": 0.2221, "검토 권장": 0.3709, "위험": None}
+    assert new["grade_thresholds"] == old["grade_thresholds"]  # 이름 있는 입력의 하한은 그대로
+    assert rm.grade_thresholds_for(new, "x2_whole+x4") == old["grade_thresholds"]
+    kinds = new["meta"]["nameless"]["grade_thresholds"]["kinds"]
+    assert kinds["이미지만"]["n"] == 557 and kinds["이미지+상품"]["n"] == 449
+    for item in kinds.values():
+        for grade in ("주의", "검토 권장"):  # 무관한 쌍 수가 이름 있는 입력과 같다
+            entry = item["grades"][grade]
+            assert entry["named_at_or_above"] == entry["nameless_at_or_above"] > 0
+            assert entry["threshold"] == entry["matched"]
+        risk = item["grades"]["위험"]
+        assert risk["named_at_or_above"] == 0 and risk["threshold"] is None
+    grades = [rm.risk_score({**image_only, "x2_whole": image}, new).grade
+              for image in (0.2, 0.36, 0.5, 0.7, 0.89, 1.0)]
+    assert grades == ["안전", "안전", "주의", "검토 권장", "검토 권장", "검토 권장"]
+    # 상품이 겹치면(1.0) 이미지 유사도와 상관없이 검토 권장, 겹치지 않으면(0.0) 이미지만일 때와 비슷
+    assert rm.risk_score({**image_only, "x2_whole": 0.2, "x4": 1.0}, new).grade == "검토 권장"
+    assert [rm.risk_score({**image_only, "x2_whole": image, "x4": 0.0}, new).grade
+            for image in (0.2, 0.36, 0.7)] == ["안전", "주의", "검토 권장"]
+    # 하한을 떼면(2차 시도 채택 때의 판정) 같은 입력이 v1.3 하한으로 매겨진다
+    plain = json.loads(json.dumps(new))
+    for block in plain[rm.NAMELESS_KEY].values():
+        block.pop("grade_thresholds")
+    assert rm.risk_score({**image_only, "x2_whole": 0.36}, plain).grade == "검토 권장"
+    assert rm.risk_score({**image_only, "x2_whole": 1.0}, plain).grade == "위험"
+
+
+# ---- 이름 없는 입력의 등급 하한(§7-4-3) ---------------------------------------------------------
+
+def test_grade_for_skips_null_thresholds():
+    """하한이 null 인 등급은 위험도로는 닿지 않는다(단독 규칙으로만)."""
+    full = {"주의": 0.1, "검토 권장": 0.2, "위험": 0.6}
+    assert [rm.grade_for(p, full) for p in (0.05, 0.1, 0.2, 0.59, 0.6, 1.0)] == [
+        "안전", "주의", "검토 권장", "검토 권장", "위험", "위험"]
+    no_risk = {"주의": 0.1, "검토 권장": 0.2, "위험": None}
+    assert rm.grade_for(0.99, no_risk) == "검토 권장" and rm.grade_for(0.15, no_risk) == "주의"
+    no_review = {"주의": 0.3, "검토 권장": None, "위험": None}
+    assert rm.grade_for(0.99, no_review) == "주의" and rm.grade_for(0.29, no_review) == "안전"
+    assert rm.grade_for(0.99, {"주의": None, "검토 권장": None, "위험": None}) == "안전"
+    assert rm.grade_for(0.7, {"주의": None, "검토 권장": 0.5, "위험": None}) == "검토 권장"
+
+
+def test_nameless_blocks_use_their_own_grade_thresholds():
+    base = _model_v14_same_name()
+    nameless = {key: dict(block) for key, block in base["nameless_patterns"].items()}
+    nameless["x2_whole"]["grade_thresholds"] = {"주의": 0.3, "검토 권장": 0.45, "위험": None}
+    nameless["x2_whole+x4"]["grade_thresholds"] = {"주의": 0.35, "검토 권장": 0.7, "위험": 0.8}
+    model = _model_v14_same_name(nameless_patterns=nameless)
+    assert rm.grade_thresholds_for(model, "noname:x2_whole") == nameless["x2_whole"][
+        "grade_thresholds"]
+    assert rm.grade_thresholds_for(model, "noname:x2_whole+x4")["위험"] == 0.8
+    for pattern in ("", "base", "x2_whole", "x4", "x2_whole+x4", "noname:x4"):
+        assert rm.grade_thresholds_for(model, pattern) == model["grade_thresholds"]
+    # 자기 하한이 없는 집합은 최상위 하한
+    assert rm.grade_thresholds_for(base, "noname:x2_whole") == base["grade_thresholds"]
+    image_only = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x4": None,
+                  "has_meaning_both": False, "mark_type": "문자"}
+
+    def score(image, **extra):
+        return rm.risk_score({**image_only, "x2_whole": image, **extra}, model)
+
+    # 문자계 이미지만: 로짓 −1.0 + 1.2·이미지 → p 0.269(0.0)·0.401(0.5)·0.550(1.0)
+    assert [score(image).grade for image in (0.0, 0.5, 1.0)] == ["안전", "주의", "검토 권장"]
+    assert score(0.5).prob == rm.risk_score({**image_only, "x2_whole": 0.5}, base).prob  # 확률 불변
+    assert rm.risk_score({**image_only, "x2_whole": 0.5}, base).grade == "검토 권장"  # 종전 하한
+    # 위험 하한이 null 이면 위험도가 아무리 높아도 위험이 아니다 — 도형 단독 규칙은 그대로 검토 권장
+    figure = score(1.0, mark_type="도형")
+    assert figure.prob > 0.6 and figure.grade == "검토 권장" and figure.figure_caveat
+    low_figure = {**image_only, "x2_whole": 0.95, "mark_type": "도형"}
+    strict = {key: dict(block) for key, block in nameless.items()}
+    strict["x2_whole"]["grade_thresholds"] = {"주의": 0.9, "검토 권장": None, "위험": None}
+    lifted = rm.risk_score(low_figure, _model_v14_same_name(nameless_patterns=strict))
+    assert lifted.grade == "검토 권장"  # p 로는 안전이지만 x2_whole ≥ τ 0.9 → 도형 규칙
+    assert rm.risk_score({**low_figure, "x2_whole": 0.5}, _model_v14_same_name(
+        nameless_patterns=strict)).grade == "안전"
+    # 이미지+상품은 자기 하한(위험 0.8)
+    assert score(1.0, x4=1.0, mark_type="도형").grade == "위험"  # 로짓 2.2 → p 0.90
+    assert score(0.5, x4=0.5).grade == "주의"  # 로짓 0.3 → p 0.574: 0.35 ≤ p < 0.7
+    # 이름 있는 입력·이름도 이미지도 없는 입력은 최상위 하한 그대로(v1.3 과 같은 결과)
+    old = _model_v13()
+    for features in ({"x1_d": 0.9, "x2_text_d": 0.8, "x2_whole": 0.9, "mark_type": "문자"},
+                     {"x1_d": 0.2, "x2_text_d": 0.1, "x4": 1.0, "mark_type": "도형"},
+                     {**image_only, "x2_whole": None, "x4": 1.0}):
+        assert tuple(rm.risk_score(features, model)) == tuple(rm.risk_score(features, old))
+
+
+def test_validate_nameless_grade_thresholds():
+    good = _model_v14_same_name()["nameless_patterns"]
+
+    def with_thresholds(thresholds):
+        blocks = {key: dict(block) for key, block in good.items()}
+        blocks["x2_whole"]["grade_thresholds"] = thresholds
+        return _model_v14_same_name(nameless_patterns=blocks)
+
+    assert with_thresholds({"주의": 0.2, "검토 권장": None, "위험": None})
+    assert with_thresholds({"주의": None, "검토 권장": None, "위험": None})
+    assert with_thresholds({"주의": 0.2, "검토 권장": 0.2, "위험": 1.0})
+    with pytest.raises(ValueError, match="grade_thresholds 키"):
+        with_thresholds({"주의": 0.2, "검토 권장": 0.4})
+    with pytest.raises(ValueError, match="grade_thresholds 키"):
+        with_thresholds([0.2, 0.4, 0.6])
+    with pytest.raises(ValueError, match="오름차순"):
+        with_thresholds({"주의": 0.5, "검토 권장": 0.4, "위험": None})
+    with pytest.raises(ValueError, match="오름차순"):
+        with_thresholds({"주의": 0.5, "검토 권장": None, "위험": 0.4})
+    with pytest.raises(ValueError, match="오름차순"):
+        with_thresholds({"주의": 0.0, "검토 권장": 0.4, "위험": 0.6})
+    with pytest.raises(ValueError, match="오름차순"):
+        with_thresholds({"주의": "0.2", "검토 권장": 0.4, "위험": 0.6})
+    # 최상위 하한은 여전히 null 을 허용하지 않는다(이름 있는 입력)
+    with pytest.raises((ValueError, TypeError)):
+        _model_v13(grade_thresholds={"주의": 0.06, "검토 권장": None, "위험": 0.56})

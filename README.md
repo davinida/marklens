@@ -18,19 +18,21 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | [판단 축 X1·X2·X3·X4](#축-한눈에-보기) | 완료 | X1 v1.6 · X3 v1.3 · X4 v1 — 축별 AUC·계수는 "축 한눈에 보기" 표 |
 | [식별력·요부 필터](#식별력과-요부-필터) | 완료 | v0.3 — 약한 토큰 수·3호 승인 항목 수는 해당 절 |
 | [통합 모델](#통합-모델) | 완료 | v1.3 · 심결 AUC 0.618(0.55~0.68) · 현실 분포 AUC 0.911(0.89~0.93) · "위험" 등급 정밀도 0.70 — 등급 하한·단독 임계값은 해당 절 |
-| [통합 모델 2차 학습 v1.4](#통합-모델) | 완료 | 서비스 반영 전 — 이름 있는 입력은 v1.3 과 같고 이름 없는 입력(이미지만 / 이미지+상품)용 계수 집합 2벌 추가 · 이름 없는 75행 Brier 0.529 → 0.213 · 쉬운 음성 섞은 AUC 0.816 → 0.893(짝 차이 +0.077, CI +0.050~+0.104) · 반영 전에 이름 없는 입력의 등급 하한 결정 필요 |
+| [통합 모델 2차 학습 v1.4](#통합-모델) | 완료 | 서비스 반영 전 — 이름 있는 입력은 v1.3 과 같고 이름 없는 입력(이미지만 / 이미지+상품)용 계수 집합 2벌 추가 · 이름 없는 75행 Brier 0.529 → 0.213 · 쉬운 음성 섞은 AUC 0.816 → 0.893(짝 차이 +0.077, CI +0.050~+0.104) · 이름 없는 입력의 등급 하한은 따로(이미지만 주의 0.2790·검토 권장 0.4258, 이미지+상품 0.2221·0.3709, 위험은 닿지 않음) |
 | [등록상표 DB](#등록상표-db) | 완료 | 1,383건 = 기존 수집 1,100 + 유명 브랜드 283 · generation `20261119T111642Z-3b0759a08391`(2026-11-19) · 유사군 보유 1,383/1,383건 · 기동 캐시 X1 발음 1,195건·X3 관념 710건·X2 철자 1,246건·상품 변환표 91,591건 |
 | [유명 브랜드 DB 추가](#유명-브랜드-목록) | 완료 | 유명 브랜드 30개(13개 업종) 283건 — 상표명에 브랜드명이 든 표장 215건 · 2026-11-19 운영 반영(승격·색인 재생성·유형 사전) |
 | [정답 데이터(심결례)](#정답-데이터) | 완료 | 라벨 776행 = 유사 369·비유사 228·제외 179 · 도형계 유사·비유사 110행(양쪽 이미지 106)·문자계 447행 · 학습 특징 597행(1차 350·2차 247, 이름 축 1차 313·2차 178행) |
-| [테스트](#검증-명령) | 완료 | Python `1413 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `199 passed`(22 파일) · Playwright `15 passed` |
+| [테스트](#검증-명령) | 완료 | Python `1422 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `199 passed`(22 파일) · Playwright `15 passed` |
 | [CI](#ci) | 완료 | GitHub Actions 4잡(python · frontend · deployment-config · backend-image) 통과 |
 | [공개 배포](#공개-배포-준비) | 보류 | 템플릿만 제공 — 실제 도메인·TLS·계정 배포는 하지 않음 |
 
-마지막 갱신 2026-11-19 — `main` = `develop` = `8413734`(PR #98 유명 브랜드 운영 반영 병합) 위에 통합 모델 2차 학습
-v1.4(브랜치 `feat/risk-model-v1.4` — 1차 시도 보류, 2차 시도 채택·서비스 반영 전). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
+마지막 갱신 2026-11-20 — `main` = `develop` = `8413734`(PR #98 유명 브랜드 운영 반영 병합) 위에 통합 모델 2차 학습
+v1.4(브랜치 `feat/risk-model-v1.4` — 1차 시도 보류, 2차 시도 채택, 이름 없는 입력의 등급 하한·서비스 반영 전). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
 
 <details>
 <summary>이력</summary>
+
+- v1.4 2차 시도 커밋(`b0531c0`, 2026-11-19) 때의 통합 모델 2차 학습 칸 끝: "… · 반영 전에 이름 없는 입력의 등급 하한 결정 필요". 테스트 Python `1413 passed, 26 skipped`. 마지막 갱신 기록은 "2026-11-19 — … 통합 모델 2차 학습 v1.4(브랜치 `feat/risk-model-v1.4` — 1차 시도 보류, 2차 시도 채택·서비스 반영 전)".
 
 - v1.4 1차 시도 커밋(`a181dab`, 2026-11-19) 때의 통합 모델 2차 학습 칸: "보류 — 1·2차 566행(이름 없는 75행 포함) + 쉬운 음성 700 으로 재학습 — 미리 고정한 채택 기준 미달(1차 가중 AUC 짝 차이 −0.074, CI −0.124~−0.029)로 채택하지 않음 · 서비스는 v1.3". 테스트 Python `1403 passed, 26 skipped`. 마지막 갱신 기록은 "… 위에 통합 모델 2차 학습 v1.4(브랜치 `feat/risk-model-v1.4`, 채택 보류)".
 
@@ -353,7 +355,7 @@ has_goods(set())                                                               #
 4축 점수를 로지스틱 회귀로 결합해 출처 혼동 위험도(0~1)와 등급을 내는 모델입니다. 가중치는 심결례 정답 데이터(1차 라벨의 학습 특징 + 쉬운 음성 700 — 행 수는 [현재 상태](#현재-상태) 표)로 학습했고(`ml/scripts/train_risk_model.py`), 런타임 `ml/src/model/risk_model.py` 의 `risk_score(features)` 가 계수 JSON(`shared/model/risk_model_v1.json`)을 읽어 위험도·등급·근거 축 기여도를 냅니다. 엔진 `multi_search` 가 적재합니다. 구조는 판례를 따릅니다.
 
 - 상태: 완료 — v1.3 학습 완료(2026-10-25, PR #67) — 엔진 PR #65·API PR #69·화면 PR #72 연결 완료 (분배 항목 프론트-9 통합 모델·재보정). 2차 학습 v1.4 는 학습·채택까지 끝났고 서비스 반영 전입니다(아래 "2차 학습").
-- 위치: `ml/src/model/risk_model.py`, `ml/scripts/train_risk_model.py`, `ml/scripts/train_risk_model_v14_nameless.py`(2차 학습 — 채택분)·`train_risk_model_v14.py`(2차 학습 1차 시도, 재현용), `ml/scripts/pairs_features.py`(`--fill-easy-images`·`--refresh-easy`), `ml/src/photo_mark.py`(사진 표장 판정), `ml/requirements-experiments.txt`, `shared/model/risk_model_v1.json`(서비스)·`risk_model_v1.4.json`(반영 전)·`photo_direction_v1.json`, `ml/tests/test_risk_model.py`(21)·`test_train_risk_model.py`(12)·`test_train_risk_model_v14.py`(15)·`test_pairs_features.py`(15)·`test_photo_mark.py`(5), `docs/MarkLens_통합모델_설계.md` §7~§7-4
+- 위치: `ml/src/model/risk_model.py`, `ml/scripts/train_risk_model.py`, `ml/scripts/train_risk_model_v14_nameless.py`(2차 학습 — 채택분)·`train_risk_model_v14.py`(2차 학습 1차 시도, 재현용), `ml/scripts/nameless_grade_thresholds.py`(이름 없는 입력의 등급 하한), `ml/scripts/pairs_features.py`(`--fill-easy-images`·`--refresh-easy`), `ml/src/photo_mark.py`(사진 표장 판정), `ml/requirements-experiments.txt`, `shared/model/risk_model_v1.json`(서비스)·`risk_model_v1.4.json`(반영 전)·`photo_direction_v1.json`, `ml/tests/test_risk_model.py`(24)·`test_train_risk_model.py`(12)·`test_train_risk_model_v14.py`(15)·`test_nameless_grade_thresholds.py`(6)·`test_pairs_features.py`(15)·`test_photo_mark.py`(5), `docs/MarkLens_통합모델_설계.md` §7~§7-4
 - 요약: 4축 점수를 판례 사전분포 + 단조 제약 로지스틱 회귀(유형·요부 교호작용)로 결합해 출처 혼동 위험도 p(0~1)·등급 4단계(안전/주의/검토 권장/위험)·근거 축 기여도. 축 하나가 단독 임계값(정밀도 0.7) 이상이면 등급 하한 "검토 권장", 도형계 입력은 참고용 표시(x2_whole ≥ 0.9 면 검토 권장, 미검증). 심결례 정답 데이터로 가중치 학습. 결측(이미지·상품)은 지시변수가 아니라 관측 조합별 계수 집합 + 결합 제약(v1.3).
 - v1.3: 이미지·상품 결측을 지시변수 대신 관측 조합(base / 이미지 / 상품 / 둘 다)별 계수 집합으로 두고 결합 제약을 걸어 **축을 하한값(현실 분포 비유사 평균 이미지 0.35·상품 0.03) 이상으로 더 관측하면 p 가 내려가지 않는다**(적재 때 검증).
 - 실측 "블루커피" / BLU hands: 이름만 0.530 → 셋 다 0.531 — 입력을 더 줘도 위험도가 내려가지 않습니다.
@@ -362,7 +364,8 @@ has_goods(set())                                                               #
   - 학습: 1·2차 정답 데이터에서 이미지가 관측된 모든 행(이름을 가림)으로, 사건 단위 가중(한 사건의 가중 합 상한 3), 사진이 낀 쌍의 이미지 축은 관측 없음(사진 판정 `ml/src/photo_mark.py` — CLIP 임베딩 방향, 눈으로 확인한 30쌍 중 27쌍 일치).
   - 보장: 이미지만(또는 이미지+상품) 입력에 후보와 **같은 이름**을 더하면 위험도가 내려가지 않습니다(적재 때 검증). 다른 이름을 더하면 내려갈 수 있습니다 — 이름이 다르다는 증거입니다.
   - 채택 기준(결과 전 고정) 네 가지를 모두 통과: 이름 있는 입력 불변 · 이름 없는 행의 보정 개선(Brier) · 쉬운 음성을 섞은 AUC 개선 · 단조성 위반 0.
-  - 반영 전에 정할 것: 이름 없는 입력의 등급 하한. 등급 하한은 이름 있는 입력용 값을 그대로 쓰는데, 이름을 가린 무관한 로고 쌍에 대 보면 97% 가 "검토 권장"이 됩니다(순서는 v1.3 과 같고 확률만 올라갑니다). 도형 caveat "참고용"은 유지합니다 — 근거와 결정 대기 항목은 설계 §7-4 끝·§6 맨 위.
+  - 이름 없는 입력의 등급 하한(2026-11-20, 계수는 그대로): 등급의 뜻을 입력 종류와 상관없이 같게 하려고 "무관한 상표 쌍이 그 등급 이상을 받는 비율"을 이름 있는 입력과 맞췄습니다(값은 [현재 상태](#현재-상태) 표). 이름 있는 입력의 하한을 그대로 쓰면 이름을 가린 무관한 로고 쌍의 95% 가 "검토 권장"이었고, 새 하한에서는 4.5% 로 이름 있는 입력과 같습니다(이미지만 기준 557쌍). 이름 없는 유사 38쌍 가운데 28쌍이 검토 권장으로 남고, 검토 권장 등급의 정밀도는 0.52 → 0.82 입니다.
+  - 이름 없는 입력은 위험 등급에 닿지 않습니다 — 이름 있는 입력에서 무관한 쌍이 위험을 받은 적이 없어 맞출 비율이 0 이기 때문입니다. 이미지가 같아도 검토 권장까지입니다. 도형 caveat "참고용"은 유지합니다 — 근거는 설계 §7-4 끝, 서비스 반영 때 할 일은 설계 §6 맨 위.
   - 1차 시도(여섯 계수 집합을 모두 다시 학습하고 "이름을 무관한 상표 수준 이상으로 더 주면 내려가지 않음"을 건 것)는 이름 있는 입력의 변별력이 내려가 채택하지 않았습니다(설계 §7-4-1).
 
 구조가 따르는 판례:
@@ -388,6 +391,8 @@ has_goods(set())                                                               #
 
 <details>
 <summary>이력</summary>
+
+- v1.4 2차 시도 커밋(`b0531c0`, 2026-11-19) 때 "2차 학습" 항목의 끝줄: "반영 전에 정할 것: 이름 없는 입력의 등급 하한. 등급 하한은 이름 있는 입력용 값을 그대로 쓰는데, 이름을 가린 무관한 로고 쌍에 대 보면 97% 가 "검토 권장"이 됩니다(순서는 v1.3 과 같고 확률만 올라갑니다). 도형 caveat "참고용"은 유지합니다 — 근거와 결정 대기 항목은 설계 §7-4 끝·§6 맨 위." 위치 줄의 테스트 수는 `test_risk_model.py`(21), 등급 하한 스크립트·테스트는 없었습니다.
 
 - v1.4 1차 시도 커밋(`a181dab`, 2026-11-19) 때: 상태 줄 끝 "2차 학습 v1.4 는 보류입니다", 위치 줄은 2차 학습 스크립트가 `train_risk_model_v14.py` 하나이고 테스트 수 `test_risk_model.py`(17)·`test_train_risk_model_v14.py`(9), `shared/model/` 에 `risk_model_v1.4.json` 없음. 그때의 "2차 학습" 항목: 2차 학습(v1.4, 2026-11-19): 보류 — 1·2차 정답 데이터로 다시 학습했지만 결과 전에 고정한 채택 기준에 못 미쳐 서비스 모델을 바꾸지 않았습니다(`shared/model/risk_model_v1.4.json` 없음, 후보 계수는 비공개 데이터 저장소). 수치는 [현재 상태](#현재-상태) 표와 설계 §7-4 에 있습니다. / 바꾼 것: 이름 없는 행(순수 도형 대부분)을 학습에 넣으려고 이름 없는 입력용 계수 집합 2벌(이미지만 / 이미지+상품)을 더하고, "이름을 더 줘도 위험도가 내려가지 않음"을 결합 제약으로 걸었습니다. 사건 단위 가중(한 사건의 가중 합 상한 3), 사진이 낀 쌍의 이미지 축은 관측 없음(사진 판정 `ml/src/photo_mark.py` — CLIP 임베딩 방향, 눈으로 확인한 30쌍 중 27쌍 일치). / 걸린 것: 이름 있는 입력의 변별력이 내려갔습니다 — 채택 기준 ①(v1.3 과의 짝 차이 CI 상한 < 0: 1차 가중 AUC)과 ②(판례 조건 (i)·(iv) 의 부트스트랩 성립 비율 하락). 단조성(③)은 지켜졌습니다. / 원인: 이름이 무관한 상표 수준으로 다르다는 것은 강한 비유사 증거인데(그런 행의 유사 비율 0.05, 이름을 가린 전체 0.34), 제약은 그 지점의 위험도를 이름을 모를 때보다 낮추지 못하게 합니다. / 지금 서비스(v1.3)의 이름 없는 도형 입력: 이미지가 같아도 위험도 0.065 라 등급은 도형 단독 규칙(τ 0.9)으로만 올라갑니다 — 도형 caveat "참고용" 유지. 이름 없는 입력을 어떤 제약으로 넣을지는 결정 대기입니다(설계 §6 맨 위).
 
@@ -840,7 +845,7 @@ Browser
 
 - `frontend/`: Next.js UI, 수동 크롭, Turnstile 검증, BFF(`app/api/*`)
 - `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인·발음 유사도·관념 유사도·상품 검색 API(`src/api/`), 세 입력 통합 검색 엔진(`src/core/multi_search.py`, 질의 유형 OCR `src/core/ocr.py` — 계약 v2), 기동 시 캐시(`src/core/phonetic_search.py`·`semantic_search.py`)와 변환표(`src/core/goods.py`), KIPRIS 수집 스크립트(`scripts/`), 심결례 수집·보강 스크립트(`scripts/trials_collect.py`·`trials_enrich.py`)
-- `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구, 통합 모델 런타임(`src/model/risk_model.py`)·학습(`scripts/train_risk_model.py`, 2차 학습 `scripts/train_risk_model_v14_nameless.py` — 채택분·`scripts/train_risk_model_v14.py` — 1차 시도), 유형 사전 계산(`scripts/precompute_types.py`), 유형 규칙(`src/mark_type.py`), 사진 표장 판정(`src/photo_mark.py`)
+- `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구, 통합 모델 런타임(`src/model/risk_model.py`)·학습(`scripts/train_risk_model.py`, 2차 학습 `scripts/train_risk_model_v14_nameless.py` — 채택분·`scripts/train_risk_model_v14.py` — 1차 시도, 이름 없는 입력의 등급 하한 `scripts/nameless_grade_thresholds.py`), 유형 사전 계산(`scripts/precompute_types.py`), 유형 규칙(`src/mark_type.py`), 사진 표장 판정(`src/photo_mark.py`)
 - `ml/src/axes/`: 다축 모델의 축 함수 — X1 호칭 유사도(`x1_phonetic.py`, 브랜드·지명 로마자표 `korean_brands.py`), X2 문자 외관(철자) `x2_ortho.py`, X3 관념 유사도(`x3_semantic.py`), X4 상품 견련성(`x4_goods.py`), 변환표 로더(`goods_map.py`), 식별력 필터(`distinctiveness.py`), 쌍별 4축 공용 계산(`pair_axes.py` — 서비스와 학습이 같은 식)
 - `ml/evaluation/`: 200-pair 라벨링 팩과 강건성 평가 계약
 - `shared/`: 프런트·백엔드 공용 자산 — `goods_map/`(상품↔유사군 변환표 파서·검증기, 변환표 `goods_map.json.gz` 1.86MB 저장소 포함), `famous_brands.txt`(유명 브랜드 목록 — 브랜드 표 + 식별력 토큰 절), `types/goods.ts`(변환표 타입)
@@ -1253,7 +1258,8 @@ ml/venv/bin/python ml/scripts/train_risk_model.py --methods logistic,prior,ebm,g
 # 통합 모델 2차 학습 v1.4(2026-11-19 실행 확인). 서비스 모델 파일(risk_model_v1.json)은 건드리지 않는다
 ml/venv/bin/python ml/scripts/pairs_features.py --refresh-easy      # 쉬운 음성의 이름 축·요부·상품 축을 현재 코드·데이터로(쌍 목록·이미지 축 유지, 17초; 다시 돌려도 바뀐 칸 0)
 ml/venv/bin/python ml/scripts/train_risk_model_v14_nameless.py      # 채택분(2차 시도): 이름 없는 2벌 학습 + 기준 ①~④ + 평가(6초) → shared/model/risk_model_v1.4.json + ml/data/trials/risk_model_v1.4_attempt2_{report.md,results.json}
-#   기준을 하나라도 못 채우면 shared/model 에 쓰지 않고 ml/data/trials/risk_model_v1.4_attempt2_candidate.json 만 쓰고 종료 코드 3
+#   기준을 하나라도 못 채우면 shared/model 에 쓰지 않고 ml/data/trials/risk_model_v1.4_attempt2_candidate.json 만 쓰고 종료 코드 3. 채택하면 이름 없는 입력의 등급 하한까지 붙여서 쓴다
+ml/venv/bin/python ml/scripts/nameless_grade_thresholds.py          # 이름 없는 입력의 등급 하한만 다시(1초, 계수는 그대로; --dry-run 은 JSON 을 쓰지 않음) → ml/data/trials/risk_model_v1.4_thresholds_{report.md,results.json}
 ml/venv/bin/python ml/scripts/train_risk_model_v14.py               # 1차 시도(재현용, 채택 안 됨 — 종료 코드 3, 약 40초) → ml/data/trials/risk_model_v1.4_{report.md,results.json,candidate.json}
 #   1차 시도는 기준을 통과해도 shared/model 이 아니라 ml/data/trials/risk_model_v1.4_attempt1.json 에 쓴다(shared/model/risk_model_v1.4.json 은 2차 시도의 채택분)
 ml/venv/bin/python ml/scripts/train_risk_model_v14.py --bootstrap 20 --metric-bootstrap 100 --repeats 1 --no-sensitivity --no-diagnostics   # 1차 시도 빠른 확인
@@ -1499,10 +1505,12 @@ TLS edge는 외부의 `X-MarkLens-Client-IP`를 제거한 뒤 검증한 원격 I
 유형 규칙)은 끝났습니다. 남은 일은 두 갈래입니다(식별력 유명 브랜드 토큰을 새 목록에 맞출지는 통합 모델 재학습 때 정합니다).
 
 1. **서비스 연결 마무리** — 남은 것은 운영 배포 검증입니다(DB 모드 배포는 1,383건 세대를 `migrate_json_to_db --prune` 으로 먼저 적재). v1 엔드포인트와 BFF 는 최종 발표(2026-12-20)까지 유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md)에 사유와 함께 있습니다.
-2. **11월** — 남은 순서: 통합 모델 v1.4 의 서비스 반영 — 먼저 이름 없는 입력의 등급 하한·표시 방식을 정하고([통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위), 사진 판정을 서비스에 연결하고, 계약 v2 의 `pattern` 값에 이름 없는 집합을 더한 뒤 기본 모델 경로를 바꾸고 시나리오를 다시 검산 → 식별력 재검토(결합 규칙 임계 0.9/0.88·어순 바뀐 결합·단일 공통 토큰, 식별력 설계 §4-2).
+2. **11월** — 남은 순서: 통합 모델 v1.4 의 서비스 반영([통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위 "서비스 반영 때 할 일" 다섯 가지 — 응답 `meta.thresholds` 에 질의 종류에 맞는 하한 싣기, 이름 없는 질의에서는 위험도 % 대신 등급과 이미지 유사도 표시, 사진으로 판정된 이미지 질의에 주의 문구, 계약 v2 의 계수 집합 값, "도형은 참고용" 유지와 문구) → 기본 모델 경로를 바꾸고 시나리오를 다시 검산 → 식별력 재검토(결합 규칙 임계 0.9/0.88·어순 바뀐 결합·단일 공통 토큰, 식별력 설계 §4-2).
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-20(`feat/risk-model-v1.4`, 등급 하한): 이름 없는 입력의 등급 하한을 따로 정했습니다(설계 §7-4-3, 계수는 그대로). 이 항목의 이전 문구: "2. **11월** — 남은 순서: 통합 모델 v1.4 의 서비스 반영 — 먼저 이름 없는 입력의 등급 하한·표시 방식을 정하고(통합 모델 설계 §6 맨 위), 사진 판정을 서비스에 연결하고, 계약 v2 의 `pattern` 값에 이름 없는 집합을 더한 뒤 기본 모델 경로를 바꾸고 시나리오를 다시 검산 → 식별력 재검토(결합 규칙 임계 0.9/0.88·어순 바뀐 결합·단일 공통 토큰, 식별력 설계 §4-2)."
 
 - 2026-11-19(`feat/risk-model-v1.4`, 2차 시도): 이름 있는 입력은 v1.3 그대로 두고 이름 없는 입력용 계수 집합 2벌만 학습해 덧붙인 v1.4 가 채택 기준 ①~④를 통과했습니다(설계 §7-4-2) — 서비스 반영 전. 이 항목의 이전 문구: "2. **11월** — 남은 순서: 통합 모델 2차 학습의 결정(이름 없는 입력용 계수 집합을 어떤 제약으로 넣을지, 채택 기준의 비교 상대, 문자계에도 사진 규칙을 쓸지, 단독 임계값의 기준 집합 — 통합 모델 설계 §6 맨 위) → 정해진 구조로 다시 학습·서비스 반영(사진 판정의 서비스 연결 포함) → 식별력 재검토(결합 규칙 임계 0.9/0.88·어순 바뀐 결합·단일 공통 토큰, 식별력 설계 §4-2).". 그 가운데 정해진 것: 이름 없는 입력용 계수 집합의 제약("같은 이름" 하나)과 채택 기준의 비교 상대(이름 있는 쪽을 다시 학습하지 않아 문제가 사라짐). 남은 것: 문자계에도 사진 규칙을 쓸지, 단독 임계값의 기준 집합, 그리고 새로 생긴 이름 없는 입력의 등급 하한.
 - 2026-11-19(`feat/risk-model-v1.4`): 통합 모델 2차 학습(v1.4)을 돌렸고 채택 기준 미달로 보류했습니다(설계 §7-4). 이 항목의 이전 문구: "2. **11월** — 남은 순서: 판례 조건 (ii) 검증 → 통합 모델 2차(접미 분리를 반영한 특징 재생성 뒤 재학습, 도형 외관 입력은 `x2_whole` 그대로·도형계 이미지 계수를 결합 제약이 아니라 데이터로, 도형 단독 규칙 τ·사진 표장 쌍 처리 결정(X2 설계 §7.6), 관념 계수 0·X3 게이트 재측정, "위험" 정밀도 0.8 을 지지 30 에서) → 식별력 재검토(…)". 그 가운데 한 것: 재학습(접미 분리 반영 특징·사건 가중·사진 규칙), 판례 조건 (ii)(후보의 최종 적합에서 성립하지만 이름 결합 제약의 산물), 관념 계수(0 → 0.195), 도형 단독 규칙 τ 0.9 유지, "위험" 정밀도(가중 지지 30 에서 최대 0.70 — 0.8 미달 그대로).
