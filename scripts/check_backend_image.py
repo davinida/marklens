@@ -24,9 +24,12 @@ def check_shared_assets() -> None:
     sys.path.insert(0, str(root / "ml"))
     from src.axes.distinctiveness import load_distinctiveness
     from src.model.risk_model import load_model, risk_score
+    from src.photo_mark import load_direction
 
     for relative in (
         "model/risk_model_v1.json",
+        "model/risk_model_v1.4.json",  # 서비스 기본 모델(2026-11-20)
+        "model/photo_direction_v1.json",  # 사진 질의 판정
         "distinctiveness/token_stats.json",
         "distinctiveness/descriptive_terms.json",
         "distinctiveness/weak_token_overrides.json",
@@ -36,8 +39,13 @@ def check_shared_assets() -> None:
         path = root / "shared" / relative
         assert path.is_file() and path.stat().st_size > 0, f"Missing shared asset: {relative}"
     model = load_model()
-    assert model["version"] == "risk_model_v1.3"
+    # 명시 값 — 기본 모델을 바꿀 때 이 검사도 의식적으로 같이 고치게 하는 가드
+    assert model["version"] == "risk_model_v1.4", model["version"]
     assert 0 <= risk_score({}, model).prob <= 1
+    # 이름 없는 이미지 질의는 v1.4 의 이름 없는 계수 집합으로 채점된다
+    assert risk_score({"x2_whole": 1.0, "mark_type": "도형"}, model).pattern == "noname:x2_whole"
+    direction, _ = load_direction()
+    assert direction.shape == (512,)
     distinct = load_distinctiveness()
     assert distinct.stats and distinct.goods_names and distinct.famous
     assert distinct.token_score("커피", {"G0301"}) == 0.0
