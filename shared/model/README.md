@@ -50,6 +50,9 @@
 - 1차 시도(`ml/scripts/train_risk_model_v14.py` — 여섯 집합을 모두 다시 학습 + `coupling.name_floors`)는 채택 기준 ①·② 미달로 채택하지 않았다(설계 §7-4-1). 런타임은 그
   형식(`name_floors`)도 적재할 수 있지만 재현용이고, 이 디렉터리에 그 파일은 없다.
 - 런타임 `MODEL_VERSION`·`DEFAULT_MODEL_PATH` 는 v1.3 그대로다. v1.4 를 읽으려면 경로를 명시한다(`rm.load_model(path)` 또는 환경변수 `MARKLENS_RISK_MODEL`).
+- 축 계산 버전(2026-11-20): 계수 JSON 은 `axis_versions`(예: `{"x2_text": 2}`)로 그 계수가 학습된 축 정의를 밝힐 수 있다 — 없으면 모두 1(v1.3·v1.4). 입력의
+  `x2_text_version`(`pair_axes.model_features` 가 싣는다, 없으면 1)이 다르면 `risk_score` 가 ValueError 를 내고, 엔진은 모델이 요구하는 철자 버전으로 축을 계산한다.
+  철자 v2 를 요구하는 JSON 은 아직 없다(통합 모델 설계 §7-5 — 철자 v2 는 측정의 진행 조건 미달로 v1 유지).
 
 ## `photo_direction_v1.json` — 사진 표장 판정 방향 벡터 (2026-11-19)
 

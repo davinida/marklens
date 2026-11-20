@@ -22,7 +22,9 @@
       벡터(reconstruct). 코사인, 음수는 0. `--fill-easy-images` 는 기존 pairs_features_easy.csv 에
       x2_whole·has_image 만 채운다(재생성 없음 — 표본·이름 축은 그대로).
 축:   x1       phonetic_similarity(X1 호칭) — 발음 후보 없으면 함수가 0.0 을 돌려준다(게이트 꺼짐)
-      x2_text  orthographic_similarity(X2 문자 외관) — 글자 토큰 없으면 0.0
+      x2_text  orthographic_similarity(X2 문자 외관, 철자 v1) — 글자 토큰 없으면 0.0
+      x2_text_v2·x2_text_d_v2  같은 쌍의 철자 v2(요부 토큰 덮개 점수 — x2_ortho 모듈 설명,
+               2026-11-20). x2_text·x2_text_d 는 v1 그대로(통합 모델 v1.3·v1.4 의 입력)
       x2_fig   image_pairs_v1.csv 의 도형 크롭 CLIP 코사인(양쪽 크롭이 있을 때, x2_cache_v0 임베딩)
       x2_whole image_pairs_v1.csv 의 전체 이미지 CLIP 코사인(이미지 쌍이 있을 때) — 보조 열
       x3       semantic_similarity(X3 관념, 실제 모델) — has_meaning 이 한쪽이라도 False 면 0.0
@@ -94,6 +96,7 @@ META_COLUMNS = [
 DEFAULT_QUEUE_NAME = "curation_queue.csv"  # labels.csv 옆 — 라벨링 회차(회차 열)
 AXIS_COLUMNS = [
     "x1", "x2_text", "x2_fig", "x2_whole", "x3", "x3_raw", "x4", "x1_d", "x2_text_d", "x3_d",
+    "x2_text_v2", "x2_text_d_v2",  # 철자 v2(2026-11-20, x2_ortho 모듈 설명) — 앞의 둘은 v1
 ]
 FLAG_COLUMNS = [
     "has_names", "has_pron_a", "has_pron_b", "has_meaning_a", "has_meaning_b", "has_spelling_a",
@@ -270,6 +273,7 @@ def name_axes(name_a: str, name_b_: str, goods: frozenset[str], model: Distincti
     name_a = model.split_goods_suffix(name_a or "")
     name_b_ = model.split_goods_suffix(name_b_ or "")
     out = {"x1": "", "x2_text": "", "x3": "", "x3_raw": "", "x1_d": "", "x2_text_d": "", "x3_d": "",
+           "x2_text_v2": "", "x2_text_d_v2": "",
            "has_distinctive_part_a": int(model.has_distinctive_part(name_a, goods or None)),
            "has_distinctive_part_b": int(model.has_distinctive_part(name_b_, goods or None)),
            "weak_a": ";".join(sorted(model.weak_tokens(name_a, goods or None))),
@@ -284,6 +288,9 @@ def name_axes(name_a: str, name_b_: str, goods: frozenset[str], model: Distincti
         "x3": _fmt(gated), "x3_raw": _fmt(raw),
         "x1_d": _fmt(phonetic_similarity(name_a, name_b_, extra_generic=generic)),
         "x2_text_d": _fmt(orthographic_similarity(name_a, name_b_, extra_generic=generic)),
+        "x2_text_v2": _fmt(orthographic_similarity(name_a, name_b_, version=2)),
+        "x2_text_d_v2": _fmt(orthographic_similarity(name_a, name_b_, extra_generic=generic,
+                                                     version=2)),
         "x3_d": _fmt(x3.semantic_similarity(name_a, name_b_, extra_generic=generic)),
     })
     return out
@@ -620,19 +627,14 @@ def _db_name(record: dict) -> str:
     return (record.get("상표한글명") or record.get("상표영문명") or "").strip()
 
 
-def refresh_easy_rows(easy_rows: list[dict], features: list[dict], label_rows: list[dict],
-                      db_records: list[dict], *, model: Distinctiveness,
-                      max_score: float = EASY_MAX_SCORE) -> tuple[list[dict], dict]:
-    """쉬운 음성 쌍 목록(키·이름·pair_source)은 그대로 두고 이름 축·요부 플래그·상품 축을 현재
-    코드·현재 데이터로 다시 계산한다. 이미지 축(REFRESH_KEEP)은 기존 값. 유사군 출처를 찾지 못한
-    쌍(그 사건·이름의 행이 지금 특징 파일에 없거나 db 색인의 이름이 다름)은 유사군 없이 이름 축만
-    다시 계산하고 x4 는 기존 값을 둔다(보고의 "출처_못_찾음"). 같은 이름의 상대 표장이 여럿이면
-    기존 x4 를 그대로 내는 후보를, 없으면 상대번호 순 첫 후보를 쓴다.
-
-    보고: 열별 바뀐 칸 수(전체·출처별), 우연 유사 기준(x1·x2_text ≥ max_score)에 새로 걸린 쌍."""
+def easy_pair_goods(easy_rows: list[dict], features: list[dict], label_rows: list[dict],
+                    db_records: list[dict]) -> list[tuple[frozenset[str] | None,
+                                                          frozenset[str] | None]]:
+    """쉬운 음성 쌍마다 (이름 A 쪽 유사군, 이름 B 쪽 유사군) — 출처를 못 찾으면 (None, None) 쪽이
+    있다. cross 는 사건·이름의 유사군(같은 이름의 상대 표장이 여럿이면 기존 x4 를 그대로 내는 후보,
+    없으면 상대번호 순 첫 후보), db 는 색인의 레코드(이름이 같을 때만)."""
     side_a, side_b = easy_goods_sides(features, label_rows)
-    out: list[dict] = []
-    unresolved = {"cross": 0, "db": 0}
+    out: list[tuple[frozenset[str] | None, frozenset[str] | None]] = []
     for old in easy_rows:
         source, _, pair = old["심판번호"].partition(":")
         name_a, name_b_ = old["이름A"], old["이름B"]
@@ -661,6 +663,27 @@ def refresh_easy_rows(easy_rows: list[dict], features: list[dict], label_rows: l
             ):
                 goods_a = frozenset(record_a.get("유사군") or ())
                 goods_b = frozenset(record_b.get("유사군") or ())
+        out.append((goods_a, goods_b))
+    return out
+
+
+def refresh_easy_rows(easy_rows: list[dict], features: list[dict], label_rows: list[dict],
+                      db_records: list[dict], *, model: Distinctiveness,
+                      max_score: float = EASY_MAX_SCORE) -> tuple[list[dict], dict]:
+    """쉬운 음성 쌍 목록(키·이름·pair_source)은 그대로 두고 이름 축·요부 플래그·상품 축을 현재
+    코드·현재 데이터로 다시 계산한다. 이미지 축(REFRESH_KEEP)은 기존 값. 유사군 출처를 찾지 못한
+    쌍(그 사건·이름의 행이 지금 특징 파일에 없거나 db 색인의 이름이 다름)은 유사군 없이 이름 축만
+    다시 계산하고 x4 는 기존 값을 둔다(보고의 "출처_못_찾음"). 같은 이름의 상대 표장이 여럿이면
+    기존 x4 를 그대로 내는 후보를, 없으면 상대번호 순 첫 후보를 쓴다.
+
+    보고: 열별 바뀐 칸 수(전체·출처별), 우연 유사 기준(x1·x2_text ≥ max_score)에 새로 걸린 쌍."""
+    out: list[dict] = []
+    unresolved = {"cross": 0, "db": 0}
+    for old, (goods_a, goods_b) in zip(easy_rows,
+                                       easy_pair_goods(easy_rows, features, label_rows,
+                                                       db_records)):
+        source = old["심판번호"].partition(":")[0]
+        name_a, name_b_ = old["이름A"], old["이름B"]
         resolved = goods_a is not None and goods_b is not None
         row = _easy_row(source, old["심판번호"], name_a, name_b_, goods_a or frozenset(),
                         goods_b or frozenset(), model)
