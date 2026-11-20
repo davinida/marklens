@@ -31,6 +31,15 @@
                없으면 결측
 플래그: has_names(양쪽 이름), has_pron_a/b, has_meaning_a/b, has_spelling_a/b, has_goods, has_image,
       has_fig (1/0).
+사진: 사진A·사진B — 쌍의 두 이미지가 실물·장면 사진인지(src.photo_mark, CLIP 임베딩 방향 판정;
+      1/0, 이미지 쌍이 없으면 빈 칸). 통합 모델 v1.4 학습은 사진이 낀 쌍의 이미지 축을 "관측 없음"
+      으로 둔다(값은 지우지 않는다 — 판정과 값은 따로).
+쌍키: 표장 쌍 키(trials_collect.pair_key 와 같은 규칙: 번호 > 정규화 명칭) — 같은 쌍 키가 여러
+      사건에 걸치면 교차검증·부트스트랩에서 한 묶음으로 다룬다. 보강: 2등급 보강(sheet
+      --augment-queue)으로 큐에 든 사건이면 1(민감도 분석용).
+쉬운 음성 다시 계산(--refresh-easy): 쌍 목록(키·이름)은 그대로 두고 이름 축·요부 플래그·상품 축을
+      현재 코드·현재 데이터로 다시 계산한다(이미지 축 x2_whole·has_image 는 기존 값 유지). db 쌍의
+      색인은 수집 출처 "기존 수집" 레코드(표본을 뽑던 때의 1,100건) 기준이다.
 메타: 심판번호, 종류, 상대번호, 최종라벨(유사여부_확정), 표장라벨(x2_benchmark.mark_label —
       상품만으로 결론 난 비유사는 ""), 판단축(판단축_확정, 비면 llm_b_판단축),
       상표유형(확정 > 추정), 이름A, 이름B, 이름B_출처, 메모, 회차(라벨링 회차 — curation_queue.csv
@@ -55,6 +64,7 @@ if str(ML_ROOT) not in sys.path:
 
 # x2_benchmark 가 torch → faiss 순서로 import 한다(ml/src/search.py 주석). 그 뒤에 축 함수.
 from scripts.x2_benchmark import mark_label  # noqa: E402
+from src import photo_mark  # noqa: E402
 from src.axes import x3_semantic as x3  # noqa: E402
 from src.axes.distinctiveness import Distinctiveness, load_distinctiveness  # noqa: E402
 from src.axes.x1_phonetic import has_pronunciation, phonetic_similarity  # noqa: E402
@@ -79,7 +89,7 @@ NAME_B_SOURCES = (("kipris", "상대표장_명칭_kipris"), ("llm", "상대표�
 FIGURE_MEMO = "도형"  # label --name-b "" --memo 도형 이 메모에 남기는 표시
 META_COLUMNS = [
     "심판번호", "종류", "상대번호", "최종라벨", "표장라벨", "판단축", "판단축_출처", "상표유형",
-    "상표유형_출처", "이름A", "이름B", "이름B_출처", "메모", "pair_source", "회차",
+    "상표유형_출처", "이름A", "이름B", "이름B_출처", "메모", "pair_source", "회차", "쌍키", "보강",
 ]
 DEFAULT_QUEUE_NAME = "curation_queue.csv"  # labels.csv 옆 — 라벨링 회차(회차 열)
 AXIS_COLUMNS = [
@@ -88,8 +98,11 @@ AXIS_COLUMNS = [
 FLAG_COLUMNS = [
     "has_names", "has_pron_a", "has_pron_b", "has_meaning_a", "has_meaning_b", "has_spelling_a",
     "has_spelling_b", "has_goods", "has_image", "has_fig", "has_distinctive_part_a",
-    "has_distinctive_part_b", "weak_a", "weak_b",
+    "has_distinctive_part_b", "weak_a", "weak_b", "사진A", "사진B",
 ]
+PHOTO_COLUMNS = ("사진A", "사진B")
+EASY_DB_SOURCE = "기존 수집"  # 쉬운 음성 db 쌍의 색인 기준(표본을 뽑던 때의 DB 1,100건)
+PAIR_KEY_SEPARATOR = "||"
 COLUMNS = META_COLUMNS + AXIS_COLUMNS + FLAG_COLUMNS
 
 
@@ -119,6 +132,44 @@ def label_rounds(queue_rows: list[dict]) -> dict[str, str]:
             continue
         out[number] = last if (row.get("보강") or "").strip() else (row.get("round") or "")
     return out
+
+
+def augmented_cases(queue_rows: list[dict]) -> set[str]:
+    """2등급 보강(sheet --augment-queue)으로 큐에 든 심판번호 — 보강 열이 찬 항목."""
+    return {row.get("심판번호", "") for row in queue_rows
+            if row.get("심판번호") and (row.get("보강") or "").strip()}
+
+
+def _normalize_mark_name(name: str) -> str:
+    """trials_collect.normalize_mark_name 과 같은 식(NFKC·소문자, 글자·숫자만)."""
+    import re
+    import unicodedata
+
+    return re.sub(r"[\W_]+", "", unicodedata.normalize("NFKC", name or "").casefold())
+
+
+def pair_key(row: dict) -> str:
+    """표장 쌍 키 — backend/scripts/trials_collect.pair_key 와 같은 규칙(번호가 있으면 번호, 없으면
+    정규화한 명칭; 상대 표장 명칭은 판정자가 적은 `상대표장_명칭_llm` 만). 한쪽이라도 없으면 ""."""
+    number_a = (row.get("상표A_번호") or "").strip()
+    a = f"번호:{number_a}" if number_a else _normalize_mark_name(row.get("상표A_명칭", ""))
+    number_b = (row.get("상표B_번호") or "").strip()
+    b = f"번호:{number_b}" if number_b else _normalize_mark_name(row.get("상대표장_명칭_llm", ""))
+    return f"{a}{PAIR_KEY_SEPARATOR}{b}" if a and b else ""
+
+
+def photo_flag(is_photo) -> str:
+    """사진 판정 → CSV 값("1"/"0", 판정 불가는 빈 칸)."""
+    return "" if is_photo is None else str(int(bool(is_photo)))
+
+
+def photo_lookup(paths: list[str], embeddings) -> dict[str, bool]:
+    """이미지 식별자 목록 → {식별자: 사진 여부}. embeddings(목록) → {식별자: 벡터}; 임베딩이 없는
+    식별자는 결과에 없다(판정 불가)."""
+    wanted = sorted({path for path in paths if path})
+    if not wanted or embeddings is None:
+        return {}
+    return {path: photo_mark.is_photo(vector) for path, vector in embeddings(wanted).items()}
 
 
 def _memo_says_figure(row: dict) -> bool:
@@ -239,7 +290,8 @@ def name_axes(name_a: str, name_b_: str, goods: frozenset[str], model: Distincti
 
 
 def build_row(row: dict, image_row: dict | None, model: Distinctiveness,
-              rounds: dict[str, str] | None = None) -> dict:
+              rounds: dict[str, str] | None = None, *, photos: dict[str, bool] | None = None,
+              augmented: set[str] | None = None) -> dict:
     name_a = (row.get("상표A_명칭") or "").strip()
     name_b_, source_b = name_b(row)
     axes, axes_source = judging_axes(row)
@@ -262,6 +314,11 @@ def build_row(row: dict, image_row: dict | None, model: Distinctiveness,
         "이름A": name_a, "이름B": name_b_, "이름B_출처": source_b, "메모": memo,
         "pair_source": "trial",
         "회차": (rounds or {}).get(row["심판번호"]) or row.get("round", "") or "",
+        "쌍키": pair_key(row), "보강": "1" if row["심판번호"] in (augmented or ()) else "",
+        "사진A": photo_flag((photos or {}).get((image_row or {}).get("이미지A") or ""))
+        if x2_whole is not None else "",
+        "사진B": photo_flag((photos or {}).get((image_row or {}).get("이미지B") or ""))
+        if x2_whole is not None else "",
         "x2_fig": _fmt(x2_fig), "x2_whole": _fmt(x2_whole), "x4": _fmt(x4),
         "has_names": int(has_names),
         "has_pron_a": int(has_pronunciation(name_a)), "has_pron_b": int(has_pronunciation(name_b_)),
@@ -276,11 +333,18 @@ def build_row(row: dict, image_row: dict | None, model: Distinctiveness,
 
 def build_features(label_rows: list[dict], image_rows: list[dict], *,
                    model: Distinctiveness | None = None,
-                   rounds: dict[str, str] | None = None) -> list[dict]:
+                   rounds: dict[str, str] | None = None, photo_embeddings=None,
+                   augmented: set[str] | None = None) -> list[dict]:
+    """photo_embeddings(상대 경로 목록) → {경로: CLIP 벡터} 가 있으면 사진A·사진B 를 채운다."""
     model = model or load_distinctiveness()
     by_key, by_case = image_index(image_rows)
-    return [build_row(row, find_image_row(row, by_key, by_case), model, rounds)
-            for row in target_rows(label_rows)]
+    targets = target_rows(label_rows)
+    matched = [find_image_row(row, by_key, by_case) for row in targets]
+    photos = photo_lookup(
+        [image_row.get(key) or "" for image_row in matched if image_row
+         for key in ("이미지A", "이미지B")], photo_embeddings)
+    return [build_row(row, image_row, model, rounds, photos=photos, augmented=augmented)
+            for row, image_row in zip(targets, matched)]
 
 
 # ---- 쉬운 음성 -------------------------------------------------------------------------------
@@ -305,14 +369,19 @@ def _easy_row(source: str, key: str, name_a: str, name_b_: str, goods_a: frozens
     return out
 
 
-def read_db_records(path: Path) -> list[dict]:
+def read_db_records(path: Path, source: str | None = EASY_DB_SOURCE) -> list[dict]:
     """DB(kipris_metadata.json) 레코드 중 상표명(한글명 > 영문명)이 있는 것. 쉬운 음성
-    `db:{i}|{j}` 의 i·j 는 이 목록의 색인이다(read_db_names 와 같은 순서)."""
+    `db:{i}|{j}` 의 i·j 는 이 목록의 색인이다(read_db_names 와 같은 순서).
+
+    source: 레코드에 `수집_출처` 가 있으면 그 값이 source 인 것만 — 쉬운 음성 표본은 DB 가 1,100건
+    ("기존 수집")일 때 뽑았으므로, 유명 브랜드 283건이 더해진 뒤에도 같은 색인이 같은 레코드를
+    가리키게 한다(출처 필드가 없는 옛 메타는 전부). None 이면 거르지 않는다."""
     if not Path(path).exists():
         return []
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     records = data.get("trademarks", data) if isinstance(data, dict) else data
-    return [r for r in records if (r.get("상표한글명") or r.get("상표영문명") or "").strip()]
+    return [r for r in records if (r.get("상표한글명") or r.get("상표영문명") or "").strip()
+            and (source is None or r.get("수집_출처") in (None, "", source))]
 
 
 def read_db_names(path: Path) -> list[tuple[str, frozenset[str]]]:
@@ -523,6 +592,168 @@ def fill_easy_images(easy_path: Path, features_path: Path, image_pairs_path: Pat
     return report
 
 
+# ---- 쉬운 음성 다시 계산(통합 모델 v1.4) -------------------------------------------------------
+
+REFRESH_KEEP = ("x2_whole", "has_image", "회차")  # 다시 계산하지 않고 기존 값을 두는 열
+
+
+def easy_goods_sides(features: list[dict], label_rows: list[dict]) -> tuple[dict, dict]:
+    """cross 쌍의 유사군 출처: (사건, 이름A) → 이 사건 표장 유사군, (사건, 이름B) → 상대 표장 유사군
+    후보 목록(상대번호 순 — 같은 이름의 상대 표장이 여럿일 수 있다). easy_negatives 와 같은 출처
+    (labels.csv 의 goods_codes_this·goods_codes_prior)."""
+    goods_by_key = {(r["심판번호"], r.get("상표B_번호", "") or ""):
+                    (_codes(r.get("goods_codes_this")), _codes(r.get("goods_codes_prior")))
+                    for r in label_rows}
+    side_a: dict[tuple[str, str], frozenset[str]] = {}
+    side_b: dict[tuple[str, str], list[frozenset[str]]] = {}
+    for feature in sorted(features, key=lambda f: (f["심판번호"], f.get("상대번호") or "")):
+        this, prior = goods_by_key.get((feature["심판번호"], feature.get("상대번호") or ""),
+                                       (frozenset(), frozenset()))
+        if feature["이름A"]:
+            side_a.setdefault((feature["심판번호"], feature["이름A"]), this)
+        if feature["이름B"]:
+            side_b.setdefault((feature["심판번호"], feature["이름B"]), []).append(prior)
+    return side_a, side_b
+
+
+def _db_name(record: dict) -> str:
+    return (record.get("상표한글명") or record.get("상표영문명") or "").strip()
+
+
+def refresh_easy_rows(easy_rows: list[dict], features: list[dict], label_rows: list[dict],
+                      db_records: list[dict], *, model: Distinctiveness,
+                      max_score: float = EASY_MAX_SCORE) -> tuple[list[dict], dict]:
+    """쉬운 음성 쌍 목록(키·이름·pair_source)은 그대로 두고 이름 축·요부 플래그·상품 축을 현재
+    코드·현재 데이터로 다시 계산한다. 이미지 축(REFRESH_KEEP)은 기존 값. 유사군 출처를 찾지 못한
+    쌍(그 사건·이름의 행이 지금 특징 파일에 없거나 db 색인의 이름이 다름)은 유사군 없이 이름 축만
+    다시 계산하고 x4 는 기존 값을 둔다(보고의 "출처_못_찾음"). 같은 이름의 상대 표장이 여럿이면
+    기존 x4 를 그대로 내는 후보를, 없으면 상대번호 순 첫 후보를 쓴다.
+
+    보고: 열별 바뀐 칸 수(전체·출처별), 우연 유사 기준(x1·x2_text ≥ max_score)에 새로 걸린 쌍."""
+    side_a, side_b = easy_goods_sides(features, label_rows)
+    out: list[dict] = []
+    unresolved = {"cross": 0, "db": 0}
+    for old in easy_rows:
+        source, _, pair = old["심판번호"].partition(":")
+        name_a, name_b_ = old["이름A"], old["이름B"]
+        goods_a: frozenset[str] | None = None
+        goods_b: frozenset[str] | None = None
+        if source == "cross":
+            case_a, _, case_b = pair.partition("|")
+            goods_a = side_a.get((case_a, name_a))
+            candidates = side_b.get((case_b, name_b_))
+            if goods_a is not None and candidates:
+                goods_b = candidates[0]
+                for candidate in candidates:
+                    both = bool(goods_a) and bool(candidate)
+                    value = _fmt(goods_similarity(goods_a, candidate)) if both else ""
+                    if value == (old.get("x4") or ""):
+                        goods_b = candidate
+                        break
+        elif source == "db":
+            i, _, j = pair.partition("|")
+            try:
+                record_a, record_b = db_records[int(i)], db_records[int(j)]
+            except (IndexError, ValueError):
+                record_a = record_b = None
+            if record_a and record_b and _db_name(record_a) == name_a and (
+                _db_name(record_b) == name_b_
+            ):
+                goods_a = frozenset(record_a.get("유사군") or ())
+                goods_b = frozenset(record_b.get("유사군") or ())
+        resolved = goods_a is not None and goods_b is not None
+        row = _easy_row(source, old["심판번호"], name_a, name_b_, goods_a or frozenset(),
+                        goods_b or frozenset(), model)
+        if not resolved:
+            unresolved[source] = unresolved.get(source, 0) + 1
+            row["x4"], row["has_goods"] = old.get("x4", ""), old.get("has_goods", 0)
+        for column in REFRESH_KEEP:
+            row[column] = old.get(column, "")
+        for column in PHOTO_COLUMNS:
+            row[column] = old.get(column, "")
+        out.append(row)
+    compared = [column for column in COLUMNS if column in easy_rows[0]] if easy_rows else []
+    changed: dict[str, dict[str, int]] = {}
+    for column in compared:
+        counts = {"cross": 0, "db": 0}
+        for old, new in zip(easy_rows, out):
+            if str(old.get(column, "")) != str(new.get(column, "")):
+                counts[new["pair_source"]] = counts.get(new["pair_source"], 0) + 1
+        if any(counts.values()):
+            changed[column] = {**counts, "합계": sum(counts.values())}
+    coincidental = [row["심판번호"] for row in out
+                    if row["x1"] != "" and (float(row["x1"]) >= max_score
+                                            or float(row["x2_text"]) >= max_score)]
+    report = {
+        "쌍": len(out), "출처_못_찾음": unresolved,
+        "바뀐_칸": changed, "바뀐_칸_합계": sum(item["합계"] for item in changed.values()),
+        "바뀐_행": sum(1 for old, new in zip(easy_rows, out)
+                    if any(str(old.get(c, "")) != str(new.get(c, "")) for c in compared)),
+        "유지한_열": list(REFRESH_KEEP),
+        "상품_축_있음": {source: sum(1 for row in out if row["pair_source"] == source
+                               and row["x4"] != "") for source in ("cross", "db")},
+        "우연_유사_기준_초과": {"기준": f"x1 또는 x2_text ≥ {max_score}", "쌍": coincidental},
+    }
+    return out, report
+
+
+def easy_photo_flags(easy_rows: list[dict], features: list[dict], image_rows: list[dict],
+                     db_records: list[dict], *, trial_embeddings, db_embeddings) -> dict:
+    """쉬운 음성 행에 사진A·사진B 를 제자리에서 채운다(이미지 축이 있는 행만 — easy_image_scores
+    와 같은 이미지 식별자). 같은 식별자로 x2_whole 을 다시 계산해 기존 값과 같은지도 센다(다르면 그
+    쌍의 이미지 식별이 표본을 채울 때와 달라졌다는 뜻)."""
+    sides, _reasons = easy_image_sides(easy_rows, features, image_rows, db_records)
+    wanted: dict[str, set[str]] = {"cross": set(), "db": set()}
+    for row, side in zip(easy_rows, sides):
+        if side and row["pair_source"] in wanted and row.get("x2_whole", "") != "":
+            wanted[row["pair_source"]].update(side)
+    vectors = {
+        "cross": trial_embeddings(sorted(wanted["cross"])) if wanted["cross"] else {},
+        "db": db_embeddings(sorted(wanted["db"])) if wanted["db"] else {},
+    }
+    filled = mismatch = photo_pairs = 0
+    for row, side in zip(easy_rows, sides):
+        row["사진A"] = row["사진B"] = ""
+        if row.get("x2_whole", "") == "" or side is None:
+            continue
+        table = vectors.get(row["pair_source"], {})
+        if side[0] not in table or side[1] not in table:
+            continue
+        score = max(0.0, float(np.dot(table[side[0]], table[side[1]])))
+        if abs(score - float(row["x2_whole"])) > 5e-4:
+            mismatch += 1
+            continue
+        flags = [photo_mark.is_photo(table[side[0]]), photo_mark.is_photo(table[side[1]])]
+        row["사진A"], row["사진B"] = photo_flag(flags[0]), photo_flag(flags[1])
+        filled += 1
+        photo_pairs += int(any(flags))
+    return {"판정한_쌍": filled, "사진_낀_쌍": photo_pairs, "이미지_식별_불일치": mismatch,
+            "이미지_축_있음": sum(1 for row in easy_rows if row.get("x2_whole", "") != "")}
+
+
+def refresh_easy(easy_path: Path, features_path: Path, labels_path: Path,
+                 image_pairs_path: Path, metadata_path: Path, *,
+                 model: Distinctiveness | None = None, providers=None) -> dict:
+    """pairs_features_easy.csv 를 제자리에서 다시 계산한다(쌍 목록·이미지 축 유지)."""
+    model = model or load_distinctiveness()
+    easy_rows = read_csv(easy_path)
+    features = read_csv(features_path)
+    label_rows = read_csv(labels_path)
+    db_records = read_db_records(metadata_path)
+    rows, report = refresh_easy_rows(easy_rows, features, label_rows, db_records, model=model)
+    if providers is not None:
+        image_rows = read_csv(image_pairs_path) if Path(image_pairs_path).exists() else []
+        trial_embeddings, db_embeddings = providers
+        report["사진"] = easy_photo_flags(rows, features, image_rows, db_records,
+                                        trial_embeddings=trial_embeddings,
+                                        db_embeddings=db_embeddings)
+    write_csv(easy_path, rows)
+    report["db_레코드(기존 수집, 이름 있음)"] = len(db_records)
+    report["x3_모델"] = x3.embedder_name()
+    report["출력"] = str(easy_path)
+    return report
+
+
 def _count(rows: list[dict], key: str) -> dict:
     counts: dict[str, int] = {}
     for row in rows:
@@ -563,6 +794,17 @@ def summarize(features: list[dict]) -> dict:
             for axis in ("x1", "x2_text", "x3")
         },
         "회차": _count(features, "회차"),
+        "사진": {
+            "판정한_쌍": sum(1 for f in features
+                         if f.get("사진A", "") != "" and f.get("사진B", "") != ""),
+            "한쪽만_판정한_쌍": sum(1 for f in features
+                             if (f.get("사진A", "") != "") != (f.get("사진B", "") != "")),
+            "사진_낀_쌍": sum(1 for f in features if "1" in (f.get("사진A"), f.get("사진B"))),
+            "사진A": sum(1 for f in features if f.get("사진A") == "1"),
+            "사진B": sum(1 for f in features if f.get("사진B") == "1"),
+        },
+        "쌍키_있음": sum(1 for f in features if f.get("쌍키")),
+        "보강": sum(1 for f in features if f.get("보강")),
         "종류": _count(features, "종류"), "상표유형": _count(features, "상표유형"),
         "상표유형_출처": _count(features, "상표유형_출처"),
         "판단축_출처": _count(features, "판단축_출처"),
@@ -580,12 +822,17 @@ def write_csv(path: Path, features: list[dict]) -> None:
 def run(labels_path: Path, image_pairs_path: Path, out_path: Path, *,
         model: Distinctiveness | None = None, easy: bool = False,
         metadata_path: Path = DEFAULT_METADATA, seed: int = 0, easy_images=None) -> dict:
+    """easy_images = (trial_embeddings, db_embeddings) 가 있으면 사진A·사진B(심결 추출 이미지의 사진
+    판정)와 쉬운 음성 이미지 축을 채운다. 없으면 사진 열은 빈 칸."""
     model = model or load_distinctiveness()
     label_rows = read_csv(labels_path)
     image_rows = read_csv(image_pairs_path) if Path(image_pairs_path).exists() else []
     queue_path = Path(labels_path).with_name(DEFAULT_QUEUE_NAME)
-    rounds = label_rounds(read_csv(queue_path)) if queue_path.exists() else {}
-    features = build_features(label_rows, image_rows, model=model, rounds=rounds)
+    queue_rows = read_csv(queue_path) if queue_path.exists() else []
+    rounds = label_rounds(queue_rows) if queue_rows else {}
+    features = build_features(label_rows, image_rows, model=model, rounds=rounds,
+                              photo_embeddings=easy_images[0] if easy_images else None,
+                              augmented=augmented_cases(queue_rows))
     write_csv(out_path, features)
     report = summarize(features)
     report["식별력"] = {"theta": model.theta, "theta_a": model.theta_a, "theta_n": model.theta_n,
@@ -620,10 +867,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--fill-easy-images", action="store_true",
                         help="기존 pairs_features_easy.csv 에 x2_whole·has_image 만 채운다"
                              "(재생성 없음)")
+    parser.add_argument("--refresh-easy", action="store_true",
+                        help="기존 pairs_features_easy.csv 의 쌍 목록·이미지 축은 두고 이름 축·"
+                             "요부·상품 축을 현재 코드·데이터로 다시 계산(사진A·사진B 도 채움)")
     parser.add_argument("--metadata", type=Path, default=DEFAULT_METADATA)
     parser.add_argument("--seed", type=int, default=0)
     args = parser.parse_args(argv)
     providers = default_easy_image_providers(base=args.image_pairs.parent)
+    if args.refresh_easy:
+        report = refresh_easy(args.out.with_name(args.out.stem + "_easy.csv"), args.out,
+                              args.labels, args.image_pairs, args.metadata, providers=providers)
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+        return 0
     if args.fill_easy_images:
         if providers is None:
             parser.error("서비스 색인(ml/data/index)이 없어 DB 이미지 임베딩을 읽을 수 없습니다")

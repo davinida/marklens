@@ -1,0 +1,777 @@
+{
+ "version": "risk_model_v1.4",
+ "trained_at": "2026-11-19",
+ "label": "최종",
+ "method": "prior_monotone_logistic",
+ "w_easy": 0.5,
+ "hyper": 1.0,
+ "removed_terms": [
+  "type_도형",
+  "type_결합-문자요부",
+  "type_결합-도형요부",
+  "miss_x1",
+  "miss_x2text",
+  "has_distinctive_part_a",
+  "has_distinctive_part_b",
+  "miss_x2img",
+  "miss_x4",
+  "miss_x3"
+ ],
+ "prior": {
+  "mu": {
+   "x1_d": 1.0,
+   "x2_text_d": 0.5,
+   "x3_d": 0.5,
+   "x1_d×문자계": 1.0,
+   "x1_d×any_no_distinctive": -0.5,
+   "x2_whole": 0.5,
+   "x2_whole×도형계": 1.0,
+   "x4": 1.0
+  },
+  "sigma": 1.0,
+  "applies_to": [
+   "x1_d",
+   "x2_text_d",
+   "x3_d",
+   "x1_d×문자계",
+   "x1_d×any_no_distinctive",
+   "x2_whole",
+   "x2_whole×도형계",
+   "x4"
+  ],
+  "intercept_prior": false
+ },
+ "monotone": {
+  "features": [
+   "x1_d",
+   "x2_text_d",
+   "x2_whole",
+   "x3_d",
+   "x4",
+   "x1_d×문자계",
+   "x2_whole×도형계",
+   "x1_d×any_no_distinctive"
+  ],
+  "constraint": "유사도 축 본체 ≥ 0; x2_whole 본체 + 도형계 교호작용 ≥ 0; x1 본체 + {문자계, 요부없음} 교호작용 모든 조합 ≥ 0 — 패턴마다"
+ },
+ "figure_rule": {
+  "threshold": 0.9,
+  "caveat": "도형 유사는 검증 데이터가 적어 참고용",
+  "validated": false,
+  "basis": "97후3050 후단(한 축의 유사로 혼동 우려) — 도형계 쌍 17 로 데이터 검증 불가, 제품 규칙(미검증). 도형계 입력은 figure_caveat True"
+ },
+ "pattern_axes": [
+  "x2_whole",
+  "x4"
+ ],
+ "pattern_rule": "패턴마다 소수 클래스 ≥ 50",
+ "reference_pattern": "x2_whole+x4",
+ "patterns": {
+  "base": {
+   "requires": [],
+   "features": [
+    "x1_d",
+    "x2_text_d",
+    "x3_d",
+    "any_no_distinctive",
+    "x1_d×문자계",
+    "x1_d×any_no_distinctive"
+   ],
+   "coefficients": {
+    "x1_d": 1.558,
+    "x2_text_d": 0.8547,
+    "x3_d": 0.0,
+    "any_no_distinctive": 0.7364,
+    "x1_d×문자계": 2.1974,
+    "x1_d×any_no_distinctive": -0.9297
+   },
+   "intercept": -3.6361,
+   "meta": {
+    "n": 1014,
+    "n_심결": 314,
+    "n_쉬운_음성": 700,
+    "유사": 187,
+    "비유사": 827,
+    "자기_패턴_행": 54,
+    "cv_auc": {
+     "심결": 0.6348,
+     "심결+cross+db": 0.9001
+    }
+   }
+  },
+  "x2_whole": {
+   "requires": [
+    "x2_whole"
+   ],
+   "features": [
+    "x1_d",
+    "x2_text_d",
+    "x3_d",
+    "any_no_distinctive",
+    "x1_d×문자계",
+    "x1_d×any_no_distinctive",
+    "x2_whole",
+    "x2_whole×도형계"
+   ],
+   "coefficients": {
+    "x1_d": 1.3354,
+    "x2_text_d": 0.8547,
+    "x3_d": 0.0,
+    "any_no_distinctive": 0.7488,
+    "x1_d×문자계": 2.4199,
+    "x1_d×any_no_distinctive": -0.9421,
+    "x2_whole": 0.5,
+    "x2_whole×도형계": 0.6382
+   },
+   "intercept": -3.8103,
+   "meta": {
+    "n": 887,
+    "n_심결": 272,
+    "n_쉬운_음성": 615,
+    "유사": 159,
+    "비유사": 728,
+    "자기_패턴_행": 602,
+    "cv_auc": {
+     "심결": 0.6231,
+     "심결+cross+db": 0.9013
+    }
+   }
+  },
+  "x4": {
+   "requires": [
+    "x4"
+   ],
+   "features": [
+    "x1_d",
+    "x2_text_d",
+    "x3_d",
+    "any_no_distinctive",
+    "x1_d×문자계",
+    "x1_d×any_no_distinctive",
+    "x4"
+   ],
+   "coefficients": {
+    "x1_d": 1.4033,
+    "x2_text_d": 0.8547,
+    "x3_d": 0.0,
+    "any_no_distinctive": 1.21,
+    "x1_d×문자계": 2.1454,
+    "x1_d×any_no_distinctive": -1.4033,
+    "x4": 0.9583
+   },
+   "intercept": -3.4535,
+   "meta": {
+    "n": 358,
+    "n_심결": 168,
+    "n_쉬운_음성": 190,
+    "유사": 95,
+    "비유사": 263,
+    "자기_패턴_행": 73,
+    "cv_auc": {
+     "심결": 0.6233,
+     "심결+cross+db": 0.8799
+    }
+   }
+  },
+  "x2_whole+x4": {
+   "requires": [
+    "x2_whole",
+    "x4"
+   ],
+   "features": [
+    "x1_d",
+    "x2_text_d",
+    "x3_d",
+    "any_no_distinctive",
+    "x1_d×문자계",
+    "x1_d×any_no_distinctive",
+    "x2_whole",
+    "x2_whole×도형계",
+    "x4"
+   ],
+   "coefficients": {
+    "x1_d": 1.2467,
+    "x2_text_d": 0.8547,
+    "x3_d": 0.0,
+    "any_no_distinctive": 1.0534,
+    "x1_d×문자계": 2.1454,
+    "x1_d×any_no_distinctive": -1.2467,
+    "x2_whole": 0.5,
+    "x2_whole×도형계": 0.3637,
+    "x4": 0.9583
+   },
+   "intercept": -3.4712,
+   "meta": {
+    "n": 285,
+    "n_심결": 144,
+    "n_쉬운_음성": 141,
+    "유사": 78,
+    "비유사": 207,
+    "자기_패턴_행": 285,
+    "cv_auc": {
+     "심결": 0.5919,
+     "심결+cross+db": 0.8515
+    }
+   }
+  }
+ },
+ "features": [
+  "x1_d",
+  "x2_text_d",
+  "x3_d",
+  "any_no_distinctive",
+  "x1_d×문자계",
+  "x1_d×any_no_distinctive",
+  "x2_whole",
+  "x2_whole×도형계",
+  "x4"
+ ],
+ "coefficients": {
+  "x1_d": 1.2467,
+  "x2_text_d": 0.8547,
+  "x3_d": 0.0,
+  "any_no_distinctive": 1.0534,
+  "x1_d×문자계": 2.1454,
+  "x1_d×any_no_distinctive": -1.2467,
+  "x2_whole": 0.5,
+  "x2_whole×도형계": 0.3637,
+  "x4": 0.9583
+ },
+ "intercept": -3.4712,
+ "coupling": {
+  "floors": {
+   "x2_whole": 0.3487,
+   "x4": 0.0252
+  },
+  "basis": "쉬운 음성(cross·db, 현실 분포) 비유사 쌍 평균 — 심결 비유사는 다툼이 있던 경계 쌍이라 '보통의 서로 다른 상표'보다 비슷하다",
+  "constraint": "상위 패턴(축 하나 더 관측, 그 축 = 하한값) 로짓 ≥ 하위 패턴 로짓 — 설계 항 상자의 모든 꼭짓점(rm.coupling_vertices); 학습은 SLSQP 선형 제약, 런타임은 적재 때 검증",
+  "same_name": {
+   "x1_d": 1.0,
+   "x2_text_d": 1.0,
+   "basis": "이름 없는 입력에 후보와 같은 이름(호칭·철자 1.0)을 더했을 때 이름 있는 패턴(v1.3)의 로짓 ≥ 이름 없는 패턴의 로짓 — 더한 뒤의 유형은 문자계(도형계였던 입력은 결합-문자요부), 요부 있음·없음 둘 다, 관념 게이트 꺼짐, 이미지·상품 값의 모든 꼭짓점. 학습은 선형 제약, 런타임은 적재 때 검증"
+  }
+ },
+ "grade_thresholds": {
+  "주의": 0.0902,
+  "검토 권장": 0.1805,
+  "위험": 0.5902
+ },
+ "grade_basis": "심결+cross+db OOF 확률(행마다 자기 결측 패턴의 계수 집합; 위험 정밀도 ≥ 0.8·최소 지지 30, 검토 권장 재현율 ≥ 0.9, 안전/주의 등분; 미달이면 위험 하한은 검토 권장 하한과 1.0 의 중간)",
+ "standalone_thresholds": {
+  "x1_d": 0.98,
+  "x2_text_d": 0.75,
+  "x2_whole": null,
+  "x3_d": 0.7707,
+  "x4": null
+ },
+ "standalone_precision": 0.7,
+ "standalone_reason": {
+  "x1_d": "τ 0.98: 정밀도 0.7068 재현율 0.5027 (점수 ≥ τ 인 쌍 133)",
+  "x2_text_d": "τ 0.75: 정밀도 0.7034 재현율 0.5455 (점수 ≥ τ 인 쌍 145)",
+  "x2_whole": "비활성 — 지지 10 이상에서 최대 정밀도 0.6211 (t ≥ 0.3777, n 190) < 0.7",
+  "x3_d": "τ 0.7707: 정밀도 0.7 재현율 0.1123 (점수 ≥ τ 인 쌍 30)",
+  "x4": "비활성 — 지지 10 이상에서 최대 정밀도 0.6706 (t ≥ 0.3333, n 85) < 0.7"
+ },
+ "meta": {
+  "n_trial": 314,
+  "n_pos": 187,
+  "n_neg": 127,
+  "n_excluded_no_name": 37,
+  "n_easy": 700,
+  "n_easy_with_image": 615,
+  "n_easy_with_goods": 190,
+  "folds": 5,
+  "repeats": 3,
+  "bootstrap": 500,
+  "cv_auc": {
+   "심결": 0.6184,
+   "심결+cross": 0.8705,
+   "심결+cross+db": 0.9113
+  },
+  "cv_auc_ci95": {
+   "심결": [
+    0.5543,
+    0.6756
+   ],
+   "심결+cross": [
+    0.8377,
+    0.8996
+   ],
+   "심결+cross+db": [
+    0.8877,
+    0.9335
+   ]
+  },
+  "brier": {
+   "심결": 0.2561,
+   "심결+cross+db": 0.0863
+  },
+  "comparison_cv_auc": {
+   "logistic": 0.6261,
+   "prior": 0.6184
+  },
+  "adoption_notes": [
+   "기준 logistic 심결 AUC 0.6261 (CI 상한 0.6857)",
+   "CI 밖으로 높은 방법 없음 → prior(판례 사전분포·단조 제약) 채택"
+  ],
+  "adoption_pending": false,
+  "sigma_selection": "fixed",
+  "sigma_fixed": "CV 무차별(심결 AUC 차 0.006 안, CI 겹침) → 설계 원칙에 따라 중간값 1.0",
+  "risk_min_support": 30,
+  "grade_precision": 0.7039,
+  "pattern_choice": {
+   "기준": "패턴마다 소수 클래스 ≥ 50",
+   "시도": [
+    {
+     "축": [
+      "x2_whole",
+      "x4"
+     ],
+     "패턴": {
+      "base": {
+       "n": 1014,
+       "유사": 187,
+       "비유사": 827
+      },
+      "x2_whole": {
+       "n": 887,
+       "유사": 159,
+       "비유사": 728
+      },
+      "x4": {
+       "n": 358,
+       "유사": 95,
+       "비유사": 263
+      },
+      "x2_whole+x4": {
+       "n": 285,
+       "유사": 78,
+       "비유사": 207
+      }
+     },
+     "가능": true
+    }
+   ]
+  },
+  "coupling_floors": {
+   "x2_whole": {
+    "하한": 0.3487,
+    "근거": "쉬운 음성 비유사 평균",
+    "쉬운_음성_비유사_평균": 0.3487,
+    "심결_비유사_평균": 0.4906,
+    "전체_비유사_평균": 0.3707,
+    "쉬운_음성_관측_n": 615
+   },
+   "x4": {
+    "하한": 0.0252,
+    "근거": "쉬운 음성 비유사 평균",
+    "쉬운_음성_비유사_평균": 0.0252,
+    "심결_비유사_평균": 0.3316,
+    "전체_비유사_평균": 0.1102,
+    "쉬운_음성_관측_n": 190
+   }
+  },
+  "monotonicity": {
+   "base → x2_whole (x2_whole)": {
+    "하한": 0.3487,
+    "n": 887,
+    "하한_이상": {
+     "n": 455,
+     "위반(p 내려감)": 0,
+     "로짓차_평균": 0.0956,
+     "로짓차_최소": 0.0004
+    },
+    "하한_미만": {
+     "n": 432,
+     "내려간_수": 422,
+     "로짓차_평균": -0.0469
+    },
+    "하한값_대입_로짓차_최소": 0.0
+   },
+   "base → x4 (x4)": {
+    "하한": 0.0252,
+    "n": 358,
+    "하한_이상": {
+     "n": 154,
+     "위반(p 내려감)": 0,
+     "로짓차_평균": 0.5131,
+     "로짓차_최소": 0.0322
+    },
+    "하한_미만": {
+     "n": 204,
+     "내려간_수": 17,
+     "로짓차_평균": 0.1608
+    },
+    "하한값_대입_로짓차_최소": 0.0
+   },
+   "x4 → x2_whole+x4 (x2_whole)": {
+    "하한": 0.3487,
+    "n": 285,
+    "하한_이상": {
+     "n": 176,
+     "위반(p 내려감)": 0,
+     "로짓차_평균": 0.1602,
+     "로짓차_최소": 0.0043
+    },
+    "하한_미만": {
+     "n": 109,
+     "내려간_수": 37,
+     "로짓차_평균": 0.0286
+    },
+    "하한값_대입_로짓차_최소": 0.0
+   },
+   "x2_whole → x2_whole+x4 (x4)": {
+    "하한": 0.0252,
+    "n": 285,
+    "하한_이상": {
+     "n": 134,
+     "위반(p 내려감)": 0,
+     "로짓차_평균": 0.5603,
+     "로짓차_최소": 0.0495
+    },
+    "하한_미만": {
+     "n": 151,
+     "내려간_수": 12,
+     "로짓차_평균": 0.2535
+    },
+    "하한값_대입_로짓차_최소": 0.0
+   }
+  },
+  "indicator_reference": {
+   "설명": "v1.2.1 지시변수 구조 + 쉬운 음성 이미지 축(오프셋 없이 전체 행 적합) — 참고",
+   "계수": {
+    "x1_d": 1.3301,
+    "x2_text_d": 0.9178,
+    "x2_whole": 0.6884,
+    "x3_d": 0.0759,
+    "x4": 1.3205,
+    "miss_x2img": 0.5646,
+    "miss_x3": 0.228,
+    "miss_x4": 0.3182,
+    "any_no_distinctive": 0.7951,
+    "x1_d×문자계": 2.4793,
+    "x2_whole×도형계": 0.6868,
+    "x1_d×any_no_distinctive": -0.9351
+   },
+   "절편": -4.4634,
+   "cv_auc": {
+    "심결": 0.6173,
+    "심결+cross": 0.8759,
+    "심결+cross+db": 0.9138
+   },
+   "brier": {
+    "심결": 0.2633,
+    "심결+cross+db": 0.0866
+   }
+  },
+  "feature_definitions": "축 점수 0~1. 결측 패턴(pattern_axes 의 관측 조합)마다 계수 집합 — 관측된 축만 입력, 결측 지시변수 없음(x3_d 는 has_meaning_both False 면 값 0). any_no_distinctive = 1 − has_distinctive_part_a·b, 교호작용 x1_d×문자계(문자·결합-문자요부·미상·결합)·x2_whole×도형계(도형·결합-도형요부)·x1_d×any_no_distinctive. 유형 주효과·miss_*·요부 플래그 2개 없음. 표준화 없음. 기여도 miss_pattern = 패턴 절편 − 기준 절편.",
+  "named_from": {
+   "version": "risk_model_v1.3",
+   "trained_at": "2026-10-25",
+   "note": "이름 있는 4벌(patterns)·등급 하한·단독 임계값·grade_precision·figure_rule 은 v1.3 JSON 을 그대로 복사 — 위 meta 의 n·AUC 도 v1.3 학습 때의 값"
+  },
+  "nameless": {
+   "attempt": "v1.4 2차 시도 — 이름 있는 4벌은 v1.3 그대로, 이름 없는 2벌만 학습",
+   "trained_at": "2026-11-19",
+   "집합": {
+    "noname:x2_whole": {
+     "n": 1010,
+     "n_심결": 453,
+     "n_쉬운_음성": 557,
+     "유사": 270,
+     "비유사": 740,
+     "가중_유사": 225.0,
+     "가중_비유사": 439.5,
+     "자기_패턴_행": 31,
+     "자기_패턴_심결": 31
+    },
+    "noname:x2_whole+x4": {
+     "n": 727,
+     "n_심결": 278,
+     "n_쉬운_음성": 449,
+     "유사": 168,
+     "비유사": 559,
+     "가중_유사": 123.9,
+     "가중_비유사": 317.8,
+     "자기_패턴_행": 44,
+     "자기_패턴_심결": 44
+    }
+   },
+   "n_trial": 566,
+   "n_nameless": 75,
+   "n_excluded_no_name_no_image": 31,
+   "n_easy": 700,
+   "rounds": {
+    "1": 329,
+    "2": 237
+   },
+   "case_weight": {
+    "상한": 3.0,
+    "사건": 433,
+    "묶음": 430,
+    "1_미만_행": 97,
+    "가중_합": 499.0,
+    "rule": "w = min(1, 3 / 그 사건의 행 수)"
+   },
+   "w_easy": 0.5,
+   "photo": {
+    "적용": true,
+    "이미지_있는_쌍": {
+     "trial": 538,
+     "cross": 265,
+     "db": 350
+    },
+    "사진_낀_쌍": {
+     "trial": 85,
+     "cross": 44,
+     "db": 14
+    },
+    "rule": "사진A·사진B(src.photo_mark) 가운데 하나라도 1 이면 이미지 축을 관측 없음으로 — 이름 없는 집합의 학습 행에만 적용"
+   },
+   "prior": {
+    "mu": {
+     "x2_whole": 0.5,
+     "x2_whole×도형계": 1.0,
+     "x4": 1.0
+    },
+    "sigma": 1.0,
+    "intercept_prior": false
+   },
+   "constraints": "단조(기울기 ≥ 0) + 두 벌 사이의 축 결합(coupling.floors) + 같은 이름(coupling.same_name)",
+   "folds": 5,
+   "repeats": 3,
+   "bootstrap": 500,
+   "metric_bootstrap": 1000,
+   "cv": {
+    "전체": {
+     "auc_가중": 0.6526,
+     "brier_가중": 0.2422,
+     "auc_가중_v1.3": 0.6189,
+     "brier_가중_v1.3": 0.282
+    },
+    "1차": {
+     "auc_가중": 0.6395,
+     "brier_가중": 0.2477,
+     "auc_가중_v1.3": 0.6349,
+     "brier_가중_v1.3": 0.2581
+    },
+    "2차": {
+     "auc_가중": 0.6831,
+     "brier_가중": 0.2322,
+     "auc_가중_v1.3": 0.6087,
+     "brier_가중_v1.3": 0.3261
+    },
+    "문자계": {
+     "auc_가중": 0.6238,
+     "brier_가중": 0.2486,
+     "auc_가중_v1.3": 0.622,
+     "brier_가중_v1.3": 0.255
+    },
+    "도형계": {
+     "auc_가중": 0.7889,
+     "brier_가중": 0.2078,
+     "auc_가중_v1.3": 0.5105,
+     "brier_가중_v1.3": 0.4275
+    },
+    "이름 있는 행": {
+     "auc_가중": 0.643,
+     "brier_가중": 0.2465,
+     "auc_가중_v1.3": 0.643,
+     "brier_가중_v1.3": 0.2465
+    },
+    "이름 없는 행": {
+     "auc_가중": 0.7968,
+     "brier_가중": 0.2128,
+     "auc_가중_v1.3": 0.7582,
+     "brier_가중_v1.3": 0.5287
+    },
+    "심결+cross": {
+     "auc_가중": 0.8544,
+     "brier_가중": 0.147,
+     "auc_가중_v1.3": 0.79,
+     "brier_가중_v1.3": 0.1703
+    },
+    "심결+cross+db": {
+     "auc_가중": 0.8934,
+     "brier_가중": 0.1087,
+     "auc_가중_v1.3": 0.8164,
+     "brier_가중_v1.3": 0.1252
+    },
+    "이름 있는 심결+cross+db": {
+     "auc_가중": 0.8942,
+     "brier_가중": 0.1029,
+     "auc_가중_v1.3": 0.8942,
+     "brier_가중_v1.3": 0.1029
+    }
+   },
+   "optimizer": {
+    "solver": "SLSQP",
+    "kkt_residual": 7.321292133605588e-07,
+    "min_slack": -3.736122522468577e-11,
+    "cv_수렴_실패": 0
+   },
+   "adoption": {
+    "채택": true,
+    "판정": "v1.4 채택"
+   },
+   "grade_thresholds": {
+    "calibrated_at": "2026-11-20",
+    "rule": {
+     "뜻": "등급의 뜻 = 무관한 상표 쌍이 그 등급 이상을 받는 비율 — 이름 있는 입력과 맞춘다",
+     "기준_집합": "U = 이미지가 있는 쉬운 음성 쌍(cross·db, 사진 규칙 뒤). 이미지+상품용은 상품도 관측된 쌍",
+     "이름_있는_채점": "v1.3(= v1.4 의 이름 있는 쪽)으로 같은 축만(이미지만용은 상품을 가린다), 행의 유형(쉬운 음성은 문자), 등급은 risk_score 의 최종 등급(단독 규칙 포함)",
+     "이름_없는_채점": "이름을 가린 도형계 입력을 v1.4 의 이름 없는 집합(배포 계수)으로",
+     "하한": "U 에서 이름 있는 등급이 그 등급 이상인 쌍 수 k → 이름 없는 위험도의 k 번째로 큰 값(소수 4자리 내림). 주의·검토 권장",
+     "위험": "max(기존 위험 하한, 같은 방식으로 맞춘 값)",
+     "예외": "비율이 0 이거나 하한이 표본 최댓값(U 의 이름 없는 위험도 최댓값)을 넘으면 그 등급은 그 입력 종류에서 '단독 규칙으로만 도달'(하한 null). 다른 규칙은 시도하지 않는다"
+    },
+    "kinds": {
+     "이미지만": {
+      "pattern": "noname:x2_whole",
+      "n": 557,
+      "pairs": {
+       "cross": 221,
+       "db": 336
+      },
+      "nameless_prob": {
+       "최댓값": 0.5442,
+       "최솟값": 0.1335,
+       "평균": 0.267
+      },
+      "grades": {
+       "주의": {
+        "named_at_or_above": 186,
+        "share": 0.3339,
+        "matched": 0.279,
+        "threshold": 0.279,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 186
+       },
+       "검토 권장": {
+        "named_at_or_above": 25,
+        "share": 0.0449,
+        "matched": 0.4258,
+        "threshold": 0.4258,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 25
+       },
+       "위험": {
+        "named_at_or_above": 0,
+        "share": 0.0,
+        "matched": null,
+        "threshold": null,
+        "reason": "비율 0 — 단독 규칙으로만 도달",
+        "nameless_at_or_above": 0
+       }
+      }
+     },
+     "이미지+상품": {
+      "pattern": "noname:x2_whole+x4",
+      "n": 449,
+      "pairs": {
+       "cross": 113,
+       "db": 336
+      },
+      "nameless_prob": {
+       "최댓값": 0.7295,
+       "최솟값": 0.1291,
+       "평균": 0.2641
+      },
+      "grades": {
+       "주의": {
+        "named_at_or_above": 270,
+        "share": 0.6013,
+        "matched": 0.2221,
+        "threshold": 0.2221,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 270
+       },
+       "검토 권장": {
+        "named_at_or_above": 48,
+        "share": 0.1069,
+        "matched": 0.3709,
+        "threshold": 0.3709,
+        "reason": "U 에서 비율을 맞춤",
+        "nameless_at_or_above": 48
+       },
+       "위험": {
+        "named_at_or_above": 0,
+        "share": 0.0,
+        "matched": null,
+        "threshold": null,
+        "reason": "비율 0 — 단독 규칙으로만 도달",
+        "nameless_at_or_above": 0
+       }
+      }
+     }
+    },
+    "note": "null = 그 등급은 그 입력 종류에서 위험도로는 닿지 않는다(단독 규칙으로만). 이름 있는 입력은 최상위 grade_thresholds 그대로"
+   }
+  }
+ },
+ "nameless_patterns": {
+  "x2_whole": {
+   "requires": [
+    "x2_whole"
+   ],
+   "features": [
+    "x2_whole",
+    "x2_whole×도형계"
+   ],
+   "coefficients": {
+    "x2_whole": 2.1447,
+    "x2_whole×도형계": 0.3229
+   },
+   "intercept": -1.9187,
+   "meta": {
+    "n": 1010,
+    "n_심결": 453,
+    "n_쉬운_음성": 557,
+    "유사": 270,
+    "비유사": 740,
+    "가중_유사": 225.0,
+    "가중_비유사": 439.5,
+    "자기_패턴_행": 31,
+    "자기_패턴_심결": 31
+   },
+   "grade_thresholds": {
+    "주의": 0.279,
+    "검토 권장": 0.4258,
+    "위험": null
+   }
+  },
+  "x2_whole+x4": {
+   "requires": [
+    "x2_whole",
+    "x4"
+   ],
+   "features": [
+    "x2_whole",
+    "x2_whole×도형계",
+    "x4"
+   ],
+   "coefficients": {
+    "x2_whole": 2.1447,
+    "x2_whole×도형계": 0.3229,
+    "x4": 1.5302
+   },
+   "intercept": -1.9572,
+   "meta": {
+    "n": 727,
+    "n_심결": 278,
+    "n_쉬운_음성": 449,
+    "유사": 168,
+    "비유사": 559,
+    "가중_유사": 123.9,
+    "가중_비유사": 317.8,
+    "자기_패턴_행": 44,
+    "자기_패턴_심결": 44
+   },
+   "grade_thresholds": {
+    "주의": 0.2221,
+    "검토 권장": 0.3709,
+    "위험": null
+   }
+  }
+ }
+}

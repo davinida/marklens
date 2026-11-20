@@ -1,4 +1,5 @@
-"""통합 모델 런타임(v1 → v1.1 → v1.2 → v1.3) — 4축 점수(X1 호칭·X2 외관·X3 관념·X4 상품)를 출처
+"""통합 모델 런타임(v1 → v1.1 → v1.2 → v1.3 → v1.4) — 4축 점수(X1 호칭·X2 외관·X3 관념·X4 상품)를
+출처
 혼동 위험도 p(0~1)·등급·기여도·도형 주의 표시로 합치는 순수 함수. 설계는
 docs/MarkLens_통합모델_설계.md §3·§4-3·§7·§7-1·§7-2·§7-3.
 
@@ -33,6 +34,25 @@ v1.3(§7-3) — 결측 패턴별 계수 집합: ≤ v1.2.1 은 결측 축을 "�
 묶는다). `coupling`(결합 제약)이 있으면 적재 때 "축 하나를 하한값(`floors`, 현실 분포 비유사 쌍
 평균)으로 더 관측해도 로짓이 내려가지 않음"을 설계 항 상자의 모든 꼭짓점에서 검증한다 — 입력을
 더 주면 p 가 내려가지 않는다는 보장(`coupling_violations`).
+
+v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·철자) 축이 없는 입력도 이름 있는
+패턴에 이름 항 0 을 넣어 계산했다. v1.4 JSON 은 `nameless_patterns`(키는 `patterns` 와 같은 패턴 키,
+이미지가 관측된 것만 — 이미지만 `x2_whole` / 이미지+상품 `x2_whole+x4`)를 더 두고, x1_d·x2_text_d
+가 둘 다 결측인 입력에 그 패턴 키가 있으면 그 집합을 쓴다(`RiskResult.pattern` 은 "noname:" + 키;
+입력 항은 이미지·상품 항뿐). 이름도 이미지도 없는 입력(상품만 등)은 종전대로 `patterns` 의 집합에
+이름 항 0. 결합 제약은 이름 쪽으로도 넓혀 적재 때 검증한다 — 이름 없는 패턴 안에서 축 하나를 더
+관측하는 것(하한 이상이면 로짓 비감소)과 이름을 더 관측하는 것. 이름 쪽 제약은 JSON 이 가진 키로
+정해진다: `coupling.same_name`(2차 시도 — 이름 없는 입력에 후보와 **같은 이름**(호칭·철자 1.0)을
+더했을 때의 이름 있는 패턴 로짓 ≥ 이름 없는 패턴 로짓; 더한 뒤의 유형은 서비스 규칙대로 문자계
+`type_with_name`, 요부 유무 양쪽, 이미지·상품 값의 모든 꼭짓점) 또는 `coupling.name_floors`(1차
+시도 — 이름을 쉬운 음성 평균 이상으로 더 관측하면 비감소; 채택되지 않은 형식이고 그 학습 스크립트의
+재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다. 서비스 기본
+모델(DEFAULT_MODEL_PATH)은 v1.3 그대로다.
+
+이름 없는 입력의 등급 하한(§7-4-3): 이름 없는 계수 집합은 `grade_thresholds` 를 따로 둘 수 있고,
+그 집합이 쓰인 입력의 등급은 그 하한으로 매긴다(`grade_thresholds_for`; 없으면 최상위 하한). 하한이
+null 인 등급은 위험도 p 로는 닿지 않는다 — 단독 규칙(도형 규칙 τ)으로만 닿는다. 이름 있는 입력과
+v1.3 이하 JSON 의 등급 판정은 달라지지 않는다.
 """
 
 from __future__ import annotations
@@ -50,15 +70,18 @@ __all__ = [
     "grade_for", "axis_contributions", "mark_type_level", "monotone_violations",
     "coupling_violations", "coupling_vertices", "select_pattern", "pattern_key", "pattern_keys",
     "block_logit", "GRADES", "TYPE_LEVELS", "AXIS_INPUTS", "FIGURE_FAMILY", "PATTERN_BASE_KEY",
-    "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH",
+    "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH", "NAMELESS_KEY", "NAMELESS_PREFIX", "NAME_AXES",
+    "NAME_FLOOR_AXES", "NAME_DERIVED_TERMS", "name_missing", "nameless_vertices",
+    "name_coupling_vertices", "SAME_NAME_KEY", "type_with_name", "same_name_input",
+    "grade_thresholds_for",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1.3"
+MODEL_VERSION = "risk_model_v1.3"  # 서비스 기본 모델(train_risk_model.py 가 쓰는 버전)
 SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2", "risk_model_v1.2.1",
-                      "risk_model_v1.3")
+                      "risk_model_v1.3", "risk_model_v1.4")
 INTERACTION_OF = {"x1_d": "x1_d×문자계", "x2_whole": "x2_whole×도형계"}
 MONOTONE_AXES = ("x1_d", "x2_text_d", "x2_whole", "x3_d", "x4")
 X1_EXTRA_INTERACTIONS = ("x1_d×any_no_distinctive",)  # x1 효과에 더해지는 교호작용(요부 없음)
@@ -70,6 +93,17 @@ AXIS_INPUTS = (
 MISS_OF = dict(AXIS_INPUTS)
 PATTERN_BASE_KEY = "base"  # v1.3: 패턴 축이 하나도 관측되지 않은 입력의 계수 집합
 PATTERNABLE_AXES = ("x2_whole", "x4")  # 결측 패턴을 가를 수 있는 축(x3 는 게이트 결측 → 값 0)
+# v1.4: 이름 없는 입력의 계수 집합
+NAMELESS_KEY = "nameless_patterns"
+NAMELESS_PREFIX = "noname:"  # RiskResult.pattern 표기 — "noname:x2_whole" 등
+NAME_AXES = ("x1_d", "x2_text_d")  # 둘 다 결측이면 이름 없는 입력
+NAME_FLOOR_AXES = ("x1_d", "x2_text_d", "x3_d")  # coupling.name_floors 의 키
+SAME_NAME_KEY = "same_name"  # coupling.same_name — "같은 이름을 더하면 내려가지 않음"의 기준점
+NAME_DERIVED_TERMS = frozenset({  # 이름에서 나오는 설계 항 — 이름 없는 계수 집합에 둘 수 없다
+    "x1_d", "x2_text_d", "x3_d", "miss_x1", "miss_x2text", "miss_x3", "has_meaning_both",
+    "x3_d×has_meaning_both", "x1_d×문자계", "x1_d×any_no_distinctive", "x1_d×no_distinctive",
+    "any_no_distinctive", "has_distinctive_part_a", "has_distinctive_part_b",
+})
 TYPE_LEVELS = ("문자", "도형", "결합-문자요부", "결합-도형요부")
 TEXT_FAMILY = ("문자", "결합-문자요부")
 FIGURE_FAMILY = ("도형", "결합-도형요부")
@@ -194,14 +228,23 @@ def pattern_present(key: str) -> list[str]:
     return [] if key == PATTERN_BASE_KEY else key.split("+")
 
 
+def name_missing(values: dict[str, float]) -> bool:
+    """이름 없는 입력인가 — 이름 축(x1_d·x2_text_d)이 둘 다 결측."""
+    return all(values[MISS_OF[axis]] == 1.0 for axis in NAME_AXES)
+
+
 def select_pattern(model: dict, values: dict[str, float]) -> tuple[str, dict]:
     """v1.3: 관측된(miss_* = 0) 패턴 축의 조합으로 `patterns[키]` 를 고른다. 패턴이 없는(≤ v1.2.1)
-    JSON 이면 ("", model) — 최상위 계수 집합 그대로."""
+    JSON 이면 ("", model) — 최상위 계수 집합 그대로. v1.4: 이름 없는 입력이고
+    `nameless_patterns` 에 그 키가 있으면 ("noname:" + 키, 그 집합)."""
     patterns = model.get("patterns")
     if not patterns:
         return "", model
     axes = model.get("pattern_axes") or ()
     key = pattern_key([axis for axis in axes if values[MISS_OF[axis]] == 0.0], axes)
+    nameless = model.get(NAMELESS_KEY)
+    if nameless and key in nameless and name_missing(values):
+        return NAMELESS_PREFIX + key, nameless[key]
     return key, patterns[key]
 
 
@@ -245,14 +288,116 @@ def coupling_vertices(sub_features: Iterable[str]) -> list[dict]:
     return out
 
 
+def nameless_vertices(sub_features: Iterable[str]) -> list[dict]:
+    """이름 없는 패턴끼리의 결합 제약(축 하나를 더 관측)을 검사할 꼭짓점 — 유형(문자계·도형계) ×
+    하위 패턴 입력에 있는 패턴 축 0·1, 없는 축은 결측. 이름 축은 모두 결측."""
+    sub = set(sub_features)
+    states = {axis: ([0.0, 1.0] if axis in sub else [None]) for axis in PATTERNABLE_AXES}
+    return [{"x1_d": None, "x2_text_d": None, "x3_d": None, "mark_type": level,
+             "x2_whole": x2_whole, "x4": x4}
+            for level in ("문자", "도형")
+            for x2_whole in states["x2_whole"] for x4 in states["x4"]]
+
+
+def name_coupling_vertices(sub_features: Iterable[str]) -> list[dict]:
+    """이름을 더 관측하는 결합 제약(이름 없는 패턴 → 같은 키의 이름 있는 패턴)의 꼭짓점 —
+    nameless_vertices 에 요부 없음 유무를 더한 것(요부 플래그는 이름을 관측해야 생긴다)."""
+    return [{**vertex, "has_distinctive_part_a": True, "has_distinctive_part_b": distinctive}
+            for vertex in nameless_vertices(sub_features) for distinctive in (True, False)]
+
+
+def type_with_name(level: object) -> str:
+    """이름 없는 입력에 이름이 생긴 뒤의 유형 — 서비스 규칙(API 계약 v2 §2-4 5항): 이름이 있으면
+    항상 문자계. 도형계로 판정됐던 입력(도형 영역이 뚜렷함)은 결합-문자요부, 그 밖은 그대로(문자·
+    결합-문자요부)."""
+    level = mark_type_level(level)
+    return "결합-문자요부" if level in FIGURE_FAMILY else level
+
+
+def same_name_input(features: dict, same_name: dict | None = None, *,
+                    distinctive: bool = True) -> dict:
+    """이름 없는 입력에 후보와 같은 이름을 더한 입력: 호칭·철자 = `same_name` 의 값(기본 1.0),
+    관념은 게이트가 꺼진 것으로(값 0 — 계수가 음이 아니므로 가장 낮은 경우), 유형은 type_with_name,
+    요부 플래그는 distinctive(False = 요부 없는 이름)."""
+    values = same_name or {}
+    return {**features,
+            **{axis: float(values.get(axis, 1.0)) for axis in NAME_AXES},
+            "x3_d": None, "has_meaning_both": False,
+            "mark_type": type_with_name(features.get("mark_type", features.get("상표유형"))),
+            "has_distinctive_part_a": True, "has_distinctive_part_b": bool(distinctive)}
+
+
+def _where(vertex: dict) -> str:
+    return ", ".join(f"{k}={v}" for k, v in vertex.items()
+                     if k in ("x1_d", "x2_text_d", "x3_d", "mark_type", "x2_whole", "x4")
+                     and v is not None)
+
+
+def _nameless_coupling_violations(model: dict, tolerance: float) -> list[str]:
+    """v1.4: 이름 없는 패턴의 결합 제약 위반 — (a) 이름 없는 패턴 안에서 축 하나를 하한값으로 더
+    관측 (b) `coupling.name_floors` 가 있으면 이름을 그 값으로 더 관측(같은 키의 이름 있는 패턴,
+    관념 게이트는 켜진 상태로 값 = 하한 — 1차 시도 형식) (c) `coupling.same_name` 이 있으면 같은
+    이름을 더한 입력(same_name_input — 유형은 문자계로, 요부 유무 양쪽)."""
+    nameless = model.get(NAMELESS_KEY) or {}
+    if not nameless:
+        return []
+    patterns = model.get("patterns") or {}
+    coupling = model.get("coupling") or {}
+    floors = coupling.get("floors") or {}
+    name_floors = coupling.get("name_floors")
+    axes = list(model.get("pattern_axes") or ())
+    out = []
+    for key, upper in nameless.items():
+        present = pattern_present(key)
+        for axis in present:
+            lower_key = pattern_key([a for a in present if a != axis], axes)
+            if axis not in floors or lower_key not in nameless:
+                continue
+            lower = nameless[lower_key]
+            floor = float(floors[axis])
+            for vertex in nameless_vertices(lower["features"]):
+                low = block_logit(lower, design_values(vertex))
+                high = block_logit(upper, design_values({**vertex, axis: floor}))
+                if high < low - tolerance:
+                    out.append(f"{NAMELESS_PREFIX}{lower_key} → {NAMELESS_PREFIX}{key} "
+                               f"({axis} = {floor}) {round(high - low, 6)} @ {_where(vertex)}")
+    if name_floors is not None:
+        named = {axis: float(name_floors.get(axis, 0.0)) for axis in NAME_FLOOR_AXES}
+        for key, lower in nameless.items():
+            upper = patterns[key]
+            for vertex in name_coupling_vertices(lower["features"]):
+                low = block_logit(lower, design_values(vertex))
+                high = block_logit(upper, design_values({**vertex, **named,
+                                                         "has_meaning_both": True}))
+                if high < low - tolerance:
+                    out.append(f"{NAMELESS_PREFIX}{key} → {key} (이름 = {named}) "
+                               f"{round(high - low, 6)} @ {_where(vertex)}, "
+                               f"요부없음={not vertex['has_distinctive_part_b']}")
+    same_name = coupling.get(SAME_NAME_KEY)
+    if same_name is not None:
+        for key, lower in nameless.items():
+            upper = patterns[key]
+            for vertex in nameless_vertices(lower["features"]):
+                low = block_logit(lower, design_values(vertex))
+                for distinctive in (True, False):
+                    high = block_logit(upper, design_values(
+                        same_name_input(vertex, same_name, distinctive=distinctive)))
+                    if high < low - tolerance:
+                        out.append(f"{NAMELESS_PREFIX}{key} → {key} (같은 이름) "
+                                   f"{round(high - low, 6)} @ {_where(vertex)}, "
+                                   f"요부없음={not distinctive}")
+    return out
+
+
 def coupling_violations(model: dict, tolerance: float = 1e-9) -> list[str]:
     """결합 제약을 어기는 (하위 패턴 → 상위 패턴, 축, 꼭짓점) 설명 목록. 상위 패턴은 하위 패턴에
     축 하나를 더 관측한 것, 그 축 값은 `coupling.floors[축]`(현실 분포 비유사 쌍 평균). 로짓 차가
-    −tolerance 보다 작으면 위반."""
+    −tolerance 보다 작으면 위반. v1.4 JSON 이면 이름 없는 패턴의 제약(_nameless_coupling_violations)
+    도 함께."""
     patterns = model.get("patterns") or {}
     floors = (model.get("coupling") or {}).get("floors") or {}
     axes = list(model.get("pattern_axes") or ())
-    out = []
+    out = _nameless_coupling_violations(model, tolerance)
     for key, upper in patterns.items():
         present = pattern_present(key)
         for axis in present:
@@ -337,8 +482,62 @@ def _validate_patterns(data: dict, known: dict) -> None:
             or not 0.0 <= float(value) <= 1.0 for axis, value in floors.items()
         ):
             raise ValueError("risk_model: coupling.floors 는 {패턴 축: 0~1} 이어야 합니다")
+        name_floors = coupling.get("name_floors") if isinstance(coupling, dict) else None
+        if name_floors is not None and (not isinstance(name_floors, dict) or any(
+            axis not in NAME_FLOOR_AXES or not isinstance(value, (int, float))
+            or not 0.0 <= float(value) <= 1.0 for axis, value in name_floors.items()
+        )):
+            raise ValueError(f"risk_model: coupling.name_floors 는 {NAME_FLOOR_AXES} 의 값(0~1) "
+                             "사전이어야 합니다")
+        same_name = coupling.get(SAME_NAME_KEY) if isinstance(coupling, dict) else None
+        if same_name is not None and (not isinstance(same_name, dict) or any(
+            not isinstance(same_name.get(axis, 1.0), (int, float))
+            or not 0.0 <= float(same_name.get(axis, 1.0)) <= 1.0 for axis in NAME_AXES
+        )):
+            raise ValueError(f"risk_model: coupling.{SAME_NAME_KEY} 는 {NAME_AXES} 의 값(0~1)을 "
+                             "가진 사전이어야 합니다")
+    nameless = data.get(NAMELESS_KEY)
+    if nameless is not None:
+        _validate_nameless(data, nameless, known)
+    if coupling is not None:
         for violation in coupling_violations(data):
             raise ValueError(f"risk_model: 결합 제약 위반 — {violation}")
+
+
+def _validate_nameless(data: dict, nameless: object, known: dict) -> None:
+    """v1.4 `nameless_patterns` 검증: 키는 패턴 키의 부분집합, 입력 항은 이름에서 나오는 항이 없고
+    키의 패턴 축과 맞아야 한다(단조 제약도 집합마다)."""
+    axes = data["pattern_axes"]
+    valid_keys = pattern_keys(axes)
+    if not isinstance(nameless, dict) or not nameless or any(k not in valid_keys for k in nameless):
+        raise ValueError(f"risk_model: {NAMELESS_KEY} 의 키는 {valid_keys} 의 부분집합이어야 "
+                         "합니다")
+    for key, block in nameless.items():
+        label = f"risk_model.{NAMELESS_KEY}[{key}]"
+        _validate_block(block, label, known)
+        derived = sorted(NAME_DERIVED_TERMS & set(block["features"]))
+        if derived:
+            raise ValueError(f"{label}: 이름에서 나오는 항 {derived} 는 둘 수 없습니다")
+        present = pattern_present(key)
+        for axis in axes:
+            if (axis in present) != (axis in block["features"]):
+                raise ValueError(f"{label}: 입력의 패턴 축이 키와 다릅니다({axis})")
+            if MISS_OF[axis] in block["features"]:
+                raise ValueError(f"{label}: 결측 지시변수 {MISS_OF[axis]} 는 둘 수 없습니다")
+        if data.get("monotone"):
+            for violation in monotone_violations(block["coefficients"]):
+                raise ValueError(f"{label}: 단조 제약 위반 — {violation}")
+        thresholds = block.get("grade_thresholds")
+        if thresholds is not None:
+            if not isinstance(thresholds, dict) or set(thresholds) != set(GRADE_THRESHOLD_KEYS):
+                raise ValueError(f"{label}: grade_thresholds 키는 {GRADE_THRESHOLD_KEYS} 여야 "
+                                 "합니다")
+            cuts = [thresholds[grade] for grade in GRADE_THRESHOLD_KEYS
+                    if thresholds[grade] is not None]
+            if any(not isinstance(cut, (int, float)) or not 0.0 < float(cut) <= 1.0
+                   for cut in cuts) or any(a > b for a, b in zip(cuts, cuts[1:])):
+                raise ValueError(f"{label}: grade_thresholds 는 null 또는 (0, 1] 안의 값이고 "
+                                 "오름차순이어야 합니다")
 
 
 def validate_model(data: dict) -> dict:
@@ -427,12 +626,24 @@ def load_model(path: str | os.PathLike[str] | None = None) -> dict:
 
 
 def grade_for(prob: float, thresholds: dict) -> str:
-    """p 를 4단계로: 하한 이상이면 그 등급(위험 하한 이상 → 위험)."""
+    """p 를 4단계로: 하한 이상이면 그 등급(위험 하한 이상 → 위험). 하한이 null 인 등급은 p 로는 닿지
+    않는다(이름 없는 입력의 계수 집합에서만 — 그 등급은 단독 규칙으로만 닿는다)."""
     grade = GRADES[0]
     for key in GRADE_THRESHOLD_KEYS:
-        if prob >= float(thresholds[key]):
+        cut = thresholds[key]
+        if cut is not None and prob >= float(cut):
             grade = key
     return grade
+
+
+def grade_thresholds_for(model: dict, pattern: str = "") -> dict:
+    """그 계수 집합이 쓰인 입력의 등급 하한. `pattern` 은 RiskResult.pattern("x4"·"noname:x2_whole"
+    등). 이름 없는 집합에 자기 `grade_thresholds` 가 있으면 그것, 아니면 최상위 하한."""
+    if pattern.startswith(NAMELESS_PREFIX):
+        block = (model.get(NAMELESS_KEY) or {}).get(pattern[len(NAMELESS_PREFIX):]) or {}
+        if block.get("grade_thresholds"):
+            return block["grade_thresholds"]
+    return model["grade_thresholds"]
 
 
 def risk_score(features: dict, model: dict | None = None) -> RiskResult:
@@ -460,7 +671,7 @@ def risk_score(features: dict, model: dict | None = None) -> RiskResult:
         contributions[name] = term
         logit += term
     prob = 1.0 / (1.0 + math.exp(-logit)) if logit > -700 else 0.0
-    grade = grade_for(prob, model["grade_thresholds"])
+    grade = grade_for(prob, grade_thresholds_for(model, key))
     for axis, tau in (model.get("standalone_thresholds") or {}).items():
         if tau is None:
             continue
