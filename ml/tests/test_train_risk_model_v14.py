@@ -450,7 +450,7 @@ from scripts import train_risk_model_v14_nameless as t4n  # noqa: E402
 
 def test_attempt2_constraints_use_same_name_and_keep_named_blocks_fixed(data):
     features, easy = data
-    model_old = rm.load_model()
+    model_old = rm.load_model(rm.V13_MODEL_PATH)
     rows = t4.load_dataset(features, easy).rows
     a = t4.arrays(rows)
     design = t4.Design(rows)
@@ -496,7 +496,7 @@ def test_attempt2_random_inputs_and_identity_check():
     assert all(f["x1_d"] is not None or f["x2_text_d"] is not None for f in inputs)  # 이름 있음
     assert any(f["x1_d"] is None for f in inputs) and any(f["x2_whole"] is None for f in inputs)
     assert any(f["x4"] is None for f in inputs) and len({f["mark_type"] for f in inputs}) == 6
-    model = rm.load_model()
+    model = rm.load_model(rm.V13_MODEL_PATH)
     assert t4n.count_differences(inputs, model, model) == 0
     shifted = {**model, "patterns": {key: {**block, "intercept": block["intercept"] + 1e-4}
                                      for key, block in model["patterns"].items()}}
@@ -552,7 +552,7 @@ def test_attempt2_run_end_to_end_copies_v13_and_adds_nameless_blocks(data, tmp_p
     results = t4n.run(features, easy, out_dir=out_dir, model_path=model_path, folds=3, repeats=1,
                       bootstrap=4, metric_bootstrap=30, seed=0, n_random=300,
                       min_pattern_minority=5)
-    model_old = rm.load_model()
+    model_old = rm.load_model(rm.V13_MODEL_PATH)
     adoption = results["채택"]
     assert set(adoption["판정표"]) == {"①", "②", "③", "④"} and adoption["기준"] == t4n.ADOPTION
     # ① 이름 있는 입력의 출력은 v1.3 과 같다(구조상 언제나) · ④ 단조성도 제약이 보장한다
@@ -624,7 +624,7 @@ def test_attempt2_run_end_to_end_copies_v13_and_adds_nameless_blocks(data, tmp_p
 
 def test_attempt2_only_nameless_rows_change_and_minority_rule(data):
     features, easy = data
-    model_old = rm.load_model()
+    model_old = rm.load_model(rm.V13_MODEL_PATH)
     rows = t4.load_dataset(features, easy).rows
     result = t4n.train_once(rows, model_old, folds=3, repeats=1, min_minority=5)
     a, design = result["arrays"], result["design"]
@@ -642,7 +642,7 @@ def test_attempt2_image_only_population_is_a_reference_diagnostic(data):
     """판정 뒤에 덧붙인 참고 진단: 이름 없는 심결 행 + 이름을 가린 쉬운 음성 이미지 쌍을 도형계
     입력으로 본 집합의 지표·등급. 채택 판정표에는 들어가지 않는다."""
     features, easy = data
-    model_old = rm.load_model()
+    model_old = rm.load_model(rm.V13_MODEL_PATH)
     rows = t4.load_dataset(features, easy).rows
     result = t4n.train_once(rows, model_old, folds=3, repeats=1, min_minority=5)
     a, design = result["arrays"], result["design"]

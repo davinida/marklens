@@ -79,7 +79,8 @@ DEFAULT_BASE = ML_ROOT / "data" / "trials"
 DEFAULT_FEATURES = DEFAULT_BASE / "pairs_features.csv"
 DEFAULT_EASY = DEFAULT_BASE / "pairs_features_easy.csv"
 DEFAULT_OUT_DIR = DEFAULT_BASE
-DEFAULT_MODEL = rm.DEFAULT_MODEL_PATH
+DEFAULT_MODEL = rm.V13_MODEL_PATH  # 이 스크립트는 v1.3 을 쓴다(서비스 기본은 v1.4 — 덮어쓰지 않게)
+MODEL_VERSION = "risk_model_v1.3"
 NUMERIC = ("x1", "x2_text", "x2_fig", "x2_whole", "x3", "x3_raw", "x4", "x1_d", "x2_text_d", "x3_d")
 FLAGS = ("has_names", "has_pron_a", "has_pron_b", "has_meaning_a", "has_meaning_b",
          "has_spelling_a", "has_spelling_b", "has_goods", "has_image", "has_fig")
@@ -1518,7 +1519,7 @@ def run(features_path: Path, easy_path: Path | None, *, out_dir: Path, model_pat
     reference = blocks[design.full]
     pattern_meta = adopted["패턴"]
     model = {
-        "version": rm.MODEL_VERSION, "trained_at": date.today().isoformat(), "label": "최종",
+        "version": MODEL_VERSION, "trained_at": date.today().isoformat(), "label": "최종",
         "method": "prior_monotone_logistic" if adopted_method == "prior" else "logistic_l2",
         "w_easy": w_easy, "hyper": adopted["hyper"],
         "removed_terms": removed,

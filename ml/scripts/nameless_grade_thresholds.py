@@ -43,7 +43,7 @@ from scripts import train_risk_model as tr  # noqa: E402
 from scripts import train_risk_model_v14 as t4  # noqa: E402  (데이터 적재·가중 지표 도우미)
 
 DEFAULT_MODEL = rm.REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"
-DEFAULT_V13 = rm.DEFAULT_MODEL_PATH
+DEFAULT_V13 = rm.V13_MODEL_PATH
 DEFAULT_OUT_DIR = t4.DEFAULT_OUT_DIR
 REPORT_STEM = "risk_model_v1.4_thresholds"
 KINDS = (("이미지만", "x2_whole"), ("이미지+상품", "x2_whole+x4"))  # (표시 이름, 이름 없는 패턴 키)
@@ -328,12 +328,14 @@ def evaluate(rows: list[dict], model_named: dict, before: dict, after: dict, cal
 def run(features_path: Path, easy_path: Path, *, model_path: Path = DEFAULT_MODEL,
         v13_path: Path = DEFAULT_V13, out_dir: Path = DEFAULT_OUT_DIR, write: bool = True,
         folds: int = t4.FOLDS, repeats: int = t4.REPEATS, seed: int = 0,
-        min_pattern_minority: int = tr.MIN_PATTERN_MINORITY) -> dict:
+        min_pattern_minority: int = tr.MIN_PATTERN_MINORITY, force: bool = False) -> dict:
     """채택된 v1.4 JSON 을 읽어 하한을 계산하고(계수는 그대로) JSON 과 보고를 쓴다. 이름 없는 행의
     전후 표에는 2차 시도와 같은 OOF 위험도를 쓴다(겹 적합은 표를 위한 것이고 JSON 의 계수와
     무관)."""
     from scripts import train_risk_model_v14_nameless as t4n  # 순환 import 를 피해 여기서
 
+    if write:  # 실제 검색 기준 하한(§7-4-4)이 있으면 --force 없이는 계산 전에 멈춘다
+        rm.check_nameless_overwrite(model_path, force=force)
     model_named = rm.validate_model(json.loads(Path(v13_path).read_text(encoding="utf-8")))
     stored = rm.validate_model(json.loads(Path(model_path).read_text(encoding="utf-8")))
     before = without_thresholds(stored)
@@ -431,9 +433,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--v13", type=Path, default=DEFAULT_V13, help="이름 있는 채점에 쓰는 v1.3")
     parser.add_argument("--out-dir", type=Path, default=DEFAULT_OUT_DIR)
     parser.add_argument("--dry-run", action="store_true", help="JSON 을 쓰지 않는다")
+    parser.add_argument("--force", action="store_true",
+                        help="실제 검색 기준 하한(§7-4-4)이 있는 JSON 도 덮어쓴다")
     args = parser.parse_args(argv)
-    results = run(args.features, args.easy, model_path=args.model, v13_path=args.v13,
-                  out_dir=args.out_dir, write=not args.dry_run)
+    try:
+        results = run(args.features, args.easy, model_path=args.model, v13_path=args.v13,
+                      out_dir=args.out_dir, write=not args.dry_run, force=args.force)
+    except rm.OverwriteRefused as exc:
+        print(f"쓰지 않음: {exc}", file=sys.stderr)
+        return 4
     print(report_text(results))
     return 0
 

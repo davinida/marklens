@@ -21,21 +21,24 @@
 | `meta` | n·CV AUC(심결 0.6184·현실 0.9113)·Brier·채택 규칙·입력 정의·`sigma_selection`·`risk_min_support`·`grade_precision`·`pattern_choice`·`coupling_floors`·`monotonicity`(학습 행 검사)·`indicator_reference`(지시변수 구조 참고 모델 — miss_x2img 0.56) |
 
 재학습(프로젝트 루트, KIPRIS 호출 0, 기본 2방법 약 13초): `ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images`(쉬운 음성 이미지 축, 5초) →
-`ml/venv/bin/python ml/scripts/train_risk_model.py`. 런타임 `MODEL_VERSION` 은 risk_model_v1.3 이고 v1~v1.2.1 JSON 도 적재한다(패턴 없는 JSON 은 최상위
-계수 집합 하나로, 없는 키는 규칙 미적용).
+`ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-20 부터 서비스 기본 모델은 아래
+`risk_model_v1.4.json`(런타임 `MODEL_VERSION` risk_model_v1.4, `DEFAULT_MODEL_PATH`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1~v1.2.1 JSON 도 적재한다
+(패턴 없는 JSON 은 최상위 계수 집합 하나로, 없는 키는 규칙 미적용).
 
-## `risk_model_v1.4.json` — v1.4 (2차 학습), 서비스 반영 전 (2026-11-19 · 이름 없는 입력의 등급 하한 2026-11-20)
+## `risk_model_v1.4.json` — v1.4 (2차 학습), 서비스 기본 모델 (2026-11-19 학습 · 2026-11-20 서비스 반영)
 
-**서비스가 읽는 기본 모델은 위 `risk_model_v1.json`(v1.3) 그대로다.** `risk_model_v1.4.json`(version `risk_model_v1.4`)은 v1.3 JSON 에 이름 없는 입력용 계수 집합 2벌을
-덧붙인 것으로, `ml/scripts/train_risk_model_v14_nameless.py` 가 결과 전에 고정한 채택 기준 ①~④를 모두 채웠을 때만 쓴다(통합 모델 설계 §7-4-2). 이름 없는 입력의 등급
-하한은 따로 정했다(2026-11-20, 설계 §7-4-3 — 이름 있는 입력용 v1.3 하한을 그대로 쓰면 이름을 가린 무관한 로고 쌍의 95% 가 "검토 권장"이 되기 때문). 서비스에 반영할 때 할 일은
-설계 §6 맨 위 목록.
+**2026-11-20 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 — 파일을 바꾸면 서버를 다시
+띄운다). `risk_model_v1.4.json`(version `risk_model_v1.4`)은 v1.3 JSON 에 이름 없는 입력용 계수 집합 2벌을 덧붙인 것으로, `ml/scripts/train_risk_model_v14_nameless.py` 가
+결과 전에 고정한 채택 기준 ①~④를 모두 채웠을 때만 쓴다(통합 모델 설계 §7-4-2). 이름 없는 입력의 등급 하한은 `ml/scripts/nameless_search_thresholds.py` 가 실제 검색
+기준으로 쓴다(설계 §7-4-4) — 학습 스크립트·옛 하한 스크립트(`nameless_grade_thresholds.py`, §7-4-3)는 같은 값을 옛 방식으로 쓰므로 meta 에 실제 검색 기준
+하한이 있으면 `--force` 없이는 쓰지 않는다(종료 코드 4). 런타임 엔진은 이름 없는 이미지+상품 판단에 업종 하한(`goods_floor`, 상품 겹침 ≥ `coupling.floors.x4`
+0.0252 면 이미지만 판단과 견줘 높은 등급)을 적용한다.
 
 | 키 | 내용 |
 |---|---|
-| `patterns`·`features`·`coefficients`·`intercept`·`grade_thresholds`·`standalone_thresholds`·`figure_rule`·`meta.grade_precision` | **v1.3 JSON 을 그대로 복사**(재학습 없음). 이름 있는 입력(호칭·철자 중 하나라도 있음)과 이름도 이미지도 없는 입력의 출력은 v1.3 과 완전히 같다 — 무작위 입력 20,000개·학습에 쓴 이름 있는 491행에서 차이 0 |
+| `patterns`·`features`·`coefficients`·`intercept`·`grade_thresholds`·`standalone_thresholds`·`figure_rule`·`meta.grade_precision` | **v1.3 JSON 을 그대로 복사**(재학습 없음 — `figure_rule.caveat` 문구만 2026-11-20 서비스 문구로). 이름 있는 입력(호칭·철자 중 하나라도 있음)과 이름도 이미지도 없는 입력의 출력은 v1.3 과 완전히 같다 — 무작위 입력 20,000개·학습에 쓴 이름 있는 491행에서 차이 0. 위험 하한 0.5902 는 정밀도 0.8 목표(지지 30) 미달 대체값 |
 | `nameless_patterns` | 이름 없는 입력(호칭·철자 둘 다 결측)에 이미지가 있을 때 쓰는 계수 집합: `x2_whole`(이미지만 — 절편 −1.9187, x2_whole 2.1447, x2_whole×도형계 0.3229) / `x2_whole+x4`(이미지+상품 — 절편 −1.9572, 같은 이미지 계수, x4 1.5302). 입력 항은 이미지·상품뿐이고 `RiskResult.pattern` 은 "noname:" + 키. 이미지가 관측된 모든 학습 행(1,010·727행 — 이름이 있는 행도 이름을 가리고 참여)으로 적합, 사건 단위 가중, 사진이 낀 쌍 제외 |
-| `nameless_patterns[키].grade_thresholds` | **이름 없는 입력의 등급 하한**(그 계수 집합이 쓰인 입력에만 — `rm.grade_thresholds_for(model, pattern)`): `x2_whole` 주의 0.2790·검토 권장 0.4258·위험 null / `x2_whole+x4` 주의 0.2221·검토 권장 0.3709·위험 null. 기준 집합 U(이미지가 있는 쉬운 음성 쌍 — 557·449쌍)에서 "무관한 상표 쌍이 그 등급 이상을 받는 비율"을 이름 있는 입력(v1.3)과 맞춘 값(이미지만 주의 33.4%·검토 권장 4.5%, 이미지+상품 60.1%·10.7%). **null = 위험도로는 그 등급에 닿지 않는다**(단독 규칙으로만 — 이름 있는 입력에서 무관한 쌍이 위험을 받은 적이 없다; 이름 없는 입력에 걸리는 단독 규칙은 도형 규칙 τ 0.9 → 검토 권장뿐이라 지금은 위험에 닿지 않는다). 최상위 `grade_thresholds` 는 이름 있는 입력용으로 그대로다. 근거는 `meta.nameless.grade_thresholds` |
+| `nameless_patterns[키].grade_thresholds` | **이름 없는 입력의 등급 하한**(그 계수 집합이 쓰인 판단에만 — `rm.grade_thresholds_for(model, pattern)`, 응답 `meta.thresholds.nameless`): `x2_whole` 주의 0.3677·검토 권장 0.4910·위험 0.5724 / `x2_whole+x4` 주의 0.2944·검토 권장 0.4441·위험 0.7892. 실제 검색 기준(2026-11-20, 설계 §7-4-4) — 심사를 거치지 않은 표장 184질의(정답 데이터의 거절결정불복 출원 표장·권리범위확인 확인대상표장 중 DB 에 없는 것)로 검색한 후보 쌍에서 이름 없는 판단이 그 등급 이상인 비율을 같은 쌍을 이름을 알고 채점했을 때와 맞춤(같은 출원인 후보는 `shared/applicant_aliases.json` 까지 써서 뺌). 산출 방법·표본·DB 300질의 확인값·규칙 sha256·이전 값 이력은 `meta.nameless.grade_thresholds`. 도형 caveat 문구(`figure_rule.caveat`)는 서비스 문구로 바꿨다(이전 문구는 `meta.figure_caveat_history`) |
 | `coupling.same_name` | 이름 없는 입력에 후보와 **같은 이름**(호칭·철자 1.0)을 더했을 때 이름 있는 패턴의 로짓 ≥ 이름 없는 패턴의 로짓 — 더한 뒤의 유형은 서비스 규칙대로 문자계, 요부 있음·없음 둘 다, 이미지·상품 값의 모든 꼭짓점. 적재 때 검증한다(어기면 ValueError). `coupling.floors` 는 v1.3 값 그대로이고 이름 없는 두 집합 사이의 축 결합(상품을 하한 이상으로 더하면 비감소)에도 쓴다 |
 | `meta.named_from`·`meta.nameless` | 이름 있는 쪽의 출처(v1.3, 2026-10-25)와 이름 없는 2벌의 학습 메타(행 수·사건 가중·사진 규칙·사전분포·OOF 지표·채택 판정). 최상위 `meta` 의 n·AUC·`grade_precision` 은 v1.3 학습 때의 값 |
 

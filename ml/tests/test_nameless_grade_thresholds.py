@@ -19,7 +19,7 @@ NAN = float("nan")
 
 def _model(image_only=(-2.0, 2.0, 0.5), with_goods=(-2.05, 2.0, 0.5, 1.5)) -> dict:
     """v1.3 JSON + 이름 없는 2벌(절편, x2_whole, ×도형계[, x4]). 결합 검증은 끈다(coupling null)."""
-    model = copy.deepcopy(rm.load_model())
+    model = copy.deepcopy(rm.load_model(rm.V13_MODEL_PATH))
     model["version"] = "risk_model_v1.4"
     model["coupling"] = None
     model[rm.NAMELESS_KEY] = {
@@ -46,7 +46,7 @@ def _row(x1: float, image: float, goods: float = NAN, source: str = "db", **extr
 
 
 def _named_levels(rows: list[dict], key: str) -> list[int]:
-    old = rm.load_model()
+    old = rm.load_model(rm.V13_MODEL_PATH)
     return [rm.GRADES.index(rm.risk_score(ngt.named_input(row, key), old).grade) for row in rows]
 
 
@@ -81,7 +81,7 @@ def test_threshold_is_kth_largest_nameless_probability():
     rows = [_row(x1, image) for x1, image in zip(names, images)]
     levels = _named_levels(rows, "x2_whole")
     probs = sorted(_nameless_probs(rows, "x2_whole", model), reverse=True)
-    result = ngt.calibrate_kind(rows, "x2_whole", rm.load_model(), model)
+    result = ngt.calibrate_kind(rows, "x2_whole", rm.load_model(rm.V13_MODEL_PATH), model)
     assert result["n"] == 12 and result["패턴"] == "noname:x2_whole"
     assert result["쌍_출처"] == {"cross": 0, "db": 12}
     assert result["이름_없는_위험도"]["최댓값"] == round(probs[0], 4)
@@ -105,7 +105,7 @@ def test_threshold_is_kth_largest_nameless_probability():
 
 def test_zero_share_and_beyond_sample_maximum_leave_grade_to_standalone_rule():
     model = _model()
-    old = rm.load_model()
+    old = rm.load_model(rm.V13_MODEL_PATH)
     existing = old["grade_thresholds"]["위험"]
     # (가) 비율 0: 이름이 모두 다르다 → 이름 있는 입력에서 검토 권장·위험 0쌍
     rows = [_row(0.05, image) for image in (0.2, 0.4, 0.6, 0.8)]
@@ -146,7 +146,7 @@ def test_zero_share_and_beyond_sample_maximum_leave_grade_to_standalone_rule():
 
 def test_apply_thresholds_keeps_coefficients_and_runtime_uses_them():
     model = _model()
-    old = rm.load_model()
+    old = rm.load_model(rm.V13_MODEL_PATH)
     rows = ([_row(x1, image) for x1, image in zip((0.05, 0.3, 0.5, 0.62, 0.7, 0.78, 0.1, 0.2),
                                                    (0.9, 0.5, 0.7, 0.2, 0.6, 0.4, 0.8, 0.3))]
             + [_row(x1, image, goods) for x1, image, goods in (
@@ -216,7 +216,7 @@ def test_similarity_equivalents_invert_the_logit():
         value = out["이미지+상품"]["위험"][case]
         logit = -2.05 + 2.5 * value + 1.5 * goods
         assert 1 / (1 + math.exp(-logit)) == pytest.approx(0.8, abs=2e-3)
-    assert ngt.similarity_equivalents(rm.load_model()) == {}
+    assert ngt.similarity_equivalents(rm.load_model(rm.V13_MODEL_PATH)) == {}
 
 
 def test_run_updates_only_thresholds_in_the_model_file(tmp_path):
@@ -277,3 +277,28 @@ def test_run_updates_only_thresholds_in_the_model_file(tmp_path):
         assert trained["등급_하한(이름 없는 입력)"]["새_하한"] == results["새_하한"]
         for key, thresholds in results["새_하한"].items():
             assert stored[rm.NAMELESS_KEY][key]["grade_thresholds"] == thresholds
+
+
+def test_old_writers_refuse_to_overwrite_search_thresholds(tmp_path):
+    """이름 없는 하한을 옛 방식으로 쓰는 두 스크립트(쉬운 음성 기준 하한·2차 학습)는 실제 검색 기준
+    하한(§7-4-4)이 있는 JSON 을 --force 없이는 덮어쓰지 않는다 — 검색 기준 스크립트만 쓴다."""
+    import json
+
+    from scripts import train_risk_model_v14_nameless as t2
+
+    shipped = rm.load_model(rm.V14_MODEL_PATH)
+    assert rm.search_calibrated(shipped)
+    target = tmp_path / "risk_model_v1.4.json"
+    text = json.dumps(shipped, ensure_ascii=False)
+    target.write_text(text, encoding="utf-8")
+    # 쉬운 음성 기준 하한 스크립트: 계산 전에 멈추고 종료 코드 4, 파일 그대로
+    assert ngt.main(["--model", str(target), "--out-dir", str(tmp_path)]) == 4
+    assert target.read_text(encoding="utf-8") == text
+    # 2차 학습 스크립트의 배포 경로 쓰기도 같은 검사(후보 저장 — guard False — 는 상관없음)
+    with pytest.raises(rm.OverwriteRefused):
+        t2.write_model(target, {"version": "x"}, guard=True)
+    assert target.read_text(encoding="utf-8") == text
+    t2.write_model(tmp_path / "candidate.json", {"version": "x"}, guard=False)
+    t2.write_model(target, {"version": "forced"}, guard=True, force=True)  # --force 면 쓴다
+    assert json.loads(target.read_text(encoding="utf-8")) == {"version": "forced"}
+    rm.check_nameless_overwrite(target)  # 검색 기준이 아닌 JSON 은 막지 않는다

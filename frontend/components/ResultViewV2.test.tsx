@@ -45,6 +45,9 @@ describe("ResultViewV2 — 문자상표(§3-1)", () => {
       screen.getByText("이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"),
     ).toBeVisible();
     expect(screen.getAllByText("BLUE CAFE 블루카페").length).toBeGreaterThan(0);
+    // 이름 있는 판단: 등급 눈금에 위험도 위치 표식, 이름 없는 질의 안내는 없음
+    expect(screen.getByTestId("grade-scale-marker")).toBeInTheDocument();
+    expect(screen.queryByTestId("nameless-guidance")).toBeNull();
   });
 
   it("후보 카드를 펼치면 요부 제외 문장(§4-2)을 보여준다", async () => {
@@ -137,11 +140,22 @@ describe("ResultViewV2 — 도형상표(§3-2)", () => {
       />,
     );
 
-    expect(screen.getByText("도형 유사는 검증 데이터가 적어 참고용")).toBeVisible();
+    const figureText = "로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요";
+    expect(screen.getByText(figureText)).toBeVisible();
     // v1 결과 화면과 같은 4상태 문구(코드가 아니라)
     expect(screen.getByText(/시각 유사 상태: 매우 닮은 등록상표가 있어요/)).toBeVisible();
     expect(screen.queryByText(/STRONG_MATCH/)).toBeNull();
-    expect(screen.getByTestId("overall-prob")).toHaveTextContent("위험도 6%"); // 0.06
+    // 전체 등급이 이름 없는 판단(noname:x2_whole)에서 나왔다 → 위험도 %·정밀도 문구를 숨긴다(§4-3·§4-4)
+    expect(screen.getByTestId("overall-grade")).toHaveTextContent("위험");
+    expect(screen.queryByTestId("overall-prob")).toBeNull();
+    expect(screen.queryByText(/검증 데이터 기준 10건 중/)).toBeNull();
+    expect(screen.getByTestId("nameless-guidance")).toHaveTextContent(
+      "상표명·업종을 넣으면 더 정확하게 판단해요",
+    );
+    // 등급 눈금은 이름 없는 하한으로, 위험도 위치 표식 없음
+    const scale = screen.getAllByTestId("grade-scale")[0];
+    expect(scale.querySelectorAll("[data-grade]")).toHaveLength(4);
+    expect(screen.queryByTestId("grade-scale-marker")).toBeNull();
 
     await user.click(
       screen.getAllByRole("button", { name: /이름 미등록 상표/ })[0],
@@ -149,6 +163,11 @@ describe("ResultViewV2 — 도형상표(§3-2)", () => {
     expect(
       screen.getByText("도형이 매우 비슷해 검토 권장으로 올렸습니다(검증 데이터 부족, 참고용)"),
     ).toBeVisible();
+    expect(screen.getByTestId("nameless-judgment")).toHaveTextContent(
+      "이름 없이 로고만으로 본 판단이라 위험도 %는 보이지 않아요",
+    );
+    expect(screen.getAllByText(figureText)).toHaveLength(2); // 전체 caveat + 펼친 카드
+    expect(screen.getAllByText("이미지 93%").length).toBeGreaterThan(0); // 이미지 유사도는 보인다
   });
 
   it("null 축은 '정보 없음'으로 표시한다", () => {
@@ -206,5 +225,90 @@ describe("ResultViewV2 — 이미지에서 글자 제안(NAME_SUGGESTED)", () =>
 
     await user.click(screen.getByRole("button", { name: /상표명으로 넣기/ }));
     expect(onUseSuggestedName).toHaveBeenCalledWith("블루커피");
+  });
+});
+
+
+describe("ResultViewV2 — 이름 있는·없는 판단이 섞인 응답(v1.4, §4-4)", () => {
+  const named = SEARCH_V2_TEXT_FIXTURE.candidates[0];
+  const nameless = SEARCH_V2_FIGURE_FIXTURE.candidates[0];
+
+  it("판별은 요청 상태가 아니라 pattern 으로 — 이름 있는 질의라도 전체가 이름 없는 판단이면 %를 숨긴다", () => {
+    render(
+      <ResultViewV2
+        result={{
+          ...SEARCH_V2_TEXT_FIXTURE,
+          overall: { ...SEARCH_V2_TEXT_FIXTURE.overall, pattern: "noname:x2_whole" },
+          candidates: [nameless, named],
+        }}
+        queryPreview={null}
+        queryHasName
+        onReset={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId("overall-prob")).toBeNull();
+    expect(screen.queryByTestId("nameless-guidance")).toBeNull(); // 이름을 넣은 질의
+    // 이름 있는 "위험" 카드에만 정밀도 문구 — 이름 없는 "위험" 카드에는 없다
+    expect(screen.getAllByText("검증 데이터 기준 10건 중 7건")).toHaveLength(1);
+  });
+
+  it("전체가 이름 있는 판단이면 이름 없는 후보가 섞여도 전체 %를 보인다", () => {
+    render(
+      <ResultViewV2
+        result={{ ...SEARCH_V2_TEXT_FIXTURE, candidates: [named, nameless] }}
+        queryPreview={null}
+        queryHasName
+        onReset={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("overall-prob")).toHaveTextContent("위험도 60%");
+  });
+
+  it("goods_floor 규칙 문구를 보여준다", async () => {
+    const user = userEvent.setup();
+    render(
+      <ResultViewV2
+        result={{
+          ...SEARCH_V2_FIGURE_FIXTURE,
+          candidates: [
+            {
+              ...nameless,
+              axes: { ...nameless.axes, x4: 0.33 },
+              risk: { ...nameless.risk, rule_triggers: ["figure_x2_img", "goods_floor"] },
+            },
+          ],
+        }}
+        queryPreview={null}
+        queryHasName={false}
+        onReset={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /이름 미등록 상표/ }));
+    expect(screen.getByText("업종이 겹쳐 로고만으로 본 등급을 유지했어요")).toBeVisible();
+  });
+
+  it("nameless_floor 규칙 문구를 보여준다", async () => {
+    const user = userEvent.setup();
+    render(
+      <ResultViewV2
+        result={{
+          ...SEARCH_V2_FIGURE_FIXTURE,
+          candidates: [
+            {
+              ...nameless,
+              title: "블루커피",
+              risk: { ...nameless.risk, rule_triggers: ["figure_x2_img", "nameless_floor"] },
+            },
+          ],
+        }}
+        queryPreview={null}
+        queryHasName
+        onReset={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /블루커피/ }));
+    expect(
+      screen.getByText("도형으로 고친 질의라 로고만으로 본 판단의 등급을 썼습니다"),
+    ).toBeVisible();
   });
 });

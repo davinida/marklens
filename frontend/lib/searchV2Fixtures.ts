@@ -13,9 +13,9 @@ export const SEARCH_V2_TEXT_FIXTURE: SearchV2Response = {
   overall: {
     grade: "위험",
     prob: 0.604,
+    pattern: "x4",
     caveats: [
       "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
-      "비교 대상 중 지정상품 정보가 있는 상표는 100/1,100건입니다",
     ],
     query_type: { type: "문자", source: "fallback", detail: null, suggested_name: null },
     visual_status: null,
@@ -36,6 +36,7 @@ export const SEARCH_V2_TEXT_FIXTURE: SearchV2Response = {
         missing_adjustment: 0.018,
         figure_caveat: false,
         rule_triggers: [],
+        pattern: "x4",
       },
       salient: {
         query_tokens: ["블루"],
@@ -63,6 +64,7 @@ export const SEARCH_V2_TEXT_FIXTURE: SearchV2Response = {
         missing_adjustment: 0.018,
         figure_caveat: false,
         rule_triggers: [],
+        pattern: "x4",
       },
       salient: {
         query_tokens: ["블루"],
@@ -89,6 +91,7 @@ export const SEARCH_V2_TEXT_FIXTURE: SearchV2Response = {
         missing_adjustment: 0.018,
         figure_caveat: false,
         rule_triggers: [],
+        pattern: "x4",
       },
       salient: {
         query_tokens: ["블루"],
@@ -114,6 +117,7 @@ export const SEARCH_V2_TEXT_FIXTURE: SearchV2Response = {
         missing_adjustment: 0.018,
         figure_caveat: false,
         rule_triggers: [],
+        pattern: "x4",
       },
       salient: {
         query_tokens: ["블루"],
@@ -126,10 +130,14 @@ export const SEARCH_V2_TEXT_FIXTURE: SearchV2Response = {
     },
   ],
   meta: {
-    model_version: "risk_model_v1.3",
+    model_version: "risk_model_v1.4",
     grade_precision: 0.7039,
     thresholds: {
       grade: { 주의: 0.0902, "검토 권장": 0.1805, 위험: 0.5902 },
+      nameless: {
+        "noname:x2_whole": { 주의: 0.3677, "검토 권장": 0.491, 위험: 0.5724 },
+        "noname:x2_whole+x4": { 주의: 0.2944, "검토 권장": 0.4441, 위험: 0.7892 },
+      },
       standalone: { x1: 0.98, x2_text: 0.75, x2_img: null, x3: 0.7707, x4: null },
       figure: 0.9,
     },
@@ -153,10 +161,11 @@ export const SEARCH_V2_FIGURE_FIXTURE: SearchV2Response = {
   research_beta: true,
   legal_conclusion: false,
   overall: {
-    grade: "검토 권장",
-    prob: 0.06,
+    grade: "위험",
+    prob: 0.593,
+    pattern: "noname:x2_whole",
     caveats: [
-      "도형 유사는 검증 데이터가 적어 참고용",
+      "로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요",
       "상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다",
       "지정상품이 없어 상품 견련성은 비교하지 않았습니다",
     ],
@@ -178,12 +187,13 @@ export const SEARCH_V2_FIGURE_FIXTURE: SearchV2Response = {
       nice_classes: [25],
       axes: { x1: null, x2_text: null, x2_img: 0.93, x3: null, x4: null },
       risk: {
-        prob: 0.06,
-        grade: "검토 권장",
-        contributions: { X1: 0.0, X2: 1.059, X3: 0.0, X4: 0.0, 요부: 0.0 },
-        missing_adjustment: -0.339,
+        prob: 0.593,
+        grade: "위험",
+        contributions: { X1: 0.0, X2: 2.295, X3: 0.0, X4: 0.0, 요부: 0.0 },
+        missing_adjustment: 1.552,
         figure_caveat: true,
         rule_triggers: ["figure_x2_img"],
+        pattern: "noname:x2_whole",
       },
       salient: { query_tokens: [], candidate_tokens: [], removed: [] },
       goods: { codes: [], jaccard: null },
@@ -197,12 +207,13 @@ export const SEARCH_V2_FIGURE_FIXTURE: SearchV2Response = {
       nice_classes: [9, 42],
       axes: { x1: null, x2_text: null, x2_img: 0.81, x3: null, x4: null },
       risk: {
-        prob: 0.053,
-        grade: "안전",
-        contributions: { X1: 0.0, X2: 0.922, X3: 0.0, X4: 0.0, 요부: 0.0 },
-        missing_adjustment: -0.339,
+        prob: 0.52,
+        grade: "검토 권장",
+        contributions: { X1: 0.0, X2: 1.999, X3: 0.0, X4: 0.0, 요부: 0.0 },
+        missing_adjustment: 1.552,
         figure_caveat: true,
         rule_triggers: [],
+        pattern: "noname:x2_whole",
       },
       salient: { query_tokens: [], candidate_tokens: ["뫼비우스", "mobius"], removed: [] },
       goods: { codes: ["G390802"], jaccard: null },
@@ -216,22 +227,27 @@ export const SEARCH_V2_FIGURE_FIXTURE: SearchV2Response = {
       nice_classes: [35],
       axes: { x1: null, x2_text: null, x2_img: 0.62, x3: null, x4: null },
       risk: {
-        prob: 0.043,
-        grade: "안전",
-        contributions: { X1: 0.0, X2: 0.706, X3: 0.0, X4: 0.0, 요부: 0.0 },
-        missing_adjustment: -0.339,
+        prob: 0.404,
+        grade: "주의",
+        contributions: { X1: 0.0, X2: 1.53, X3: 0.0, X4: 0.0, 요부: 0.0 },
+        missing_adjustment: 1.552,
         figure_caveat: true,
         rule_triggers: [],
+        pattern: "noname:x2_whole",
       },
       salient: { query_tokens: [], candidate_tokens: ["infinity"], removed: [] },
       goods: { codes: [], jaccard: null },
     },
   ],
   meta: {
-    model_version: "risk_model_v1.3",
+    model_version: "risk_model_v1.4",
     grade_precision: 0.7039,
     thresholds: {
       grade: { 주의: 0.0902, "검토 권장": 0.1805, 위험: 0.5902 },
+      nameless: {
+        "noname:x2_whole": { 주의: 0.3677, "검토 권장": 0.491, 위험: 0.5724 },
+        "noname:x2_whole+x4": { 주의: 0.2944, "검토 권장": 0.4441, 위험: 0.7892 },
+      },
       standalone: { x1: 0.98, x2_text: 0.75, x2_img: null, x3: 0.7707, x4: null },
       figure: 0.9,
     },
@@ -257,6 +273,7 @@ export const SEARCH_V2_EMPTY_FIXTURE: SearchV2Response = {
   overall: {
     grade: null,
     prob: null,
+    pattern: null,
     caveats: [
       "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
       "지정상품이 없어 상품 견련성은 비교하지 않았습니다",
@@ -267,10 +284,14 @@ export const SEARCH_V2_EMPTY_FIXTURE: SearchV2Response = {
   },
   candidates: [],
   meta: {
-    model_version: "risk_model_v1.3",
+    model_version: "risk_model_v1.4",
     grade_precision: 0.7039,
     thresholds: {
       grade: { 주의: 0.0902, "검토 권장": 0.1805, 위험: 0.5902 },
+      nameless: {
+        "noname:x2_whole": { 주의: 0.3677, "검토 권장": 0.491, 위험: 0.5724 },
+        "noname:x2_whole+x4": { 주의: 0.2944, "검토 권장": 0.4441, 위험: 0.7892 },
+      },
       standalone: { x1: 0.98, x2_text: 0.75, x2_img: null, x3: 0.7707, x4: null },
       figure: 0.9,
     },

@@ -21,6 +21,16 @@ describe("SearchV2ResponseSchema", () => {
     }
   });
 
+  it("accepts any rule trigger string, including goods_floor and nameless_floor (v1.4)", () => {
+    const fixture = structuredClone(imageFixture);
+    fixture.candidates[0].risk.rule_triggers = ["figure_x2_img", "goods_floor", "nameless_floor"];
+    expect(SearchV2ResponseSchema.parse(fixture).candidates[0].risk.rule_triggers).toEqual([
+      "figure_x2_img",
+      "goods_floor",
+      "nameless_floor",
+    ]);
+  });
+
   it("accepts an empty candidate result with nullable overall fields", () => {
     const fixture = structuredClone(textFixture);
     const empty = {

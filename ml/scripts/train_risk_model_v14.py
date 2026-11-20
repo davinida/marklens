@@ -67,7 +67,7 @@ from scripts import train_risk_model as tr  # noqa: E402  (v1.3 학습 도구 �
 MODEL_VERSION = "risk_model_v1.4"
 # 1차 시도의 계수 JSON 기본 경로 — shared/model/risk_model_v1.4.json(2차 시도의 채택분)이 아니다
 DEFAULT_MODEL = tr.DEFAULT_BASE / "risk_model_v1.4_attempt1.json"
-DEFAULT_V13 = rm.DEFAULT_MODEL_PATH
+DEFAULT_V13 = rm.V13_MODEL_PATH
 DEFAULT_OUT_DIR = tr.DEFAULT_BASE
 REPORT_STEM = "risk_model_v1.4"
 SIGMA = 1.0  # v1.2.1 부터 고정(설계 §7-2)
