@@ -19,6 +19,9 @@
        x1·x2_text 는 게이트와 무관한 원 값(게이트 꺼짐이면 함수가 0.0), x3 는 원 값 +
        has_meaning_both
        플래그(risk_model.design_values 가 결측 처리), x4 는 양쁙 코드가 있을 때만.
+    5. 철자 버전(2026-11-20): x2_text 는 `spelling_version`(기본 1) 정의로 계산한다 — 서비스는 통합
+       모델 JSON 이 요구하는 버전(`risk_model.spelling_version`)을 넘기고, `model_features` 가 그
+       버전을 `x2_text_version` 으로 실어 런타임이 모델과 맞는지 검사한다(x2_ortho 모듈 설명).
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ from typing import Iterable
 from . import x3_semantic as x3
 from .distinctiveness import Distinctiveness
 from .x1_phonetic import has_pronunciation, phonetic_similarity
-from .x2_ortho import has_spelling, orthographic_similarity
+from .x2_ortho import DEFAULT_SPELLING_VERSION, has_spelling, orthographic_similarity
 from .x4_goods import goods_similarity, has_goods
 
 __all__ = ["RemovedToken", "PairAxes", "clean_name", "compute_pair_axes", "normalize_codes"]
@@ -83,13 +86,16 @@ class PairAxes:
     candidate_tokens: tuple[str, ...]
     removed: tuple[RemovedToken, ...]
     generic: frozenset[str]
+    spelling_version: int = DEFAULT_SPELLING_VERSION  # x2_text 를 계산한 철자 정의 버전
 
     def model_features(self, *, x2_img: float | None, mark_type: str) -> dict:
         """risk_model.risk_score 입력 — 계수 JSON 입력 정의(x1_d·x2_text_d·x2_whole·x3_d·x4·
-        has_meaning_both·has_distinctive_part_a/b·mark_type)와 키 이름을 1:1 로 맞춘다."""
+        has_meaning_both·has_distinctive_part_a/b·mark_type)와 키 이름을 1:1 로 맞춘다.
+        `x2_text_version` 은 x2_text_d 를 계산한 철자 버전(런타임이 모델이 요구하는 버전과 대조)."""
         return {
             "x1_d": self.x1_raw,
             "x2_text_d": self.x2_text_raw,
+            "x2_text_version": self.spelling_version,
             "x2_whole": x2_img,
             "x3_d": self.x3_raw,
             "x4": self.x4,
@@ -112,13 +118,14 @@ def compute_pair_axes(
     goods_a: Iterable[str] | str | None = None,
     goods_b: Iterable[str] | str | None = None,
     x3_enabled: bool = True,
+    spelling_version: int = DEFAULT_SPELLING_VERSION,
 ) -> PairAxes:
     """질의 이름 A 와 후보 이름 B 의 축 점수·요부 정보. 이름이 비면 호출하지 않는다(엔진이 결측
     처리).
 
     x3_enabled=False(MARKLENS_X3_ENABLED=0)면 x3 는 None·has_meaning_both False 로 두어 모델이
     관념을
-    결측으로 본다.
+    결측으로 본다. spelling_version 은 x2_text 의 철자 정의(기본 1 — v1.3·v1.4 와 지금 서비스).
     """
     a = model.split_goods_suffix(clean_name(name_a))
     b = model.split_goods_suffix(clean_name(name_b))
@@ -127,7 +134,7 @@ def compute_pair_axes(
     generic = model.pair_generic(a, b, goods)
 
     x1_raw = phonetic_similarity(a, b, extra_generic=generic)
-    x2_raw = orthographic_similarity(a, b, extra_generic=generic)
+    x2_raw = orthographic_similarity(a, b, extra_generic=generic, version=spelling_version)
     pron_both = has_pronunciation(a) and has_pronunciation(b)
     spell_both = has_spelling(a) and has_spelling(b)
     if x3_enabled:
@@ -172,4 +179,5 @@ def compute_pair_axes(
         candidate_tokens=tuple(token for token, _ in model.salient_tokens(b, goods)),
         removed=tuple(removed),
         generic=generic,
+        spelling_version=spelling_version,
     )

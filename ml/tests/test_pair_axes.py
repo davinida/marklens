@@ -110,7 +110,9 @@ def test_model_features_match_coefficient_json_inputs(small_model):
     assert set(features) == {
         "x1_d", "x2_text_d", "x2_whole", "x3_d", "x4", "has_meaning_both",
         "has_distinctive_part_a", "has_distinctive_part_b", "mark_type",
+        "x2_text_version",  # 철자 정의 버전(기본 1) — 런타임이 모델과 대조한다
     }
+    assert features["x2_text_version"] == 1 == axes.spelling_version
     model = rm.load_model()
     values = rm.design_values(features)
     assert set(model["features"]) <= set(values)
@@ -123,3 +125,54 @@ def test_clean_name_and_codes():
     assert pa.clean_name(None) == ""
     assert pa.normalize_codes(["g0502", " S120602 ", "", None]) == frozenset({"G0502", "S120602"})
     assert pa.normalize_codes("G0301") == frozenset({"G0301"})
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_spelling_version_matches_training_columns(real_model, version):
+    """서비스 축(compute_pair_axes)의 철자는 학습 특징(name_axes)의 같은 버전 열과 같다 — v1 은
+    x2_text_d, v2 는 x2_text_d_v2."""
+    column = "x2_text_d" if version == 1 else "x2_text_d_v2"
+    for name_a, name_b, goods in (("블루 보틀 커피", "블루 핸즈 커피", "G0301"),
+                                  ("GATE HELLO", "GATE WORLD", ""),
+                                  ("닥치고 떡볶이", "떡볶이 명가", "G0301;G0302"),
+                                  ("스타벅스", "스타박스", "G0301")):
+        codes = _codes(goods)
+        axes = pa.compute_pair_axes(name_a, name_b, model=real_model, goods_a=codes,
+                                    goods_b=codes, spelling_version=version)
+        row = pf.name_axes(name_a, name_b, codes, real_model)
+        assert axes.spelling_version == version
+        assert round(axes.x2_text_raw, 4) == float(row[column]), (name_a, name_b, version)
+        assert axes.model_features(x2_img=None, mark_type="문자")["x2_text_version"] == version
+    assert pa.compute_pair_axes("GATE HELLO", "GATE WORLD", model=real_model).spelling_version == 1
+
+
+def test_runtime_rejects_spelling_version_mismatch(small_model):
+    """계수 JSON 의 철자 버전(axis_versions, 없으면 1)과 입력의 x2_text_version 이 다르면
+    ValueError — x2_text_d 가 관측된 입력만. v1.3·v1.4 JSON 은 버전 표기 없는 입력도 그대로
+    받는다."""
+    import copy
+
+    v13 = rm.load_model()
+    assert rm.spelling_version(v13) == 1
+    axes_v1 = pa.compute_pair_axes("블루커피", "레드커피", model=small_model)
+    axes_v2 = pa.compute_pair_axes("블루커피", "레드커피", model=small_model, spelling_version=2)
+    features_v1 = axes_v1.model_features(x2_img=None, mark_type="문자")
+    assert rm.risk_score(features_v1, v13).prob > 0
+    legacy = {k: v for k, v in features_v1.items() if k != "x2_text_version"}
+    assert tuple(rm.risk_score(legacy, v13)) == tuple(rm.risk_score(features_v1, v13))
+    with pytest.raises(ValueError, match="철자 버전"):
+        rm.risk_score(axes_v2.model_features(x2_img=None, mark_type="문자"), v13)
+    v15 = copy.deepcopy(v13)
+    v15["version"] = "risk_model_v1.5"
+    v15[rm.AXIS_VERSIONS_KEY] = {rm.SPELLING_AXIS: 2}
+    rm.validate_model(v15)
+    assert rm.spelling_version(v15) == 2
+    assert rm.risk_score(axes_v2.model_features(x2_img=None, mark_type="문자"), v15).prob > 0
+    for wrong in (features_v1, legacy):  # 버전 표기가 없으면 v1 로 본다
+        with pytest.raises(ValueError, match="철자 버전"):
+            rm.risk_score(wrong, v15)
+    nameless = {"x1_d": None, "x2_text_d": None, "x2_whole": 0.8, "mark_type": "도형"}
+    assert rm.risk_score(nameless, v15).prob > 0  # 철자가 결측이면 검사하지 않는다
+    for broken in ({"x2_text": 3}, {"x9": 1}, [2]):
+        with pytest.raises(ValueError, match="axis_versions"):
+            rm.validate_model({**v15, rm.AXIS_VERSIONS_KEY: broken})

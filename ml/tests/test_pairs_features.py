@@ -177,6 +177,7 @@ def test_run_writes_csv_and_report(paths):
     assert report["축별_결측"] == {
         "x1": 2, "x2_text": 2, "x2_fig": 4, "x2_whole": 3, "x3": 2, "x3_raw": 2, "x4": 4,
         "x1_d": 2, "x2_text_d": 2, "x3_d": 2,
+        "x2_text_v2": 2, "x2_text_d_v2": 2,  # 철자 v2 열도 이름이 있는 행에만
     }
     # 스타벅스(조어)·커피빈(붙여쓴 합성어 폴백 실패)·Zyqrt 가 has_meaning False → R1·R2·R5
     assert report["게이트_꺼짐"]["x3(has_meaning 한쪽 False)"] == 3

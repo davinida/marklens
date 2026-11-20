@@ -558,6 +558,7 @@ def multi_search(
     if state.model is None or state.distinct is None:
         raise ModelNotReadyError(state.error or "통합 모델이 준비되지 않았습니다.")
     model, distinct = state.model, state.distinct
+    spelling = rm.spelling_version(model)  # 철자 축 정의 버전(계수 JSON axis_versions, 없으면 1)
     index_size = int(engine.state.index.ntotal)
 
     query_type, ocr_fallback = _resolve_query_type(image, query_name, override or None)
@@ -591,8 +592,8 @@ def multi_search(
                 continue
             pool.setdefault(record.appno, record)
             counts["phonetic"] += 1
-        scored = [
-            (orthographic_similarity(query_name, record.title), record)
+        scored = [  # 철자 풀도 모델이 요구하는 철자 버전으로(v1.3·v1.4 = v1)
+            (orthographic_similarity(query_name, record.title, version=spelling), record)
             for record in state.spelling_entries
         ]
         scored = [item for item in scored if item[0] > 0.0]
@@ -642,7 +643,7 @@ def multi_search(
         if query_name and record.title:
             axes = compute_pair_axes(
                 query_name, record.title, model=distinct, goods_a=goods, goods_b=record.goods,
-                x3_enabled=x3_on,
+                x3_enabled=x3_on, spelling_version=spelling,
             )
             features = axes.model_features(x2_img=x2_img, mark_type=query_type.type)
             x4 = axes.x4

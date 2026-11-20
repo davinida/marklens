@@ -393,3 +393,50 @@ def test_rule_image_only_without_text_is_figure(client, monkeypatch):
     assert disabled["overall"]["query_type"]["source"] == "user"
     assert ms.CAVEAT_FIGURE_LOW_DATA in disabled["overall"]["caveats"]
 
+
+
+def _spelling_model(version: int) -> dict:
+    """서비스 모델(v1.3) 사본에 철자 버전만 바꾼 것 — 엔진이 모델의 철자 버전을 따르는지 본다."""
+    import copy
+
+    from src.model import risk_model as rm
+
+    model = copy.deepcopy(ms.state.model)
+    if version != 1:
+        model["version"] = "risk_model_v1.5"
+        model[rm.AXIS_VERSIONS_KEY] = {rm.SPELLING_AXIS: version}
+    return rm.validate_model(model)
+
+
+def test_engine_spelling_follows_model_version(client, monkeypatch):
+    """v1.3·v1.4 JSON(철자 버전 표기 없음 = v1)은 지금 서비스와 같은 철자 점수를, 철자 v2 를
+    요구하는 JSON 은 v2 점수를 쓴다(풀 점수와 쌍별 축 모두) — 다른 버전으로 계산한 점수에 계수를
+    곱하지 않는다."""
+    from src.axes.pair_axes import compute_pair_axes
+    from src.axes.x2_ortho import orthographic_similarity
+
+    query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
+    assert ms.state.model["version"] == "risk_model_v1.3"
+    results = {}
+    for version in (1, 2):
+        monkeypatch.setattr(ms.state, "model", _spelling_model(version))
+        results[version] = {c["id"]: c for c in engine.multi_search(
+            name=query, top_k=9).to_dict()["candidates"]}
+    title = {record.appno: record.title for record in ms.state.records}
+    for version, candidates in results.items():
+        for appno, candidate in candidates.items():
+            axes = compute_pair_axes(query, title[appno], model=ms.state.distinct,
+                                     goods_b=next(r.goods for r in ms.state.records
+                                                  if r.appno == appno),
+                                     spelling_version=version)
+            assert candidate["axes"]["x2_text"] == axes.x2_text, (version, appno)
+    top_v1 = results[1]["4020210000001"]["axes"]["x2_text"]
+    top_v2 = results[2]["4020210000001"]["axes"]["x2_text"]
+    assert top_v1 == 1.0 and top_v2 < 1.0  # 정의가 실제로 다르게 들어갔다
+    assert orthographic_similarity(query, NAME) == 1.0
+    # 서비스 모델(v1.3)의 결과는 철자 버전 인자를 넣기 전과 같다 — 기본값이 v1
+    monkeypatch.setattr(ms.state, "model", _spelling_model(1))
+    default = engine.multi_search(name=NAME_Q, top_k=5).to_dict()
+    top = default["candidates"][0]
+    assert top["axes"]["x2_text"] == 1.0
+    assert "standalone_x2_text" in top["risk"]["rule_triggers"]

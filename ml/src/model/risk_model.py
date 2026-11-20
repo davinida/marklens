@@ -53,6 +53,11 @@ v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·�
 그 집합이 쓰인 입력의 등급은 그 하한으로 매긴다(`grade_thresholds_for`; 없으면 최상위 하한). 하한이
 null 인 등급은 위험도 p 로는 닿지 않는다 — 단독 규칙(도형 규칙 τ)으로만 닿는다. 이름 있는 입력과
 v1.3 이하 JSON 의 등급 판정은 달라지지 않는다.
+
+축 계산 버전(§7-5, 2026-11-20): JSON 의 `axis_versions`(예: {"x2_text": 2})는 그 계수가 학습된 축
+정의의 버전이다 — 없으면 모두 1(v1.3·v1.4). 입력의 `x2_text_version`(pair_axes.model_features 가
+싣는다; 없으면 1)이 모델의 철자 버전과 다르고 x2_text_d 가 관측된 입력이면 `risk_score` 가
+ValueError 를 낸다 — 다른 정의로 계산한 철자 점수에 계수를 곱하지 않게.
 """
 
 from __future__ import annotations
@@ -73,7 +78,8 @@ __all__ = [
     "DEFAULT_MODEL_PATH", "ENV_MODEL_PATH", "NAMELESS_KEY", "NAMELESS_PREFIX", "NAME_AXES",
     "NAME_FLOOR_AXES", "NAME_DERIVED_TERMS", "name_missing", "nameless_vertices",
     "name_coupling_vertices", "SAME_NAME_KEY", "type_with_name", "same_name_input",
-    "grade_thresholds_for",
+    "grade_thresholds_for", "AXIS_VERSIONS_KEY", "SPELLING_AXIS", "SPELLING_VERSION_INPUT",
+    "SUPPORTED_SPELLING_VERSIONS", "spelling_version",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -81,7 +87,11 @@ DEFAULT_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
 MODEL_VERSION = "risk_model_v1.3"  # 서비스 기본 모델(train_risk_model.py 가 쓰는 버전)
 SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2", "risk_model_v1.2.1",
-                      "risk_model_v1.3", "risk_model_v1.4")
+                      "risk_model_v1.3", "risk_model_v1.4", "risk_model_v1.5")
+AXIS_VERSIONS_KEY = "axis_versions"  # 계수가 학습된 축 정의의 버전(없으면 모두 1)
+SPELLING_AXIS = "x2_text"
+SPELLING_VERSION_INPUT = "x2_text_version"  # 입력이 x2_text_d 를 계산한 철자 버전(없으면 1)
+SUPPORTED_SPELLING_VERSIONS = (1, 2)  # = ml/src/axes/x2_ortho.SPELLING_VERSIONS(테스트로 고정)
 INTERACTION_OF = {"x1_d": "x1_d×문자계", "x2_whole": "x2_whole×도형계"}
 MONOTONE_AXES = ("x1_d", "x2_text_d", "x2_whole", "x3_d", "x4")
 X1_EXTRA_INTERACTIONS = ("x1_d×any_no_distinctive",)  # x1 효과에 더해지는 교호작용(요부 없음)
@@ -169,6 +179,24 @@ def _meaning_both(features: dict) -> bool:
             _flag(features, "has_meaning_b", False) == 1.0
         )
     return True  # 게이트 정보가 없으면 x3_d 가 있을 때 그대로 쓴다
+
+
+def spelling_version(model: dict) -> int:
+    """그 모델의 계수가 학습된 철자(X2 문자 외관) 정의 버전 — `axis_versions.x2_text`, 없으면 1."""
+    return int((model.get(AXIS_VERSIONS_KEY) or {}).get(SPELLING_AXIS, 1))
+
+
+def _check_spelling_version(features: dict, values: dict[str, float], model: dict) -> None:
+    """x2_text_d 가 관측된 입력의 철자 버전이 모델과 다르면 ValueError."""
+    if values["miss_x2text"] != 0.0:
+        return
+    given = features.get(SPELLING_VERSION_INPUT)
+    given = 1 if given in (None, "") else int(given)
+    required = spelling_version(model)
+    if given != required:
+        raise ValueError(f"risk_model: 입력의 철자 버전 v{given} 이 모델({model.get('version')})이 "
+                         f"요구하는 v{required} 와 다릅니다 — pair_axes.compute_pair_axes("
+                         f"spelling_version={required}) 로 계산하세요")
 
 
 def design_values(features: dict) -> dict[str, float]:
@@ -555,6 +583,13 @@ def validate_model(data: dict) -> dict:
     cuts = [float(thresholds[key]) for key in GRADE_THRESHOLD_KEYS]
     if not all(0.0 < cut <= 1.0 for cut in cuts) or any(a > b for a, b in zip(cuts, cuts[1:])):
         raise ValueError("risk_model: grade_thresholds 는 (0, 1] 안에서 오름차순이어야 합니다")
+    versions = data.get(AXIS_VERSIONS_KEY)
+    if versions is not None and (
+        not isinstance(versions, dict) or set(versions) - {SPELLING_AXIS}
+        or versions.get(SPELLING_AXIS, 1) not in SUPPORTED_SPELLING_VERSIONS
+    ):
+        raise ValueError(f"risk_model: {AXIS_VERSIONS_KEY} 는 {{'{SPELLING_AXIS}': "
+                         f"{SUPPORTED_SPELLING_VERSIONS} 중 하나}} 여야 합니다")
     standalone = data.get("standalone_thresholds", {})
     if not isinstance(standalone, dict):
         raise ValueError("risk_model: standalone_thresholds 는 객체여야 합니다")
@@ -660,6 +695,7 @@ def risk_score(features: dict, model: dict | None = None) -> RiskResult:
     """
     model = model or load_model()
     values = design_values(features)
+    _check_spelling_version(features, values, model)
     key, block = select_pattern(model, values)
     coefficients = block["coefficients"]
     contributions: dict[str, float] = {"intercept": float(model["intercept"])}
