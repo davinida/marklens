@@ -303,14 +303,14 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
 - `query.has_meaning`은 X3 관념 게이트(정규화 토큰 중 실제 단어가 있는지)이고 `query.text`는
   실제로 임베딩한 텍스트입니다. 입력이 조어·기호뿐이면 `has_meaning=false`, `matches=[]`,
   `note="관념 없음(조어)"`으로 200을 반환합니다.
-- `score`는 임베딩 코사인을 DB 200쌍 기준선으로 재보정한 0~1 값(X3 `semantic_similarity`와 같음)
+- `score`는 임베딩 코사인을 DB 200쌍 기준선으로 재보정한 0–1 값(X3 `semantic_similarity`와 같음)
   이며 `matches`는 `score` 내림차순(동점은 출원번호 순), `threshold`(=`params.min_score`) 미만은
   제외됩니다. `searched_count`는 관념이 있어 비교한 DB 레코드 수, `excluded_no_meaning`은 상표명이
   없거나 관념이 없어 제외한 수입니다.
 - `이미지URL`은 현재 인덱스에 있는 이미지만 연결하며 `/phonetic-search`와 같은 규칙입니다.
 - 임베딩 캐시는 서버 기동 시 한 배치로 만들고(2026-09-30 실측: 1,100건 세대에서 515건, 6.4초,
   RSS +0.65GB), 인덱스가 재게시되면 다음 요청에서 다시 만듭니다. 요청은 질의 임베딩 1회 + 행렬
-  곱이라 cold 10~18ms, warm 2ms입니다. 게이트는 영문 3자 이상·한국어 1음절은 명사 목록만 인정합니다
+  곱이라 cold 10–18ms, warm 2ms입니다. 게이트는 영문 3자 이상·한국어 1음절은 명사 목록만 인정합니다
   (X3 설계 문서 §2).
 
 ## 상품 검색·류 목록 (상품↔유사군 변환표, 프론트-6 지정상품 입력용, 2026-09-21)

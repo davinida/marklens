@@ -1,7 +1,7 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
-  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1~E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
@@ -99,14 +99,14 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | 필드 | 형식 | null | 뜻 |
 |---|---|---|---|
 | `grade` | `"안전"` \| `"주의"` \| `"검토 권장"` \| `"위험"` | 후보 0건이면 null | 후보 중 **가장 높은 등급**(규칙 하한 적용 뒤). 등급 순서는 안전 < 주의 < 검토 권장 < 위험 |
-| `prob` | 0~1 | 후보 0건이면 null | 전체 등급을 정한 판단과 **같은 종류**(이름 있는·없는)인 후보 `risk.prob` 의 최댓값(소수 3자리) — 두 종류는 위험도 눈금이 달라 섞지 않는다. 화면은 `pattern` 이 이름 없는 판단이면 이 값을 보이지 않는다(§4-4) |
+| `prob` | 0–1 | 후보 0건이면 null | 전체 등급을 정한 판단과 **같은 종류**(이름 있는·없는)인 후보 `risk.prob` 의 최댓값(소수 3자리) — 두 종류는 위험도 눈금이 달라 섞지 않는다. 화면은 `pattern` 이 이름 없는 판단이면 이 값을 보이지 않는다(§4-4) |
 | `pattern` | string | 후보 0건이면 null | 전체 등급을 정한 판단(정렬 순서로 그 등급의 첫 후보)의 계수 집합 — `risk.pattern` 과 같은 값. `noname:` 으로 시작하면 이름 없는 판단 |
 | `caveats` | string[] | 아니오(빈 배열 가능) | 사용자에게 **그대로** 보여 줄 주의 문구. 문구는 §2-5 표의 것만 쓴다(프론트가 문자열 비교로 아이콘을 고를 수 있게) |
 | `query_type.type` | `"문자"` \| `"도형"` \| `"결합-문자요부"` \| `"결합-도형요부"` | 아니오 | 모델이 쓴 유형(교호작용 `x1×문자계`·`x2_img×도형계` 와 도형 규칙의 기준). **이름이 있으면 항상 문자계**, 도형계는 이름 없는 이미지 질의·사용자 선택만(§2-4 5항) |
 | `query_type.suggested_name` | string | 읽은 글자가 없으면 null(이름이 있거나 이미지가 없으면 항상 null) | 이름 없는 이미지 질의에서 OCR 이 읽은 글자(확신도 ≥ 0.5 박스만, 읽기 순서, 최대 60자). 화면이 "상표명으로 넣기"를 제안하고 사용자 확인 뒤 `name` 으로 재요청한다(이 요청에서 이름 축은 계산하지 않음 — 토큰 1회용) |
 | `query_type.source` | `"ocr"` \| `"fallback"` \| `"user"` | 아니오 | `ocr` 이미지 글자 면적으로 판정, `fallback` OCR 없음·실패라 입력 구성으로 정함, `user` `type_override` |
 | `query_type.detail` | `{ "text_ratio": 0~1, "fig_ratio": 0~1 }` | `ocr` 가 아니면 null | OCR 글자 박스 면적 비율·글자를 지운 뒤 남은 면적 비율(판정 근거, 디버그·툴팁용) |
-| `visual_status` | v1 `status_code`(`STRONG_MATCH`…`NO_CLOSE_MATCH`) | 이미지가 없으면 null | **제안(선택)**: 이미지 입력에 대한 v1 시각 4상태(임계 0.75/0.55/0.45). v1.3 까지는 이미지만 넣으면 `prob` 가 0.02~0.06 이라 화면이 시각 유사 자체를 보여 주려고 두었다. v1.4 는 이름 없는 계수 집합으로 이미지 유사도가 등급에 들어가지만 이 4상태는 그대로 둔다 |
+| `visual_status` | v1 `status_code`(`STRONG_MATCH`…`NO_CLOSE_MATCH`) | 이미지가 없으면 null | **제안(선택)**: 이미지 입력에 대한 v1 시각 4상태(임계 0.75/0.55/0.45). v1.3 까지는 이미지만 넣으면 `prob` 가 0.02–0.06 이라 화면이 시각 유사 자체를 보여 주려고 두었다. v1.4 는 이름 없는 계수 집합으로 이미지 유사도가 등급에 들어가지만 이 4상태는 그대로 둔다 |
 
 ### 2-2. `candidates[]`
 
@@ -118,12 +118,12 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | `type` | `"문자"` \| `"도형"` \| `"결합"` \| null | 알 수 없으면 null | **표시용** 후보 유형. DB `상표구분` → `도형상표`=도형, `도형복합`=결합, 비어 있으면 비엔나코드 + 상표명 있음=결합, 비엔나코드만=도형, 비엔나코드 없음=문자. 모델은 이 값이 아니라 `overall.query_type.type` 을 쓴다 |
 | `applicant` | string | 없으면 null | **제안(선택)**: 출원인(v1 `출원인`) — 현재 화면이 보여 주는 값이라 재조회를 피하려 둔다 |
 | `nice_classes` | int[] | 아니오(빈 배열 가능) | **제안(선택)**: 류(v1 `류`) |
-| `axes.x1` | 0~1 | 이름 없음·어느 쪽이든 호칭 없음(`has_pronunciation` false)이면 null | X1 호칭 `phonetic_similarity(query, title, extra_generic=removed)` — 학습의 `x1_d` |
-| `axes.x2_text` | 0~1 | 이름 없음·어느 쪽이든 글자 토큰 없음(`has_spelling` false)이면 null | X2 철자 `orthographic_similarity(…, extra_generic=removed)` — `x2_text_d` |
-| `axes.x2_img` | 0~1 | 이미지 없음·후보 이미지 없음, 그리고 사진 질의의 이름 있는 판단(§2-4 7항)이면 null | X2 전체 이미지 CLIP 코사인(v1 `similarity`, 음수는 0 으로 자른다) — `x2_whole`. 모델에 들어간 값 그대로 |
-| `axes.x3` | 0~1 | 이름 없음·어느 쪽이든 관념 없음(`has_meaning` false — 조어·기호)이면 null | X3 관념 `semantic_similarity(…, extra_generic=removed)` — `x3_d`. 두 이름 모두 사전어가 있어야 값이 있다(게이트) |
-| `axes.x4` | 0~1 | `goods_codes` 없음·후보에 유사군 없음이면 null | X4 `goods_similarity(goods_codes, candidate.goods.codes)` 자카드 |
-| `risk.prob` | 0~1 | 아니오 | 통합 모델 위험도(소수 3자리). 이름 있는 판단(v1.3 그대로): null 인 이미지·상품 축은 지시변수가 아니라 **결측 패턴별 계수 집합**으로 — 관측된 축 조합(base / x2_whole / x4 / x2_whole+x4)마다 계수·절편이 따로 있고 런타임이 입력에 맞는 집합을 고른다(설계 §7-3). 관념 축이 null 이면 값 0. 이름 없는 판단(v1.4, 설계 §7-4): 호칭·철자가 둘 다 결측이고 이미지가 있으면 이름 없는 계수 집합(`noname:x2_whole`·`noname:x2_whole+x4`) — 위험도 눈금이 이름 있는 판단과 달라 등급은 그 집합의 하한으로 매긴다 |
+| `axes.x1` | 0–1 | 이름 없음·어느 쪽이든 호칭 없음(`has_pronunciation` false)이면 null | X1 호칭 `phonetic_similarity(query, title, extra_generic=removed)` — 학습의 `x1_d` |
+| `axes.x2_text` | 0–1 | 이름 없음·어느 쪽이든 글자 토큰 없음(`has_spelling` false)이면 null | X2 철자 `orthographic_similarity(…, extra_generic=removed)` — `x2_text_d` |
+| `axes.x2_img` | 0–1 | 이미지 없음·후보 이미지 없음, 그리고 사진 질의의 이름 있는 판단(§2-4 7항)이면 null | X2 전체 이미지 CLIP 코사인(v1 `similarity`, 음수는 0 으로 자른다) — `x2_whole`. 모델에 들어간 값 그대로 |
+| `axes.x3` | 0–1 | 이름 없음·어느 쪽이든 관념 없음(`has_meaning` false — 조어·기호)이면 null | X3 관념 `semantic_similarity(…, extra_generic=removed)` — `x3_d`. 두 이름 모두 사전어가 있어야 값이 있다(게이트) |
+| `axes.x4` | 0–1 | `goods_codes` 없음·후보에 유사군 없음이면 null | X4 `goods_similarity(goods_codes, candidate.goods.codes)` 자카드 |
+| `risk.prob` | 0–1 | 아니오 | 통합 모델 위험도(소수 3자리). 이름 있는 판단(v1.3 그대로): null 인 이미지·상품 축은 지시변수가 아니라 **결측 패턴별 계수 집합**으로 — 관측된 축 조합(base / x2_whole / x4 / x2_whole+x4)마다 계수·절편이 따로 있고 런타임이 입력에 맞는 집합을 고른다(설계 §7-3). 관념 축이 null 이면 값 0. 이름 없는 판단(v1.4, 설계 §7-4): 호칭·철자가 둘 다 결측이고 이미지가 있으면 이름 없는 계수 집합(`noname:x2_whole`·`noname:x2_whole+x4`) — 위험도 눈금이 이름 있는 판단과 달라 등급은 그 집합의 하한으로 매긴다 |
 | `risk.grade` | 4등급 | 아니오 | §2-4 규칙 적용 뒤 등급 |
 | `risk.contributions` | `{ "X1": n, "X2": n, "X3": n, "X4": n, "요부": n }` | 아니오 | 축별 **로짓 기여도**(계수×값, 양·음 가능). 점수 항만 모은다 — `x1`·`x1×문자계`·`x1×요부없음` → X1, `x2_text`·`x2_img`·`x2_img×도형계` → X2, `x3` → X3, `x4` → X4, `any_no_distinctive` → 요부. 결측 보정(`miss_pattern`)은 넣지 않는다(아래 `missing_adjustment`). 런타임 `axis_contributions()` 는 결측 항을 포함하므로 엔진이 `miss_` 항을 떼어 낸다 |
 | `risk.missing_adjustment` | number | 아니오 | 결측 패턴 절편 보정 = 쓰인 패턴의 절편 − 기준 절편(기준 = 이미지·상품 모두 관측한 패턴 `x2_whole+x4`, 절편 -3.4712). v1.3 패턴 절편: base -3.6361·x2_whole -3.8103·x4 -3.4535 → 보정 -0.165·-0.339·0.018·0(음수 가능, 결측 지시변수 아님). `intercept(-3.4712) + Σcontributions + missing_adjustment = logit(prob)` 가 성립해야 한다(엔진 테스트 조건; §3 예시는 소수 3자리로 반올림했으므로 되계산한 p 는 ±0.001 안) |
@@ -133,16 +133,16 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | `salient.query_tokens` | string[] | 아니오 | 입력 상표명의 **요부 후보**(식별력 점수 ≥ θ 0.5, 이름 순서, NFKC·소문자 정규화). 이름이 없으면 빈 배열. 비어 있고 이름이 있으면 "요부 없음 → 전체 대비"(2000후2453) |
 | `salient.candidate_tokens` | string[] | 아니오 | 후보 상표명의 요부 후보(같은 규칙) |
 | `salient.removed[]` | `{ "token": s, "reason": s, "side": "query" \| "candidate" \| "both" }` | 아니오(빈 배열 가능) | 이 쌍의 비교에서 **실제로 뺀 토큰**(`pair_generic(query, title, goods_codes)` 결과)과 판정 사유(`judge().reasons` 를 `·` 로 이음: `1호 보통명칭`, `3호 기술적 표장:원재료(류 30,35,43)`, `4호 지명`, `5호 흔한 성`, `6호 간단 표장`, `일반어(zipf 4.6)`, `다수 등록(A=53, N=54)`). 결합 규칙 v0.2·v0.3 이 요부로 되돌린 토큰은 여기 없다(비교에 쓰였으므로) |
-| `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`) — 형식(G/S + 숫자 4~6자리)에 맞는 코드만(수집 원본의 형식이 다른 코드는 무시, 2026-11-20 기준 7건 108개). DB 보유 1,383/1,383건 — 없으면 빈 배열이고 `x4` 는 null |
-| `goods.jaccard` | 0~1 | `x4` 와 같은 조건으로 null | `axes.x4` 와 같은 값(지정상품 요약 영역용 중복 제공) |
+| `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`) — 형식(G/S + 숫자 4–6자리)에 맞는 코드만(수집 원본의 형식이 다른 코드는 무시, 2026-11-20 기준 7건 108개). DB 보유 1,383/1,383건 — 없으면 빈 배열이고 `x4` 는 null |
+| `goods.jaccard` | 0–1 | `x4` 와 같은 조건으로 null | `axes.x4` 와 같은 값(지정상품 요약 영역용 중복 제공) |
 
 ### 2-3. `meta`
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
 | `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4"`(2026-11-20 부터; 이름 있는 판단의 계수·하한은 v1.3 그대로) |
-| `grade_precision` | 0~1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF, 행마다 자기 결측 패턴)에서 "위험"으로 분류된 152쌍 중 심결이 유사로 본 107쌍 → 0.7039 ≈ **0.70**(v1.3, 설계 §7-3; v1.2.1 은 159쌍 중 109 → 0.6855). 엔진은 JSON `meta.grade_precision` 을 읽는다(E-6) |
-| `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 }` | **이름 있는 판단**의 등급 하한 p(JSON `grade_thresholds`, v1.3 그대로). 안전은 0~0.0902. 위험 0.5902 는 "정밀도 0.8 이상인 가장 낮은 p(지지 30)" 규칙이 미달해 쓴 대체값(검토 권장 하한과 1.0 의 중간) |
+| `grade_precision` | 0–1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF, 행마다 자기 결측 패턴)에서 "위험"으로 분류된 152쌍 중 심결이 유사로 본 107쌍 → 0.7039 ≈ **0.70**(v1.3, 설계 §7-3; v1.2.1 은 159쌍 중 109 → 0.6855). 엔진은 JSON `meta.grade_precision` 을 읽는다(E-6) |
+| `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 }` | **이름 있는 판단**의 등급 하한 p(JSON `grade_thresholds`, v1.3 그대로). 안전은 0–0.0902. 위험 0.5902 는 "정밀도 0.8 이상인 가장 낮은 p(지지 30)" 규칙이 미달해 쓴 대체값(검토 권장 하한과 1.0 의 중간) |
 | `thresholds.nameless` | `{ "noname:x2_whole": { "주의": 0.3677, "검토 권장": 0.491, "위험": 0.5724 }, "noname:x2_whole+x4": { "주의": 0.2944, "검토 권장": 0.4441, "위험": 0.7892 } }` | **이름 없는 판단**의 계수 집합(`risk.pattern`)별 등급 하한(JSON `nameless_patterns[키].grade_thresholds`). null 인 등급은 위험도로는 닿지 않는다. 값과 산출 방법은 §2-4 2항 |
 | `thresholds.standalone` | `{ "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null }` | 단독 임계값 τ(JSON `standalone_thresholds`, 정밀도 ≥ 0.7 지점). null 은 비활성 |
 | `thresholds.figure` | 0.9 | 도형 규칙 τ(JSON `figure_rule.threshold`, 미검증) |
@@ -936,7 +936,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | 예외 | 언제 | 메시지(그대로 `detail` 로) | HTTP |
 |---|---|---|---:|
 | `multi_search.EmptyQueryError`(ValueError) | `image`·`name`(공백만 포함)·`goods_codes`(빈 값만 포함)가 모두 없음 | `image, name, goods_codes 중 하나는 있어야 합니다.` | 400 |
-| `ValueError` | `top_k` 가 1~20 밖, `type_override` 가 문자·도형·결합 밖 | `top_k 는 1~20 정수여야 합니다 (받은 값: …).` / `type_override 는 문자·도형·결합 중 하나여야 합니다.` | 422 |
+| `ValueError` | `top_k` 가 1–20 밖, `type_override` 가 문자·도형·결합 밖 | `top_k 는 1~20 정수여야 합니다 (받은 값: …).` / `type_override 는 문자·도형·결합 중 하나여야 합니다.` | 422 |
 | `multi_search.ModelNotReadyError`(RuntimeError) | 계수 JSON(`shared/model/risk_model_v1.json`, `meta.grade_precision` 포함) 또는 식별력 모델을 기동 때 못 읽음 — 서버는 떠 있고 이 기능만 | `multi_search.state.error`(원인 목록) | 503 |
 | `RuntimeError` | 엔진(인덱스·CLIP) 미준비 — v1 `run_search` 와 같은 메시지 | `Engine 이 아직 초기화되지 않았습니다.` | 503 |
 | (이미지 디코딩 `ValueError`) | v1 과 같이 API 의 `validation.validate_and_decode` 단계에서 — 엔진은 검증된 PIL 이미지를 받는다 | v1 과 같음 | 400 |
@@ -968,5 +968,5 @@ OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아�
 2초 초과면 fallback; 모델 디렉터리 `EASYOCR_MODULE_PATH` — 컨테이너는 빌드 때 모델을 미리 내려받아야 한다) ② 제안 필드
 `visual_status`·`applicant`·`nice_classes` **포함** ③ v1 엔드포인트는 최종 발표(2026-12-20)까지 유지 뒤 별도 PR 로 제거(§5-5) ④ 접미
 분리(E-3)는 **고시 단일 명칭만**(2음절 이상 접미·2음절 이상 앞부분, 1음절 앞부분은 오분리가 많아 제외 — `Distinctiveness.
-split_goods_suffix`). 엔진 몫 E-1~E-6 은 `feat/engine-multiaxis` 에 구현됐고(`backend/src/core/multi_search.py`·`ocr.py`,
-`ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`). B-1~B-5의 API·문서용 Pydantic 스키마·BFF·zod·gateway는 2026-10-26 구현했다(PR #69 — 실제 모델로 BFF까지 §2 스키마·등급 규칙·로짓 검산 확인). F-1~F-5 화면(PR #72)과 E2E v2 15건도 2026-10-27 연결을 마쳤다(연결 완료; 발표 전 보완 2026-10-28 — 1층 위험도 %, 제외 사유 원문 "자세히", 시각 4상태 문구, 위험 등급 후보 카드의 정밀도 문구). 운영 배포 검증은 별도다.
+split_goods_suffix`). 엔진 몫 E-1–E-6 은 `feat/engine-multiaxis` 에 구현됐고(`backend/src/core/multi_search.py`·`ocr.py`,
+`ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`). B-1–B-5의 API·문서용 Pydantic 스키마·BFF·zod·gateway는 2026-10-26 구현했다(PR #69 — 실제 모델로 BFF까지 §2 스키마·등급 규칙·로짓 검산 확인). F-1–F-5 화면(PR #72)과 E2E v2 15건도 2026-10-27 연결을 마쳤다(연결 완료; 발표 전 보완 2026-10-28 — 1층 위험도 %, 제외 사유 원문 "자세히", 시각 4상태 문구, 위험 등급 후보 카드의 정밀도 문구). 운영 배포 검증은 별도다.

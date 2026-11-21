@@ -15,7 +15,7 @@
 7. 미래 행은 증거가 생기기 전까지 `계획`으로 둡니다.
 8. 작성 기준일에 확보된 기능은 `기준선 확보`로 기록하고 근거가 되는 실제 날짜를
    유지합니다.
-9. 9~10월 보고서에는 각 주차의 **구현 정리·clean 재현·분석·시연·보고 활동**을
+9. 9–10월 보고서에는 각 주차의 **구현 정리·clean 재현·분석·시연·보고 활동**을
    기록합니다.
 10. 학기 활동을 실제로 수행하기 전에는 `학기 수행·재현일`을 `예정`으로 두며,
     기존 기준선만으로 `검증완료`로 올리지 않습니다.
@@ -104,32 +104,32 @@ print(dict(sorted(counts.items())))
 
 | ID | 기준선 구현 주장 | 상태 | 기준 증거일 | 학기 검증 예정 주차 | 근거 | 사실 경계 |
 |---|---|---|---:|---:|---|---|
-| `PRE-ML-01` | OpenCLIP ViT-B-32의 정규화된 512차원 벡터와 FAISS `IndexFlatIP` 기반 Top-K 검색을 구현했다 | 기준선 확보 | 2026-05-11~06-10 | 1주, 08/31~09/06 | `ml/src/embedding.py`, `ml/src/search.py`, `ml/scripts/build_index.py`, `ml/tests/` | 법적 유사성·등록 가능성 판정이 아님 |
-| `PRE-ML-02` | 절대 유사도와 후보 격차를 결합한 참고용 scoring을 구현하고 역전 사례를 보완했다 | 기준선 확보 | 2026-05-11~07-11 | 7주, 10/12~10/18 | `ml/src/scoring.py`, `ml/tests/test_scoring.py`, [설계결정기록](../../MarkLens_설계결정기록.md) | 확률·법률 위험 점수가 아니며 사람 라벨 교정 전 |
-| `PRE-ML-03` | 모델·전처리·데이터·index generation과 SHA를 연결하고 불일치 시 로딩을 중단하는 artifact 계약을 구현했다 | 기준선 확보 | 2026-08-14~08-15 | 7주, 10/12~10/18 | `ml/evaluation/artifacts.py`, `backend/src/core/engine.py`, `backend/tests/test_engine_manifest.py` | 현재 세대는 `git.dirty=true`라 release artifact가 아님 |
-| `PRE-KIP-01` | HTTPS KIPRIS Plus client와 `POST /name-check` 완전일치 조회·후보 응답 경로를 구현했다 | 기준선 확보 | 2026-07-08~07-11 | 3주, 09/14~09/20 | `backend/src/core/kipris_client.py`, `backend/src/api/namecheck.py`, [API 계약](../../MarkLens_API계약_v1.md) | 사용자 입력 문자열 조회이며 OCR·호칭 유사 알고리즘이 아님 |
-| `PRE-KIP-02` | 105건 세대에서 `마크렌즈`를 live API로 1회 조회해 `resultCode=00`, 완전일치 0건을 확인했다 | 기준선 확보 | 2026-08-14 | 3주, 09/14~09/20 | [KIPRIS API 신청 가이드](../../MarkLens_KIPRIS_API_신청가이드.md) | BBQ 후보 화면은 fixture/E2E이며 live BBQ 결과로 주장하지 않음 |
-| `PRE-KIP-03` | 수집·명칭 확인의 월 호출 예산을 분리하고 cache·counter·950회 내부 상한·서지상세 opt-in 방어를 구현했다 | 기준선 확보 | 2026-07-08~08-15 | 5주, 09/28~10/04 | `backend/src/api/namecheck.py`, `backend/scripts/collect_pipeline.py`, [데이터 확장 실행계획](../../MarkLens_데이터확장_실행계획_2026-08.md) | 공급자 한도·권한·정책은 운영 전 다시 확인 필요 |
-| `PRE-DATA-01` | BBQ 5건 파일럿 뒤 신규 895건을 추가해 권리·이미지·벡터를 105건에서 1,000건으로 확장했다 | 기준선 확보 | 2026-08-14~08-15 | 5~6주, 09/28~10/11 | [데이터 확장 실행계획](../../MarkLens_데이터확장_실행계획_2026-08.md) | 1,000은 권리 레코드 수이며 독립 도안 수가 아님 |
-| `PRE-DATA-02` | 1,000건의 키 정합성·전체 decode·Nice 45/45류와 구조 차단 이슈 0건을 감사했다 | 기준선 확보 | 2026-08-15 | 6주, 10/05~10/11 | `backend/scripts/audit_dataset.py`, [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | 품질·대표성·검색 정확도 검증과는 별개 |
-| `PRE-DATA-03` | 원본 선저장·checkpoint·기수집 skip·격리·quarantine·원자 승격·dirty marker 복구 경로를 구현했다 | 기준선 확보 | 2026-07-08~08-15 | 5~6주, 09/28~10/11 | `backend/scripts/collect_pipeline.py`, `backend/scripts/promote_file_staging.py`, 관련 tests | 실제 장애 복구와 운영 backup/restore 훈련은 미완료 |
-| `PRE-DATA-04` | 769개 자동 visual family, 동일 bytes 123그룹·330파일, 희소 Nice 12류, 유사군 100/1,000의 한계를 계수했다 | 기준선 확보 | 2026-08-15 | 6~7주, 10/05~10/18 | [모델·데이터 카드](../../MarkLens_모델카드_데이터카드.md), [데이터 확장 실행계획](../../MarkLens_데이터확장_실행계획_2026-08.md) | 자동 family는 사람 정답 라벨이 아니며 `.png` 1,000개 중 실제 JPEG 900개 |
-| `PRE-UI-01` | PNG·JPEG·WebP 업로드, crop·취소·오류 상태와 반응형 검색 흐름을 구현했다 | 기준선 확보 | 2026-07-08~08-15 | 4주, 09/21~09/27 | `frontend/components/SearchForm.tsx`, `frontend/components/ImageCropDialog.tsx`, `frontend/e2e/marklens.spec.ts` | SVG·PDF·EPS 입력은 지원하지 않음 |
-| `PRE-UI-02` | 점수 분포·후보 비교·근거·권리 상세를 보여 주는 결과 대시보드를 구현했다 | 기준선 확보 | 2026-08-14~08-15 | 4주, 09/21~09/27 | `frontend/components/ResultView.tsx`, `frontend/app/page.tsx`, frontend tests | 화면 설명은 모델 정확도 증거가 아님 |
-| `PRE-UI-03` | 명칭 후보 목록·상태 분포와 클릭 상세 UI를 구현하고 BBQ fixture로 브라우저 흐름을 검증했다 | 기준선 확보 | 2026-08-14~08-15 | 3~4주, 09/14~09/27 | `frontend/components/NameCheckPanel.tsx`, `frontend/e2e/marklens.spec.ts` | BBQ 데이터는 mock/fixture이며 live KIPRIS 조회 증거가 아님 |
-| `PRE-UI-04` | 현재 입력·평가 경계를 조사해 SVG·PDF·EPS vector graphic upload와 손글씨 전용 benchmark가 없음을 확인했다 | 기준선 확보 | 2026-08-15 | 9~12주, 10/26~11/22 | `frontend/components/SearchForm.tsx`, [모델·데이터 카드](../../MarkLens_모델카드_데이터카드.md) | raster 손글씨는 입력 가능하지만 별도 성능 주장은 불가 |
-| `PRE-SEC-01` | 브라우저가 backend URL·key를 직접 받지 않는 Next.js same-origin BFF를 구현했다 | 기준선 확보 | 2026-07-08~08-15 | 4·8주, 09/21~10/25 | `frontend/app/api/`, `frontend/lib/server/backend.ts`, [공개배포·보안 가이드](../../MarkLens_공개배포_보안가이드.md) | 로컬 경계 검증이며 공개 배포 완료가 아님 |
-| `PRE-SEC-02` | 업로드 검증, API key, rate limit, CORS, HTTPS 강제, request ID와 안전한 오류 매핑을 구현했다 | 기준선 확보 | 2026-07-08~08-15 | 8주, 10/19~10/25 | `backend/src/core/validation.py`, `auth.py`, `ratelimit.py`, `request_id.py`, `backend/tests/test_hardening.py` | 외부 침투시험·운영 TLS 검증은 미완료 |
-| `PRE-SEC-03` | production 배포 전 gate와 잔여 위험을 문서화했다 | 기준선 확보 | 2026-08-15 | 8주, 10/19~10/25 | [공개배포·보안 가이드](../../MarkLens_공개배포_보안가이드.md), [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | Turnstile production key·hostname, 실제 TLS·도메인·production DB는 미검증 |
-| `PRE-EVAL-01` | 769 family 기반 200쌍 라벨 팩, 160 development·40 frozen holdout 분리와 검수 UI를 준비했다 | 기준선 확보 | 2026-08-15 | 13~15주, 11/23~12/13 | `ml/evaluation/labeling.py`, `ml/evaluation/review.py`, `ml/evaluation/review_ui/` | 사람 라벨은 0/200이고 holdout은 아직 평가하지 않음 |
-| `PRE-EVAL-02` | 25개 원본과 100개 변형의 v4 내부 강건성 평가를 실행했다 | 기준선 확보 | 2026-08-15 | 7주, 10/12~10/18 | `ml/evaluation/robustness_model_full_v4.json`, [모델·데이터 카드](../../MarkLens_모델카드_데이터카드.md) | exact R@5 1.0은 내부 변형 복원 결과이며 전체 정확도가 아님 |
-| `PRE-EVAL-03` | 현행 전처리와 대안 전처리의 비교 실행·보고 경로를 구현했다 | 기준선 확보 | 2026-08-15 | 7·9주, 10/12~11/01 | `ml/evaluation/preprocess_comparison.py`, `ml/evaluation/preprocess_comparison_full_v1.json`, 관련 tests | 운영 전처리는 아직 legacy이며 사람 라벨 교정·fine-tuning 없음 |
-| `PRE-TEST-01` | Python 337 passed·5 skipped, frontend 34/34, E2E 9/9, lint·typecheck·build를 통과했다 | 기준선 확보 | 2026-08-15 | 1·8주, 08/31~10/25 | [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | 학기 제출 시 같은 명령을 다시 실행해야 함 |
-| `PRE-RUN-01` | 1,000건 FastAPI·BFF health, 검색, 결과 이미지와 검수 화면 runtime smoke를 통과했다 | 기준선 확보 | 2026-08-15 | 1·8주, 08/31~10/25 | [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | 이 smoke의 KIPRIS `/name-check` 호출은 0회 |
-| `PRE-DB-01` | PostgreSQL schema·migration·JSON 이관과 file/DB 저장 추상화를 구현했다 | 기준선 확보 | 2026-07-08~07-11 | 2주, 09/07~09/13 | `backend/migrations/001_init.sql`, `backend/scripts/migrate_json_to_db.py`, `backend/src/core/storage.py`, DB tests | 현재 1,000건 실행은 `DATABASE_URL` 없는 file mode이며 production backup/restore 미검증 |
-| `PRE-DEP-01` | Dockerfile·nginx·Compose/CI 구조와 공개배포 보안 절차를 준비했다 | 기준선 확보 | 2026-07-08~08-15 | 8주, 10/19~10/25 | `deploy/`, `compose.production.yml`, `.github/workflows/`, [공개배포·보안 가이드](../../MarkLens_공개배포_보안가이드.md) | 실제 production 배포·공개 도메인 운영을 완료하지 않음 |
+| `PRE-ML-01` | OpenCLIP ViT-B-32의 정규화된 512차원 벡터와 FAISS `IndexFlatIP` 기반 Top-K 검색을 구현했다 | 기준선 확보 | 2026-05-11–06-10 | 1주, 08/31–09/06 | `ml/src/embedding.py`, `ml/src/search.py`, `ml/scripts/build_index.py`, `ml/tests/` | 법적 유사성·등록 가능성 판정이 아님 |
+| `PRE-ML-02` | 절대 유사도와 후보 격차를 결합한 참고용 scoring을 구현하고 역전 사례를 보완했다 | 기준선 확보 | 2026-05-11–07-11 | 7주, 10/12–10/18 | `ml/src/scoring.py`, `ml/tests/test_scoring.py`, [설계결정기록](../../MarkLens_설계결정기록.md) | 확률·법률 위험 점수가 아니며 사람 라벨 교정 전 |
+| `PRE-ML-03` | 모델·전처리·데이터·index generation과 SHA를 연결하고 불일치 시 로딩을 중단하는 artifact 계약을 구현했다 | 기준선 확보 | 2026-08-14–08-15 | 7주, 10/12–10/18 | `ml/evaluation/artifacts.py`, `backend/src/core/engine.py`, `backend/tests/test_engine_manifest.py` | 현재 세대는 `git.dirty=true`라 release artifact가 아님 |
+| `PRE-KIP-01` | HTTPS KIPRIS Plus client와 `POST /name-check` 완전일치 조회·후보 응답 경로를 구현했다 | 기준선 확보 | 2026-07-08–07-11 | 3주, 09/14–09/20 | `backend/src/core/kipris_client.py`, `backend/src/api/namecheck.py`, [API 계약](../../MarkLens_API계약_v1.md) | 사용자 입력 문자열 조회이며 OCR·호칭 유사 알고리즘이 아님 |
+| `PRE-KIP-02` | 105건 세대에서 `마크렌즈`를 live API로 1회 조회해 `resultCode=00`, 완전일치 0건을 확인했다 | 기준선 확보 | 2026-08-14 | 3주, 09/14–09/20 | [KIPRIS API 신청 가이드](../../MarkLens_KIPRIS_API_신청가이드.md) | BBQ 후보 화면은 fixture/E2E이며 live BBQ 결과로 주장하지 않음 |
+| `PRE-KIP-03` | 수집·명칭 확인의 월 호출 예산을 분리하고 cache·counter·950회 내부 상한·서지상세 opt-in 방어를 구현했다 | 기준선 확보 | 2026-07-08–08-15 | 5주, 09/28–10/04 | `backend/src/api/namecheck.py`, `backend/scripts/collect_pipeline.py`, [데이터 확장 실행계획](../../MarkLens_데이터확장_실행계획_2026-08.md) | 공급자 한도·권한·정책은 운영 전 다시 확인 필요 |
+| `PRE-DATA-01` | BBQ 5건 파일럿 뒤 신규 895건을 추가해 권리·이미지·벡터를 105건에서 1,000건으로 확장했다 | 기준선 확보 | 2026-08-14–08-15 | 5–6주, 09/28–10/11 | [데이터 확장 실행계획](../../MarkLens_데이터확장_실행계획_2026-08.md) | 1,000은 권리 레코드 수이며 독립 도안 수가 아님 |
+| `PRE-DATA-02` | 1,000건의 키 정합성·전체 decode·Nice 45/45류와 구조 차단 이슈 0건을 감사했다 | 기준선 확보 | 2026-08-15 | 6주, 10/05–10/11 | `backend/scripts/audit_dataset.py`, [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | 품질·대표성·검색 정확도 검증과는 별개 |
+| `PRE-DATA-03` | 원본 선저장·checkpoint·기수집 skip·격리·quarantine·원자 승격·dirty marker 복구 경로를 구현했다 | 기준선 확보 | 2026-07-08–08-15 | 5–6주, 09/28–10/11 | `backend/scripts/collect_pipeline.py`, `backend/scripts/promote_file_staging.py`, 관련 tests | 실제 장애 복구와 운영 backup/restore 훈련은 미완료 |
+| `PRE-DATA-04` | 769개 자동 visual family, 동일 bytes 123그룹·330파일, 희소 Nice 12류, 유사군 100/1,000의 한계를 계수했다 | 기준선 확보 | 2026-08-15 | 6–7주, 10/05–10/18 | [모델·데이터 카드](../../MarkLens_모델카드_데이터카드.md), [데이터 확장 실행계획](../../MarkLens_데이터확장_실행계획_2026-08.md) | 자동 family는 사람 정답 라벨이 아니며 `.png` 1,000개 중 실제 JPEG 900개 |
+| `PRE-UI-01` | PNG·JPEG·WebP 업로드, crop·취소·오류 상태와 반응형 검색 흐름을 구현했다 | 기준선 확보 | 2026-07-08–08-15 | 4주, 09/21–09/27 | `frontend/components/SearchForm.tsx`, `frontend/components/ImageCropDialog.tsx`, `frontend/e2e/marklens.spec.ts` | SVG·PDF·EPS 입력은 지원하지 않음 |
+| `PRE-UI-02` | 점수 분포·후보 비교·근거·권리 상세를 보여 주는 결과 대시보드를 구현했다 | 기준선 확보 | 2026-08-14–08-15 | 4주, 09/21–09/27 | `frontend/components/ResultView.tsx`, `frontend/app/page.tsx`, frontend tests | 화면 설명은 모델 정확도 증거가 아님 |
+| `PRE-UI-03` | 명칭 후보 목록·상태 분포와 클릭 상세 UI를 구현하고 BBQ fixture로 브라우저 흐름을 검증했다 | 기준선 확보 | 2026-08-14–08-15 | 3–4주, 09/14–09/27 | `frontend/components/NameCheckPanel.tsx`, `frontend/e2e/marklens.spec.ts` | BBQ 데이터는 mock/fixture이며 live KIPRIS 조회 증거가 아님 |
+| `PRE-UI-04` | 현재 입력·평가 경계를 조사해 SVG·PDF·EPS vector graphic upload와 손글씨 전용 benchmark가 없음을 확인했다 | 기준선 확보 | 2026-08-15 | 9–12주, 10/26–11/22 | `frontend/components/SearchForm.tsx`, [모델·데이터 카드](../../MarkLens_모델카드_데이터카드.md) | raster 손글씨는 입력 가능하지만 별도 성능 주장은 불가 |
+| `PRE-SEC-01` | 브라우저가 backend URL·key를 직접 받지 않는 Next.js same-origin BFF를 구현했다 | 기준선 확보 | 2026-07-08–08-15 | 4·8주, 09/21–10/25 | `frontend/app/api/`, `frontend/lib/server/backend.ts`, [공개배포·보안 가이드](../../MarkLens_공개배포_보안가이드.md) | 로컬 경계 검증이며 공개 배포 완료가 아님 |
+| `PRE-SEC-02` | 업로드 검증, API key, rate limit, CORS, HTTPS 강제, request ID와 안전한 오류 매핑을 구현했다 | 기준선 확보 | 2026-07-08–08-15 | 8주, 10/19–10/25 | `backend/src/core/validation.py`, `auth.py`, `ratelimit.py`, `request_id.py`, `backend/tests/test_hardening.py` | 외부 침투시험·운영 TLS 검증은 미완료 |
+| `PRE-SEC-03` | production 배포 전 gate와 잔여 위험을 문서화했다 | 기준선 확보 | 2026-08-15 | 8주, 10/19–10/25 | [공개배포·보안 가이드](../../MarkLens_공개배포_보안가이드.md), [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | Turnstile production key·hostname, 실제 TLS·도메인·production DB는 미검증 |
+| `PRE-EVAL-01` | 769 family 기반 200쌍 라벨 팩, 160 development·40 frozen holdout 분리와 검수 UI를 준비했다 | 기준선 확보 | 2026-08-15 | 13–15주, 11/23–12/13 | `ml/evaluation/labeling.py`, `ml/evaluation/review.py`, `ml/evaluation/review_ui/` | 사람 라벨은 0/200이고 holdout은 아직 평가하지 않음 |
+| `PRE-EVAL-02` | 25개 원본과 100개 변형의 v4 내부 강건성 평가를 실행했다 | 기준선 확보 | 2026-08-15 | 7주, 10/12–10/18 | `ml/evaluation/robustness_model_full_v4.json`, [모델·데이터 카드](../../MarkLens_모델카드_데이터카드.md) | exact R@5 1.0은 내부 변형 복원 결과이며 전체 정확도가 아님 |
+| `PRE-EVAL-03` | 현행 전처리와 대안 전처리의 비교 실행·보고 경로를 구현했다 | 기준선 확보 | 2026-08-15 | 7·9주, 10/12–11/01 | `ml/evaluation/preprocess_comparison.py`, `ml/evaluation/preprocess_comparison_full_v1.json`, 관련 tests | 운영 전처리는 아직 legacy이며 사람 라벨 교정·fine-tuning 없음 |
+| `PRE-TEST-01` | Python 337 passed·5 skipped, frontend 34/34, E2E 9/9, lint·typecheck·build를 통과했다 | 기준선 확보 | 2026-08-15 | 1·8주, 08/31–10/25 | [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | 학기 제출 시 같은 명령을 다시 실행해야 함 |
+| `PRE-RUN-01` | 1,000건 FastAPI·BFF health, 검색, 결과 이미지와 검수 화면 runtime smoke를 통과했다 | 기준선 확보 | 2026-08-15 | 1·8주, 08/31–10/25 | [기술 감사보고서](../../MarkLens_기술감사보고서_2026-08.md) | 이 smoke의 KIPRIS `/name-check` 호출은 0회 |
+| `PRE-DB-01` | PostgreSQL schema·migration·JSON 이관과 file/DB 저장 추상화를 구현했다 | 기준선 확보 | 2026-07-08–07-11 | 2주, 09/07–09/13 | `backend/migrations/001_init.sql`, `backend/scripts/migrate_json_to_db.py`, `backend/src/core/storage.py`, DB tests | 현재 1,000건 실행은 `DATABASE_URL` 없는 file mode이며 production backup/restore 미검증 |
+| `PRE-DEP-01` | Dockerfile·nginx·Compose/CI 구조와 공개배포 보안 절차를 준비했다 | 기준선 확보 | 2026-07-08–08-15 | 8주, 10/19–10/25 | `deploy/`, `compose.production.yml`, `.github/workflows/`, [공개배포·보안 가이드](../../MarkLens_공개배포_보안가이드.md) | 실제 production 배포·공개 도메인 운영을 완료하지 않음 |
 
-## 6. 1차 보고서 증빙, 1~4주
+## 6. 1차 보고서 증빙, 1–4주
 
 | ID | 목표 주장 | 요구 증거 | 상태 | 실제 근거·결과 |
 |---|---|---|---|---|
@@ -144,7 +144,7 @@ print(dict(sorted(counts.items())))
 | `R1-W04-S` | BFF에서 backend URL·key 비노출 경계를 재확인했다 | browser network trace, server env, regression | 계획 | `PRE-SEC-01` |
 | `R1-W04-D` | 1차 보고서에 기준 증거일과 학기 실행일을 구분해 제출했다 | 제출 파일, PRE/R1 mapping, 발표일 | 계획 | 제출 전 입력 |
 
-## 7. 2차 보고서 증빙, 5~8주
+## 7. 2차 보고서 증빙, 5–8주
 
 | ID | 목표 주장 | 요구 증거 | 상태 | 실제 근거·결과 |
 |---|---|---|---|---|
@@ -159,7 +159,7 @@ print(dict(sorted(counts.items())))
 | `R2-W08-D` | production 미검증 항목과 배포 gate를 판정했다 | deployment checklist, TLS/DB/Turnstile 상태 | 계획 | `PRE-SEC-03`, `PRE-DEP-01`; 미운영을 완료로 표기 금지 |
 | `R2-W08-T` | 1,000건 통합 회귀·runtime smoke를 재통과하고 2차 보고서를 제출했다 | suite 결과, runtime response, 제출 파일 | 계획 | 8월 기준 `PRE-TEST-01`, `PRE-RUN-01`; 제출 전 재실행 |
 
-## 8. 3차 보고서 증빙, 9~12주
+## 8. 3차 보고서 증빙, 9–12주
 
 | ID | 목표 주장 | 요구 증거 | 상태 | 실제 근거·결과 |
 |---|---|---|---|---|
@@ -201,7 +201,7 @@ print(dict(sorted(counts.items())))
 | `R3-CONTROL-MODEL` | `R3-W11-P`, `R3-W12-S` | model·index generation·환경 고정 receipt | 계획 |
 | `R3-CONTROL-HOLDOUT` | `R3-W12-D` | 기존 frozen holdout 미열람 확인 | 계획 |
 
-## 9. 최종보고서 증빙, 13~16주
+## 9. 최종보고서 증빙, 13–16주
 
 | ID | 목표 주장 | 요구 증거 | 상태 | 실제 근거·결과 |
 |---|---|---|---|---|

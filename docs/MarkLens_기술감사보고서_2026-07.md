@@ -48,7 +48,7 @@
 **정의**: 동시 사용자와 데이터 증가를 현 아키텍처가 감당하는가.
 **측정**: 이벤트 루프 점유, CPU 추론 경합, 캐시 상한, 외부 API 쿼터 방어.
 **실측**:
-- **치명 결함(해소)**: `POST /search`(async)가 CPU 바운드 CLIP 인코딩+FAISS+동기 DB 쿼리를 이벤트 루프에서 직접 실행 — 검색 1건이 도는 동안 /health까지 전부 동결되는 구조였다. ✔ **조치완료**: `anyio.to_thread.run_sync` + `CapacityLimiter(2)` 오프로드([search.py:124](../backend/src/api/search.py), [config.py:58](../backend/src/core/config.py)). **실측: /search 2건 동시 진행 중 /health 응답 6~7ms** (조치 전에는 검색 완료까지 블록).
+- **치명 결함(해소)**: `POST /search`(async)가 CPU 바운드 CLIP 인코딩+FAISS+동기 DB 쿼리를 이벤트 루프에서 직접 실행 — 검색 1건이 도는 동안 /health까지 전부 동결되는 구조였다. ✔ **조치완료**: `anyio.to_thread.run_sync` + `CapacityLimiter(2)` 오프로드([search.py:124](../backend/src/api/search.py), [config.py:58](../backend/src/core/config.py)). **실측: /search 2건 동시 진행 중 /health 응답 6–7ms** (조치 전에는 검색 완료까지 블록).
 - /name-check의 httpx.Client 호출마다 생성 → ✔ **조치완료**: 모듈 공용 클라이언트 + 커넥션 풀 + lifespan 정리.
 - /name-check 캐시가 상한 없는 수제 dict(무한 성장 가능) → ✔ **조치완료**: `TTLCache(maxsize=1024)`([namecheck.py:27](../backend/src/api/namecheck.py)).
 - KIPRIS 쿼터 방어는 원래 견고: 월 950회 파일 영속 카운터 + 0.1s 간격 + 24h 캐시. **인바운드** 레이트리밋은 없음(R12, 시연 배포 전 필수).
@@ -63,27 +63,27 @@
 - 테스트는 존재했으나(계약 23/23 이력) **인덱스가 없으면 전부 skip**되는 구조 + pytest 설정/CI 전무, ml/tests 빈 폴더. ✔ **조치완료**: 루트 [pyproject.toml](../pyproject.toml) pytest 설정, **더미 FAISS 인덱스 인프로세스 픽스처 + encode_image 몽키패치**([conftest.py](../backend/tests/conftest.py))로 계약 테스트가 CLIP 다운로드 없이 어디서나 실행, [GitHub Actions CI](../.github/workflows/ci.yml)(postgres 서비스 컨테이너 포함) 작성. **실측: 전체 48 passed / 0 skipped** (실모드), 가짜 ML 모드 35 passed.
 - 문서 불일치 잔존: 설계결정기록(2026-05-25)이 폐기된 OCR 설계를 정본처럼 기술, README의 프론트 상태 서술 내부 모순(§2 "시안만 완성" vs §6-7 실행 안내). → M1 내 30분 작업으로 개정 권고.
 
-**종합**: 기능 진척(외관 축 E2E + 프론트 1차 연동)은 일정 대비 우수하고 코드 단위 품질도 높다. 문제는 기능이 아니라 **기반(보존·관측·동시성·검증 자동화)** 이었고, 이번 감사에서 그 중 구조적 결함 대부분을 즉시 해소했다. 남은 것은 아래 작업 2~4의 계획대로 실행하면 된다.
+**종합**: 기능 진척(외관 축 E2E + 프론트 1차 연동)은 일정 대비 우수하고 코드 단위 품질도 높다. 문제는 기능이 아니라 **기반(보존·관측·동시성·검증 자동화)** 이었고, 이번 감사에서 그 중 구조적 결함 대부분을 즉시 해소했다. 남은 것은 아래 작업 2–4의 계획대로 실행하면 된다.
 
 ---
 
 ## 작업 2 — Phase 2(3개월) 마일스톤 및 파트별 구현 목표
 
-> 기준: [로드맵·마일스톤](MarkLens_로드맵_마일스톤.md)의 M1~M4와 정합. 주차는 2026-07-07(월) 시작.
+> 기준: [로드맵·마일스톤](MarkLens_로드맵_마일스톤.md)의 M1–M4와 정합. 주차는 2026-07-07(월) 시작.
 > 파트 = 실제 R&R: **백엔드·인프라(현수)** / **프론트+모델(지원)** / **데이터·법리(다빈)**.
 > 크리티컬 패스: **다빈-1 정답 데이터 → 통합 모델(E) → 등급 재보정(F) → 백엔드-8·9**. 데이터 수집이 늦으면 전부 늦는다.
 
 | 마일스톤 (기간) | 파트 | 구현 목표 | 완료 기준 (Definition of Done) |
 |---|---|---|---|
 | **M0 잔여 정리** (즉시) | 전원 | 기반선 정리 | ✔ 미커밋 1개월분 커밋(6개 논리 커밋) · ✔ 중복 클론 제거 · ✔ 등급 역전 회귀 테스트 고정 — **전부 2026-07-08 완료**. 남은 것: 브랜치 push + PR 머지, 원격 토폴로지 합의(로컬 `master` vs 원격 `main`/`develop`) |
-| **M1 착수** (7/7~7/19) | 전원 | KIPRIS Plus 계정·키 각자 발급 | 처리상태 "사용중" + 키를 .env에 보관(커밋 금지). **유일한 외부 하드 의존 — 1주차에 신청** |
+| **M1 착수** (7/7–7/19) | 전원 | KIPRIS Plus 계정·키 각자 발급 | 처리상태 "사용중" + 키를 .env에 보관(커밋 금지). **유일한 외부 하드 의존 — 1주차에 신청** |
 | | 백엔드 | ✔R2 등급역전 ✔R3 로깅 ✔R4 루프차단 (완료) + 백엔드-2 실데이터 마이그레이션 | 실데이터 100건 기준 `migrate_json_to_db` 실행, `SELECT count(*) FROM trademark` = reconcile 후 건수와 일치 |
 | | 프론트+모델 | 프론트-1 변경 시안 확정 + 프론트-2 상품↔유사군 변환표 | 시안 단톡 확정. 변환표 JSON(1:N 구조) `shared/`에 커밋 + 다빈 검증 통과 |
-| | 데이터·법리 | 다빈-1 수집 개시(상시) + 다빈-2 X1 호칭 v1 | `ml/src/axes/x1_phonetic.py` 순수 함수(0~1 float) + 테스트: 스타벅스↔스타박스 > 스타벅스↔커피빈 |
-| **M2 인프라 전환 + 축 구현** (7/20~8/16) | 백엔드 | R5 설정 통합 → R9+백엔드-3 스토리지 분리 → R10 ml 패키징 → 백엔드-5 파이프라인 실호출 검증 | pydantic-settings로 기동 시 env 검증 실패가 필드명 명시. 이미지가 `STORAGE_DIR`로 분리(서버가 ml/data/images 없이 기동). `pip install -e ./ml` 후 `grep -rn "sys.path" backend ml` 0건. `collect_pipeline --dry-run` → 실호출 1건 성공 |
+| | 데이터·법리 | 다빈-1 수집 개시(상시) + 다빈-2 X1 호칭 v1 | `ml/src/axes/x1_phonetic.py` 순수 함수(0–1 float) + 테스트: 스타벅스↔스타박스 > 스타벅스↔커피빈 |
+| **M2 인프라 전환 + 축 구현** (7/20–8/16) | 백엔드 | R5 설정 통합 → R9+백엔드-3 스토리지 분리 → R10 ml 패키징 → 백엔드-5 파이프라인 실호출 검증 | pydantic-settings로 기동 시 env 검증 실패가 필드명 명시. 이미지가 `STORAGE_DIR`로 분리(서버가 ml/data/images 없이 기동). `pip install -e ./ml` 후 `grep -rn "sys.path" backend ml` 0건. `collect_pipeline --dry-run` → 실호출 1건 성공 |
 | | 프론트+모델 | 프론트-3 브랜드 목록(8/8 마감) + 프론트-6 지정상품 검색 UI + 프론트-7 X3 관념 + 프론트-8 X4 자카드 | `ml/src/axes/`에 x3·x4 순수 함수+테스트 (X3: King↔왕 높음/King↔사과 낮음). 상품 검색 UI가 유사군 코드 배열을 전송 형태로 산출 |
 | | 데이터·법리 | 다빈-3 식별력 필터(명백 유형) + 다빈-1 계속 | 명백 유형 사전 대조 + "단정 금지" 문구 출력. 라벨 표 진행량 주 1회 공유 |
-| **M3 데이터 확장 + 통합 모델** (8/17~8/30) | 백엔드 | 백엔드-6 데이터 확장 + R12 시연 하드닝 + R13 부하 베이스라인 + R14 재보정 지원 | **DB 500~1,000건**(수집 기준 단톡 합의 → 월 쿼터 분배 계획 준수, 체크포인트+원본 선저장). slowapi 429 + X-API-Key 401 동작. locustfile 커밋 + /search p50/p95 기록(다축 전 공식 베이스라인). /health p95 <100ms 부하 중 유지 |
+| **M3 데이터 확장 + 통합 모델** (8/17–8/30) | 백엔드 | 백엔드-6 데이터 확장 + R12 시연 하드닝 + R13 부하 베이스라인 + R14 재보정 지원 | **DB 500–1,000건**(수집 기준 단톡 합의 → 월 쿼터 분배 계획 준수, 체크포인트+원본 선저장). slowapi 429 + X-API-Key 401 동작. locustfile 커밋 + /search p50/p95 기록(다축 전 공식 베이스라인). /health p95 <100ms 부하 중 유지 |
 | | 프론트+모델 | 프론트-9 통합 모델(E) 1차 학습 | 4축 점수 → 로지스틱 회귀 → 위험 % 프로토타입 1회전. 교차검증·ROC-AUC 리포트 + 가중치 해석("호칭>외관"이 판례와 부합하는지) |
 | | 데이터·법리 | 라벨 표 완성(수백 건 목표) + 등급 재보정(F) 협업 | [상표A/B 번호, 상표명, 유사군, 라벨, 근거] 표 — 번호 필수(공보 API 재조회용) |
 | **M4 다축 서비스 통합** (9월~) | 백엔드 | R11 서비스 계층(8월 말 선행) 기반 백엔드-8 오케스트레이션 + 백엔드-9 3입력 확장 | 외관+호칭 후보 병합 → 배치 메타 조회 → 4축 `score_batch` → 위험 % 정렬 응답. 기존 응답 필드 전부 유지(가산적 확장) + 계약 테스트 green |
@@ -103,9 +103,9 @@
 | 1-3 | | 시크릿 관리 | .env 관리 + .gitignore 검증됨. **커밋된 시크릿 0건** (git 이력 확인). KIPRIS 키 각자 발급 규칙 코드화 | ✅ | 유지. 실서비스 전 dev DB 암호 교체(주석에 이미 명시) |
 | 2-1 | **DB 쿼리 최적화** | N+1 / 배치 조회 | 후보 메타를 단일 `ANY(%s)` 배치 조회 ([db.py:104](../backend/src/core/db.py)) | ✅ | 유지. 백엔드-8 후보 병합 시 `application_no` 버전 동일 패턴으로 추가 |
 | 2-2 | | 인덱스 설계 | PK(출원번호) + image_key UNIQUE + 배열 컬럼 GIN 3종 (001_init.sql) | ✅ | 유지. X1 도입 시 name_ko 인덱스 검토 |
-| 2-3 | | 커넥션 관리 | psycopg_pool(1~4) + 기동 시 SELECT 1 검증. 동기 드라이버 | ✅ | 유지 — 동기 드라이버는 R4 스레드 오프로드 안에서 실행되므로 **구조적으로 옳다**. asyncpg 전환 금지(과잉) |
+| 2-3 | | 커넥션 관리 | psycopg_pool(1–4) + 기동 시 SELECT 1 검증. 동기 드라이버 | ✅ | 유지 — 동기 드라이버는 R4 스레드 오프로드 안에서 실행되므로 **구조적으로 옳다**. asyncpg 전환 금지(과잉) |
 | 2-4 | | 마이그레이션 체계 | ~~버전 추적 없음(매번 전체 재실행)~~ → ✔ `schema_migrations` 테이블 + 미적용분만 파일당 트랜잭션 적용 | ✅ | 2회 연속 실행 "0 applied" — 실검증 완료. 새 스키마는 새 파일로만 추가 |
-| 3-1 | **API 응답 시간** | 이벤트 루프 비차단 | ~~CLIP+FAISS+DB가 루프 직접 점유~~ → ✔ `to_thread` + `CapacityLimiter(2)` ([search.py:124](../backend/src/api/search.py)) | ✅ | **실측: 검색 2건 동시 진행 중 /health 6~7ms**. 회귀 기준: 부하 중 /health p95 <100ms (R13에서 자동화) |
+| 3-1 | **API 응답 시간** | 이벤트 루프 비차단 | ~~CLIP+FAISS+DB가 루프 직접 점유~~ → ✔ `to_thread` + `CapacityLimiter(2)` ([search.py:124](../backend/src/api/search.py)) | ✅ | **실측: 검색 2건 동시 진행 중 /health 6–7ms**. 회귀 기준: 부하 중 /health p95 <100ms (R13에서 자동화) |
 | 3-2 | | 무거운 리소스 수명 | CLIP·인덱스·메타 startup 1회 로딩 + 워밍업 + fail-fast | ✅ | 유지 |
 | 3-3 | | 외부 API 클라이언트 | ~~httpx.Client 호출마다 생성~~ → ✔ 모듈 공용 클라이언트 + 커넥션 풀 + lifespan 정리 | ✅ | 유지 |
 | 3-4 | | 응답 시간 베이스라인 | 측정 체계 없음 (단발 실측: /search ~0.2s @ 더미 10건·워밍업 후) | ⚠️ | R13 locust 베이스라인 — **다축 확장 전 필수** (9월 추가 비용을 측정하려면 기준점이 있어야 함) |
@@ -139,18 +139,18 @@
 | R1 | M1 | **git 복구**: 논리 단위 커밋(마이그레이션·DB / KIPRIS / 이중모드 / 테스트 / 프론트 / 문서) → 브랜치 → PR. 중복 클론은 고유 커밋 無 + 클린 트리 확인 후 삭제 | `git status --porcelain` 빈 출력 | ✔ **완료** (6커밋, 클론 삭제. push/PR만 잔여) |
 | R2 | M1 | **등급 역전 핫픽스**: 절대 유사도 안전장치 `SIM_IDENTICAL=0.95` — 격차 조건이 완전 일치를 강등 못 하게 ([scoring.py:154](../ml/src/scoring.py)). 회귀 테스트 선작성(TDD). 임계값 전면 재보정은 **R14로 연기**(더미 10건으로 보정은 통계적 무의미) | `pytest ml/tests` green + API 실측: top1=0.99999/gap 0.144 → CAUTION | ✔ **완료** (12 테스트 + API 실증) |
 | R3 | M1 | **로깅**: stdlib dictConfig(× loguru — uvicorn 핸들러와 충돌, 수집기 없인 이득 0) + 요청 ID ASGI 미들웨어(contextvars ~50줄) + 전역 예외 핸들러 | `grep -rn "print(" backend/src` 0건, `curl -i /health`에 X-Request-ID | ✔ **완료** |
-| R4 | M1 | **루프 차단 해소**: `anyio.to_thread.run_sync` + `CapacityLimiter(2)` (× asyncio 병렬화, × asyncpg 전환 — 동기 DB는 스레드 안에서 옳다). torch/FAISS는 GIL을 놓으므로 스레드 오프로드가 실효 있음. 동시 CLIP 2개 초과는 대기열로(스래싱 방지) | /search 진행 중 /health <100ms | ✔ **완료** (실측 6~7ms) |
+| R4 | M1 | **루프 차단 해소**: `anyio.to_thread.run_sync` + `CapacityLimiter(2)` (× asyncio 병렬화, × asyncpg 전환 — 동기 DB는 스레드 안에서 옳다). torch/FAISS는 GIL을 놓으므로 스레드 오프로드가 실효 있음. 동시 CLIP 2개 초과는 대기열로(스래싱 방지) | /search 진행 중 /health <100ms | ✔ **완료** (실측 6–7ms) |
 | R7 | M2→선행 | **schema_migrations** (× Alembic — SQLAlchemy 모델이 없어 autogenerate 무용, raw SQL 철학에 30줄 업그레이드가 정합) | 2회 연속 실행 → "0 applied" | ✔ **완료** (PostgreSQL 실검증 + 테스트) |
 | R8 | M2→선행 | **캐시 강화**: `cachetools.TTLCache(1024)` (× Redis — 단일 프로세스에 브로커 추가는 과잉). 쿼터 보호 장치이므로 백엔드-7 실호출 전 필수 | 가짜 시계 TTL 만료 테스트 green | ✔ **완료** (3 테스트) |
 | R6 | M2→선행 | **테스트 인프라+CI**: 더미 FAISS 인덱스 인프로세스 생성 + encode_image 몽키패치 → CLIP 가중치 없이 계약 테스트 상시 실행. GitHub Actions: torch CPU 휠 인덱스(기본 리눅스 휠은 CUDA ~2GB), postgres:16 서비스 컨테이너 | 로컬 `pytest` 48/0 skip ✔. CI 첫 run green(push 후) | ✔ 로컬 완료 / CI run 확인 잔여 |
 | R5 | M2 | **pydantic-settings 최소 도입**: env 유래 값만 `Settings` 클래스로(순수 상수는 현행 유지 — 근거 주석 스타일이 좋음). `config.py` 재수출로 호출부 무변경. CORS 기본값을 localhost:3000으로 교체 | 잘못된 env로 기동 시 필드명 명시 실패; `os.getenv`가 Settings 안에만 | 예정 |
 | R9 | M2 | **스토리지 분리**(=백엔드-3): 저장소 밖 `STORAGE_DIR` + `core/storage.py` 심 3함수(save/url/open) (× MinIO — 관리할 컨테이너 추가, × AWS S3 지금 — 계정/과금 리스크. 실배포 확정 시 같은 심 뒤로 S3 드롭인). **수집 파이프라인은 파싱 전에 원본 바이트 저장**(일회성 링크 보호) | ml/data/images 없이 서버 기동; 이미지 URL 200 | 예정 |
-| R10 | M2~M3 | **ml 패키징**: `ml/src`→`marklens_ml` rename + `pip install -e ./ml`, sys.path 핵 제거, 스크립트 `__file__` 상대화, `DEVICE` env화. **팀 조율 필요**(전원 import 변경) — 단일 PR로 공지 | `grep -rn "sys.path" backend ml` 0건; 아무 cwd에서나 import | 예정 |
+| R10 | M2–M3 | **ml 패키징**: `ml/src`→`marklens_ml` rename + `pip install -e ./ml`, sys.path 핵 제거, 스크립트 `__file__` 상대화, `DEVICE` env화. **팀 조율 필요**(전원 import 변경) — 단일 PR로 공지 | `grep -rn "sys.path" backend ml` 0건; 아무 cwd에서나 import | 예정 |
 | R11 | M3 | **서비스 계층 추출** — 백엔드-8의 실질적 enabler: engine.py → `core/resources.py`(수명) + `services/search_service.py`(오케스트레이터) 분리, `Retriever`/`AxisScorer` Protocol 정의. **축 인터페이스는 batch-first**(`score_batch(query, candidates) → ndarray`) — 후보별 파이썬 루프에서 torch를 부르는 함정 차단. 행위 보존은 R6 계약 테스트로 검증 | 응답 무변화(계약 테스트 green) + Protocol 2종 + CLIP retriever 구현체 | 예정 |
 | R12 | M3 | **시연 하드닝**: slowapi(/search 10/min/IP, /name-check 30/min/IP) + 정적 X-API-Key 의존성(설정 시만 활성 — 로컬 무영향) + CORS 실오리진 (× JWT/OAuth — 유저 없음) | 11번째 /search→429; 키 미첨부→401; 타 오리진 차단 | 예정 |
 | R13 | M3 | **부하 베이스라인**: locust (× k6 — 파이썬 팀, multipart 업로드 locust가 단순, CPU 바운드 한 자릿수 RPS엔 통찰이 필요하지 광량이 아님). 시나리오: /search 5동시 + /health 1폴링 | locustfile 커밋 + p50/p95 기록 + /health p95<100ms + 5xx 0 | 예정 |
-| R14 | M3 | **등급 재보정(F)**: 실데이터 500+건에서 팀 라벨 평가셋 30~50쌍 → 임계값 스윕 → 골든 회귀 테스트로 고정. R2 안전장치는 유지. LR 피처 설계용 분포도 함께 산출 | 근거 주석 포함 임계값 커밋 + 평가 스크립트 + R2 테스트 green | 예정 (데이터 의존) |
-| R15 | M4 | **다축 오케스트레이션**(=백엔드-8): ①이미지 1회 인코딩 ②X1·X2 retriever 후보 추림 → `application_no` 병합(출처 보존) ③병합 후보 **1회 배치 DB 조회**(기존 ANY 패턴 확장) ④4축 `score_batch` → 피처 행렬 ⑤LR `predict_proba` + 단독 임계값 오버라이드 ⑥정렬 응답. **전 파이프라인을 단일 to_thread 안의 동기 순수 함수로**(× 축별 asyncio.gather — 20~40 후보의 축 연산은 numpy 마이크로초, 루프 스케줄링 섞으면 지터+복잡도만 증가) | 3입력 검색 E2E + 계약 테스트 green | 예정 (9월) |
+| R14 | M3 | **등급 재보정(F)**: 실데이터 500+건에서 팀 라벨 평가셋 30–50쌍 → 임계값 스윕 → 골든 회귀 테스트로 고정. R2 안전장치는 유지. LR 피처 설계용 분포도 함께 산출 | 근거 주석 포함 임계값 커밋 + 평가 스크립트 + R2 테스트 green | 예정 (데이터 의존) |
+| R15 | M4 | **다축 오케스트레이션**(=백엔드-8): ①이미지 1회 인코딩 ②X1·X2 retriever 후보 추림 → `application_no` 병합(출처 보존) ③병합 후보 **1회 배치 DB 조회**(기존 ANY 패턴 확장) ④4축 `score_batch` → 피처 행렬 ⑤LR `predict_proba` + 단독 임계값 오버라이드 ⑥정렬 응답. **전 파이프라인을 단일 to_thread 안의 동기 순수 함수로**(× 축별 asyncio.gather — 20–40 후보의 축 연산은 numpy 마이크로초, 루프 스케줄링 섞으면 지터+복잡도만 증가) | 3입력 검색 E2E + 계약 테스트 green | 예정 (9월) |
 | R16 | M4 | **/search 3입력 확장**(=백엔드-9): 기존 필드 전부 유지 + `axes`/`risk_percent`/`verdict` **가산적** 추가 (× /v2 엔드포인트 — 프론트 1개·팀 1개에 버전 분기는 과잉) | 구 필드 생존을 계약 테스트가 강제 | 예정 (9월) |
 
 ### 하지 말 것 (과잉 설계 금지 목록)
@@ -160,7 +160,7 @@
 | Alembic / SQLAlchemy ORM | 모델이 없어 autogenerate 무용. raw SQL + 버전 테이블로 100% 커버 |
 | asyncpg / psycopg-async 전환 | 동기 드라이버가 to_thread 안에서 실행되는 현 구조가 이 규모에선 영구히 옳다 |
 | Redis (캐시·레이트리밋 백엔드) | 단일 프로세스. Postgres + 인메모리로 충분 |
-| Celery / 작업 큐 | 검색은 1~3s 동기 작업. 브로커+워커+장애 모드만 추가된다 |
+| Celery / 작업 큐 | 검색은 1–3s 동기 작업. 브로커+워커+장애 모드만 추가된다 |
 | MinIO / AWS S3 (현시점) | 이미지 수백 MB에 관리 대상 컨테이너/클라우드 계정 추가 — R9 심 뒤로 후환 |
 | TorchServe/Triton/ONNX/GPU | 시연 규모 CPU로 충분. R13 p95가 불허할 때만 재검토 |
 | JWT / OAuth / 사용자 시스템 | 유저가 없다. 정적 키 1개 |
@@ -171,8 +171,8 @@
 
 ### 횡단 리스크
 
-- **KIPRIS 쿼터 산수**: 500~1,000건 × 건당 2~4회 호출, 상품별 월 1,000회 → **한 번에 다 쓸 수 있는 예산이 아니다**. 수집 파이프라인에 ①레코드별 체크포인트 ②기수집 출원번호 skip ③파싱 전 원본(XML·이미지) 디스크 선저장(일회성 링크 + 파싱 버그가 재호출을 유발하면 안 됨)을 백엔드-5 DoD로 포함.
-- **키 발급 지연 시**: R10/R11을 앞당기고 백엔드-6/7을 M2 후반~M3으로 밀어도 크리티컬 패스는 유지된다(계획이 우아하게 열화).
+- **KIPRIS 쿼터 산수**: 500–1,000건 × 건당 2–4회 호출, 상품별 월 1,000회 → **한 번에 다 쓸 수 있는 예산이 아니다**. 수집 파이프라인에 ①레코드별 체크포인트 ②기수집 출원번호 skip ③파싱 전 원본(XML·이미지) 디스크 선저장(일회성 링크 + 파싱 버그가 재호출을 유발하면 안 됨)을 백엔드-5 DoD로 포함.
+- **키 발급 지연 시**: R10/R11을 앞당기고 백엔드-6/7을 M2 후반–M3으로 밀어도 크리티컬 패스는 유지된다(계획이 우아하게 열화).
 - **팀 조율 포인트 2건뿐**: R10 rename PR, R9 README 셋업 변경 — 각각 단일 공지 PR로.
 
 ---
@@ -193,7 +193,7 @@
 | git 복구 | 미커밋 1개월분 → 6개 논리 커밋(`feat/phase2-baseline`), 중복 클론 안전 확인 후 삭제, 작업트리 클린 |
 | 등급 역전(R2) | 단위 12 테스트 + API 실측: 동일 로고(top1 0.99999, gap 0.144) → **CAUTION** (구버전: REVIEW 강등) |
 | 로깅(R3) | X-Request-ID 응답 헤더 실측, print 0건, 전역 500 핸들러 |
-| 루프 차단(R4) | /search 2건 동시 진행 중 /health **6~7ms** |
+| 루프 차단(R4) | /search 2건 동시 진행 중 /health **6–7ms** |
 | 마이그레이션(R7) | PostgreSQL 16.14 실검증: 2회차 실행 "0 applied" |
 | 캐시(R8) | TTLCache 상한 1024 + 가짜 시계 만료 테스트 |
 | 테스트/CI(R6) | **전체 48 passed / 0 skipped**(실모드), 가짜 ML 모드 35 passed, CI 워크플로 작성 |
