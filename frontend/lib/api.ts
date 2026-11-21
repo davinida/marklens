@@ -3,14 +3,12 @@ import {
   GoodsSearchResponseSchema,
   parseNameCheckResponse,
   PhoneticSearchResponseSchema,
-  SearchResponseSchema,
   SearchV2ResponseSchema,
   SemanticSearchResponseSchema,
   type GoodsClassesResponse,
   type GoodsSearchResponse,
   type NameCheckResult,
   type PhoneticSearchResponse,
-  type SearchResponse,
   type SearchV2Response,
   type SemanticSearchResponse,
 } from "@/lib/contracts";
@@ -20,11 +18,8 @@ export type {
   GoodsClassesResponse,
   GoodsMatch,
   GoodsSearchResponse,
-  GradeCode,
   PhoneticMatch,
   PhoneticSearchResponse,
-  SearchMatch,
-  SearchResponse,
   SearchV2Candidate,
   SearchV2Response,
   SemanticMatch,
@@ -90,41 +85,6 @@ async function assertOk(response: Response): Promise<unknown> {
 function networkError(error: unknown): never {
   if (error instanceof DOMException && error.name === "AbortError") throw error;
   throw new ApiError(0, "서버에 연결할 수 없어요. 네트워크 연결을 확인해 주세요.");
-}
-
-export async function searchTrademark(
-  file: File,
-  topK: number,
-  turnstileToken: string,
-  signal?: AbortSignal,
-): Promise<SearchResponse> {
-  const form = new FormData();
-  form.append("file", file);
-
-  let response: Response;
-  try {
-    response = await fetch(`/api/search?top_k=${topK}`, {
-      method: "POST",
-      headers: { "x-turnstile-token": turnstileToken },
-      body: form,
-      credentials: "same-origin",
-      cache: "no-store",
-      signal,
-    });
-  } catch (error) {
-    networkError(error);
-  }
-
-  const body = await assertOk(response);
-  const parsed = SearchResponseSchema.safeParse(body);
-  if (!parsed.success) {
-    throw new ApiError(
-      502,
-      "검색 서비스의 응답 형식이 예상과 달라 결과를 표시할 수 없어요.",
-      response.headers.get("x-request-id"),
-    );
-  }
-  return parsed.data;
 }
 
 export type TypeOverride = "문자" | "도형" | "결합";

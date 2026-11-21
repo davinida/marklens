@@ -41,12 +41,6 @@ def dup_query() -> bytes:
     return png_bytes(draw_fn=lambda d: d.ellipse([48, 48, 208, 208], fill=(220, 30, 30)))
 
 
-def gif_bytes() -> bytes:
-    buf = io.BytesIO()
-    Image.new("RGB", (64, 64), "blue").save(buf, "GIF")
-    return buf.getvalue()
-
-
 @pytest.fixture(scope="session")
 def client():
     from fastapi.testclient import TestClient
@@ -83,9 +77,10 @@ def identity_query(fake_ml_mode) -> bytes:
     return first_image.read_bytes()
 
 
-def post_search(client, content: bytes, mime="image/png", query=""):
+def post_search_v2(client, content: bytes, mime="image/png", query=""):
+    """이미지만 질의하는 통합 검색 v2 — multipart 필드명은 계약 v2 상 "image"."""
     return client.post(
-        f"/search{query}", files={"file": ("q.png", content, mime)}
+        f"/search/v2{query}", files={"image": ("q.png", content, mime)}
     )
 
 
@@ -105,130 +100,75 @@ def test_health_contract(client):
 
 
 # ---------------------------------------------------------------
-# POST /search — 정상 경로
+# POST /search/v2 — 이미지만 질의의 정상 경로
+# (2026-11-21 v1 POST /search 를 없애며 v1 계약 테스트의 같은 항목을 옮김. 형식·크기·치수·
+#  top_k 오류 계약은 test_search_v2_api.py 의 검증 테스트가 맡는다.)
 # ---------------------------------------------------------------
 
-def test_search_happy_path(client, identity_query):
-    r = post_search(client, identity_query, query="?top_k=5")
-    assert r.status_code == 200
+VISUAL_STATUSES = ("STRONG_MATCH", "POSSIBLE_MATCH", "WEAK_MATCH", "NO_CLOSE_MATCH")
+
+
+def test_search_v2_image_happy_path(client, identity_query, fake_ml_mode):
+    from backend.src.schemas.search_v2 import SearchV2Response
+
+    r = post_search_v2(client, identity_query, query="?top_k=5")
+    assert r.status_code == 200, r.text
     body = r.json()
+    # 응답 계약 — dataset_info 4필드·등급·후보 메타 형식까지
+    SearchV2Response.model_validate(body)
 
-    # 랭킹: 완전 동일 이미지가 rank1, 유사도 ≈ 1.0
-    top = body["matches"][0]
-    assert top["rank"] == 1
-    assert top["similarity"] >= 0.98
-    assert top["이미지URL"] == f"/images/{top['이미지파일']}"
+    # 랭킹: 완전 동일 이미지가 1위, 이미지 유사도 ≈ 1.0
+    top = body["candidates"][0]
+    assert top["axes"]["x2_img"] >= 0.98
+    assert top["image_url"].startswith(f"{config.IMAGES_URL_PREFIX}/")
     # 메타 결합 (file/db 모드 공통 계약)
-    assert top["trademark"] is not None
-    assert top["trademark"]["출원번호"]
-    assert isinstance(top["trademark"]["류"], list)
+    assert isinstance(top["nice_classes"], list)
+    if fake_ml_mode:
+        assert top["id"] == "4020210000001"
+        assert top["image_url"] == f"{config.IMAGES_URL_PREFIX}/4020210000001.png"
+        assert top["applicant"] == "테스트 출원인"
 
-    # 등급 블록
-    grade = body["grade"]
-    for key in (
-        "status_code", "status_name", "uncertain", "uncertainty_reasons",
-        "scored_candidate_count", "threshold_version", "grade_code", "grade_name",
-        "message", "top1_similarity", "separability_a", "separability_b", "warnings",
-    ):
-        assert key in grade
-    assert grade["status_code"] in (
-        "STRONG_MATCH", "POSSIBLE_MATCH", "WEAK_MATCH", "NO_CLOSE_MATCH"
-    )
-    assert grade["grade_code"] in ("CAUTION", "REVIEW", "LOW")
-    assert grade["calibrated"] is False
-    assert grade["legal_conclusion"] is False
+    assert body["overall"]["visual_status"] in VISUAL_STATUSES
     assert body["research_beta"] is True
-
-    # 데이터셋 안내 4필드
+    assert body["legal_conclusion"] is False
     for key in ("총_상표수", "출원일자_범위", "데이터_기준", "생성일자"):
         assert key in body["dataset_info"]
-
     assert body["top_k_requested"] == 5
-    assert body["top_k_returned"] == 5
+    assert body["top_k_returned"] == len(body["candidates"]) == 5
 
 
-def test_search_default_top_k(client):
-    r = post_search(client, dup_query())
-    assert r.status_code == 200
-    assert r.json()["top_k_requested"] == config.DEFAULT_TOP_K
-
-
-def test_search_assessment_is_independent_from_display_top_k(client):
-    one = post_search(client, dup_query(), query="?top_k=1")
-    five = post_search(client, dup_query(), query="?top_k=5")
+def test_search_v2_assessment_is_independent_from_display_top_k(client):
+    one = post_search_v2(client, dup_query(), query="?top_k=1")
+    five = post_search_v2(client, dup_query(), query="?top_k=5")
     assert one.status_code == five.status_code == 200
     one_body = one.json()
     five_body = five.json()
-    assert one_body["grade"] == five_body["grade"]
-    assert one_body["scoring_k"] == five_body["scoring_k"]
-    assert one_body["scoring_k"] == min(
-        config.SCORING_TOP_K, one_body["index_size"]
-    )
+    # 시각 4상태·전체 등급은 후보 풀 전체로 정한다 — 표시 개수와 무관
+    assert one_body["overall"] == five_body["overall"]
+    assert one_body["candidates"][0] == five_body["candidates"][0]
     assert one_body["top_k_returned"] == 1
     assert five_body["top_k_returned"] == 5
 
 
-def test_search_top_k_clamped_to_index_size(client):
-    r = post_search(client, dup_query(), query="?top_k=20")
+def test_search_v2_top_k_beyond_pool_returns_available(client, fake_ml_mode):
+    r = post_search_v2(client, dup_query(), query="?top_k=20")
     assert r.status_code == 200
     body = r.json()
-    assert body["top_k_returned"] == min(20, body["index_size"])
+    assert body["top_k_returned"] == len(body["candidates"]) <= 20
+    if fake_ml_mode:
+        assert body["top_k_returned"] == 9  # 색인 10건 중 메타가 있는 9건
 
 
-def test_search_missing_metadata_yields_null_trademark(client, fake_ml_mode):
+def test_search_v2_skips_index_entries_without_metadata(client, fake_ml_mode):
     if not fake_ml_mode:
         pytest.skip("더미 픽스처 전용 — 실데이터는 메타 완전")
-    # 더미 데이터는 10번 상표를 메타에서 고의 누락 → trademark: null 경로 검증
-    r = post_search(client, dup_query(), query="?top_k=20")
-    nulls = [m for m in r.json()["matches"] if m["trademark"] is None]
-    assert len(nulls) >= 1
-
-
-# ---------------------------------------------------------------
-# POST /search — 오류 계약
-# ---------------------------------------------------------------
-
-@pytest.mark.parametrize("bad_top_k", [0, 21])
-def test_search_top_k_out_of_range_422(client, bad_top_k):
-    r = post_search(client, dup_query(), query=f"?top_k={bad_top_k}")
-    assert r.status_code == 422
-
-
-def test_search_wrong_content_type_415(client):
-    r = post_search(client, dup_query(), mime="text/plain")
-    assert r.status_code == 415
-
-
-def test_search_empty_file_400(client):
-    r = post_search(client, b"")
-    assert r.status_code == 400
-
-
-def test_search_oversize_413(client):
-    r = post_search(client, b"\x00" * (11 * 1024 * 1024))
-    assert r.status_code == 413
-
-
-def test_search_undecodable_415(client):
-    r = post_search(client, b"\x00" * 4096)
-    assert r.status_code == 415
-
-
-def test_search_disallowed_format_gif_415(client):
-    # 실제 GIF 를 image/png 으로 위장 → PIL 포맷 검증(디코드 후)에서 걸러야 함
-    r = post_search(client, gif_bytes())
-    assert r.status_code == 415
-
-
-def test_search_too_small_400(client):
-    r = post_search(client, png_bytes(size=(16, 16)))
-    assert r.status_code == 400
-
-
-def test_search_oversized_dimensions_rejected_before_decode(client):
-    r = post_search(client, png_bytes(size=(config.MAX_IMAGE_DIM + 1, 32)))
-    assert r.status_code == 400
-    assert "치수 상한" in r.json()["detail"]
+    # 더미 데이터는 10번 상표를 메타에서 고의 누락. v1 은 trademark: null 로 냈고, v2 는 메타가 없는
+    # 색인 항목을 후보에서 뺀다 — 응답은 깨지지 않는다.
+    r = post_search_v2(client, dup_query(), query="?top_k=20")
+    assert r.status_code == 200
+    ids = [candidate["id"] for candidate in r.json()["candidates"]]
+    assert "4020210000010" not in ids
+    assert len(ids) == 9
 
 
 # ---------------------------------------------------------------
@@ -236,10 +176,9 @@ def test_search_oversized_dimensions_rejected_before_decode(client):
 # ---------------------------------------------------------------
 
 def test_images_static_serving(client):
-    r = post_search(client, dup_query())
+    r = post_search_v2(client, dup_query())
     assert r.status_code == 200
-    filename = r.json()["matches"][0]["이미지파일"]
-    img = client.get(f"/images/{filename}")
+    img = client.get(r.json()["candidates"][0]["image_url"])
     assert img.status_code == 200
     assert img.headers["content-type"] == "image/png"
 

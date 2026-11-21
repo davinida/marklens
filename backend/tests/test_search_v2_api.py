@@ -24,6 +24,12 @@ def png(size=(64, 64)):
     return buffer.getvalue()
 
 
+def gif():
+    buffer = io.BytesIO()
+    Image.new("RGB", (64, 64), "blue").save(buffer, "GIF")
+    return buffer.getvalue()
+
+
 @pytest.fixture
 def api(monkeypatch):
     app = FastAPI()
@@ -82,11 +88,24 @@ def test_all_input_combinations_and_exact_passthrough(api, mask):
     ([("image", ("q.png", b"garbage", "image/png"))], 415),
     ([("image", ("q.png", png((31, 64)), "image/png"))], 400),
     ([("image", ("q.png", png(), "text/html"))], 415),
+    # 실제 GIF 를 image/png 로 위장 — 디코드 뒤 PIL 형식 검증에서 거른다(v1 계약 테스트에서 옮김)
+    ([("image", ("q.png", gif(), "image/png"))], 415),
 ])
 def test_validation(api, fields, code):
     client, calls, _ = api
     assert client.post("/search/v2", files=fields).status_code == code
     assert calls == []
+
+
+def test_oversized_dimensions_rejected_before_decode(api):
+    """치수 상한(MAX_IMAGE_DIM)을 넘는 이미지는 전체 디코드 전에 400 — v1 계약 테스트에서 옮김."""
+    client, calls, _ = api
+    response = client.post("/search/v2", files={
+        "image": ("q.png", png((config.MAX_IMAGE_DIM + 1, 32)), "image/png"),
+    })
+    assert response.status_code == 400
+    assert "치수 상한" in response.json()["detail"]
+    assert not calls
 
 
 @pytest.mark.parametrize("field", ["name", "image", "type_override"])
@@ -251,19 +270,18 @@ def test_unready_or_empty_index_is_503(api, monkeypatch, ready, index):
     assert not calls
 
 
-def test_v1_and_v2_share_remote_ip_quota(api, monkeypatch):
+def test_search_quota_counts_failed_requests(api, monkeypatch):
     client, _, _ = api
-    # Mutate the existing parsed limit, preserving the real decorators and IP key function.
+    # v1 POST /search 를 없앤 뒤(2026-11-21) "search" 한도 묶음은 /search/v2 하나만 쓴다.
     groups = [group for groups in limiter._route_limits.values() for group in groups]
     shared = [limit for limit in groups if limit.scope == "search"]
-    assert len(shared) == 2
-    for limit in shared:
-        monkeypatch.setattr(limit, "limit", type(limit.limit)(2, 1))
+    assert len(shared) == 1
+    # Mutate the existing parsed limit, preserving the real decorator and IP key function.
+    monkeypatch.setattr(shared[0], "limit", type(shared[0].limit)(2, 1))
     assert client.post("/search/v2", data={"name": "x"}).status_code == 200
-    # Failed requests also consume the real shared bucket, without running CLIP.
+    # Failed requests also consume the real bucket, without running CLIP.
     monkeypatch.setattr(search.engine.state, "ready", False)
-    response = client.post("/search", files={"file": ("q.png", png(), "image/png")})
-    assert response.status_code == 503
+    assert client.post("/search/v2", data={"name": "x"}).status_code == 503
     response = client.post("/search/v2", data={"name": "x"})
     assert response.status_code == 429
 

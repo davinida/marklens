@@ -2,35 +2,6 @@ import { z } from "zod";
 
 const NullableText = z.string().nullable().optional();
 
-export const TrademarkInfoSchema = z
-  .object({
-    출원번호: z.string(),
-    등록번호: NullableText,
-    출원일자: NullableText,
-    등록일자: NullableText,
-    상표한글명: NullableText,
-    상표영문명: NullableText,
-    상표구분: NullableText,
-    출원인: NullableText,
-    최종권리자: NullableText,
-    비엔나코드: z.array(z.string()).optional().default([]),
-    류: z.array(z.number()).optional().default([]),
-    유사군: z.array(z.string()).optional().default([]),
-  })
-  .passthrough();
-
-export const SearchMatchSchema = z
-  .object({
-    rank: z.number().int().positive(),
-    similarity: z.number().finite(),
-    이미지파일: NullableText,
-    이미지URL: NullableText,
-    trademark: TrademarkInfoSchema.nullable().optional(),
-  })
-  .passthrough();
-
-// 백엔드 scoring 은 SAFE 를 절대 내보내지 않는다(2026-08 개정) — 수용 목록에서도 제거.
-export const GradeCodeSchema = z.enum(["CAUTION", "REVIEW", "LOW"]);
 export const StatusCodeSchema = z.enum([
   "STRONG_MATCH",
   "POSSIBLE_MATCH",
@@ -38,70 +9,12 @@ export const StatusCodeSchema = z.enum([
   "NO_CLOSE_MATCH",
 ]);
 
-export const GradeInfoSchema = z
-  .object({
-    grade_code: GradeCodeSchema,
-    grade_name: z.string(),
-    status_code: StatusCodeSchema.optional(),
-    status_name: z.string().min(1).optional(),
-    uncertain: z.boolean().optional(),
-    uncertainty_reasons: z.array(z.string()).optional(),
-    scored_candidate_count: z.number().int().positive().optional(),
-    threshold_version: z.string().min(1).optional(),
-    // 판정에 사용한 경계값(단일 소스). 구버전 백엔드 호환을 위해 optional.
-    thresholds: z.record(z.string(), z.number().finite()).optional(),
-    scope: z.literal("visual_similarity_only").optional(),
-    calibrated: z.literal(false).optional(),
-    legal_conclusion: z.literal(false).optional(),
-    message: z.string(),
-    top1_similarity: z.number().finite(),
-    separability_a: z.number().finite(),
-    separability_b: z.number().finite(),
-    warnings: z.array(z.string()).optional().default([]),
-  })
-  .passthrough()
-  .superRefine((value, context) => {
-    if (!value.status_code) return;
-    for (const field of [
-      "status_name",
-      "uncertain",
-      "uncertainty_reasons",
-      "scored_candidate_count",
-      "threshold_version",
-      "scope",
-      "calibrated",
-      "legal_conclusion",
-    ] as const) {
-      if (value[field] === undefined) {
-        context.addIssue({
-          code: "custom",
-          path: [field],
-          message: `canonical grade field ${field} is required`,
-        });
-      }
-    }
-  });
-
 export const DatasetInfoSchema = z
   .object({
     총_상표수: z.number().int().nonnegative(),
     출원일자_범위: z.string(),
     데이터_기준: z.string(),
     생성일자: z.string(),
-  })
-  .passthrough();
-
-export const SearchResponseSchema = z
-  .object({
-    grade: GradeInfoSchema,
-    matches: z.array(SearchMatchSchema),
-    dataset_info: DatasetInfoSchema,
-    index_size: z.number().int().nonnegative(),
-    top_k_requested: z.number().int().positive(),
-    top_k_returned: z.number().int().nonnegative(),
-    scoring_k: z.number().int().positive().optional(),
-    api_version: z.string().optional(),
-    research_beta: z.boolean().optional(),
   })
   .passthrough();
 
@@ -577,13 +490,10 @@ export function parseNameCheckResponse(
   };
 }
 
-export type SearchResponse = z.infer<typeof SearchResponseSchema>;
-export type SearchMatch = z.infer<typeof SearchMatchSchema>;
-export type GradeCode = z.infer<typeof GradeCodeSchema>;
 export type StatusCode = z.infer<typeof StatusCodeSchema>;
 
 // ---- X1 호칭(발음) 유사도 검색 (/api/phonetic-search) ----
-// 백엔드 /phonetic-search 응답. 한글 키는 /search 관례를 따르고 passthrough 로 추가 필드를 허용한다.
+// 백엔드 /phonetic-search 응답. 한글 키는 KIPRIS 원본 데이터 구조를 따르고 passthrough 로 추가 필드를 허용한다.
 export const PhoneticMatchSchema = z
   .object({
     rank: z.number().int().positive(),

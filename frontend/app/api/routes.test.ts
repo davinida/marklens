@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as getHealth } from "@/app/api/health/route";
 import { GET as getImage } from "@/app/api/images/[...path]/route";
 import { POST as checkName } from "@/app/api/name-check/route";
-import { POST as search } from "@/app/api/search/route";
 import { GET as getTurnstileConfig } from "@/app/api/turnstile-config/route";
 import { verifyTurnstile } from "@/lib/server/turnstile";
 
@@ -17,60 +16,6 @@ describe("same-origin API routes", () => {
   });
 
   afterEach(() => vi.unstubAllEnvs());
-
-  it("keeps the API key and verification token out of the browser-facing search", async () => {
-    vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: {
-          "content-type": "application/json",
-          "x-request-id": "upstream-id",
-        },
-      }),
-    );
-    const form = new FormData();
-    form.set("file", new File(["image"], "logo.png", { type: "image/png" }));
-
-    const response = await search(
-      new Request("http://localhost/api/search?top_k=5", {
-        method: "POST",
-        headers: {
-          "x-request-id": "edge-search-1",
-          "x-turnstile-token": "dev-bypass",
-        },
-        body: form,
-      }),
-    );
-
-    expect(response.status).toBe(200);
-    const [url, options] = vi.mocked(fetch).mock.calls[0];
-    expect(url).toBe("https://backend.example/search?top_k=5");
-    expect(new Headers(options?.headers).get("x-api-key")).toBe("private-key");
-    expect(new Headers(options?.headers).get("x-request-id")).toBe(
-      "edge-search-1",
-    );
-    expect(response.headers.get("x-request-id")).toBe("edge-search-1");
-    const upstreamForm = options?.body as FormData;
-    expect(upstreamForm.get("file")).toBeInstanceOf(File);
-    expect(upstreamForm.has("turnstile_token")).toBe(false);
-  });
-
-  it("rejects an unverified upload before parsing multipart data", async () => {
-    const response = await search(
-      new Request("http://localhost/api/search?top_k=5", {
-        method: "POST",
-        headers: {
-          "content-type": "multipart/form-data; boundary=broken",
-          "x-request-id": "edge-rejected-1",
-        },
-        body: "not multipart data",
-      }),
-    );
-
-    expect(response.status).toBe(403);
-    expect(response.headers.get("x-request-id")).toBe("edge-rejected-1");
-    expect(fetch).not.toHaveBeenCalled();
-  });
 
   it("uses only the POST body contract for name-check (legacy GET fallback removed)", async () => {
     vi.mocked(fetch).mockResolvedValue(

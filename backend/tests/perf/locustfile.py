@@ -8,7 +8,9 @@
 
 시나리오 (감사보고서 R13: "/search 5동시 + /health 1폴링")
 ----------------------------------------------------------------
-- SearchUser    : POST /search — 이미지 업로드 → CLIP 인코딩 + FAISS 검색.
+- SearchUser    : POST /search/v2 — 이미지만 업로드(image 필드) → OCR·CLIP 인코딩 + FAISS·축 계산.
+                  (2026-11-21 v1 POST /search 제거로 v2 로 바뀜 — v1 기준선과는 작업량이 달라
+                  docs/MarkLens_부하테스트_베이스라인.md 의 수치와 직접 비교하지 않는다.)
                   CPU 바운드라 처리량은 한 자릿수 RPS 수준. 이게 측정 본체.
 - HealthPollUser: GET /health — 로드밸런서/부하테스트가 키 없이 폴링하는 경량
                   엔드포인트. 검색이 이벤트 루프를 막지 않는지(회귀 기준:
@@ -18,7 +20,7 @@ env 로 조정 가능(MARKLENS_LOCUST_SEARCH_USERS / MARKLENS_LOCUST_HEALTH_USER
 
 ★★★ 반드시 읽을 것: 레이트리밋이 부하 테스트를 죽인다 ★★★
 --------------------------------------------------------------
-서버는 R12 하드닝으로 POST /search 에 IP 기준 레이트리밋(기본 10/minute)을 건다
+서버는 R12 하드닝으로 POST /search/v2 에 IP 기준 레이트리밋(기본 10/minute)을 건다
 (backend/src/core/ratelimit.py, config.SEARCH_RATE_LIMIT). 부하 테스트는 단일
 머신 = 단일 IP 에서 수백~수천 요청을 쏘므로, 기본 한도로 서버를 띄우면 몇 초 만에
 전부 429 로 튕겨 나가 측정이 무의미해진다. 429 는 아래 태스크에서 실패로 집계되니
@@ -41,7 +43,7 @@ env 로 조정 가능(MARKLENS_LOCUST_SEARCH_USERS / MARKLENS_LOCUST_HEALTH_USER
 
 인증 (X-API-Key)
 ----------------
-서버가 MARKLENS_API_KEY 를 설정한 하드닝 모드로 떠 있으면 /search·/name-check 는
+서버가 MARKLENS_API_KEY 를 설정한 하드닝 모드로 떠 있으면 /search/v2·/name-check 는
 X-API-Key 헤더가 없으면 401 이다(/health 는 무인증). 이 파일은 클라이언트 쪽
 env MARKLENS_API_KEY 가 있으면 모든 요청 헤더에 자동으로 붙여 하드닝 서버에도
 그대로 부하를 넣을 수 있게 한다. 서버가 무인증(로컬 기본)이면 env 를 비워 두면 된다.
@@ -131,7 +133,7 @@ _HEALTH_USERS = int(os.getenv("MARKLENS_LOCUST_HEALTH_USERS", "1"))
 
 
 class SearchUser(HttpUser):
-    """POST /search 를 반복하는 검색 사용자 (측정 본체, CPU 바운드)."""
+    """POST /search/v2(이미지만) 를 반복하는 검색 사용자 (측정 본체, CPU 바운드)."""
 
     # "검색 5동시" — 총 사용자 수와 무관하게 정확히 이 수만큼 스폰된다.
     fixed_count = _SEARCH_USERS
@@ -148,13 +150,13 @@ class SearchUser(HttpUser):
     @task
     def search(self) -> None:
         name, data = random.choice(_QUERY_IMAGES)
-        # multipart 필드명은 API 계약상 반드시 "file".
-        files = {"file": (name, data, "image/png")}
+        # multipart 필드명은 API 계약 v2 상 "image".
+        files = {"image": (name, data, "image/png")}
         # name= 로 통계 라벨을 고정(파일명이 달라도 한 줄로 집계).
         with self.client.post(
-            "/search",
+            "/search/v2",
             files=files,
-            name="POST /search",
+            name="POST /search/v2",
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:

@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from ..core import config, engine, semantic_search, storage
 from ..core.ratelimit import limiter
-from ..schemas.search import DatasetInfo
+from ..schemas.dataset import DatasetInfo
 from ..schemas.semantic_search import (
     SemanticMatch,
     SemanticQuery,

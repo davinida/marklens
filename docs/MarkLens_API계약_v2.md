@@ -1,7 +1,7 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
-  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
@@ -21,8 +21,8 @@
 | 처리 | 입력별 후보 풀(CLIP·발음·철자·관념·유사군)을 합쳐 → 후보마다 4축 점수(식별력 필터 적용) → 통합 모델 v1.3 `risk_score`(입력의 결측 패턴에 맞는 계수 집합) → 위험도 내림차순 |
 | 출력 | `overall`(등급·위험도·주의 문구·유형) · `candidates[]`(축 점수·위험도·등급·근거 축 기여도·규칙·요부·지정상품) · `meta`(모델 버전·등급 정밀도·임계값·소요) |
 | 경계 | v1 과 같다 — 브라우저는 same-origin BFF `/api/search/v2` 만, FastAPI 는 내부(`X-API-Key`), Turnstile 1회용 토큰, `X-Request-ID` |
-| 한도 | v1 `/search` 와 같은 설정값·같은 버킷(`MARKLENS_SEARCH_RATELIMIT` 기본 10/minute, gateway 사용자별 5회/분) |
-| v1 | `POST /search`·`/phonetic-search`·`/semantic-search` 는 최종 발표(2026-12-20)까지 유지, 이후 제거 PR(§5-5) |
+| 한도 | `MARKLENS_SEARCH_RATELIMIT`(기본 10/minute, 한도 묶음 `search`), gateway 사용자별 5회/분 |
+| v1 | 이미지 검색 `POST /search`·BFF `/api/search` 는 2026-11-21 제거(v2 로 일원화). `/phonetic-search`·`/semantic-search` 는 상표명 확인 패널용 엔드포인트, 유지(§5-5) |
 
 결과는 참고 정보이며 법적 판단이 아니다(`legal_conclusion: false`, `research_beta: true` — v1 과 같은 플래그).
 
@@ -47,7 +47,7 @@
 | `goods_codes` | string, **반복 필드**(`goods_codes=G0502&goods_codes=S120602`) 또는 쉼표로 이은 1개 | 〃 | 유사군 코드 `^[GS][0-9]{4,6}$`, 대소문자 무시, 중복 제거, 최대 60개(프론트-6 선택 20개의 유사군 합집합 `goodsCodeUnion`) |
 | `type_override` | `문자` \| `도형` \| `결합` | 아니오 | 사용자가 결과 화면에서 유형을 고쳐 다시 요청할 때. 있으면 `query_type.source = "user"` |
 
-BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상한(10 MiB + 1 MiB) → `top_k` 검증(422) → Turnstile
+BFF 는 이 순서로 처리한다: `content-length` 상한(10 MiB + 1 MiB) → `top_k` 검증(422) → Turnstile
 검증(403/503/504) → 폼 파싱(400) → `image` 크기·MIME(413/415) → `name`·`goods_codes`·`type_override` 형식(422) → 세 입력이
 모두 비면 400 → 토큰을 떼고 내부 `POST /search/v2?top_k=`로 **같은 필드 이름**으로 전달 → 응답 본문·상태를 그대로 돌려준다
 (`safeResponseHeaders`). 이미지 URL 은 응답에 `/api/images/...` 로 들어 있으므로 BFF 가 바꾸지 않는다.
@@ -56,7 +56,7 @@ BFF 는 v1 `/api/search` 와 같은 순서로 처리한다: `content-length` 상
 
 `POST /search/v2?top_k=1..20` — 필드·검증은 1-1 과 같다. 추가 검증: `image` 는 v1 과 같은 디코딩·치수 검사, `goods_codes` 는
 정규식·개수, `type_override` 는 열거값. 세 입력이 모두 없으면 **400** `{"detail": "image, name, goods_codes 중 하나는 있어야
-합니다."}`(§5-1). 한도는 `MARKLENS_SEARCH_RATELIMIT`(v1 `/search` 와 같은 값·같은 버킷 — 한 IP 가 v1+v2 합쳐 10/minute).
+합니다."}`(§5-1). 한도는 `MARKLENS_SEARCH_RATELIMIT`(한 IP 10/minute, 한도 묶음 `search`).
 
 ### 1-3. 입력 조합 → 계산되는 축·후보 풀·유형 출처
 
@@ -818,7 +818,8 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
   "정보 없음"으로 회색 처리해 맨 뒤.
 - 라벨: `X1` → 호칭(발음), `X2` → 외관(철자·이미지), `X3` → 관념(뜻), `X4` → 지정상품, `요부` → 요부(식별력).
 - 바 길이 = 해당 축 기여도 ÷ 양수 기여도 합(예 3-1 후보 1: X1 3.628/4.688 = 77%, X2 13%, X4 8%, X3 2%).
-- 축 값 표기는 `axes.*` 를 백분율 정수로("호칭 89%"), 바는 기여도로 — 둘을 섞지 않는다(점수가 높아도 계수가 작으면 기여도가 작다: X3).
+- 축 값 표기는 `axes.*` 를 백분율 정수로("호칭 89%") — **내림**(0.7499 → 74%: 시각 상태 0.75·도형 규칙 0.9·단독 임계값 같은
+  기준을 넘지 않은 값이 넘은 것처럼 보이지 않게, 위험도 %·지정상품 겹침 %도 같다, 2026-11-21), 바는 기여도로 — 둘을 섞지 않는다(점수가 높아도 계수가 작으면 기여도가 작다: X3).
 - `rule_triggers` 가 있으면 등급 옆에 한 줄: `standalone_x1` "호칭이 거의 같아 검토 권장으로 올렸습니다", `standalone_x2_text` "철자가
   매우 비슷해 …", `standalone_x3` "뜻이 매우 비슷해 …", `figure_x2_img` "도형이 매우 비슷해 …(검증 데이터 부족, 참고용)", `nameless_floor` "도형으로 고친 질의라 로고만으로 본 판단의 등급을
   썼습니다", `goods_floor` "업종이 겹쳐 로고만으로 본 등급을 유지했어요".
@@ -872,7 +873,9 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 
 - 이름 없는 판단은 **위험도 %를 보이지 않고** 등급과 이미지 유사도(`axes.x2_img`)를 보인다. 전체 등급이 이름 없는 판단에서 나왔으면
   전체 위험도 %(`overall.prob`)도 숨긴다. 이유: 이름 있는 입력과 이름 없는 입력의 % 눈금이 달라 섞어 보면 오해한다.
-- 등급 눈금은 그 판단의 하한으로 그린다(§2-3). 이름 있는 판단만 위험도 위치 표식을 둔다.
+- 등급 눈금은 그 판단의 하한으로 그린다(§2-3). 이름 있는 판단만 위험도 위치 표식을 둔다. 하한은 숫자로 보이지 않고 구간 폭
+  (정확한 값)으로만, 표식도 반올림 없는 위치로 그린다 — 하한이 % 정수 사이에 있으면(위험 0.5902) 같은 "59%"가 하한 아래(0.5900·0.5901,
+  검토 권장)와 위(0.5902–0.5999, 위험)에 함께 나올 수 있고, 내림이라 하한 아래 값이 "60%"로 올라가 보이지는 않는다.
 - 이름 없는 질의(`name` 없음)에는 1층에 한 줄: **"상표명·업종을 넣으면 더 정확하게 판단해요"**.
 
 ### 4-5. 도형 caveat·시각 상태
@@ -893,10 +896,10 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | HTTP | 언제 | `detail` |
 |---:|---|---|
 | 400 | `image`·`name`·`goods_codes` 가 모두 없음(공백 `name`, 빈 `goods_codes` 포함) | `image, name, goods_codes 중 하나는 있어야 합니다.` |
-| 400 | 빈 파일·치수·콘텐츠 품질 | v1 `/search` 와 같음 |
-| 413 / 415 | 이미지 크기·형식 | v1 과 같음 |
+| 400 | 빈 파일·치수·콘텐츠 품질 | 공용 이미지 검증(`backend/src/core/validation.py`)의 메시지 |
+| 413 / 415 | 이미지 크기·형식 | 공용 이미지 검증의 메시지 |
 | 422 | `top_k` 범위, `name` 100자 초과, `goods_codes` 형식(`^[GS][0-9]{4,6}$`)·60개 초과, `type_override` 열거값 밖 | 필드별 메시지 |
-| 429 | 한도(v1 `/search` 와 같은 버킷) | — |
+| 429 | 한도(`search` 묶음, `MARKLENS_SEARCH_RATELIMIT`) | — |
 | 503 | 엔진·인덱스 미준비(`RuntimeError`), 계수 JSON·식별력 모델 적재 실패(`ModelNotReadyError`). X3 비활성(`MARKLENS_X3_ENABLED=0`)은 **503 이 아니라** `x3` null + caveat `X3_DISABLED` 로 진행 | — |
 
 ### 5-2. OCR 실패·유형
@@ -921,12 +924,13 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 후보 풀이 비면(이름에 호칭·관념이 없고 이미지도 없음, 또는 모든 축의 하한 미달) `candidates: []`, `overall.grade: null`,
 `overall.prob: null`, `caveats` 에 `NO_CANDIDATES`(+ 해당 `NO_*`), `meta.pool.total: 0` 으로 **200** 을 돌려준다.
 
-### 5-5. v1 엔드포인트 유지
+### 5-5. v1 엔드포인트
 
-`POST /search`(이미지 4상태), `POST /phonetic-search`, `POST /semantic-search` 와 BFF `/api/search`·`/api/phonetic-search`·
-`/api/semantic-search` 는 **최종 발표(2026-12-20, `docs/course/2026-2`)까지 유지**한다. 결과 화면이 v2 로 바뀐 뒤에도 상표명 확인
-패널의 발음·관념 섹션은 v1 두 엔드포인트를 그대로 쓴다(검색과 별개 흐름). 제거는 발표 뒤 별도 PR 로 하며 v1 문서의 deprecated 필드
-(`grade_code`·`grade_name`)도 그때 함께 지운다.
+이미지 검색 v1 `POST /search`(이미지 4상태)와 BFF `/api/search`, gateway `location = /api/search`, v1 결과 화면은 **2026-11-21
+제거**했다(v2 로 일원화 — 공개 배포 전이라 외부 사용자 없음). 시각 4상태는 v2 `overall.visual_status` 로 그대로 나가고, v1 응답의
+deprecated 필드(`grade_code`·`grade_name`)도 함께 없어졌다. `POST /phonetic-search`·`POST /semantic-search` 와 BFF
+`/api/phonetic-search`·`/api/semantic-search` 는 상표명 확인 패널의 발음·관념 섹션이 쓰는 별개 흐름이라 **상표명 확인
+패널용 엔드포인트로 유지**한다(2026-11-21 결정 — 최종 발표 뒤 제거하려던 계획은 철회).
 
 ### 5-6. 엔진 예외 ↔ HTTP (B-1 매핑 기준, 2026-10-24 구현)
 
@@ -938,8 +942,8 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | `multi_search.EmptyQueryError`(ValueError) | `image`·`name`(공백만 포함)·`goods_codes`(빈 값만 포함)가 모두 없음 | `image, name, goods_codes 중 하나는 있어야 합니다.` | 400 |
 | `ValueError` | `top_k` 가 1–20 밖, `type_override` 가 문자·도형·결합 밖 | `top_k 는 1~20 정수여야 합니다 (받은 값: …).` / `type_override 는 문자·도형·결합 중 하나여야 합니다.` | 422 |
 | `multi_search.ModelNotReadyError`(RuntimeError) | 계수 JSON(`shared/model/risk_model_v1.json`, `meta.grade_precision` 포함) 또는 식별력 모델을 기동 때 못 읽음 — 서버는 떠 있고 이 기능만 | `multi_search.state.error`(원인 목록) | 503 |
-| `RuntimeError` | 엔진(인덱스·CLIP) 미준비 — v1 `run_search` 와 같은 메시지 | `Engine 이 아직 초기화되지 않았습니다.` | 503 |
-| (이미지 디코딩 `ValueError`) | v1 과 같이 API 의 `validation.validate_and_decode` 단계에서 — 엔진은 검증된 PIL 이미지를 받는다 | v1 과 같음 | 400 |
+| `RuntimeError` | 엔진(인덱스·CLIP) 미준비 | `Engine 이 아직 초기화되지 않았습니다.` | 503 |
+| (이미지 디코딩 `ValueError`) | API 의 `validation.validate_and_decode` 단계에서 — 엔진은 검증된 PIL 이미지를 받는다 | 검증 메시지 그대로, 그 밖의 디코딩 오류는 `이미지를 디코딩할 수 없습니다.` | 400 |
 
 OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아니라 `query_type.source = "fallback"` + caveat 로 진행한다(§5-2).
 
@@ -966,7 +970,7 @@ OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아�
 
 결정됨(2026-10-24): ① OCR 은 **easyocr 채택**(ko·en, CPU, 지연 로드; `MARKLENS_OCR_ENABLED` 기본 1, 실패·`MARKLENS_OCR_TIMEOUT`
 2초 초과면 fallback; 모델 디렉터리 `EASYOCR_MODULE_PATH` — 컨테이너는 빌드 때 모델을 미리 내려받아야 한다) ② 제안 필드
-`visual_status`·`applicant`·`nice_classes` **포함** ③ v1 엔드포인트는 최종 발표(2026-12-20)까지 유지 뒤 별도 PR 로 제거(§5-5) ④ 접미
+`visual_status`·`applicant`·`nice_classes` **포함** ③ v1 엔드포인트는 최종 발표(2026-12-20)까지 유지 뒤 별도 PR 로 제거(§5-5 — 2026-11-21: 이미지 검색 `/search` 는 제거, 발음·관념은 상표명 확인 패널용으로 유지) ④ 접미
 분리(E-3)는 **고시 단일 명칭만**(2음절 이상 접미·2음절 이상 앞부분, 1음절 앞부분은 오분리가 많아 제외 — `Distinctiveness.
 split_goods_suffix`). 엔진 몫 E-1–E-6 은 `feat/engine-multiaxis` 에 구현됐고(`backend/src/core/multi_search.py`·`ocr.py`,
 `ml/src/axes/pair_axes.py`, `ml/src/mark_type.py`, `ml/scripts/precompute_types.py`). B-1–B-5의 API·문서용 Pydantic 스키마·BFF·zod·gateway는 2026-10-26 구현했다(PR #69 — 실제 모델로 BFF까지 §2 스키마·등급 규칙·로짓 검산 확인). F-1–F-5 화면(PR #72)과 E2E v2 15건도 2026-10-27 연결을 마쳤다(연결 완료; 발표 전 보완 2026-10-28 — 1층 위험도 %, 제외 사유 원문 "자세히", 시각 4상태 문구, 위험 등급 후보 카드의 정밀도 문구). 운영 배포 검증은 별도다.

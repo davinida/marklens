@@ -60,17 +60,9 @@ MAX_IMAGE_PIXELS: int = MAX_IMAGE_DIM * MAX_IMAGE_DIM
 # 검색 파라미터  (env 무관 순수 상수 — 현행 유지)
 # ====================================================================
 
-# 화면에 표시할 기본 top-k 값. 5장 정도면 사용자가 한눈에 보기 적당하다.
-# 판정과 불확실성 계산은 아래 SCORING_TOP_K 후보를 별도로 사용한다.
-DEFAULT_TOP_K: int = 5
-
 # top-k 허용 범위. 너무 크면 응답 크기 증폭.
 MIN_TOP_K: int = 1
 MAX_TOP_K: int = 20
-
-# 화면에 반환하는 top_k와 판정에 쓰는 후보 수를 분리한다. 사용자가 top_k=1을
-# 선택해도 같은 이미지의 시각 판정이 달라지지 않아야 한다.
-SCORING_TOP_K: int = 20
 
 
 # ====================================================================
@@ -169,7 +161,7 @@ class Settings(BaseSettings):
     )
 
     # IP 기준 요청 한도. slowapi 포맷("<정수>/<단위>", 예: "10/minute").
-    # 근거(감사보고서 작업3 6-3): /search 는 CPU 바운드(CLIP+FAISS) 보호,
+    # 근거(감사보고서 작업3 6-3): /search/v2 는 CPU 바운드(CLIP+FAISS) 보호,
     #   /name-check 는 KIPRIS 월 쿼터(1,000회) 보호가 목적이라 서로 다른 기본값.
     search_rate_limit: str = Field(
         default="10/minute", validation_alias="MARKLENS_SEARCH_RATELIMIT"
@@ -234,7 +226,7 @@ class Settings(BaseSettings):
     # 어긋나도 기동은 되고(경고 로그 + 해당 항목 제외) 검색 응답의 presets 만 빈다.
     goods_presets_path: str = Field(default="", validation_alias="MARKLENS_GOODS_PRESETS_PATH")
 
-    # 정적 X-API-Key. 설정 시에만 /search·/name-check 에서 헤더 일치를 검증(불일치 401).
+    # 정적 X-API-Key. 설정 시에만 /search/v2·/name-check 에서 헤더 일치를 검증(불일치 401).
     # 미설정("")이면 완전 비활성 — 로컬 개발은 무인증 개방. (core/auth.py 참조)
     api_key: str = Field(default="", validation_alias="MARKLENS_API_KEY")
 

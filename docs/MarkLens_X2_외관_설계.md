@@ -4,7 +4,7 @@
 진단·게이팅(§8) 완료 + 문자 외관(철자) 축 함수 `x2_ortho.py`(§9; 2026-11-20 철자 v2 시도 — v1 유지). 서비스 반영은 다음 PR** · 브랜치
 `feat/x2-benchmark`(v0, PR #33 병합) → `feat/x2-v1`(v1 ①·②, PR #34 병합) → `feat/axes-benchmark`(§9)
 
-X2(외관)는 1학기에 OpenCLIP 임베딩 + FAISS 코사인 검색으로 구현돼 현재 서비스(`POST /search`)에
+X2(외관)는 1학기에 OpenCLIP 임베딩 + FAISS 코사인 검색으로 구현돼 현재 서비스(통합 검색 `POST /search/v2` 의 이미지 후보 풀)에
 쓰이고 있지만, 그 점수가 심판원의 외관 판단과 얼마나 맞는지는 잰 적이 없었다. 이 문서는 (1) 현재
 X2 구현을 요약하고, (2) 심결문 PDF에 내장된 양쪽 표장 이미지로 만든 벤치마크의 정의·추출 방법·
 커버리지, (3) v0 결과와 한계를 적는다. 수치는 모두 2026-10-08 실측이다. 데이터(`ml/data/trials/`)는
@@ -19,7 +19,7 @@ X2 구현을 요약하고, (2) 심결문 PDF에 내장된 양쪽 표장 이미�
 | 전처리 계약(기본) | `clip-center-crop-v1`: EXIF 회전 보정 → 알파는 흰 배경에 합성 → RGB(최소 32px, 최대 4096px, 빈·균일 이미지 거부: 채널 범위 ≥ 4, 표준편차 ≥ 1) → OpenCLIP validation transform(짧은 변 224 리사이즈 + 중앙 crop + 정규화) | `ml/src/preprocess.py` `prepare_model_views()` |
 | 전처리 계약(대안) | `global-letterbox-dual-bg-v1`: 224 정사각 레터박스(crop 없음), 알파가 있으면 흰·검 배경 두 view 임베딩을 평균 후 재정규화. 2026-08 paired 비교에서 legacy 와 유의한 차이가 없어 **채택하지 않음**(`ml/evaluation/README.md`) | 같은 파일 |
 | 코사인 | FAISS `IndexFlatIP`(inner product) — 정규화 벡터의 내적 = 코사인. `build_index()`·`search()`가 벡터 정규화·metric 을 검증한다 | `ml/src/search.py` |
-| 서비스 | `run_search()`: 질의 임베딩 → top-k 검색 → 메타 결합 → `score_results()`(top-1 코사인의 단조 임계값으로 4단계 상태) | `backend/src/core/engine.py`, `ml/src/scoring.py` |
+| 서비스 | 통합 검색 v2 후보 풀: 질의 임베딩(`engine.encode_image`) → FAISS 상위 20(`engine.search`) → 후보 축 `x2_img` + `score_results()`(top-1 코사인의 단조 임계값으로 4단계 상태 → `overall.visual_status`) | `backend/src/core/multi_search.py`, `backend/src/core/engine.py`, `ml/src/scoring.py` |
 
 1학기 관찰(설계결정기록 §5): 무관한 로고 사이에도 코사인 0.43–0.59 의 베이스라인이 있어 절대값보다
 격차가 신호다. 이번 벤치마크는 그 절대값이 심결의 유사/비유사를 가르는지를 직접 잰 것이다.
@@ -551,3 +551,5 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_figure_metho
 - 2026-11-20 §7.6 — 사진 판정 서비스 연결(서비스 v1.4 반영): 서비스 CLIP 경로와 학습 판정 일치 확인(심결 944·DB 1,359장 100%, 코사인
   1.0), DB 사진 판정 24/1,383, 사진 질의는 caveat + 이름 있는 판단의 이미지 축 관측 없음. 도형 caveat 문구를 "로고 파일끼리 비교한
   결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요"로.
+- 2026-11-21 §1·§2 — 서비스 경로 표기를 통합 검색 v2 이미지 후보 풀로 바꿨다(v1 이미지 검색 `POST /search`·`run_search()` 제거,
+  통합 모델 설계 §8). 이미지 임베딩·FAISS 검색·`score_results()` 는 그대로라 X2 점수 변화 없음.

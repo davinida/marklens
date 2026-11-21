@@ -1,22 +1,15 @@
-"""POST /search — multipart 이미지 업로드 → top-K 검색 결과 + 등급."""
+"""POST /search/v2 — 이미지·상표명·지정상품 유사군 3입력 통합 검색(API 계약 v2)."""
 
 import logging
 import re
 
 import anyio
 import anyio.to_thread
-from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, HTTPException, Query, Request
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
-from ..core import config, engine, multi_search, storage, validation
+from ..core import config, engine, multi_search, validation
 from ..core.ratelimit import limiter
-from ..schemas.search import (
-    DatasetInfo,
-    GradeInfo,
-    SearchMatch,
-    SearchResponse,
-    TrademarkInfo,
-)
 from ..schemas.search_v2 import SearchV2Response
 
 router = APIRouter()
@@ -35,122 +28,6 @@ def _get_search_limiter() -> anyio.CapacityLimiter:
     if _search_limiter is None:
         _search_limiter = anyio.CapacityLimiter(config.SEARCH_MAX_CONCURRENCY)
     return _search_limiter
-
-
-def _to_response(engine_result: dict) -> SearchResponse:
-    """engine.run_search() 의 dict 결과를 Pydantic 응답 모델로 변환."""
-    matches: list[SearchMatch] = []
-    for m in engine_result["matches"]:
-        tm_raw = m.get("trademark")
-        tm_obj = TrademarkInfo(**tm_raw) if tm_raw else None
-        matches.append(
-            SearchMatch(
-                rank=m["rank"],
-                similarity=m["similarity"],
-                이미지파일=m.get("이미지파일"),
-                이미지URL=storage.public_url(m.get("이미지파일")),
-                trademark=tm_obj,
-            )
-        )
-
-    grade = GradeInfo(**engine_result["grade"])
-    dataset_info = DatasetInfo(**engine.state.dataset_info)
-
-    return SearchResponse(
-        grade=grade,
-        matches=matches,
-        dataset_info=dataset_info,
-        index_size=engine_result["index_size"],
-        top_k_requested=engine_result["top_k_requested"],
-        top_k_returned=engine_result["top_k_returned"],
-        scoring_k=engine_result["scoring_k"],
-    )
-
-
-@router.post("/search", response_model=SearchResponse)
-@limiter.shared_limit(config.SEARCH_RATE_LIMIT, scope="search")
-async def search_endpoint(
-    request: Request,
-    file: UploadFile = File(..., description="검색할 상표 이미지 (PNG/JPEG/WEBP)"),
-    top_k: int = Query(
-        default=config.DEFAULT_TOP_K,
-        ge=config.MIN_TOP_K,
-        le=config.MAX_TOP_K,
-        description="반환할 상위 결과 개수",
-    ),
-) -> SearchResponse:
-    """
-    업로드 이미지로 KIPRIS 선행상표 DB를 검색합니다.
-
-    응답: 4단계 등급, top-K 매칭(상표 상세 정보 포함), 데이터셋 안내.
-    """
-    if not engine.state.ready:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="엔진이 아직 초기화되지 않았습니다. 잠시 후 다시 시도하세요.",
-        )
-    # 빈 인덱스는 클라이언트 잘못이 아니라 서버 데이터 문제 → 503
-    if engine.state.index is None or int(engine.state.index.ntotal) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="검색 인덱스가 비어 있습니다. 데이터 적재 후 다시 시도하세요.",
-        )
-
-    # 0) Content-Length 선검사 — 본문을 메모리에 다 받기 전에 큰 요청을 차단.
-    #    (헤더는 위조 가능하므로 아래 실측 크기 검증도 그대로 유지한다)
-    content_length = request.headers.get("content-length")
-    if content_length and content_length.isdigit():
-        # multipart 오버헤드가 있으므로 파일 상한보다 여유(1 MiB)를 두고 비교.
-        if int(content_length) > config.MAX_UPLOAD_BYTES + 1024 * 1024:
-            raise HTTPException(
-                status_code=413,
-                detail=(
-                    f"요청 본문이 너무 큽니다 (Content-Length: {content_length} bytes). "
-                    f"파일 상한: {config.MAX_UPLOAD_BYTES} bytes."
-                ),
-            )
-
-    # 1) 업로드 헤더와 실측 크기 검증. UploadFile 전체를 한 번에 읽지 않고
-    #    상한+1 바이트까지만 읽어 메모리 사용량을 제한한다.
-    validation.validate_content_type(file)
-
-    # 2) 디코딩과 검색을 같은 동시성 슬롯 안에서 수행한다. 검증된 PIL 객체를
-    #    엔진에 넘기므로 정상 입력을 두 번 디코딩하지 않는다.
-    try:
-        async with _get_search_limiter():
-            raw = await file.read(config.MAX_UPLOAD_BYTES + 1)
-            validation.validate_upload_size(raw)
-
-            def decode_and_search() -> dict:
-                image = validation.validate_and_decode(raw)
-                return engine.run_search(image, top_k=top_k)
-
-            result = await anyio.to_thread.run_sync(decode_and_search)
-    except HTTPException:
-        raise
-    except ValueError as e:
-        # preprocess/scoring 내부 검증 실패는 4xx로
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
-    except Exception:
-        logger.exception("검색 처리 중 서버 오류")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="검색 처리 중 서버 오류가 발생했습니다.",
-        ) from None
-
-    # 3) 응답 조립 — 메타 계약 불일치(예: dataset_info 필드 누락)가 미처리 500 으로
-    #    새지 않도록 감싼다. load_all() 이 기동 시점에 선검증하지만 이중 방어.
-    try:
-        return _to_response(result)
-    except Exception:
-        logger.exception("검색 응답 조립 중 계약 오류")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="검색 응답을 만들 수 없습니다.",
-        ) from None
 
 
 @router.post(

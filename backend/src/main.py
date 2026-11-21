@@ -116,7 +116,7 @@ app.add_middleware(
 # === 라우터 등록 ===
 # X-API-Key 인증(require_api_key)은 MARKLENS_API_KEY 설정 시에만 활성(미설정이면 무인증).
 # /health 는 무인증 유지 — 로드밸런서·부하테스트가 키 없이 상태를 폴링해야 함.
-# /search·/name-check·/phonetic-search·/semantic-search·/goods/*, 그리고 활성 시 /images(아래
+# /search/v2·/name-check·/phonetic-search·/semantic-search·/goods/*, 그리고 활성 시 /images(아래
 # 라우트에 Depends 주입)에 인증을 건다.
 app.include_router(health.router)
 app.include_router(search.router, dependencies=[Depends(require_api_key)])

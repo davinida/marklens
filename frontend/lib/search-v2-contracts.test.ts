@@ -31,6 +31,15 @@ describe("SearchV2ResponseSchema", () => {
     ]);
   });
 
+  it("rejects an unknown grade in overall or a candidate (ported from v1 SearchResponseSchema)", () => {
+    const overall = structuredClone(imageFixture) as { overall: { grade: string } };
+    overall.overall.grade = "CAUTION";
+    expect(SearchV2ResponseSchema.safeParse(overall).success).toBe(false);
+    const candidate = structuredClone(imageFixture) as { candidates: { risk: { grade: string } }[] };
+    candidate.candidates[0].risk.grade = "UNKNOWN";
+    expect(SearchV2ResponseSchema.safeParse(candidate).success).toBe(false);
+  });
+
   it("accepts an empty candidate result with nullable overall fields", () => {
     const fixture = structuredClone(textFixture);
     const empty = {

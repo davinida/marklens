@@ -120,6 +120,20 @@ describe("POST /api/search/v2", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("echoes the request ID on a 403 rejected before parsing (ported from v1 /api/search)", async () => {
+    const req = new Request("http://localhost/api/search/v2", {
+      method: "POST",
+      headers: { "content-type": "multipart/form-data; boundary=broken", "x-request-id": "edge-rejected-1" },
+      body: "not multipart data",
+    });
+    const parse = vi.spyOn(req, "formData");
+    const response = await searchV2(req);
+    expect(response.status).toBe(403);
+    expect(response.headers.get("x-request-id")).toBe("edge-rejected-1");
+    expect(parse).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("stops after failed verification without parsing or calling the backend", async () => {
     vi.stubEnv("MARKLENS_TURNSTILE_SECRET_KEY", "test-secret");
     vi.mocked(fetch).mockResolvedValue(Response.json({ success: false }));

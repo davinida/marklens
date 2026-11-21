@@ -11,7 +11,7 @@ import {
 import { imageUrl } from "@/lib/api";
 import type { SearchV2Candidate, SearchV2Grade, SearchV2Response } from "@/lib/contracts";
 // v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
-import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/ResultView";
+import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/visualStatusView";
 
 // API 계약 v2 §4-4
 const GRADE_VIEW: Record<
@@ -209,8 +209,11 @@ function josaEuroRo(text: string): "으로" | "로" {
   return finalConsonant === 8 ? "로" : "으로"; // 8 = ㄹ 받침
 }
 
-function toPercent(value: number): number {
-  return Math.round(Math.max(0, Math.min(1, value)) * 100);
+/** 0–1 점수를 % 정수로 — 내림. 기준(시각 상태 0.75·도형 규칙 0.9·단독 임계값 0.98 등)을 넘지 않은 값이
+ *  넘은 것처럼 보이지 않게 한다(0.7499 → 74%). 1e-9 는 0.57 * 100 = 56.99… 같은 이진 표현 오차 보정으로,
+ *  응답 값의 자릿수(소수 3–4자리)보다 훨씬 작다. */
+export function toPercent(value: number): number {
+  return Math.floor(Math.max(0, Math.min(1, value)) * 100 + 1e-9);
 }
 
 /** API 계약 v2 §4-2 — 제외 토큰을 side(query/candidate/both)별로 묶어 한 줄씩 문장을 만든다. */

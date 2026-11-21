@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat
 
-from .search import DatasetInfo
+from .dataset import DatasetInfo
 
 Grade = Literal["안전", "주의", "검토 권장", "위험"]
 Score = Annotated[float, Field(ge=0, le=1)]
