@@ -1,6 +1,6 @@
 # 식별력·요부 필터 v0.3 산출물 (다빈-3)
 
-`ml/scripts/distinctiveness_build.py` 가 만든다(KIPRIS 호출 0, 3~4초). 설계·근거는 `docs/MarkLens_식별력_설계.md`, 런타임은 `ml/src/axes/distinctiveness.py`.
+`ml/scripts/distinctiveness_build.py` 가 만든다(KIPRIS 호출 0, 3–4초). 설계·근거는 `docs/MarkLens_식별력_설계.md`, 런타임은 `ml/src/axes/distinctiveness.py`.
 
 | 파일 | 내용 | 용도 |
 |---|---|---|

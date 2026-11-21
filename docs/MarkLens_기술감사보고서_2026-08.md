@@ -133,7 +133,7 @@ topology는 로컬에서 실행하지 못했다. CI에는 Compose config와 공�
 | JPEG 품질 60 | 0.76 | 1.0 | 1.0 | 0.982898 |
 | 8도 회전 | 0.76 | 1.0 | 1.0 | 0.936337 |
 
-원본 exact R@1 miss 6건은 모두 byte-identical 그룹에 속했고 target 파일은 rank 2~3에
+원본 exact R@1 miss 6건은 모두 byte-identical 그룹에 속했고 target 파일은 rank 2–3에
 있었다. 105건 때보다 동일 이미지 그룹과 동률 기회가 늘어난 영향을 함께 봐야 하며,
 세대와 표본이 다른 v3의 `0.96`과 직접 성능 비교할 수 없다. v4는 family R@1을
 측정하지 않았으므로 family retrieval 성능이나 새로운 상표 일반화 성능은 알 수 없다.
