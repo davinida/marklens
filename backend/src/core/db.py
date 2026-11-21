@@ -67,8 +67,8 @@ def row_to_trademark(row: tuple) -> dict:
     """
     trademark 테이블 row → API 계약(한글 키) dict.
 
-    스키마는 schemas/search.py TrademarkInfo 와 일치.
-    `이미지파일` 은 TrademarkInfo 의 필드는 아니지만 엔진의 조인 키라 포함한다.
+    키는 file 모드 메타(kipris_metadata.json 의 trademarks 항목)와 같다.
+    `이미지파일` 은 엔진의 조인 키라 포함한다.
     """
     (
         application_no, registration_no, application_date, registration_date,

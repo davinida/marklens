@@ -1,7 +1,7 @@
 """POST /phonetic-search — 입력 상표명과 로컬 DB 상표명의 X1 호칭(발음) 유사도 상위 후보.
 
 /name-check 와 같은 본문 계약·인증·한도·로깅 패턴을 따르되, 외부 KIPRIS 호출 없이 로컬
-발음 캐시(core/phonetic_search.py)만 사용한다. CPU 작업이라 /search 처럼 워커 스레드에서 돈다.
+발음 캐시(core/phonetic_search.py)만 사용한다. CPU 작업이라 /search/v2 처럼 워커 스레드에서 돈다.
 """
 
 import logging
@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from ..core import config, engine, phonetic_search, storage
 from ..core.ratelimit import limiter
+from ..schemas.dataset import DatasetInfo
 from ..schemas.phonetic_search import (
     PhoneticMatch,
     PhoneticQuery,
@@ -19,12 +20,11 @@ from ..schemas.phonetic_search import (
     PhoneticSearchRequest,
     PhoneticSearchResponse,
 )
-from ..schemas.search import DatasetInfo
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# /search 와 같은 이유로 동시 실행 상한을 둔다(요청당 DB 전건 계산 ≈ 수백 ms CPU).
+# /search/v2 와 같은 이유로 동시 실행 상한을 둔다(요청당 DB 전건 계산 ≈ 수백 ms CPU).
 _limiter: anyio.CapacityLimiter | None = None
 
 

@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .search import DatasetInfo
+from .dataset import DatasetInfo
 
 
 class PhoneticSearchRequest(BaseModel):
@@ -37,7 +37,7 @@ class PhoneticQuery(BaseModel):
 
 
 class PhoneticMatch(BaseModel):
-    """발음 유사 후보 1건. 한글 키는 /search 응답 관례를 따른다."""
+    """발음 유사 후보 1건. 한글 키는 KIPRIS 원본 데이터 구조를 따른다."""
 
     model_config = ConfigDict(populate_by_name=True)
 

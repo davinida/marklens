@@ -1,7 +1,7 @@
 // @vitest-environment node
 
 import { describe, expect, it } from "vitest";
-import { parseNameCheckResponse, SearchResponseSchema } from "@/lib/contracts";
+import { parseNameCheckResponse } from "@/lib/contracts";
 
 describe("parseNameCheckResponse", () => {
   it("preserves additive completeness metadata", () => {
@@ -149,33 +149,6 @@ describe("parseNameCheckResponse", () => {
         },
       ],
     });
-  });
-});
-
-describe("SearchResponseSchema", () => {
-  it("rejects a response with an unknown grade", () => {
-    expect(
-      SearchResponseSchema.safeParse({
-        grade: {
-          grade_code: "UNKNOWN",
-          grade_name: "?",
-          message: "?",
-          top1_similarity: 0.1,
-          separability_a: 0,
-          separability_b: 0,
-        },
-        matches: [],
-        dataset_info: {
-          총_상표수: 0,
-          출원일자_범위: "-",
-          데이터_기준: "-",
-          생성일자: "-",
-        },
-        index_size: 0,
-        top_k_requested: 5,
-        top_k_returned: 0,
-      }).success,
-    ).toBe(false);
   });
 });
 

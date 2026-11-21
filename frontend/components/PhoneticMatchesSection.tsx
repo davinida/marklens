@@ -11,8 +11,7 @@ export type PhoneticPhase =
   | { name: "result"; data: PhoneticSearchResponse }
   | { name: "error"; message: string };
 
-// ResultView.similarityPercentage 와 같은 규칙(소수 첫째 자리 내림). ResultView 가 이
-// 컴포넌트를 import 하므로 순환 import 를 피하려고 같은 계산을 여기에 둔다.
+// 소수 첫째 자리 내림 — 표시값이 실제 점수보다 커 보이지 않게 한다.
 export function phoneticPercentage(value: number): number {
   const clamped = Math.max(0, Math.min(1, value));
   return Math.floor(clamped * 1000) / 10;

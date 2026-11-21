@@ -1,29 +1,8 @@
 // @vitest-environment node
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { imageUrl, searchGoods, searchTrademark } from "@/lib/api";
-
-const validResponse = {
-  grade: {
-    grade_code: "LOW", // SAFE 는 2026-08 개정으로 계약에서 제거됨
-    grade_name: "낮음",
-    message: "충돌 가능성이 낮아요.",
-    top1_similarity: 0.2,
-    separability_a: 0.1,
-    separability_b: 0.1,
-    warnings: [],
-  },
-  matches: [],
-  dataset_info: {
-    총_상표수: 1,
-    출원일자_범위: "2026",
-    데이터_기준: "테스트",
-    생성일자: "2026-08-14",
-  },
-  index_size: 1,
-  top_k_requested: 5,
-  top_k_returned: 0,
-};
+import { imageUrl, searchGoods, searchV2 } from "@/lib/api";
+import imageFixture from "@/test/fixtures/search-v2-image.json";
 
 describe("imageUrl", () => {
   it("routes relative and legacy backend image paths through the BFF", () => {
@@ -51,45 +30,42 @@ describe("imageUrl", () => {
   });
 });
 
-describe("searchTrademark", () => {
+describe("searchV2", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 
-  it("sends the upload only to the same-origin route", async () => {
+  it("sends the upload only to the same-origin route (ported from v1 searchTrademark)", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify(validResponse), {
+      new Response(JSON.stringify(imageFixture), {
         status: 200,
         headers: { "content-type": "application/json" },
       }),
     );
-    const file = new File(["image"], "logo.png", { type: "image/png" });
+    const image = new File(["image"], "logo.png", { type: "image/png" });
 
-    await expect(searchTrademark(file, 5, "token")).resolves.toMatchObject({
-      index_size: 1,
+    await expect(searchV2({ image }, 5, "token")).resolves.toMatchObject({
+      top_k_requested: imageFixture.top_k_requested,
     });
 
     const [url, options] = vi.mocked(fetch).mock.calls[0];
-    expect(url).toBe("/api/search?top_k=5");
+    expect(url).toBe("/api/search/v2?top_k=5");
     expect(options?.credentials).toBe("same-origin");
     expect(new Headers(options?.headers).get("x-turnstile-token")).toBe("token");
     expect(options?.body).toBeInstanceOf(FormData);
+    expect((options?.body as FormData).get("image")).toBeInstanceOf(File);
   });
 
-  it("fails closed when the backend contract is malformed", async () => {
+  it("fails closed when the backend contract is malformed (ported from v1 searchTrademark)", async () => {
     vi.mocked(fetch).mockResolvedValue(
-      new Response(JSON.stringify({ matches: [] }), {
+      new Response(JSON.stringify({ candidates: [] }), {
         status: 200,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-request-id": "bad-contract-1" },
       }),
     );
 
     await expect(
-      searchTrademark(
-        new File(["image"], "logo.png", { type: "image/png" }),
-        5,
-        "token",
-      ),
+      searchV2({ image: new File(["image"], "logo.png", { type: "image/png" }) }, 5, "token"),
     ).rejects.toEqual(
-      expect.objectContaining({ status: 502, name: "ApiError" }),
+      expect.objectContaining({ status: 502, name: "ApiError", requestId: "bad-contract-1" }),
     );
   });
 });

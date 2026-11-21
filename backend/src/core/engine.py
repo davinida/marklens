@@ -4,8 +4,8 @@ ML 리소스 로딩 및 검색 실행 엔진.
 서버 startup 시점에 1회만 모델/인덱스/메타를 로딩하고, 이후 요청에서는
 메모리에 보관된 자원을 재사용합니다.
 
-이 모듈은 ml/scripts/kipris_search.py 의 흐름을
-"검색 → 메타 결합 → 등급" 그대로 옮긴 함수 run_search() 를 제공합니다.
+이미지 검색 함수(encode_image·search)와 메타는 통합 검색 v2 의 후보 풀
+(core/multi_search.py)이 쓰고, 진입점은 multi_search() 입니다.
 """
 
 import hashlib
@@ -16,7 +16,6 @@ import sys
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Optional
 
 from . import appno, config, paths
 
@@ -53,8 +52,8 @@ from src.embedding import (  # noqa: E402, I001
 import faiss  # noqa: E402
 
 from src.preprocess import DEFAULT_PREPROCESS_VERSION  # noqa: E402
-from src.scoring import score_results  # noqa: E402
-from src.search import load_index, search  # noqa: E402
+# search 는 후보 풀(core/multi_search.py)이 engine.search 로 부른다(재수출).
+from src.search import load_index, search  # noqa: E402, F401
 
 
 @dataclass
@@ -359,8 +358,8 @@ def load_all() -> None:
 
     # ---- dataset_info 계약 검증 (기동 시점에 실패시키기) ----
     # 과거: 필드가 빠진 메타가 첫 검색 요청에서 미처리 500 을 만들었다.
-    # 응답 조립(api/search.py)이 쓰는 스키마로 지금 검증해 조용한 배포 사고를 막는다.
-    from ..schemas.search import DatasetInfo
+    # 응답 스키마(schemas/dataset.py)로 지금 검증해 조용한 배포 사고를 막는다.
+    from ..schemas.dataset import DatasetInfo
 
     try:
         DatasetInfo(**state.dataset_info)
@@ -447,98 +446,14 @@ def lookup_trademarks_by_application_numbers(
     return result
 
 
-def run_search(image_input, top_k: int) -> dict:
-    """
-    쿼리 이미지에 대해 검색 + 메타 결합 + 등급 산출까지 수행합니다.
-
-    Args:
-        image_input: encode_image()가 받을 수 있는 형태
-                     (bytes / str / Path / PIL.Image.Image).
-        top_k: 반환할 결과 개수.
-
-    Returns:
-        dict 구조:
-        {
-            "grade": <score_results 반환 dict>,
-            "matches": [
-                {
-                    "rank": int,
-                    "similarity": float,
-                    "이미지파일": str,
-                    "trademark": <kipris_metadata.json 의 trademark 객체 또는 None>,
-                }, ...
-            ],
-            "index_size": int,
-            "top_k_requested": int,
-            "top_k_returned": int,
-        }
-    """
-    if not state.ready:
-        raise RuntimeError("Engine 이 아직 초기화되지 않았습니다.")
-
-    # 1) 임베딩 + 검색. 판정용 후보 수는 표시 top_k와 독립적으로 고정한다.
-    query_emb = encode_image(image_input)
-    scoring_k = min(
-        max(int(top_k), config.SCORING_TOP_K),
-        int(state.index.ntotal),
-    )
-    scoring_distances, scoring_indices = search(
-        state.index, query_emb, k=scoring_k
-    )
-    display_count = min(int(top_k), len(scoring_distances))
-    distances = scoring_distances[:display_count]
-    indices = scoring_indices[:display_count]
-
-    # 2) 후보 파일명 확정
-    hits: list[tuple[int, float, Optional[str]]] = []  # (rank, similarity, filename)
-    for rank, (d, i) in enumerate(zip(distances, indices), 1):
-        idx_int = int(i)
-        filename = (
-            state.image_paths[idx_int]
-            if 0 <= idx_int < len(state.image_paths)
-            else None
-        )
-        hits.append((rank, float(d), filename))
-
-    # 3) 메타 결합 — db 모드는 후보만 일괄 조회(쿼리 1회), file 모드는 dict 조회
-    if state.storage_mode == "db":
-        from . import db
-
-        filenames = [f for _, _, f in hits if f]
-        lookup = db.fetch_trademarks_by_image_keys(filenames)
-    else:
-        lookup = state.trademark_lookup
-
-    matches = []
-    for rank, similarity, filename in hits:
-        matches.append({
-            "rank": rank,
-            "similarity": similarity,
-            "이미지파일": filename,
-            "trademark": lookup.get(filename) if filename else None,  # 없으면 None
-        })
-
-    # 3) 등급 산출
-    grade = score_results(scoring_distances)
-
-    return {
-        "grade": grade,
-        "matches": matches,
-        "index_size": int(state.index.ntotal),
-        "top_k_requested": int(top_k),
-        "top_k_returned": int(len(matches)),
-        "scoring_k": int(len(scoring_distances)),
-    }
-
-
 def multi_search(image=None, name=None, goods_codes=None, type_override=None, top_k: int = 5):
     """3입력(이미지·상표명·지정상품 유사군) 통합 검색 — API 계약 v2 §2 의 overall·candidates·meta 를
     `SearchV2Result`(to_dict() 가 계약 키 그대로)로 돌려준다. 구현은 core/multi_search.py.
 
-    동기 함수다 — CPU 작업(OCR·임베딩·축 계산)은 run_search 와 같이 API 가 스레드 풀에서 부른다.
+    동기 함수다 — CPU 작업(OCR·임베딩·축 계산)이라 API 가 스레드 풀에서 부른다.
     예외: 세 입력이 모두 없으면 multi_search.EmptyQueryError(→ 400), 계수 JSON·식별력 모델이
     준비되지
-    않았으면 multi_search.ModelNotReadyError(→ 503), 엔진 미준비는 run_search 와 같은 RuntimeError(→
+    않았으면 multi_search.ModelNotReadyError(→ 503), 엔진 미준비는 RuntimeError(→
     503),
     top_k·type_override 범위 밖은 ValueError(→ 422).
     """

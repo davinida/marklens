@@ -8,13 +8,13 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 ## 현재 상태
 
-기준일 2026-11-20. 여러 절에서 쓰는 수치(테스트 수·유사군 보유·모델 버전·정답 쌍 수 등)는 이 표에만 적고,
+기준일 2026-11-21. 여러 절에서 쓰는 수치(테스트 수·유사군 보유·모델 버전·정답 쌍 수 등)는 이 표에만 적고,
 다른 절은 이 표를 가리킵니다. 상태는 완료 / 진행 중 / 예정 / 보류 넷입니다.
 
 | 구성 | 상태 | 핵심 수치 |
 |---|---|---|
 | [세 입력 통합 검색 v2](#세-입력-통합-검색-엔진) (`POST /search/v2`) | 완료 | 엔진·API·BFF·결과 화면·E2E 연결 · 통합 모델 v1.4 반영(2026-11-20 — 이름 없는 판단은 등급·이미지 유사도만, 사진 질의 안내) · 운영 배포 검증은 별도 |
-| 이미지 검색 v1 (`POST /search`) | 완료 | 최종 발표(2026-12-20)까지 유지 뒤 v2 로 대체 |
+| 이미지 검색 v1 (`POST /search`) | 완료 | 2026-11-21 제거 — 이미지 검색은 v2 `POST /search/v2` 로 일원화(계약 v2 §5-5) |
 | [판단 축 X1·X2·X3·X4](#축-한눈에-보기) | 완료 | X1 v1.6 · X3 v1.3 · X4 v1 — 축별 AUC·계수는 "축 한눈에 보기" 표 |
 | [식별력·요부 필터](#식별력과-요부-필터) | 완료 | v0.3 — 약한 토큰 수·3호 승인 항목 수는 해당 절 |
 | [통합 모델](#통합-모델) | 완료 | 서비스 기본 v1.4(2026-11-20) — 이름 있는 입력은 v1.3 그대로: 심결 AUC 0.618(0.55–0.68) · 현실 분포 AUC 0.911(0.89–0.93) · "위험" 등급 정밀도 0.70 — 등급 하한·단독 임계값은 해당 절 |
@@ -22,15 +22,17 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | [등록상표 DB](#등록상표-db) | 완료 | 1,383건 = 기존 수집 1,100 + 유명 브랜드 283 · generation `20261119T111642Z-3b0759a08391`(2026-11-19) · 유사군 보유 1,383/1,383건 · 기동 캐시 X1 발음 1,195건·X3 관념 710건·X2 철자 1,246건·상품 변환표 91,591건 |
 | [유명 브랜드 DB 추가](#유명-브랜드-목록) | 완료 | 유명 브랜드 30개(13개 업종) 283건 — 상표명에 브랜드명이 든 표장 215건 · 2026-11-19 운영 반영(승격·색인 재생성·유형 사전) |
 | [정답 데이터(심결례)](#정답-데이터) | 완료 | 라벨 776행 = 유사 369·비유사 228·제외 179 · 도형계 유사·비유사 110행(양쪽 이미지 106)·문자계 447행 · 학습 특징 597행(1차 350·2차 247, 이름 축 1차 313·2차 178행) |
-| [테스트](#검증-명령) | 완료 | Python `1475 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(22 파일) · Playwright `15 passed` |
+| [테스트](#검증-명령) | 완료 | Python `1467 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(21 파일) · Playwright `15 passed` |
 | [CI](#ci) | 완료 | GitHub Actions 4잡(python · frontend · deployment-config · backend-image) 통과 |
 | [공개 배포](#공개-배포-준비) | 보류 | 템플릿만 제공 — 실제 도메인·TLS·계정 배포는 하지 않음 |
 
-마지막 갱신 2026-11-20 — `main` = `develop` = `f924591`(PR #100 철자 v2 시도 병합) 위에 서비스 v1.4 반영(브랜치
-`feat/service-v1.4` — 서비스 기본 모델 v1.4, 이름 없는 입력의 등급 하한을 실제 검색 기준으로). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
+마지막 갱신 2026-11-21 — `main` = `develop` = `5e91b95`(PR #102 문서 범위 표기 병합) 위에 v1 이미지 검색 제거(브랜치
+`refactor/remove-search-v1` — `POST /search`·BFF `/api/search`·v1 결과 화면을 지우고 v2 로 일원화). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
 
 <details>
 <summary>이력</summary>
+
+- 마지막 갱신 기록(2026-11-21, v1 이미지 검색 제거 전): "마지막 갱신 2026-11-20 — `main` = `develop` = `f924591`(PR #100 철자 v2 시도 병합) 위에 서비스 v1.4 반영(브랜치 `feat/service-v1.4` — 서비스 기본 모델 v1.4, 이름 없는 입력의 등급 하한을 실제 검색 기준으로). 남은 일은 [다음 단계](#다음-단계)에 있습니다." 그때 칸: 이미지 검색 v1 "최종 발표(2026-12-20)까지 유지 뒤 v2 로 대체" · 테스트 Python `1475 passed, 26 skipped` · Vitest `204 passed`(22 파일).
 
 - 마지막 갱신 기록(2026-11-20, 서비스 v1.4 반영 전): `main` = `develop` = `f5c3873`(PR #99 통합 모델 v1.4 병합) 위에 철자 축 v2 시도(브랜치 `feat/ortho-fix-retrain` — 축 측정의 진행 조건 미달로 철자 v1·v1.4 유지). 그때 칸: 통합 모델 "v1.3 · 심결 AUC 0.618(0.55–0.68) · …", 통합 모델 2차 학습 v1.4 "서비스 반영 전 — … · 이름 없는 입력의 등급 하한은 따로(이미지만 주의 0.2790·검토 권장 0.4258, 이미지+상품 0.2221·0.3709, 위험은 닿지 않음)", 테스트 Python `1454 passed, 26 skipped` · Vitest `199 passed`, 세 입력 통합 검색 v2 "엔진·API·BFF·결과 화면·E2E 연결. 운영 배포 검증은 별도", 기준일 2026-11-19.
 
@@ -102,7 +104,7 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 | 기능 | 상태 | 요약 |
 |---|---|---|
 | 세 입력 통합 검색(`POST /search/v2`, API 계약 v2) | 완료 | 이미지·상표명·지정상품 중 하나 이상 → 후보 풀 → 쌍별 4축 → 통합 모델 → 등급·위험도·근거 축·요부·caveat — [세 입력 통합 검색 엔진](#세-입력-통합-검색-엔진) |
-| 이미지 검색(v1 `POST /search`) | 완료 | PNG/JPEG/WebP, 최대 10 MiB, 수동 크롭 지원. 최종 발표(2026-12-20)까지 유지 뒤 v2 로 대체(계약 v2 §5-5) |
+| 이미지 검색(`POST /search/v2` 의 `image`) | 완료 | PNG/JPEG/WebP, 최대 10 MiB, 수동 크롭 지원. 이미지만 받던 v1 `POST /search` 는 2026-11-21 제거(v2 로 일원화, 계약 v2 §5-5) |
 | 시각 후보 상태 | 완료 | 단조적 4개 상태, 교정 전 임시 임계값 |
 | 상표명 완전일치 확인 | 완료 | KIPRIS 실시간 조회, 후보 상세·상태 분포·완전성 표시. **검색과 별개 기능**(검색 점수에 반영되지 않음) |
 | 발음 유사 후보(X1) | 완료 | `POST /phonetic-search` — 상표명 확인 패널의 "발음이 비슷한 등록상표" 섹션 — [X1 호칭](#x1-호칭) |
@@ -113,10 +115,17 @@ file 모드(`DATABASE_URL` 없음) + Turnstile dev bypass로 검색·상표명 �
 
 네 가지를 분명히 해 둡니다.
 
-- v1 검색 입력은 **이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음). 세 입력은 `POST /search/v2`(API 계약 v2) — API·BFF·zod·gateway(PR #69)·결과 화면 v2(PR #72)·E2E v2 까지 연결됐습니다(2026-10-27).
+- 검색 입력은 `POST /search/v2`(API 계약 v2)의 세 입력(이미지·상표명·지정상품 유사군 중 하나 이상)입니다 — API·BFF·zod·gateway(PR #69)·결과 화면 v2(PR #72)·E2E v2 까지 연결됐습니다(2026-10-27). 이미지 1개만 받던 v1 `POST /search` 는 2026-11-21 제거했습니다.
 - 상표명 확인(`/name-check`)은 검색과 분리된 별도 기능이며 검색 점수에 영향을 주지 않습니다.
-- X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. v1 검색 점수·등급에는 반영되지 않고, v2 엔진에서 `x1` 축으로 위험도에 들어갑니다.
+- X1은 `POST /phonetic-search`로 최소 연결되어 상표명 확인 패널에 발음 유사 후보를 보여 줍니다. 검색 위험도에는 v2 엔진의 `x1` 축으로 들어갑니다.
 - X3는 같은 방식으로 `POST /semantic-search`에 연결되어 같은 패널에 관념 유사 후보(최대 5건, 하한 0.55)를 보여 줍니다. 기동 시 DB 상표명 중 관념이 있는 이름을 임베딩해 캐시하며 `MARKLENS_X3_ENABLED=0`이면 이 엔드포인트만 503입니다.
+
+<details>
+<summary>이력</summary>
+
+- 2026-11-21(v1 이미지 검색 제거) 전 문구 — 기능 표 행: "| 이미지 검색(v1 `POST /search`) | 완료 | PNG/JPEG/WebP, 최대 10 MiB, 수동 크롭 지원. 최종 발표(2026-12-20)까지 유지 뒤 v2 로 대체(계약 v2 §5-5) |" · 첫 번째 안내: "v1 검색 입력은 **이미지 1개**입니다(`POST /search`는 `file`과 `top_k`만 받음). 세 입력은 `POST /search/v2`(API 계약 v2) — API·BFF·zod·gateway(PR #69)·결과 화면 v2(PR #72)·E2E v2 까지 연결됐습니다(2026-10-27)." · X1 안내 끝: "v1 검색 점수·등급에는 반영되지 않고, v2 엔진에서 `x1` 축으로 위험도에 들어갑니다."
+
+</details>
 
 ### 하지 않는 것
 
@@ -207,7 +216,7 @@ phonetic_similarity("카페 봄", "봄", extra_generic=frozenset({"카페"}))  #
 
 ### X2 외관
 
-OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색입니다. v1 이미지 검색(`POST /search`)의 엔진이고, v2 엔진에서는 `x2_img` 축으로 후보 풀 전체에 붙습니다.
+OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색입니다. 통합 검색 v2 엔진의 이미지 후보 풀(상위 20)과 `x2_img` 축이고, 이미지 질의의 시각 4상태(`overall.visual_status`)도 이 점수로 정합니다.
 
 - 상태: 완료(현재 서비스). 심결 이미지 쌍 벤치마크는 진행 중 — v0 기준선·v1 ① 요부 분리·v1 ② 변형 비교·도형 외관 세 방법 비교(2026-11-19)까지 했고, 서비스·모델의 도형 외관은 전체 이미지 CLIP 그대로입니다. 남은 것은 사진 표장이 낀 쌍의 처리와 사후 진단 후보(`crop_only`)의 확인입니다 — 분배 항목 "X2 외관 벤치마크(심결 이미지 쌍)".
 - 도형 외관 세 방법 비교(2026-11-19, 도형계 103쌍·사건 76, 사건 단위 CI): 전체 이미지 CLIP `x2_whole` 0.734(0.61–0.83; 가중 0.687) · 글자 지운 도형(개선판 — 인식 결과를 쓰지 않는 박스 지우기 + inpaint, 상표명으로 지울 박스 고르기, 사진 로고 영역) 0.771(짝 차이 +0.037, CI −0.10–+0.16) · 비엔나코드 겹침(실제 코드 + CLIP 이웃 추정, 중분류 k 5) 0.639(짝 차이 −0.096). 미리 고정한 채택 기준(짝 차이 CI 하한 > 0 가중 유무 둘 다, 1차·2차 같은 방향)을 넘은 방법이 없어 **전체 이미지 CLIP 을 유지**합니다. 사후 진단 `crop_only`(남은 내용 bbox 로 자르기) 0.773(짝 차이 +0.039, CI +0.01–+0.09)은 새 표본에서 확인할 후보입니다. 도형계 0.73 은 2차의 거절·무효 등록 표장끼리 쌍(0.88)에서 오고, 사진이 낀 쌍은 0.38 입니다. 도형 단독 규칙 τ 0.9 는 심결 도형계에서 한 번도 발동하지 않습니다(최대 0.89) — X2 설계 §7.6.
@@ -221,6 +230,8 @@ OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색입니다. v1 이미지 검�
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-21(v1 이미지 검색 제거) 전 첫 문단: "OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색입니다. v1 이미지 검색(`POST /search`)의 엔진이고, v2 엔진에서는 `x2_img` 축으로 후보 풀 전체에 붙습니다."
 
 - v1.4 1차 시도 커밋(`a181dab`) 때 문구: "도형계 계수(`x2_whole×도형계`)는 데이터가 아니라 결합 제약이 정한 값입니다(설계 §7-3). 2차 학습 v1.4 에서 데이터로 다시 정하려 했지만 채택 보류라 그대로입니다(통합 모델, 설계 §7-4·§6)."
 
@@ -847,7 +858,7 @@ production 예시는 `MARKLENS_PUBLIC_RESULT_IMAGES=false`가 기본입니다.
 
 ```text
 Browser
-  -> Next.js same-origin BFF (/api/search, /api/name-check, /api/phonetic-search, /api/semantic-search, /api/goods/search, /api/goods/classes, /api/images, /api/health, /api/turnstile-config, /api/search/v2)
+  -> Next.js same-origin BFF (/api/name-check, /api/phonetic-search, /api/semantic-search, /api/goods/search, /api/goods/classes, /api/images, /api/health, /api/turnstile-config, /api/search/v2)
   -> private FastAPI
   -> OpenCLIP + FAISS index
   -> PostgreSQL / KIPRIS Plus
@@ -868,6 +879,8 @@ Browser
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-21: 그림의 BFF 목록에서 `/api/search`(v1 이미지 검색)를 뺐습니다 — 라우트 제거, 이미지 검색은 `/api/search/v2`.
 
 - 재구성 전 `backend/` 설명에는 세 입력 통합 검색 엔진에 "엔드포인트는 진행 중"이라고 적혀 있었습니다 — 엔드포인트는 2026-10-26(PR #69)에 구현됐습니다.
 - 재구성 전에는 이 절과 CI 절이 "CI 3잡"으로, 상태 표가 4잡으로 적혀 있었습니다 — `.github/workflows/ci.yml` 은 4잡입니다.
@@ -917,10 +930,12 @@ fallback + caveat)이고 환경변수는 `.env` 의 `MARKLENS_OCR_ENABLED`(기�
 서버는 기동 때 리더를 백그라운드로 미리 적재하고(`ocr.warm_up`), 큰 업로드는 긴 변 640px 로 줄여 OCR 에 넣습니다 — 원본 그대로면
 1–4천 px 이미지가 6–31초 걸려 2초 상한에 항상 걸렸습니다(2026-10-26 실측, 줄여도 읽은 글자는 같음).
 
-유형 사전 계산(`ml/data/types.json`, DB 전건 — 결합 1,246·도형 137)은 기동 때 읽습니다. v1 엔드포인트(`POST /search`·`/phonetic-search`·`/semantic-search`)와 BFF 는 최종 발표(2026-12-20)까지 유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5).
+유형 사전 계산(`ml/data/types.json`, DB 전건 — 결합 1,246·도형 137)은 기동 때 읽습니다. v1 이미지 검색 `POST /search`·BFF `/api/search` 는 2026-11-21 제거했고(v2 로 일원화), `/phonetic-search`·`/semantic-search` 와 BFF 는 상표명 확인 패널용 엔드포인트로 유지합니다(계약 v2 §5-5).
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-21(v1 이미지 검색 제거) 전 문구: "v1 엔드포인트(`POST /search`·`/phonetic-search`·`/semantic-search`)와 BFF 는 최종 발표(2026-12-20)까지 유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5)."
 
 - 실측(실제 엔진, Apple Silicon Mac, 2026-10-25, 모델 v1.3): 이름 "블루커피" + 카페 유사군 세트 72ms(풀 55; 첫 호출 348ms), 셋 다(+ 도형상표 이미지) 331ms(풀 74; easyocr 첫 로드 포함 1.8초), 이미지만 112–280ms(풀 20).
 - 재구성 전 기능 표: **연결 완료(2026-10-27 — API #69·OCR #70·화면 #72·E2E v2 15건)** — 이미지·상표명·지정상품 중 하나 이상 → 후보 풀 → 쌍별 4축 → 통합 모델 v1.3 → 등급·위험도·근거 축·요부·caveat(`engine.multi_search`, PR #65·#66·#67). B-1–B-5(PR #69)·F-1–F-5(PR #72)·E2E v2(스펙 5 × 뷰포트 3) 완료 — 2026-10-27 실제 모델로 BFF 경유 시나리오 8종 로짓·등급·규칙·caveat·정렬 검산 통과
@@ -946,8 +961,7 @@ fallback + caveat)이고 환경변수는 `.env` 의 `MARKLENS_OCR_ENABLED`(기�
 
 | 경로 | 용도 | 한도(백엔드 IP 기준 기본값) |
 |---|---|---|
-| `POST /api/search?top_k=5` | Turnstile 검증 후 이미지 검색 프록시(v1 — 2026-12-20 까지 유지) | 백엔드 한도 적용(아래) |
-| `POST /api/search/v2?top_k=` | 세 입력 통합 검색 프록시(multipart `image`·`name`·`goods_codes[]`·`type_override`; 계약 v2 §1-1, PR #69) — Turnstile 검증 뒤 토큰을 떼고 전달 | v1 `/api/search` 와 같은 버킷 |
+| `POST /api/search/v2?top_k=` | 세 입력 통합 검색 프록시(multipart `image`·`name`·`goods_codes[]`·`type_override`; 계약 v2 §1-1, PR #69) — Turnstile 검증 뒤 토큰을 떼고 전달 | 백엔드 한도 적용(아래) |
 | `POST /api/name-check` | `{ "name": "...", "turnstileToken": "..." }` 명칭 확인 프록시 | 〃 |
 | `POST /api/phonetic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..20 }` X1 발음 유사 후보 프록시 | 〃 |
 | `POST /api/semantic-search` | `{ "name": "...", "turnstileToken": "...", "top_k"?: 1..5 }` X3 관념 유사 후보 프록시 | 〃 |
@@ -962,8 +976,7 @@ fallback + caveat)이고 환경변수는 `.env` 의 `MARKLENS_OCR_ENABLED`(기�
 | 경로 | 용도 | 한도(백엔드 IP 기준 기본값) |
 |---|---|---|
 | `GET /health` | 내부 FastAPI 엔진·인덱스 상태 | 없음 |
-| `POST /search` | 내부 이미지 검색 API (`file`, `top_k`) — v1, 최종 발표까지 유지 | 10/minute (`MARKLENS_SEARCH_RATELIMIT`) |
-| `POST /search/v2` | 세 입력 통합 검색 API(2026-10-26, PR #69) — 응답은 계약 v2 §2 그대로, 결과 화면 v2(PR #72)가 소비 | v1 `/search` 와 같은 설정값·같은 버킷(한 IP 가 v1+v2 합쳐 10/minute) |
+| `POST /search/v2` | 세 입력 통합 검색 API(2026-10-26, PR #69) — 응답은 계약 v2 §2 그대로, 결과 화면 v2(PR #72)가 소비 | 10/minute (`MARKLENS_SEARCH_RATELIMIT`) |
 | `POST /name-check` | 내부 명칭 확인 API(KIPRIS 실시간) | 30/minute (`MARKLENS_NAMECHECK_RATELIMIT`) + KIPRIS 월 예산 |
 | `POST /phonetic-search` | 내부 X1 호칭 유사도 검색 (`name`, `top_k` ≤ 20). 로컬 DB 계산, KIPRIS 무관 | 30/minute (`MARKLENS_PHONETIC_RATELIMIT`) |
 | `POST /semantic-search` | 내부 X3 관념 유사도 검색 (`name`, `top_k` ≤ 5). 기동 시 임베딩 캐시, `MARKLENS_X3_ENABLED=0`이면 503 | 30/minute (`MARKLENS_X3_RATELIMIT`) |
@@ -974,18 +987,24 @@ fallback + caveat)이고 환경변수는 `.env` 의 `MARKLENS_OCR_ENABLED`(기�
 
 production compose의 gateway는 여기에 사용자별 검색 5회/분·명칭 확인 2회/분 제한을 더합니다([공개 배포 준비](#공개-배포-준비)).
 
-검색의 정식 판정 필드는 `grade.status_code`입니다.
+이미지 질의의 시각 판정은 `overall.visual_status`(4상태)입니다.
 
 - `STRONG_MATCH`: 매우 가까운 시각 후보
 - `POSSIBLE_MATCH`: 가까울 수 있는 시각 후보
 - `WEAK_MATCH`: 약한 시각 후보
 - `NO_CLOSE_MATCH`: 현재 비교 표본에서 가까운 후보 미확인
 
-`NO_CLOSE_MATCH`는 안전 판정이 아닙니다. `grade_code`와 `grade_name`은 기존
-클라이언트를 위한 deprecated 필드이며 다음 계약 버전에서 제거할 예정입니다.
-전체 요청·응답과 오류 계약은 [API 계약 v1](docs/MarkLens_API계약_v1.md)에, 세 입력 통합 검색은
+`NO_CLOSE_MATCH`는 안전 판정이 아닙니다.
+상표명 확인·발음·관념·상품 검색과 오류 계약은 [API 계약 v1](docs/MarkLens_API계약_v1.md)에(이미지 검색 절은 기록용), 세 입력 통합 검색은
 [API 계약 v2](docs/MarkLens_API계약_v2.md)에 있습니다. v1 문서의 `GET /name-check` 호환 경로 서술은 낡았습니다 — 해당 라우트는 현재
 코드에 없습니다.
+
+<details>
+<summary>이력</summary>
+
+- 2026-11-21(v1 이미지 검색 제거): 브라우저 경계 표에서 뺀 행 `| `POST /api/search?top_k=5` | Turnstile 검증 후 이미지 검색 프록시(v1 — 2026-12-20 까지 유지) | 백엔드 한도 적용(아래) |`, v2 행 한도 칸 "v1 `/api/search` 와 같은 버킷" · 내부 FastAPI 표에서 뺀 행 `| `POST /search` | 내부 이미지 검색 API (`file`, `top_k`) — v1, 최종 발표까지 유지 | 10/minute (`MARKLENS_SEARCH_RATELIMIT`) |`, v2 행 한도 칸 "v1 `/search` 와 같은 설정값·같은 버킷(한 IP 가 v1+v2 합쳐 10/minute)" · 판정 필드 문단 "검색의 정식 판정 필드는 `grade.status_code`입니다. … `NO_CLOSE_MATCH`는 안전 판정이 아닙니다. `grade_code`와 `grade_name`은 기존 클라이언트를 위한 deprecated 필드이며 다음 계약 버전에서 제거할 예정입니다." · 계약 문서 안내 "전체 요청·응답과 오류 계약은 [API 계약 v1](docs/MarkLens_API계약_v1.md)에, 세 입력 통합 검색은 [API 계약 v2](docs/MarkLens_API계약_v2.md)에 있습니다."
+
+</details>
 
 ### 화면
 
@@ -994,26 +1013,32 @@ Next.js UI 입니다. 브라우저는 same-origin BFF(`frontend/app/api/*`)만 �
 결과 화면 v2(F-1–F-5):
 
 - 상태: 완료(2026-10-27, PR #72; 발표 전 보완 2026-10-28 `feat/demo-polish`).
-- 위치: `frontend/components/ResultViewV2.tsx`, `lib/api.ts` `searchV2`, `lib/searchV2Fixtures.ts`, 테스트 `ResultViewV2.test.tsx`(15)
+- 위치: `frontend/components/ResultViewV2.tsx`, `lib/api.ts` `searchV2`, `lib/searchV2Fixtures.ts`, 테스트 `ResultViewV2.test.tsx`(19)
 - 3층 결과 화면에 등급 배지 + 위험도 %·근거 축 바·요부 문장(제외 사유 원문은 툴팁·"자세히")·caveat·시각 4상태 문구(v1 과 같은 문구)·질의 유형 고치기·"상표명으로 넣기"(제안 이름 → 확인 → 재요청), 위험 등급 옆 "검증 데이터 기준 10건 중 N건"(`meta.grade_precision`) — 화면 문구 규약은 계약 v2 §4.
+
+- % 표시(위험도·축 점수·이미지 유사도·지정상품 겹침)는 내림 정수입니다 — 0.7499 → 74%, 기준을 넘지 않은 값이 넘은 것처럼 보이지 않게(계약 v2 §4-1).
 
 화면 골격(3층 결과 화면, 분배 항목 프론트-4):
 
-- 위치: `frontend/app/page.tsx`, `frontend/components/ResultView.tsx`
-- 이후 추가: 상표명 패널의 발음 유사·관념 유사 두 섹션(병렬 요청, 1회용 Turnstile 토큰을 발음 → 관념 순으로 소비), 결과 화면 분석 범위의 "호칭·관념 조회됨" 표시(PR #22·#26).
+- 위치: `frontend/app/page.tsx`, `frontend/components/ResultViewV2.tsx`
+- 이후 추가: 상표명 패널의 발음 유사·관념 유사 두 섹션(병렬 요청, 1회용 Turnstile 토큰을 발음 → 관념 순으로 소비, PR #22·#26).
 
 지정상품 입력(분배 항목 프론트-6, `GoodsPicker`):
 
 - 상태: 완료(범위 ②, v1.1). ③ v2 요청 `goods_codes[]` 연동도 완료(결과 화면 v2, PR #72).
-- 위치: `frontend/components/GoodsPicker.tsx`(+테스트), `lib/goods.ts`, `SearchForm.tsx`·`ResultView.tsx`, `shared/goods_map/business_presets.json`, `GET /goods/search`(q 선택·offset·`presets`)·`/goods/classes`, BFF `frontend/app/api/goods/*`
+- 위치: `frontend/components/GoodsPicker.tsx`(+테스트), `lib/goods.ts`, `SearchForm.tsx`, `shared/goods_map/business_presets.json`, `GET /goods/search`(q 선택·offset·`presets`)·`/goods/classes`, BFF `frontend/app/api/goods/*`
 - 상품명 검색(디바운스 250ms·2글자·류 배지·고시 명칭·키보드) + 분류로 찾기 + 선택 칩(최대 20, 유사군 합집합).
 - v1.1: 업종 세트 25개·79건(일상어 → 여러 류 묶음, 고시 13판 원본으로 확인·실제 gz 검증 경고 0) 카드와 "자주 찾는 업종" 칩 12개, 류 목록 상품/서비스 두 묶음(모바일 접힘), 유사군 풀이.
-- 이름 확인·검색을 거쳐도 유지, 결과 화면 상단 요약.
+- 이름 확인·검색을 거쳐도 유지(폼 초기화에서만 비움).
 
 E2E 는 [검증 명령](#검증-명령), BFF 서버 설정은 [프런트엔드](#프런트엔드)에 있습니다.
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-21: 결과 화면 v2 의 % 표시를 반올림에서 내림으로 바꿨습니다(이전엔 0.7499 → 75%). 테스트 수 표기 `ResultViewV2.test.tsx`(15) → (19) — v1.4 반영 때 업종 하한 문구 +1, % 내림 +3.
+
+- 2026-11-21(v1 이미지 검색 제거): v1 결과 화면 `ResultView.tsx` 를 지웠습니다(2026-10-27 부터 화면은 v2 만 씀; 시각 4상태 문구 `GRADE_VIEW` 는 `components/visualStatusView.ts` 로). 이전 문구 — 화면 골격 "위치: `frontend/app/page.tsx`, `frontend/components/ResultView.tsx`", "이후 추가: 상표명 패널의 발음 유사·관념 유사 두 섹션(병렬 요청, 1회용 Turnstile 토큰을 발음 → 관념 순으로 소비), 결과 화면 분석 범위의 "호칭·관념 조회됨" 표시(PR #22·#26).", 지정상품 입력 위치의 "`SearchForm.tsx`·`ResultView.tsx`", "이름 확인·검색을 거쳐도 유지, 결과 화면 상단 요약."(상단 지정상품 요약은 v1 화면에만 있었음).
 
 - 지정상품 입력 경과: 2026-09-21 API·zod 계약(PR #24) → 2026-10-01 화면(PR #27).
 - 지정상품 입력의 재구성 전 서술: ③ v2 요청 `goods_codes[]` 연동 — 엔진 완료, 결과 화면 v2 와 함께 진행 중 (결과 화면 v2 PR #72 로 완료)
@@ -1531,11 +1556,13 @@ TLS edge는 외부의 `X-MarkLens-Client-IP`를 제거한 뒤 검증한 원격 I
 모델 단계(정답 데이터 → 축별 벤치마크 → 식별력 → 통합 모델 v1.2.1 → v1.3 결측 편향 제거)와 엔진 연결(계약 v2 E-1–E-6,
 유형 규칙)은 끝났습니다. 남은 일은 두 갈래입니다(식별력 유명 브랜드 토큰을 새 목록에 맞출지는 통합 모델 재학습 때 정합니다).
 
-1. **서비스 연결 마무리** — 남은 것은 운영 배포 검증입니다(DB 모드 배포는 1,383건 세대를 `migrate_json_to_db --prune` 으로 먼저 적재). v1 엔드포인트와 BFF 는 최종 발표(2026-12-20)까지 유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md)에 사유와 함께 있습니다.
+1. **서비스 연결 마무리** — 남은 것은 운영 배포 검증입니다(DB 모드 배포는 1,383건 세대를 `migrate_json_to_db --prune` 으로 먼저 적재). v1 이미지 검색(`POST /search`·BFF `/api/search`)은 2026-11-21 제거했고, 발음·관념 엔드포인트(`/phonetic-search`·`/semantic-search`)와 BFF 는 상표명 확인 패널용으로 유지합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md)에 사유와 함께 있습니다.
 2. **11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 남은 결정은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위 — 긴 상표명 요청의 응답 시간(식별력 결합 규칙의 편집 거리)을 줄일지. 프런트는 Next.js 16.4.3 에 보안 권고 7건(전부 moderate, 16.4.4 이하 — 16.4.5 부터 고쳐짐)이 있어 `npm audit --omit=dev --audit-level=high`(CI 기준)는 통과하지만, AI 에이전트 환경(`AI_AGENT`·`CLAUDECODE` 환경변수)에서 돌리면 Next 의 업그레이드 안내 기능이 첫 `next build`·`next dev` 를 멈춥니다(5분 안에 다시 실행하면 진행, CI·사람 터미널은 해당 없음) — 업그레이드는 별도 PR.
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-21(`refactor/remove-search-v1`): v1 이미지 검색을 제거했습니다. 이 항목(서비스 연결 마무리)의 이전 문구: "v1 엔드포인트와 BFF 는 최종 발표(2026-12-20)까지 유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5)."
 
 - 2026-11-20(`feat/service-v1.4`, 업종 하한): 같은 로고 + 업종 세트의 등급 하락을 업종 하한으로 닫았습니다. 이 항목의 이전 문구: "**11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4). 남은 결정은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위 — 같은 로고에 겹침이 적은 업종 세트를 넣으면 등급이 위험 → 검토 권장으로 내려가는 것을 그대로 둘지, 긴 상표명 요청의 응답 시간(식별력 결합 규칙의 편집 거리)을 줄일지. 프런트 빌드·개발 서버는 Next.js 16.4.3 의 보안 공지 때문에 가끔 첫 실행이 멈춥니다(다시 실행하면 진행) — Next.js 업그레이드는 별도 결정입니다."
 

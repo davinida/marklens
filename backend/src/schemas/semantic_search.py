@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .search import DatasetInfo
+from .dataset import DatasetInfo
 
 TOP_K_MAX = 5  # 반환 상한(작업 명세). 요청 top_k 도 이 값을 넘지 못한다.
 

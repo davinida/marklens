@@ -1,6 +1,6 @@
 # MarkLens frontend
 
-Next.js 16 기반 UI와 same-origin BFF입니다. 브라우저는 `/api/search`,
+Next.js 16 기반 UI와 same-origin BFF입니다. 브라우저는 `/api/search/v2`,
 `/api/name-check`, `/api/images/*`, `/api/health`만 호출하며 백엔드 URL과 API key는
 서버에서만 읽습니다.
 

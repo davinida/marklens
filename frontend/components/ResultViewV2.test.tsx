@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import ResultViewV2 from "@/components/ResultViewV2";
+import ResultViewV2, { toPercent } from "@/components/ResultViewV2";
 import { SearchV2ResponseSchema } from "@/lib/contracts";
 import {
   SEARCH_V2_EMPTY_FIXTURE,
@@ -20,6 +20,51 @@ describe("API 계약 v2 §3 픽스처", () => {
 
   it("후보 0건 예시(§5-4)가 zod 스키마를 통과한다", () => {
     expect(SearchV2ResponseSchema.safeParse(SEARCH_V2_EMPTY_FIXTURE).success).toBe(true);
+  });
+});
+
+describe("ResultViewV2 — % 표시는 내림(v1 결과 화면 시험에서 옮김)", () => {
+  it("기준 바로 아래 값이 기준을 넘은 것처럼 보이지 않는다", () => {
+    // 시각 상태 0.75·0.55·0.45, 도형 규칙 0.9, 단독 x1 0.98
+    expect(toPercent(0.7499)).toBe(74);
+    expect(toPercent(0.75)).toBe(75);
+    expect(toPercent(0.5499)).toBe(54);
+    expect(toPercent(0.55)).toBe(55);
+    expect(toPercent(0.4499)).toBe(44);
+    expect(toPercent(0.8999)).toBe(89);
+    expect(toPercent(0.9799)).toBe(97);
+    expect(toPercent(0.98)).toBe(98);
+  });
+
+  it("이진 표현 오차로 한 칸 내려가지 않고 0–1 밖은 자른다", () => {
+    expect(toPercent(0.57)).toBe(57); // 0.57 * 100 = 56.99…
+    expect(toPercent(0.29)).toBe(29); // 0.29 * 100 = 28.99…
+    expect(toPercent(1)).toBe(100);
+    expect(toPercent(1.2)).toBe(100);
+    expect(toPercent(-0.1)).toBe(0);
+  });
+
+  it("화면의 이미지 유사도·위험도도 내린 값으로 보인다", async () => {
+    const user = userEvent.setup();
+    const figure = structuredClone(SEARCH_V2_FIGURE_FIXTURE);
+    figure.candidates[0].axes.x2_img = 0.8999;
+    const { unmount } = render(
+      <ResultViewV2 result={figure} queryPreview={null} queryHasName={false} onReset={vi.fn()} />,
+    );
+    await user.click(screen.getAllByRole("button", { name: /이름 미등록 상표/ })[0]);
+    expect(screen.getAllByText("이미지 89%").length).toBeGreaterThan(0);
+    expect(screen.queryByText("이미지 90%")).toBeNull();
+    unmount();
+
+    render(
+      <ResultViewV2
+        result={{ ...SEARCH_V2_TEXT_FIXTURE, overall: { ...SEARCH_V2_TEXT_FIXTURE.overall, prob: 0.7499 } }}
+        queryPreview={null}
+        queryHasName
+        onReset={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("overall-prob")).toHaveTextContent("위험도 74%");
   });
 });
 

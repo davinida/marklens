@@ -2,7 +2,7 @@ import type { GoodsMatch } from "@/lib/contracts";
 
 /**
  * 프론트-6 지정상품 선택 상태 헬퍼. 선택 항목은 변환표 항목의 name·류·유사군만 담고(alias 적중 여부는
- * 화면 표시용이라 버림), 유사군 합집합(goodsCodeUnion)은 X4 자카드·/search 연동(범위 ③, 아직 미연동)의
+ * 화면 표시용이라 버림), 유사군 합집합(goodsCodeUnion)은 통합 검색 `/api/search/v2` 의 goods_codes(X4 자카드)
  * 입력이 된다.
  */
 export type SelectedGood = Pick<GoodsMatch, "name" | "nice_class" | "similarity_codes">;

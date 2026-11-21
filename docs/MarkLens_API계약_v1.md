@@ -1,6 +1,10 @@
 # MarkLens API 계약 v1
 
-기준일: 2026-08-14
+기준일: 2026-08-14 (이미지 검색 제거 2026-11-21)
+
+> **이미지 검색 v1(`POST /api/search`·내부 `POST /search`)은 2026-11-21 제거됐습니다.** 이미지 검색은
+> [API 계약 v2](MarkLens_API계약_v2.md)의 `POST /api/search/v2`(`image` 필드)로 일원화했습니다(계약 v2 §5-5).
+> 아래 "이미지 검색" 절은 기록용이고, 경계·상표명 확인·발음·관념·상품 검색·결과 이미지·오류·상태 확인 절은 현행입니다.
 
 ## 경계
 
@@ -9,6 +13,8 @@
 `NEXT_PUBLIC_*` 환경변수나 브라우저 코드에 넣지 않습니다.
 
 ## 이미지 검색
+
+> 2026-11-21 제거 — 기록용. 현행은 [API 계약 v2](MarkLens_API계약_v2.md) `POST /api/search/v2`.
 
 ### 브라우저 API
 
@@ -232,7 +238,7 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
 - `matches`는 `similarity` 내림차순(동점은 출원번호 순)이며 `min_similarity` 미만은
   제외됩니다. `searched_count`는 발음 후보가 있어 비교한 DB 레코드 수,
   `excluded_no_pronunciation`은 상표명이 없거나 호칭이 없어 제외한 수입니다.
-- `이미지URL`은 현재 인덱스에 있는 이미지만 연결하며 `/search`와 같은 `/images` 규칙을
+- `이미지URL`은 현재 인덱스에 있는 이미지만 연결하며 `/search/v2`와 같은 `/images` 규칙을
   따릅니다(브라우저는 `/api/images/...`로 접근).
 - 발음 후보 캐시는 서버 기동 시 만들고, 인덱스가 재게시되면 다음 요청에서 다시 만듭니다.
 
