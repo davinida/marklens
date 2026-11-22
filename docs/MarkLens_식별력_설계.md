@@ -217,6 +217,10 @@ combined_single_match("SLIMLINE", "Slim Line")        # frozenset({"line"}) — 
 
 ## 8. 변경 이력
 
+- **v0.3 (2026-11-22, 속도만, `perf/long-name-latency`)**: 결합 규칙 v0.3 계산 가속 — 판정·출력 그대로. 유사도 ≥ `COMBINED_SIMILARITY` 를 같은 부동소수 식의
+  정수 거리 상한 `_max_distance` 와 띠 편집거리 `_within_distance` 로, 맞아도 더할 토큰이 없는 비교는 건너뛰고, `_combined_match_cached`·
+  `_joined_readings_cached`·`_readings`·`_jamo` 를 LRU(`COMBINED_CACHE_SIZE` 20만)로. 긴 상표명 요청의 축 단계 95% 0.90–1.00 → 0.13–0.16초. 같은 입력의
+  판정(이름 3,523·쌍 16,587) 차이 0, 시험 `ml/tests/test_combined_rule_equivalence.py`(통합 모델 설계 §8).
 - **v0.3 (2026-10-11, `feat/pretrain-cleanup`)**: 결합 규칙 v0.3 `combined_single_match` — 붙여쓴 결합어 대 띄어쓴 약한 토큰열(정규화 철자 동일 / 자모 편집거리 유사도 ≥ 0.9 / 토큰별 X1 읽기 연결 동일 / 읽기 유사도 ≥ 0.9), `COMBINED_SIMILARITY` 0.9. 14건 결정표의 붙여쓴 결합어 6건 중 2건 + SLIMLINE 복귀, distinct_drop 12 → 8, AUC 변화 CI 안. 테스트 +3.
 - **v0.2 (2026-10-11, `feat/review-wrapup`)**: 3호 사람 승인 반영(절대어 57 승인·12 해제, 상대어 380 전부 승인, crystal/크리스탈 승인·teddy/테디 추가 → 449항목), 유명 브랜드 토큰 줄(갤럭시·GALAXY·오리온·ORION, 235개), 사람 검토 제외(overrides)를 법정 사유 뒤로(통계 약화만 건너뜀), **결합 규칙**(`combined_weak_run`: 약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 요부 후보 — distinct_drop 14건 LLM 결정 후보 13·그대로 1), 재집계(약한 토큰 1,534 → 1,527, 3호 사유 46 → 34), 재측정(x1 바뀐 쌍 25 → 19, AUC 변화 CI 안). 테스트 +4(결합 규칙 3·overrides 순서 1).
 - **v0.1 (2026-10-09, `feat/descriptive-terms`)**: 3호 기술적 표장 — `DescriptiveTerm`(kind·absolute·classes·note·approved)과 JSON 로더·검증, 점수 규칙(절대 0 / 류 일치 0 / 류 불일치 무영향 / 상품 미상 0.5 상한), 후보 생성·판례 기준 분류 스크립트(후보 1,444 → 포함 447·보류 101·제외 896, 절대어 69), `descriptive_candidates.md`(승인용 표)·`descriptive_terms.json`(초안, approved false), build 사유 "3호 기술적 표장" 46, 재측정(3호만 전후 AUC 변화 ±0.01 안, 영향 쌍 9). 테스트 +4(점수 규칙·로더 검증·후보 분류 형식).

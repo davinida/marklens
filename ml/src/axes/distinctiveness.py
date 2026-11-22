@@ -105,6 +105,8 @@ ENV_OVERRIDES_PATH = "MARKLENS_WEAK_TOKEN_OVERRIDES"
 DESCRIPTIVE_UNKNOWN_SCORE = 0.5  # 상대적 기술 표장인데 지정상품을 모르면(또는 류 미지정) 점수 상한
 COMBINED_SIMILARITY = 0.9  # v0.3 결합어 판정: 붙여쓴 토큰 vs 이어 붙인 토큰열 철자·읽기 유사도 하한
 COMBINED_READINGS_CAP = 64  # 토큰별 읽기 조합 상한(조합 폭발 방지)
+# (붙여쓴 토큰, 토큰열) 판정 LRU 상한 — 요청을 넘나들며 같은 쌍을 다시 재지 않는다
+COMBINED_CACHE_SIZE = 200_000
 SUFFIX_MIN_SYLLABLES = 2  # 접미 분리(E-3): 고시 단일 명칭 접미는 2음절 이상
 SUFFIX_MIN_PREFIX = 2  # 접미 분리: 앞부분도 2음절 이상(1음절 앞부분은 오분리가 많아 나누지 않는다)
 JUDGE_CACHE_SIZE = 200_000  # 토큰 판정 캐시 상한(넘으면 비운다)
@@ -675,17 +677,24 @@ class Distinctiveness:
                 weak = {j.token for j in judged[spaced] if j.score < self.theta}
                 if len(tokens) < 2 or not weak:
                     continue
+                singles = [(j.token, j.score < self.theta) for j in judged[other]]
                 for start in range(len(tokens) - 1):
                     for stop in range(start + 2, len(tokens) + 1):
-                        run = tokens[start:stop]
+                        run = tuple(tokens[start:stop])
                         run_weak = [token for token in run if token in weak]
                         if not run_weak:
                             continue
-                        for single in judged[other]:
-                            if _combined_match(single.token, run):
+                        for token, single_weak in singles:
+                            # 맞아도 더할 토큰이 없으면(이미 모두 넘기지 않기로 함) 재지 않는다 —
+                            # 이 규칙의 출력은 넘기지 않을 토큰 집합뿐이라 결과가 같다.
+                            if withheld.issuperset(run_weak) and (
+                                not single_weak or token in withheld
+                            ):
+                                continue
+                            if _combined_match_cached(token, run):
                                 withheld.update(run_weak)
-                                if single.score < self.theta:
-                                    withheld.add(single.token)
+                                if single_weak:
+                                    withheld.add(token)
         return frozenset(withheld)
 
     def pair_generic(
@@ -707,13 +716,28 @@ class Distinctiveness:
 
 def _joined_readings(run: list[str]) -> list[str]:
     """토큰별 읽기(X1 `pronunciation_candidates`, 없으면 토큰 그대로)를 이어 붙인 호칭 후보."""
+    return list(_joined_readings_cached(tuple(run)))
+
+
+@functools.lru_cache(maxsize=COMBINED_CACHE_SIZE)
+def _joined_readings_cached(run: tuple[str, ...]) -> tuple[str, ...]:
     lists = [pronunciation_candidates(token) or [token] for token in run]
     out = []
     for parts in itertools.product(*lists):
         out.append("".join(parts))
         if len(out) >= COMBINED_READINGS_CAP:
             break
-    return out
+    return tuple(out)
+
+
+@functools.lru_cache(maxsize=COMBINED_CACHE_SIZE)
+def _readings(token: str) -> tuple[str, ...]:
+    return tuple(pronunciation_candidates(token) or [token])
+
+
+@functools.lru_cache(maxsize=COMBINED_CACHE_SIZE)
+def _jamo(text: str) -> str:
+    return decompose_jamo(text)
 
 
 def _edit_distance(left: str, right: str) -> int:
@@ -734,22 +758,88 @@ def _string_similarity(left: str, right: str) -> float:
     return 1.0 if longest == 0 else 1.0 - _edit_distance(a, b) / longest
 
 
-def _combined_match(single: str, run: list[str]) -> bool:
+@functools.lru_cache(maxsize=None)
+def _max_distance(longest: int) -> int:
+    """`1.0 - d / longest >= COMBINED_SIMILARITY`(_string_similarity 와 같은 식·같은
+    부동소수 계산)를 만족하는 가장 큰 정수 거리 d. 이 식은 d 에 대해 단조 감소라 "거리 ≤ 이 값" 과
+    "유사도 ≥ 하한" 이 같은 판정이다. 하나도 없으면 -1."""
+    best = -1
+    for distance in range(longest + 1):
+        if 1.0 - distance / longest < COMBINED_SIMILARITY:
+            break
+        best = distance
+    return best
+
+
+def _within_distance(left: str, right: str, limit: int) -> bool:
+    """`_edit_distance(left, right) <= limit` 와 같은 판정을 띠(|i−j| ≤ limit) 안만 계산해
+    낸다.
+
+    값을 limit + 1 에서 자른 표는 원래 점화식과 같은 값을 갖고(잘린 값끼리의 최솟값), 띠 밖 칸의
+    실제 거리는 |i−j| > limit 이며, 한 행의 최솟값은 최종 거리의 하한이라 그 행에서 멈춰도 판정이
+    같다."""
+    n, m = len(left), len(right)
+    if limit < 0 or abs(n - m) > limit:
+        return False
+    if limit == 0:
+        return left == right
+    cap = limit + 1
+    previous = [j if j <= limit else cap for j in range(m + 1)]
+    for i in range(1, n + 1):
+        current = [cap] * (m + 1)
+        current[0] = i if i <= limit else cap
+        row_min = current[0]
+        char = left[i - 1]
+        for j in range(max(1, i - limit), min(m, i + limit) + 1):
+            value = previous[j] + 1
+            other = current[j - 1] + 1
+            if other < value:
+                value = other
+            other = previous[j - 1] + (char != right[j - 1])
+            if other < value:
+                value = other
+            if value > cap:
+                value = cap
+            current[j] = value
+            if value < row_min:
+                row_min = value
+        if row_min > limit:
+            return False
+        previous = current
+    return previous[m] <= limit
+
+
+def _similar(left: str, right: str) -> bool:
+    """`_string_similarity(left, right) >= COMBINED_SIMILARITY` 와 같은 판정(자모 분해는 캐시)."""
+    a, b = _jamo(left), _jamo(right)
+    longest = max(len(a), len(b))
+    if longest == 0:
+        return 1.0 >= COMBINED_SIMILARITY
+    return _within_distance(a, b, _max_distance(longest))
+
+
+def _combined_match(single: str, run: Iterable[str]) -> bool:
     """붙여쓴 토큰 single 이 토큰열 run 을 이어 붙인 것과 같은가(v0.3 기준): 정규화 철자 동일 ·
     철자 유사도 ≥ 0.9 · 토큰별 읽기를 이은 호칭이 single 의 읽기와 동일 · 읽기 유사도 ≥ 0.9."""
+    return _combined_match_cached(single, tuple(run))
+
+
+@functools.lru_cache(maxsize=COMBINED_CACHE_SIZE)
+def _combined_match_cached(single: str, run: tuple[str, ...]) -> bool:
+    """`_combined_match` 의 계산 — (토큰, 토큰열)만의 순수 함수라 LRU 로 요청을 넘나들며
+    재사용한다(functools.lru_cache 는 스레드 풀에서 같이 불러도 안전). 2026-11-22 가속: 유사도 ≥ 0.9
+    판정을 정수 거리 상한(`_max_distance`)과 띠 편집거리(`_within_distance`)로 — 판정은 이전 식과
+    같다."""
     joined = "".join(run)
     if single == joined:
         return True
-    if _string_similarity(single, joined) >= COMBINED_SIMILARITY:
+    if _similar(single, joined):
         return True
-    single_readings = pronunciation_candidates(single) or [single]
-    run_readings = _joined_readings(run)
+    single_readings = _readings(single)
+    run_readings = _joined_readings_cached(run)
     if set(single_readings) & set(run_readings):
         return True
-    return any(
-        _string_similarity(left, right) >= COMBINED_SIMILARITY
-        for left in single_readings for right in run_readings
-    )
+    return any(_similar(left, right) for left in single_readings for right in run_readings)
 
 
 def combined_single_match(

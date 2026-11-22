@@ -1332,6 +1332,9 @@ def _sub_cost(a: str, b: str) -> float:
 
 @functools.lru_cache(maxsize=65536)
 def _syllable_sim_cached(x: str, y: str) -> float:
+    # 2026-11-22 속도만: 지역 이름·indel×가중치 곱의 표(같은 곱)·min() 대신 비교 — 칸마다
+    # 연산과 순서는 그대로라 결과가 비트 단위로 같다(test_combined_rule_equivalence). 처음 보는
+    # 이름의 발음 풀이 DB 1,195건과 이 DP 를 수만 번 돈다.
     a = _syllables_only(x)[:MAX_SYLLABLES]
     b = _syllables_only(y)[:MAX_SYLLABLES]
     if not a or not b:
@@ -1339,17 +1342,26 @@ def _syllable_sim_cached(x: str, y: str) -> float:
     m, k = len(a), len(b)
     weights = _position_weights(max(m, k))
     indel = COST_INDEL
+    indel_weights = [indel * weight for weight in weights]
+    first = indel_weights[0]
+    sub_cost = _sub_cost
     prev = [0.0] * (k + 1)
     for j in range(1, k + 1):
-        prev[j] = prev[j - 1] + indel * weights[0]
+        prev[j] = prev[j - 1] + first
     for i in range(1, m + 1):
-        cur = [prev[0] + indel * weights[0]] + [0.0] * k
+        cur = [prev[0] + first] + [0.0] * k
         ai = a[i - 1]
+        before = i - 1
         for j in range(1, k + 1):
-            sub = prev[j - 1] + _sub_cost(ai, b[j - 1]) * weights[min(i - 1, j - 1)]
-            delete = prev[j] + indel * weights[min(i - 1, j)]
-            insert = cur[j - 1] + indel * weights[min(i, j - 1)]
-            cur[j] = min(sub, delete, insert)
+            left = j - 1
+            best = prev[left] + sub_cost(ai, b[left]) * weights[before if before < left else left]
+            other = prev[j] + indel_weights[before if before < j else j]
+            if other < best:
+                best = other
+            other = cur[left] + indel_weights[i if i < left else left]
+            if other < best:
+                best = other
+            cur[j] = best
         prev = cur
     max_distance = indel * sum(weights)
     return max(0.0, min(1.0, 1.0 - prev[k] / max_distance))
