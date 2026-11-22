@@ -8,7 +8,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 ## 현재 상태
 
-기준일 2026-11-21. 여러 절에서 쓰는 수치(테스트 수·유사군 보유·모델 버전·정답 쌍 수 등)는 이 표에만 적고,
+기준일 2026-11-22. 여러 절에서 쓰는 수치(테스트 수·유사군 보유·모델 버전·정답 쌍 수 등)는 이 표에만 적고,
 다른 절은 이 표를 가리킵니다. 상태는 완료 / 진행 중 / 예정 / 보류 넷입니다.
 
 | 구성 | 상태 | 핵심 수치 |
@@ -22,15 +22,17 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | [등록상표 DB](#등록상표-db) | 완료 | 1,383건 = 기존 수집 1,100 + 유명 브랜드 283 · generation `20261119T111642Z-3b0759a08391`(2026-11-19) · 유사군 보유 1,383/1,383건 · 기동 캐시 X1 발음 1,195건·X3 관념 710건·X2 철자 1,246건·상품 변환표 91,591건 |
 | [유명 브랜드 DB 추가](#유명-브랜드-목록) | 완료 | 유명 브랜드 30개(13개 업종) 283건 — 상표명에 브랜드명이 든 표장 215건 · 2026-11-19 운영 반영(승격·색인 재생성·유형 사전) |
 | [정답 데이터(심결례)](#정답-데이터) | 완료 | 라벨 776행 = 유사 369·비유사 228·제외 179 · 도형계 유사·비유사 110행(양쪽 이미지 106)·문자계 447행 · 학습 특징 597행(1차 350·2차 247, 이름 축 1차 313·2차 178행) |
-| [테스트](#검증-명령) | 완료 | Python `1467 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(21 파일) · Playwright `15 passed` |
+| [테스트](#검증-명령) | 완료 | Python `1474 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(21 파일) · Playwright `15 passed` |
 | [CI](#ci) | 완료 | GitHub Actions 4잡(python · frontend · deployment-config · backend-image) 통과 |
 | [공개 배포](#공개-배포-준비) | 보류 | 템플릿만 제공 — 실제 도메인·TLS·계정 배포는 하지 않음 |
 
-마지막 갱신 2026-11-21 — `main` = `develop` = `5e91b95`(PR #102 문서 범위 표기 병합) 위에 v1 이미지 검색 제거(브랜치
-`refactor/remove-search-v1` — `POST /search`·BFF `/api/search`·v1 결과 화면을 지우고 v2 로 일원화). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
+마지막 갱신 2026-11-22 — `main` = `develop` = `837b257`(PR #87 Next.js 16.4.5 병합) 위에 긴 상표명 응답 시간 단축(브랜치
+`perf/long-name-latency` — 식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
 
 <details>
 <summary>이력</summary>
+
+- 마지막 갱신 기록(2026-11-22, 응답 시간 단축 전): "마지막 갱신 2026-11-21 — `main` = `develop` = `5e91b95`(PR #102 문서 범위 표기 병합) 위에 v1 이미지 검색 제거(브랜치 `refactor/remove-search-v1` — `POST /search`·BFF `/api/search`·v1 결과 화면을 지우고 v2 로 일원화). 남은 일은 [다음 단계](#다음-단계)에 있습니다." 그때 칸: 테스트 Python `1467 passed, 26 skipped`.
 
 - 마지막 갱신 기록(2026-11-21, v1 이미지 검색 제거 전): "마지막 갱신 2026-11-20 — `main` = `develop` = `f924591`(PR #100 철자 v2 시도 병합) 위에 서비스 v1.4 반영(브랜치 `feat/service-v1.4` — 서비스 기본 모델 v1.4, 이름 없는 입력의 등급 하한을 실제 검색 기준으로). 남은 일은 [다음 단계](#다음-단계)에 있습니다." 그때 칸: 이미지 검색 v1 "최종 발표(2026-12-20)까지 유지 뒤 v2 로 대체" · 테스트 Python `1475 passed, 26 skipped` · Vitest `204 passed`(22 파일).
 
@@ -896,6 +898,7 @@ Browser
 - 검증: 백엔드·프론트는 계약 v2 §3 예시 JSON 과 엔진 결과만으로 스텁·목업을 만들어 병렬로 구현했고, 2026-10-27 실제 모델로 BFF 경유 시나리오 8종(이름+카페 세트, +로고, 로고만 글자/도형, 제안 이름 재요청, 치킨 세트, 지정상품만, 유형 고치기)을 계약 규칙(pydantic·로짓 검산·등급 하한·규칙 트리거·caveat·정렬)로 검산해 전부 통과했습니다. 응답 시간은 엔진 기준 이름+상품 125–353ms, 로고 포함 117–288ms, 4096px 이미지 945ms(OCR 포함)였습니다.
 - 재검산(2026-11-19, 유명 브랜드 승격 뒤 1,383건 세대): 같은 8종을 BFF 경유로 같은 7항목(응답 형식·로짓·등급 하한·규칙 트리거·caveat·정렬·overall)으로 검산해 전부 통과했습니다. 1위 후보가 바뀐 것은 S6 치킨 세트(남가네 부대찌개 0.299 → 로제치킨 bbq 0.361)·S7 지정상품만(→ 빽다방)뿐이고 8종 모두 등급은 그대로입니다. 엔진 시간(데운 상태)은 승격 전 86–223ms → 후 107–297ms(지정상품만 5ms)입니다.
 - 재검산(2026-11-20, 서비스 v1.4 반영): 같은 11종(위 8종 + 유명 브랜드 3) + 새 5종(DB 로고 그대로 이미지만·같은 로고 + 카페 세트·무관한 로고
+- 응답 시간(2026-11-22, 실제 엔진·이 Mac, 표본 A 184·B 300 질의 × 세 방식, `ml/scripts/search_latency_benchmark.py` 3회씩): 이름+이미지+상품의 B(DB 상표명) 95% 1.2–1.3초·최대 2.1–3.1초(가속 전 1.9–2.3초·4.7–5.0초), 축 단계 95% 0.13–0.16초(전 0.90–1.00초). 식별력 결합 규칙 v0.3·X1 음절 DP 를 결과 불변으로 가속했습니다(후보 목록 1,300 요청·48,029건 동일, 설계 §8). 남은 꼬리는 OCR(이미지마다 0.1–1.8초 — 큰 이미지)과 처음 보는 이름의 발음 풀(최대 약 1초)입니다. 벤치마크 프로세스의 첫 이름 요청 7–8초는 관념 캐시 지연 적재라 기동 때 적재하는 서버에는 없습니다.
   이미지만·유형 고치기(도형) + 다른 이름·간판 사진 + 이름)을 v1.3(develop 소스) 대 v1.4(BFF)로 돌려 7항목을 검산해 16종 모두 통과했습니다
   (무관한 로고 1건은 응답 위험도 소수 3자리 반올림 경계). 이름 있는 질의 9종(S1·S2·S5–S8·F1–F3)은 등급·위험도·1위가 그대로이고, 간판 사진 +
   이름은 사진 규칙으로 위험도 0.243 → 0.233(등급 그대로), 유형 고치기 + 다른 이름은 로고만의 판단으로 검토 권장 → 위험, 로고만 질의는 같은
@@ -1310,6 +1313,7 @@ ml/venv/bin/python ml/scripts/train_risk_model_v14_nameless.py      # 채택분(
 ml/venv/bin/python ml/scripts/nameless_grade_thresholds.py          # 이름 없는 입력의 등급 하한만 다시(1초, 계수는 그대로; --dry-run 은 JSON 을 쓰지 않음) → ml/data/trials/risk_model_v1.4_thresholds_{report.md,results.json}
 ml/venv/bin/python ml/scripts/nameless_search_thresholds.py --precheck  # 서비스 v1.4 하한 0단계: 표본 A·B 사전 점검(4.5분, 하한 계산 없음) → ml/data/trials/nameless_search_ab_precheck.{md,json}
 ml/venv/bin/python ml/scripts/nameless_search_thresholds.py         # 이름 없는 입력의 등급 하한 — 실제 검색 기준(표본 A 채택·B 확인, 16분; --dry-run·--limit) → shared/model/risk_model_v1.4.json + ml/data/trials/nameless_search_ab_{report.md,results.json}
+ml/venv/bin/python ml/scripts/search_latency_benchmark.py --out <폴더>  # 응답 시간 벤치(표본 A·B × 세 방식, 약 10분, 하한·모델은 안 건드림) → results.json·report.md
 ml/venv/bin/python ml/scripts/photo_mark_service_check.py           # 사진 판정이 서비스 CLIP 경로에서도 학습 때와 같은지 + DB 사진 판정 비율(1분, 파일 안 고침) → ml/data/trials/photo_mark_service_check.{md,json}
 ml/venv/bin/python ml/scripts/train_risk_model_v14.py               # 1차 시도(재현용, 채택 안 됨 — 종료 코드 3, 약 40초) → ml/data/trials/risk_model_v1.4_{report.md,results.json,candidate.json}
 #   1차 시도는 기준을 통과해도 shared/model 이 아니라 ml/data/trials/risk_model_v1.4_attempt1.json 에 쓴다(shared/model/risk_model_v1.4.json 은 2차 시도의 채택분)
@@ -1557,10 +1561,12 @@ TLS edge는 외부의 `X-MarkLens-Client-IP`를 제거한 뒤 검증한 원격 I
 유형 규칙)은 끝났습니다. 남은 일은 두 갈래입니다(식별력 유명 브랜드 토큰을 새 목록에 맞출지는 통합 모델 재학습 때 정합니다).
 
 1. **서비스 연결 마무리** — 남은 것은 운영 배포 검증입니다(DB 모드 배포는 1,383건 세대를 `migrate_json_to_db --prune` 으로 먼저 적재). v1 이미지 검색(`POST /search`·BFF `/api/search`)은 2026-11-21 제거했고, 발음·관념 엔드포인트(`/phonetic-search`·`/semantic-search`)와 BFF 는 상표명 확인 패널용으로 유지합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md)에 사유와 함께 있습니다.
-2. **11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 남은 결정은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위 — 긴 상표명 요청의 응답 시간(식별력 결합 규칙의 편집 거리)을 줄일지. 프런트는 Next.js 16.4.3 에 보안 권고 7건(전부 moderate, 16.4.4 이하 — 16.4.5 부터 고쳐짐)이 있어 `npm audit --omit=dev --audit-level=high`(CI 기준)는 통과하지만, AI 에이전트 환경(`AI_AGENT`·`CLAUDECODE` 환경변수)에서 돌리면 Next 의 업그레이드 안내 기능이 첫 `next build`·`next dev` 를 멈춥니다(5분 안에 다시 실행하면 진행, CI·사람 터미널은 해당 없음) — 업그레이드는 별도 PR.
+2. **11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 긴 상표명 요청의 응답 시간은 2026-11-22 줄였습니다(식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속 — [세 입력 통합 검색 엔진](#세-입력-통합-검색-엔진)의 응답 시간). 남은 꼬리(OCR·처음 보는 이름의 발음 풀)를 더 줄일지는 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위. 프런트는 Next.js 16.4.5(PR #87)로 보안 권고 7건이 해소됐고 첫 `next dev` 가 업그레이드 안내로 멈추지 않습니다(`eslint-config-next` 는 16.4.3 그대로).
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-22(`perf/long-name-latency`): 긴 상표명 응답 시간을 줄였고 Next.js 16.4.5(PR #87)가 병합됐습니다. 이 항목의 이전 문구: "**11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 남은 결정은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위 — 긴 상표명 요청의 응답 시간(식별력 결합 규칙의 편집 거리)을 줄일지. 프런트는 Next.js 16.4.3 에 보안 권고 7건(전부 moderate, 16.4.4 이하 — 16.4.5 부터 고쳐짐)이 있어 `npm audit --omit=dev --audit-level=high`(CI 기준)는 통과하지만, AI 에이전트 환경(`AI_AGENT`·`CLAUDECODE` 환경변수)에서 돌리면 Next 의 업그레이드 안내 기능이 첫 `next build`·`next dev` 를 멈춥니다(5분 안에 다시 실행하면 진행, CI·사람 터미널은 해당 없음) — 업그레이드는 별도 PR."
 
 - 2026-11-21(`refactor/remove-search-v1`): v1 이미지 검색을 제거했습니다. 이 항목(서비스 연결 마무리)의 이전 문구: "v1 엔드포인트와 BFF 는 최종 발표(2026-12-20)까지 유지하고 그 뒤 별도 PR 로 제거합니다(계약 v2 §5-5)."
 
