@@ -476,6 +476,50 @@ this 쪽을 OCR 대신 labels 의 상표A_명칭(참값)으로 바꾸고 상대 
    +0.01–+0.09)로 숫자상 기준을 넘지만 결과를 본 뒤 고른 것이라 새 표본에서 같은 기준으로 확인한다 — 채택하면 서비스의 질의·DB 색인
    전처리를 같이 바꿔야 한다. 남은 일: 사진 표장(확인대상표장 실사용 사진)이 낀 쌍의 처리(0.38 — 로고 영역 자르기는 30장 중 4장만
    작동), 도형 단독 규칙 τ(현재 0.9 는 심결에서 발동 0)는 재학습 때 통합 모델 설계 §6 기준으로.
+6. (2026-11-22 추가) **손그림 입력(실험 기능) 실현성 — 판정 "진행", 방법 B(윤곽선 색인).** 사람이 그리지 않고 자동으로
+   확인했다 — `ml/scripts/sketch_feasibility.py`(평가 전용: 서비스 코드·서비스 색인 불변, KIPRIS 호출 0, 테스트 29건). 대상
+   표본·손그림 생성 방식과 매개변수·범주 대응표·지표·판정 기준은 검색 전에 `freeze` 로 고정했다(설정 sha256
+   `99e84cd2d781659190b3562d2cd37bb8c9e1fe8e96da52dc16f00f5bd52b7429`, `ml/data/experiments/sketch_feasibility/config.json`).
+   `run` 은 다시 계산한 설정이 고정본과 같을 때만 재고, 고정 때와 잴 때 스크립트 sha256 이 같다(`84b0ce03…`).
+   - 비교: (A) 서비스 전체 이미지 색인 그대로 · (B) DB 1,383건을 윤곽선 그림(Canny 경계 → 5px 폭, 흰 배경·검은 선, 여백
+     자르기·정사각형 패딩)으로 바꾼 임시 색인(데이터 폴더에만, 빈 그림 3건을 빼고 1,380). 질의 그림과 B 의 그림은 모두 서비스
+     업로드 디코더 → `src.embedding.encode_image`(`clip-center-crop-v1`, ViT-B/32) → FAISS 내적으로 잰다.
+   - 시험 1(같은 로고 찾기): 유형 사전 기준 도형·결합-도형요부이고 사진이 아닌 DB 상표. 유형 사전의 결합 1,246건은 모두 상표명이
+     있어 결합-도형요부가 0건이고(계약 v2 §2-4 5항), 도형 137건 중 사진 3건을 빼면 134건이라 200건 대신 전부를 seed 0 순서로 썼다.
+     손그림은 전경 마스크의 외곽선 추적(B 의 밝기 기울기 경계 검출과 다른 과정)으로 L1 깔끔(단순화 0.75px) · L2 보통(작은 부분
+     50% 생략·단순화 3.5px·흔들림 2px·회전 ±10°·가로세로 ±10%) · L3 거침(L2 + 흔들림 추가·격자 비틀림 12px·선 20–30% 누락 —
+     실제 누락 중앙값 26%)을 만들고, 선은 모두 실제 폭 5px 이다. 인정 적중 = 원래 로고, 또는 같은 출원인(정규화 +
+     `shared/applicant_aliases.json`)이면서 원래 로고와 CLIP 0.95 이상인 상표(134건 중 45건에 그런 상표가 있다).
+   - 시험 2(같은 대상 찾기): Quick, Draw!(Google, CC BY 4.0) 345개 범주 가운데 공식 비엔나 분류(WIPO VCL 9판, 2023-01-01 영문
+     참조 XML)로 대응되고 DB 에 그 분류 상표가 10건 이상인 18개 범주 — 별(1.1)·새(3.7)·나무(5.1)·잎(5.3)·꽃(5.5)·산(6.1)·왕관
+     (24.9)·원(26.1)·삼각형(26.3)·선(26.11)·곰(3.1.14)·번개(1.15.3)·회오리(1.15.23)·웃는 얼굴(4.5.7)·컵(11.3.1·11.3.4)·집(7.1.8·
+     7.1.9·7.1.10·7.1.12)·손(2.9.14–2.9.16)·포크(11.1.1·11.1.4·11.1.5). 대응 규칙 M1–M5(공식 이름에 범주 이름이 낱말로 나옴 ·
+     같은 뜻만 · 중분류 제목의 첫 항목이면 중분류 단위 · 겹치면 첫 항목 범주가 가짐 · DB 10건 이상)와 쓰지 않은 13개 범주(박쥐·
+     덤불·지그재그·얼굴·칼·숟가락·구름·돼지·전갈·해골·거미·정사각형·바퀴)의 사유는 스크립트의 `MAPPING_RULES`·`EXCLUDED` 에 있다.
+     범주마다 인식된 낙서 100장(seed 0) — 파일 8곳에서 64 KiB 씩, 범주당 512 KiB 만 받았다(18개 파일 약 1.1GB 중 9.4MB).
+   - 결과 — 시험 1(인정 기준 상위 5, 95% CI): A L1 80.6% · L2 64.9%(56.7–73.1) · L3 27.6% / B L1 94.8% · L2 94.0%(89.5–97.8) ·
+     L3 53.7%. 엄격 기준과 1위·상위 20 은 `report.md`. 시험 2 배수(범주 평균 같은 분류 비율 ÷ 범주 평균 기준 비율, 범주 단위
+     부트스트랩): A 4.05(2.08–8.65) · B 4.19(1.63–11.54). 두 방법 모두 미리 고정한 기준(L2 인정 상위 5 ≥ 50%, 배수 ≥ 2,
+     배수 CI 하한 > 1)을 넘었고, 규칙대로 L2 가 높은 B 를 골랐다. 범주별 배수 중앙값 A 1.94·B 4.79, 기준선보다 높은 범주
+     A 10/18·B 11/18.
+   - 한계: ① 자동 손그림은 원본의 외곽선에서 만들어 실제 사람 그림보다 유리하다. 특히 B 는 같은 원본의 경계 그림이 색인에 있어
+     L1·L2 가 높게 나오기 쉽다 — 실제 사람 낙서인 시험 2 가 이를 보완하며, 시험 2 의 배수는 A·B 가 비슷하다(4.05 대 4.19, B 의
+     신뢰구간이 더 넓다). ② 시험 2 는 범주마다 편차가 크다 — 별·새·산은 두 방법 모두 6배 이상, 잎·컵·포크·웃는 얼굴은 두 방법
+     모두 기준선 아래, 원·나무·왕관은 A 만, 삼각형·곰·번개·회오리는 B 만 기준선 위다(원은 A 2.76배·B 0.07배). ③ 배수는 범주
+     평균의 비라서 기준 비율이 큰 원(22.6%)·선(21.6%)의 몫이 크다. ④ 사후 관찰(판정에 쓰지 않음): 같은 몇몇 상표가 낙서마다
+     상위를 차지한다 — 시험 2 상위 5 칸 9,000개 중 가장 자주 나온 10건이 A 60%·B 44%(서로 다른 상표 A 98·B 142). DB 100건은 비엔나
+     코드가 한글 설명뿐이라 어느 분류에도 들지 않는다 — 시험 2 상위 5 칸의 A 0.5%·B 4.9%가 이런 상표다(예: B 의 잎 낙서에 자주
+     나온 "도안화(양식화)된 나뭇잎" 상표). ⑤ 사용자가 서비스 화면에서 직접 그린 그림은 재지 않았다.
+   - 함께 볼 것(나중에 1단계 그림 검사 기준용): 사진 판정 — 자동 손그림 0/402, 낙서 2/1,800, B 윤곽선 1/1,380. 잉크 비율 중앙값
+     (5–95%) — 낙서 3.0%(1.0–5.4%), L1 5.9%(2.6–16.2%), L2 5.5%(2.5–14.0%), L3 4.3%(1.9–10.8%), B 8.6%(4.3–20.1%). 그림의 볼록
+     껍질이 긴 변 정사각형을 채우는 비율 중앙값 — 낙서 0.49(0.07–0.74), 손그림 0.64–0.66, B 0.47. 선 굵기 중앙값 손그림·낙서 5.6px,
+     B 6.0px.
+   - 출처: Quick, Draw! Dataset — Google, Inc., Creative Commons Attribution 4.0 International
+     (https://github.com/googlecreativelab/quickdraw-dataset). 받은 낙서와 출처 표기는
+     `ml/data/experiments/sketch_feasibility/quickdraw/`(비공개 데이터 폴더). Vienna Classification 9th edition(2023-01-01) — © WIPO
+     (https://www.wipo.int/classifications/vienna/), 참조 파일 `vcl_9_20230101.zip`.
+   - 확인용 페이지: `ml/data/experiments/sketch_feasibility/review.html`(시험 1 단계별 대표 20·시험 2 범주별 대표 20, 비공개 데이터).
+     서비스에 손그림 입력을 만들지는 사람 결정이다.
 
 ## 11. 파일·명령
 
@@ -496,6 +540,10 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_ortho.py ml/
 ml/venv/bin/python ml/scripts/x2_figure_methods.py                   # §7.6 도형 외관 세 방법 비교 → x2_figure_methods.json(OCR 박스·CLIP 캐시 — 처음 약 16분, 캐시 뒤 약 5분)
 ml/venv/bin/python ml/scripts/x2_figure_methods.py --no-easy --bootstrap 200   # 빠른 확인(쉬운 음성 참고값 생략)
 MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_figure_methods.py   # 8건(가짜 검출기·가짜 CLIP)
+ml/venv/bin/python ml/scripts/sketch_feasibility.py fetch            # §10 6 손그림 실현성 입력: WIPO VCL 9판 zip·Quick, Draw! 범주 목록·범주당 낙서 512 KiB(인터넷, KIPRIS 아님)
+ml/venv/bin/python ml/scripts/sketch_feasibility.py freeze           # 설정 고정(검색 전) → ml/data/experiments/sketch_feasibility/config.json(+ config.sha256; 있으면 종료 코드 4)
+ml/venv/bin/python ml/scripts/sketch_feasibility.py run              # 고정본과 같을 때만(다르면 종료 코드 4): 임시 색인 B·시험 1·2 → results.json·report.md·review.html(약 2.5분)
+MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_sketch_feasibility.py   # 29건(합성 로고·VCL XML 조각, 네트워크·데이터 없이)
 ```
 
 - `ml/scripts/trials_extract_images.py` — 추출·연결·쌍·QA 시트·coverage(함수 `extract_document`,
@@ -517,6 +565,11 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_figure_metho
 - `ml/src/axes/x2_ortho.py` — §9 문자 외관(철자) 축 함수(`orthographic_similarity`·`has_spelling`·
   `spelling_candidates`), X1 정규화·자모 유틸 재사용. `ml/scripts/pairs_features.py` — 심결례 350쌍 4축 특징,
   `ml/scripts/axes_benchmark.py` — 축별 벤치마크(x2_benchmark 의 AUC·CI·히스토그램 재사용).
+- `ml/scripts/sketch_feasibility.py` — §10 6 손그림 입력 실현성(평가 전용): VCL 9판 참조 XML 해석(`parse_vcl`)·범주 대응표
+  검사(`check_mapping` — M1–M5, 사유 없이 빠진 후보·겹침·대응표에 없는 범주를 거절), 외곽선 추적 손그림 L1–L3(`make_sketches`,
+  난수 = 출원번호·단계의 sha256), 방법 B 윤곽선 그림(`contour_drawing`), Quick, Draw! 부분 내려받기(`fetch_category`), 설정
+  고정·대조(`check_frozen` → 종료 코드 4, 내려받기 실패는 5), 지표·판정(`decide`), 확인용 페이지(`write_review`).
+  `ml/tests/test_sketch_feasibility.py`(29건) — 생성 결정성·대응표 해석·낙서 줄 해석·지표·판정·고정 대조. 새 의존성 없음.
 - 의존성: `easyocr==1.7.2`(+ `opencv-python-headless==4.11.0.86`, scikit-image), `timm==1.0.27`(DINOv2,
   open_clip 이 이미 끌어오던 패키지를 직접 의존성으로 고정), `ml/requirements.txt`·`constraints.txt`.
   실험 스크립트 전용이며 서비스 기동 경로에서는 import 하지 않는다.
@@ -553,3 +606,6 @@ MARKLENS_FAKE_ML=1 ml/venv/bin/python -m pytest -q ml/tests/test_x2_figure_metho
   결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요"로.
 - 2026-11-21 §1·§2 — 서비스 경로 표기를 통합 검색 v2 이미지 후보 풀로 바꿨다(v1 이미지 검색 `POST /search`·`run_search()` 제거,
   통합 모델 설계 §8). 이미지 임베딩·FAISS 검색·`score_results()` 는 그대로라 X2 점수 변화 없음.
+- 2026-11-22 §10 6·§11 — 손그림 입력(실험 기능) 실현성: `ml/scripts/sketch_feasibility.py`(테스트 29건), 설정 고정 sha256
+  `99e84cd2…`, 판정 진행(방법 B — 윤곽선 임시 색인, 두 방법 모두 통과). Quick, Draw!(CC BY 4.0)·WIPO VCL 9판 출처 표기. 서비스
+  코드·서비스 색인 변경 없음.
