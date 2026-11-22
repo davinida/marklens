@@ -22,15 +22,17 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | [등록상표 DB](#등록상표-db) | 완료 | 1,383건 = 기존 수집 1,100 + 유명 브랜드 283 · generation `20261119T111642Z-3b0759a08391`(2026-11-19) · 유사군 보유 1,383/1,383건 · 기동 캐시 X1 발음 1,195건·X3 관념 710건·X2 철자 1,246건·상품 변환표 91,591건 |
 | [유명 브랜드 DB 추가](#유명-브랜드-목록) | 완료 | 유명 브랜드 30개(13개 업종) 283건 — 상표명에 브랜드명이 든 표장 215건 · 2026-11-19 운영 반영(승격·색인 재생성·유형 사전) |
 | [정답 데이터(심결례)](#정답-데이터) | 완료 | 라벨 776행 = 유사 369·비유사 228·제외 179 · 도형계 유사·비유사 110행(양쪽 이미지 106)·문자계 447행 · 학습 특징 597행(1차 350·2차 247, 이름 축 1차 313·2차 178행) |
-| [테스트](#검증-명령) | 완료 | Python `1474 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(21 파일) · Playwright `15 passed` |
+| [테스트](#검증-명령) | 완료 | Python `1503 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(21 파일) · Playwright `15 passed` |
 | [CI](#ci) | 완료 | GitHub Actions 4잡(python · frontend · deployment-config · backend-image) 통과 |
 | [공개 배포](#공개-배포-준비) | 보류 | 템플릿만 제공 — 실제 도메인·TLS·계정 배포는 하지 않음 |
 
-마지막 갱신 2026-11-22 — `main` = `develop` = `837b257`(PR #87 Next.js 16.4.5 병합) 위에 긴 상표명 응답 시간 단축(브랜치
-`perf/long-name-latency` — 식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
+마지막 갱신 2026-11-22 — `main` = `develop` = `b265657`(PR #104 긴 상표명 응답 시간 단축 병합) 위에 손그림 입력 실현성 실험(브랜치
+`exp/sketch-feasibility` — 평가 스크립트만, 판정 진행·방법 B, [X2 외관](#x2-외관)). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
 
 <details>
 <summary>이력</summary>
+
+- 마지막 갱신 기록(2026-11-22, 손그림 실험 전): "마지막 갱신 2026-11-22 — `main` = `develop` = `837b257`(PR #87 Next.js 16.4.5 병합) 위에 긴 상표명 응답 시간 단축(브랜치 `perf/long-name-latency` — 식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속). 남은 일은 [다음 단계](#다음-단계)에 있습니다." 그때 칸: 테스트 Python `1474 passed, 26 skipped`.
 
 - 마지막 갱신 기록(2026-11-22, 응답 시간 단축 전): "마지막 갱신 2026-11-21 — `main` = `develop` = `5e91b95`(PR #102 문서 범위 표기 병합) 위에 v1 이미지 검색 제거(브랜치 `refactor/remove-search-v1` — `POST /search`·BFF `/api/search`·v1 결과 화면을 지우고 v2 로 일원화). 남은 일은 [다음 단계](#다음-단계)에 있습니다." 그때 칸: 테스트 Python `1467 passed, 26 skipped`.
 
@@ -222,8 +224,9 @@ OpenCLIP ViT-B/32 임베딩 + FAISS 코사인 검색입니다. 통합 검색 v2 
 
 - 상태: 완료(현재 서비스). 심결 이미지 쌍 벤치마크는 진행 중 — v0 기준선·v1 ① 요부 분리·v1 ② 변형 비교·도형 외관 세 방법 비교(2026-11-19)까지 했고, 서비스·모델의 도형 외관은 전체 이미지 CLIP 그대로입니다. 남은 것은 사진 표장이 낀 쌍의 처리와 사후 진단 후보(`crop_only`)의 확인입니다 — 분배 항목 "X2 외관 벤치마크(심결 이미지 쌍)".
 - 도형 외관 세 방법 비교(2026-11-19, 도형계 103쌍·사건 76, 사건 단위 CI): 전체 이미지 CLIP `x2_whole` 0.734(0.61–0.83; 가중 0.687) · 글자 지운 도형(개선판 — 인식 결과를 쓰지 않는 박스 지우기 + inpaint, 상표명으로 지울 박스 고르기, 사진 로고 영역) 0.771(짝 차이 +0.037, CI −0.10–+0.16) · 비엔나코드 겹침(실제 코드 + CLIP 이웃 추정, 중분류 k 5) 0.639(짝 차이 −0.096). 미리 고정한 채택 기준(짝 차이 CI 하한 > 0 가중 유무 둘 다, 1차·2차 같은 방향)을 넘은 방법이 없어 **전체 이미지 CLIP 을 유지**합니다. 사후 진단 `crop_only`(남은 내용 bbox 로 자르기) 0.773(짝 차이 +0.039, CI +0.01–+0.09)은 새 표본에서 확인할 후보입니다. 도형계 0.73 은 2차의 거절·무효 등록 표장끼리 쌍(0.88)에서 오고, 사진이 낀 쌍은 0.38 입니다. 도형 단독 규칙 τ 0.9 는 심결 도형계에서 한 번도 발동하지 않습니다(최대 0.89) — X2 설계 §7.6.
+- 손그림 입력(실험 기능) 실현성(2026-11-22, 평가만 — 서비스 코드·색인은 그대로): 사람이 그리지 않고 자동으로 쟀습니다. 시험 1 은 도형 상표 134건에서 외곽선 추적으로 만든 손그림 세 단계(L1 깔끔·L2 보통·L3 거침), 시험 2 는 Quick, Draw!(Google, CC BY 4.0) 낙서 18개 범주 × 100장을 공식 비엔나 분류(WIPO VCL 9판)로 대응했습니다. 미리 고정한 기준(시험 1 L2 인정 상위 5 ≥ 50%, 시험 2 배수 ≥ 2·신뢰구간 하한 > 1)을 서비스 색인(A — 64.9% · 4.05배, CI 2.08–8.65)과 DB 를 윤곽선 그림으로 바꾼 임시 색인(B — 94.0% · 4.19배, CI 1.63–11.54)이 모두 넘어 판정은 **진행, 방법 B** 입니다. 자동 손그림은 원본에서 만들어 B 에 특히 유리하고, 시험 2 는 범주마다 편차가 커 신뢰구간이 넓습니다. 손그림 입력을 만들지는 사람 결정입니다 — X2 설계 §10 6, 결과는 `ml/data/experiments/sketch_feasibility/`(비공개).
 - 심결 이미지 쌍(2026-11-19, 1·2차): 쌍 540(1차 306·2차 232, 추출 대상은 특징과 같은 `유사여부_확정` 기준). 도형계(도형·결합-도형요부) 유사·비유사 110행 중 양쪽 이미지 106행·양쪽 도형 크롭 89행. 도형계의 이미지 축 기준선(사건 단위 CI): 전체 이미지 `x2_whole` 0.73(0.61–0.83, n 103; 가중 0.69) · 도형 크롭 `x2_fig` 0.73(0.60–0.83, n 85) — X2 설계 §7.6.
-- 위치: `ml/scripts/trials_extract_images.py`, `ml/scripts/x2_benchmark.py`, `ml/scripts/x2_split.py`, `ml/scripts/x2_variants.py`, `ml/scripts/x2_figure_methods.py`, `ml/tests/test_trials_extract_images.py`·`test_x2_benchmark.py`·`test_x2_split.py`·`test_x2_variants.py`(52건)·`test_x2_figure_methods.py`(8건), `docs/MarkLens_X2_외관_설계.md`
+- 위치: `ml/scripts/trials_extract_images.py`, `ml/scripts/x2_benchmark.py`, `ml/scripts/x2_split.py`, `ml/scripts/x2_variants.py`, `ml/scripts/x2_figure_methods.py`, `ml/scripts/sketch_feasibility.py`, `ml/tests/test_trials_extract_images.py`·`test_x2_benchmark.py`·`test_x2_split.py`·`test_x2_variants.py`(52건)·`test_x2_figure_methods.py`(8건)·`test_sketch_feasibility.py`(29건), `docs/MarkLens_X2_외관_설계.md`
 - 통합 모델에서: 계수는 축 표에 있습니다. 도형계 계수(`x2_whole×도형계`)는 데이터가 아니라 결합 제약이 정한 값입니다(설계 §7-3). 2차 학습 v1.4 도 이름 있는 입력의 계수는 v1.3 그대로이고, 이름 없는 입력(이미지만)의 이미지 기울기만 데이터로 새로 정했습니다([통합 모델](#통합-모델), 설계 §7-4·§6). 서비스(2026-11-20, v1.4)는 질의 이미지가 사진이면(`src.photo_mark` — 서비스 CLIP 경로에서도 학습 때와 판정이 같음, DB 등록 상표 1,383건 중 사진 판정 24건) "사진으로 보여요 — 로고 파일을 올리면 외관 비교가 더 정확해요" 안내와 함께 이름 있는 판단의 이미지 축을 관측 없음으로 둡니다(X2 설계 §7.6).
 - 심결 이미지 쌍 벤치마크 v1 ①(2026-10-08): 소형 기준 32px → 306쌍, 결론 대신 **표장 라벨**(유사 189·비유사 95·제외 22), 부트스트랩 95% CI, easyocr로 문자·도형 영역 분리(유형 일치 76%, OCR 완전 일치 51%). 철자 유사(`x2_text_ortho`) 외관축 AUC 0.72(0.57–0.86), 전체 이미지 0.63, 도형 크롭은 쌍 80·도형 29로 판단 보류, 사진 표장에서는 역전.
 - 심결 이미지 쌍 벤치마크 v1 ②(`x2_variants.py`): 전체 이미지 변형 5종(흑백·윤곽선·다중 해상도·DINOv2·앙상블) 모두 채택 없음(최대 외관축 +0.026, CI 겹침), OCR 노이즈 진단은 ±0.01(철자 신호 상한은 신호 자체), 유형 게이팅 `x2_gate` 외관축 0.70(잠정 후보).
@@ -1298,6 +1301,9 @@ ml/venv/bin/python ml/scripts/pairs_features.py                      # 심결 �
 ml/venv/bin/python ml/scripts/pairs_features.py --easy-negatives     # 쉬운 음성 표본까지 새로 뽑을 때만(심결 특징이 바뀌면 cross 표본도 바뀐다)
 ml/venv/bin/python ml/scripts/axes_benchmark.py --with-easy-negatives   # 사건 단위 CI·사건 가중(상한 3)·회차 × 유형 분할(약 10초); --bootstrap-unit pair --case-cap 0 은 2026-10 방식
 ml/venv/bin/python ml/scripts/x2_figure_methods.py                    # 도형 외관 세 방법 비교(X2 설계 §7.6) — OCR·CLIP 캐시, 처음 약 16분·캐시 뒤 약 5분
+ml/venv/bin/python ml/scripts/sketch_feasibility.py fetch             # 손그림 입력 실현성(X2 설계 §10 6) 입력 — WIPO 비엔나 분류표·Quick, Draw! 범주 목록·범주당 낙서 512 KiB(인터넷, KIPRIS 아님)
+ml/venv/bin/python ml/scripts/sketch_feasibility.py freeze            # 설정 고정(검색 전) → ml/data/experiments/sketch_feasibility/config.json(+ sha256; 이미 있으면 종료 코드 4)
+ml/venv/bin/python ml/scripts/sketch_feasibility.py run               # 고정본과 같을 때만: 윤곽선 임시 색인 B·시험 1·2(약 2.5분) → results.json·report.md·review.html
 
 # 통합 모델 v1.3 재학습(2026-10-25 실행 확인, 기본 logistic·prior 2방법 약 13초) → shared/model/risk_model_v1.json + ml/data/trials/risk_model_v1_{report.md,results.json,calibration.png}
 ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images   # 먼저 쉬운 음성 700쌍에 CLIP 이미지 축(x2_whole)을 채운다(5초; cross 265·db 350)
