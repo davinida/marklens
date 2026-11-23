@@ -76,7 +76,7 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.4.2"  # 서비스 기본 모델(2026-11-23)
+    assert ms.state.model["version"] == "risk_model_v1.4.3"  # 서비스 기본 모델(2026-11-23)
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
     # 가짜 ML 은 사진 판정을 끈다(임베딩이 의미 없음)
     assert ms.state.goods_ignored == 0 and ms.state.photo_direction is None
@@ -422,7 +422,7 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     from src.axes.x2_ortho import orthographic_similarity
 
     query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
-    assert ms.state.model["version"] == "risk_model_v1.4.2"
+    assert ms.state.model["version"] == "risk_model_v1.4.3"
     results = {}
     for version in (1, 2):
         monkeypatch.setattr(ms.state, "model", _spelling_model(version))

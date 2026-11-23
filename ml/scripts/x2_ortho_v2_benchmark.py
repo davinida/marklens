@@ -114,7 +114,8 @@ def spelling_token_lists(rows: list[dict], label_rows: list[dict], db_records: l
         if not (name_a and name_b):
             out.append(None)
             continue
-        generic = model.pair_generic(name_a, name_b, goods or None)
+        # 2026-11-20 측정 그대로(결합 규칙 약한 토큰열 v1 — 식별력 v0.4 이전)
+        generic = model.pair_generic(name_a, name_b, goods or None, weak_run_version=1)
         out.append((normalize_name(name_a, extra_generic=generic),
                     normalize_name(name_b, extra_generic=generic)))
     order = {id(row): i for i, row in enumerate(trial + easy)}

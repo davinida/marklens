@@ -270,8 +270,8 @@ def test_versions_accepted():
     assert _model(version="risk_model_v1.1")["version"] == "risk_model_v1.1"
     assert _model(version="risk_model_v1.2")["version"] == "risk_model_v1.2"
     assert _model(version="risk_model_v1.2.1")["version"] == "risk_model_v1.2.1"
-    assert rm.MODEL_VERSION == "risk_model_v1.4.2"  # 서비스 기본 모델(2026-11-23 부터)
-    assert rm.DEFAULT_MODEL_PATH == rm.V142_MODEL_PATH
+    assert rm.MODEL_VERSION == "risk_model_v1.4.3"  # 서비스 기본 모델(2026-11-23 부터)
+    assert rm.DEFAULT_MODEL_PATH == rm.V143_MODEL_PATH
     assert rm.V13_MODEL_PATH.name == "risk_model_v1.json"
     with pytest.raises(ValueError):
         _model(version="risk_model_v2")
@@ -589,10 +589,11 @@ def test_v14_validate_nameless_patterns():
     # name_floors 가 없는 v1.4 JSON 은 이름 결합을 검사하지 않는다(이름 없는 패턴 사이만)
     without_floors = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
     assert without_floors and all("(이름" not in v for v in without_floors)
-    assert rm.MODEL_VERSION == "risk_model_v1.4.2"  # 서비스 기본 모델(2026-11-23 부터 v1.4.2)
+    assert rm.MODEL_VERSION == "risk_model_v1.4.3"  # 서비스 기본 모델(2026-11-23 부터 v1.4.3)
     assert "risk_model_v1.4" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.1" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.2" in rm.SUPPORTED_VERSIONS
+    assert "risk_model_v1.4.3" in rm.SUPPORTED_VERSIONS
 
 
 def test_shipped_v13_scores_nameless_input_with_named_pattern():
@@ -965,20 +966,56 @@ def test_shipped_v141_changes_only_the_named_review_cut():
 
 
 
+def test_weak_run_version_key_validation():
+    """weak_run.version(식별력 결합 규칙의 약한 토큰열 — 서비스 규칙): 없으면 1, 1·2 만 받는다."""
+    from src.axes import distinctiveness as dx
+
+    base = json.loads(rm.V141_MODEL_PATH.read_text(encoding="utf-8"))
+    assert rm.weak_run_version(base) == 1
+    assert rm.weak_run_version({**base, rm.WEAK_RUN_KEY: {"version": 2}}) == 2
+    rm.validate_model({**base, rm.WEAK_RUN_KEY: {"version": 2}})
+    for bad in ({"version": 3}, {"version": True}, 2, {"enabled": True}):
+        with pytest.raises(ValueError):
+            rm.validate_model({**base, rm.WEAK_RUN_KEY: bad})
+    assert rm.SUPPORTED_WEAK_RUN_VERSIONS == dx.WEAK_RUN_VERSIONS
+
+
 def test_shipped_v142_only_adds_the_logo_floor_flag():
-    """서비스 기본 v1.4.2(설계 §7-9, 2026-11-23): v1.4.1 JSON 에 logo_floor 표시(엔진이 이름 있는
-    이미지 질의를 이미지만 판단과 견줌 — 견고성 점검 R-P0-1)와 그 출처 meta 만 더했다. 계수·하한·
-    규칙은 v1.4.1 그대로 — v1.4.1 을 다시 쓰면 이 시험이 v1.4.2 도 다시 만들라고 알린다
+    """v1.4.2(설계 §7-9, 2026-11-23 — v1.4.3 의 원본): v1.4.1 JSON 에 logo_floor 표시(엔진이 이름
+    있는 이미지 질의를 이미지만 판단과 견줌 — 견고성 점검 R-P0-1)와 그 출처 meta 만 더했다. 계수·
+    하한·규칙은 v1.4.1 그대로 — v1.4.1 을 다시 쓰면 이 시험이 v1.4.2 도 다시 만들라고 알린다
     (logo_floor_image_only.py)."""
     if not rm.V142_MODEL_PATH.exists() or not rm.V141_MODEL_PATH.exists():
         pytest.skip("v1.4.2 계수 파일 없음")
     base = json.loads(rm.V141_MODEL_PATH.read_text(encoding="utf-8"))
     new = json.loads(rm.V142_MODEL_PATH.read_text(encoding="utf-8"))
-    assert rm.DEFAULT_MODEL_PATH == rm.V142_MODEL_PATH
-    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.2"
+    assert rm.V142_MODEL_PATH.name == "risk_model_v1.4.2.json"
+    assert new["version"] == "risk_model_v1.4.2"
     assert rm.logo_floor_enabled(new) and not rm.logo_floor_enabled(base)
     assert {k for k in set(base) | set(new) if base.get(k) != new.get(k)} == {
         "version", rm.LOGO_FLOOR_KEY, "meta"}
     assert {k for k in set(base["meta"]) | set(new["meta"])
             if base["meta"].get(k) != new["meta"].get(k)} == {"logo_floor"}
     assert new["meta"]["logo_floor"]["derived_from"] == base["version"]
+
+
+def test_shipped_v143_only_adds_the_weak_run_rule():
+    """서비스 기본 v1.4.3(설계 §7-10, 2026-11-23): v1.4.2 JSON 에 weak_run 규칙 2(엔진이 이름 축을
+    계산할 때 약한 토큰열을 두 이름 모두에서 붙어 있는 구간만 묶음 — 견고성 점검 R-P0-2)와 그 출처
+    meta 만 더했다. 계수·하한·규칙은 v1.4.2 그대로 — v1.4.2 를 다시 쓰면 이 시험이 v1.4.3 도 다시
+    만들라고 알린다(weak_run_adjacent.py)."""
+    if not rm.V143_MODEL_PATH.exists() or not rm.V142_MODEL_PATH.exists():
+        pytest.skip("v1.4.3 계수 파일 없음")
+    base = json.loads(rm.V142_MODEL_PATH.read_text(encoding="utf-8"))
+    new = json.loads(rm.V143_MODEL_PATH.read_text(encoding="utf-8"))
+    assert rm.DEFAULT_MODEL_PATH == rm.V143_MODEL_PATH
+    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.3"
+    assert rm.weak_run_version(new) == 2 and rm.weak_run_version(base) == 1
+    assert {k for k in set(base) | set(new) if base.get(k) != new.get(k)} == {
+        "version", rm.WEAK_RUN_KEY, "meta"}
+    assert {k for k in set(base["meta"]) | set(new["meta"])
+            if base["meta"].get(k) != new["meta"].get(k)} == {"weak_run"}
+    assert new["meta"]["weak_run"]["derived_from"] == base["version"]
+    assert len(new["meta"]["weak_run"]["rule_sha256"]) == 64
+    model = rm.load_model(rm.V143_MODEL_PATH)
+    assert rm.coupling_violations(model) == [] and rm.logo_floor_enabled(model)

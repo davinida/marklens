@@ -1,7 +1,7 @@
 """견고성 점검(2026-11-23, docs/MarkLens_견고성_보안_점검.md) — 오류는 아니지만 결과가 이상한 입력의
 회귀 시험. 실제 식별력 모델(shared/distinctiveness)과 배포 계수 JSON 으로 쌍 하나를 채점한다
 (CLIP·X3 없이 — 관념 축은 결측으로 둔다). 지금 고쳐지지 않은 항목은 strict xfail, 사유에 점검 문서의
-항목 번호(R-P1-6 은 2026-11-23 고쳐 통과 시험).
+항목 번호(R-P1-6·R-P0-2 는 2026-11-23 고쳐 통과 시험 — R-P0-2 는 v1.4.3 의 weak_run 규칙 2).
 """
 
 from __future__ import annotations
@@ -33,19 +33,36 @@ def dist() -> Distinctiveness:
     return load_distinctiveness()
 
 
-def _score(dist: Distinctiveness, query: str, candidate: str, goods_a=None, goods_b=None):
+def _score(dist: Distinctiveness, query: str, candidate: str, goods_a=None, goods_b=None, *,
+           risk: dict | None = None):
+    """엔진처럼 계수 JSON 의 weak_run 버전으로 이름 축을 계산해 그 JSON 으로 채점(기본 = 서비스
+    모델)."""
+    risk = risk or rm.load_model()
     axes = pa.compute_pair_axes(query, candidate, model=dist, goods_a=goods_a, goods_b=goods_b,
-                                x3_enabled=False)
-    return axes, rm.risk_score(axes.model_features(x2_img=None, mark_type="문자"), rm.load_model())
+                                x3_enabled=False, weak_run_version=rm.weak_run_version(risk))
+    return axes, rm.risk_score(axes.model_features(x2_img=None, mark_type="문자"), risk)
 
 
-@pytest.mark.xfail(strict=True, reason="R-P0-2: 설명적 낱말만으로 된 이름이 같은 순서의 약한 "
-                                       "낱말 둘(맛있는…전문점)을 요부로 보아 호칭 1.0·'위험'")
 def test_descriptive_only_name_is_not_rated_danger(dist):
-    axes, result = _score(dist, "맛있는 커피 전문점", "맛있는 만두 전문점 장수손만두 1976",
-                          CAFE, DUMPLING_GOODS)
+    """R-P0-2(2026-11-23 고침, v1.4.3): 설명적 낱말만으로 된 이름이 떨어진 약한 낱말 둘(맛있는…
+    전문점)을 요부로 보아 호칭 1.0·'위험'이던 것 — 약한 토큰열을 붙어 있는 구간만 묶으면 주의
+    이하."""
+    pair = ("맛있는 커피 전문점", "맛있는 만두 전문점 장수손만두 1976")
+    axes, result = _score(dist, *pair, CAFE, DUMPLING_GOODS)
     assert axes.query_tokens == ()  # 전제: 질의에 요부가 없다(낱말이 모두 약함)
     assert result.grade in ("안전", "주의"), (axes.x1_raw, result.prob)
+    # 고친 이유의 가드: 옛 규칙(v1.4.2 — weak_run 없음 = 규칙 1)으로는 지금도 호칭 1.0·'위험'
+    old_axes, old = _score(dist, *pair, CAFE, DUMPLING_GOODS,
+                           risk=rm.load_model(rm.V142_MODEL_PATH))
+    assert old_axes.x1_raw == 1.0 and old.grade == "위험", (old_axes.x1_raw, old.prob)
+
+
+def test_weak_run_v04_does_not_join_separated_descriptive_words(dist):
+    """R-P0-2 원인: 실제 사전에서 맛있는·전문점 은 사이에 커피/만두가 끼어 결합이 아니다(식별력
+    v0.4, 규칙 2). 옛 규칙(1 — 같은 순서 부분열)은 묶었다."""
+    pair = ("맛있는 커피 전문점", "맛있는 만두 전문점 장수손만두 1976")
+    assert dist.combined_weak_run(*pair, CAFE) == ()
+    assert dist.combined_weak_run(*pair, CAFE, version=1) == ("맛있는", "전문점")
 
 
 def test_descriptive_only_name_with_one_shared_weak_word_stays_low(dist):

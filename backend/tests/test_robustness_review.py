@@ -280,6 +280,25 @@ def test_phonetic_and_semantic_search_clean_invisible_format_characters(fake_eng
     with pytest.raises(ValueError):
         semantic_search.search("\ufeff", 5, 0.0)
 
+def test_engine_uses_the_model_weak_run_version(fake_engine, monkeypatch):
+    """R-P0-2: 엔진은 계수 JSON 의 weak_run.version 으로 이름 축을 계산한다(없으면 1 — 옛 규칙)."""
+    seen: list = []
+    original = multi_search.compute_pair_axes
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("weak_run_version"))
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(multi_search, "compute_pair_axes", spy)
+    engine.multi_search(name="더미상표1", top_k=3)
+    assert seen and set(seen) == {multi_search.rm.weak_run_version(multi_search.state.model)}
+    seen.clear()
+    monkeypatch.setattr(multi_search.state, "model",
+                        {**multi_search.state.model, "weak_run": {"version": 2}})
+    engine.multi_search(name="더미상표1", top_k=3)
+    assert seen and set(seen) == {2}
+
+
 def test_identical_logo_without_name_is_danger(fake_engine, monkeypatch):
     """가드 — 이름 없이 같은 로고만 넣으면 지금도 '위험'(이름 없는 판단, 계약 §3-2)."""
     monkeypatch.setattr(config, "OCR_ENABLED", True)

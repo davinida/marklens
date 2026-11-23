@@ -22,13 +22,23 @@
 
 재학습(프로젝트 루트, KIPRIS 호출 0, 기본 2방법 약 13초): `ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images`(쉬운 음성 이미지 축, 5초) →
 `ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-23 부터 서비스 기본 모델은 아래
-`risk_model_v1.4.2.json`(런타임 `MODEL_VERSION` risk_model_v1.4.2, `DEFAULT_MODEL_PATH`; 같은 날 그 전은 `risk_model_v1.4.1.json`, 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
+`risk_model_v1.4.3.json`(런타임 `MODEL_VERSION` risk_model_v1.4.3, `DEFAULT_MODEL_PATH`; 같은 날 그 전은 `risk_model_v1.4.2.json`·`risk_model_v1.4.1.json`, 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
 (패턴 없는 JSON 은 최상위 계수 집합 하나로, 없는 키는 규칙 미적용).
 
-## `risk_model_v1.4.2.json` — v1.4.2 (같은 로고 + 다른 이름 — 이미지만 판단과 견주기), 서비스 기본 모델 (2026-11-23)
+## `risk_model_v1.4.3.json` — v1.4.3 (설명적 낱말만의 이름 — 식별력 결합 규칙 v0.4), 서비스 기본 모델 (2026-11-23)
 
-**2026-11-23 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V142_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
-파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.1.json` 에 `logo_floor` 표시(`{"enabled": true, …}` — 적용 범위·근거 문장 포함)만 더한 것이다 — 계수·
+**2026-11-23 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V143_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
+파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.2.json` 에 `weak_run` 표시(`{"version": 2, …}` — 규칙·근거 문장 포함)만 더한 것이다 — 계수·하한·단독
+임계값·도형 규칙·결합 제약·`logo_floor`·`grade_precision` 은 v1.4.2 그대로. 엔진이 이름 축을 계산할 때 식별력 결합 규칙의 약한 토큰열을 규칙 2(두 이름 모두에서
+연속으로 붙어 있는 공통 약한 토큰 구간만 요부 후보로 묶음 — 어느 한쪽에서라도 다른 낱말이 끼면 묶지 않음)로 쓴다(`salient.removed` 가 그 결과, 식별력 v0.4, 견고성
+점검 R-P0-2, 통합 모델 설계 §7-10). 계수가 학습된 특징은 규칙 1(v0.2–v0.3)이지만 규칙 2 로 다시 만들어도 바뀌는 행이 0이라 계수를 그대로 쓴다. 표시가 없는 v1.4.2
+JSON 을 `MARKLENS_RISK_MODEL` 로 지정하면 예전 계산이다(런타임 `weak_run_version` — 없으면 1, 형식은 `validate_model` 이 1·2 만). `ml/scripts/weak_run_adjacent.py apply`
+가 v1.4.2 JSON 에서 만든다 — v1.4.2 와 다른 키는 `version`·`weak_run`·`meta.weak_run`(원본 버전·설정 sha256·스크립트)뿐이고 `ml/tests/test_risk_model.py` 가 이를 고정한다.
+v1.4.2 JSON 을 다시 쓰면 이 파일도 다시 만들어야 한다.
+
+## `risk_model_v1.4.2.json` — v1.4.2 (같은 로고 + 다른 이름 — 이미지만 판단과 견주기), v1.4.3 의 원본 (2026-11-23)
+
+**2026-11-23 그 전 서비스가 읽던 기본 모델이고, 지금은 v1.4.3 의 원본이다**(런타임 `V142_MODEL_PATH`). 아래 `risk_model_v1.4.1.json` 에 `logo_floor` 표시(`{"enabled": true, …}` — 적용 범위·근거 문장 포함)만 더한 것이다 — 계수·
 하한·단독 임계값·도형 규칙·결합 제약·`grade_precision` 은 v1.4.1 그대로. 표시가 켜져 있으면 엔진이 이미지가 있는 이름 있는 질의(질의 이미지가 사진이 아니고 유형을
 도형계로 고치지 않은 것)에서 후보마다 이름도 업종도 뺀 이미지만 판단(`noname:x2_whole`)과 견줘 높은 등급·정렬 위치를 쓴다(`rule_triggers` `nameless_floor`,
 API 계약 v2 §2-4 6항, 견고성 점검 R-P0-1, 통합 모델 설계 §7-9). 표시가 없는 v1.4.1 JSON 을 `MARKLENS_RISK_MODEL` 로 지정하면 예전 동작이다(런타임
