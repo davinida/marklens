@@ -784,6 +784,7 @@ def score_record(record: Record, ctx: QueryContext,
         axes = compute_pair_axes(
             ctx.name, record.title, model=distinct, goods_a=ctx.goods, goods_b=record.goods,
             x3_enabled=ctx.x3_on, spelling_version=rm.spelling_version(model),
+            weak_run_version=rm.weak_run_version(model),
         )
         if timings is not None:
             timings["축"] = timings.get("축", 0.0) + (time.perf_counter() - started) * 1000

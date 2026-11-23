@@ -77,6 +77,10 @@ DEFAULT_BASE = ML_ROOT / "data" / "trials"
 DEFAULT_LABELS = DEFAULT_BASE / "labels.csv"
 DEFAULT_IMAGE_PAIRS = DEFAULT_BASE / "image_pairs_v1.csv"
 DEFAULT_OUT = DEFAULT_BASE / "pairs_features.csv"
+# 식별력 결합 규칙의 약한 토큰열 버전(distinctiveness.WEAK_RUN_VERSIONS). 학습 특징은 지금 계수가
+# 학습된 규칙(1 = v0.2–v0.3 부분열)으로 둔다 — 다시 만들어도 같은 파일. 2(v0.4)는
+# --weak-run-version 2.
+WEAK_RUN_VERSION = 1
 DEFAULT_METADATA = ML_ROOT / "data" / "kipris_metadata.json"
 DEFAULT_X2_CACHE = DEFAULT_BASE / "x2_cache_v0.npz"  # 심결 추출 이미지 CLIP 임베딩(sha256 키)
 DEFAULT_INDEX = ML_ROOT / "data" / "index" / "kipris.faiss"  # 서비스 색인 — DB 이미지 임베딩
@@ -281,7 +285,7 @@ def name_axes(name_a: str, name_b_: str, goods: frozenset[str], model: Distincti
     if not (name_a and name_b_):
         return out
     gated, raw = x3_scores(name_a, name_b_)
-    generic = model.pair_generic(name_a, name_b_, goods or None)
+    generic = model.pair_generic(name_a, name_b_, goods or None, weak_run_version=WEAK_RUN_VERSION)
     out.update({
         "x1": _fmt(phonetic_similarity(name_a, name_b_)),
         "x2_text": _fmt(orthographic_similarity(name_a, name_b_)),
@@ -895,7 +899,11 @@ def main(argv: list[str] | None = None) -> int:
                              "요부·상품 축을 현재 코드·데이터로 다시 계산(사진A·사진B 도 채움)")
     parser.add_argument("--metadata", type=Path, default=DEFAULT_METADATA)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--weak-run-version", type=int, choices=(1, 2), default=WEAK_RUN_VERSION,
+                        help="식별력 결합 규칙의 약한 토큰열 버전(1 = 지금 계수의 학습 특징, "
+                             "2 = v0.4)")
     args = parser.parse_args(argv)
+    globals()["WEAK_RUN_VERSION"] = args.weak_run_version
     providers = default_easy_image_providers(base=args.image_pairs.parent)
     if args.refresh_easy:
         report = refresh_easy(args.out.with_name(args.out.stem + "_easy.csv"), args.out,

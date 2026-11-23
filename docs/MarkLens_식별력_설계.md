@@ -1,6 +1,6 @@
 # MarkLens 식별력·요부 필터 v0 설계 (다빈-3)
 
-- 기준일: 2026-10-11 (v0 2026-10-09 → v0.1 같은 날 3호 초안 → v0.2 2026-10-11 사람 승인 반영 + 결합 규칙 → **v0.3 2026-10-11 붙여쓴 결합어 규칙**) · 상태: **v0.3 — 3호 기술적 표장 사람 승인 완료(상대어 380 전부·절대어 57, 해제 12, §3-3), 결합 규칙 v0.2(약한 토큰 2개 이상이 같은 순서로 양쪽에 있으면 요부 후보)·v0.3(붙여쓴 결합어 SLIMLINE·혹달린신발·QUICKPATH 대 띄어쓴 토큰열 — 2015후1690 결합상태, §4-1·§4-2), 사람 검토 제외(overrides)는 통계 약화만 건너뜀** · 구현: `ml/src/axes/distinctiveness.py` · 집계·산출물: `ml/scripts/distinctiveness_build.py` → `shared/distinctiveness/`(`token_stats.json`·`weak_tokens.json`·`report.md`), 3호 후보·분류: `ml/scripts/descriptive_candidates.py`(+ `descriptive_judgements.json`) → `descriptive_candidates.md`·`descriptive_terms.json`, 사람 검토 화면: `backend/scripts/review_ui.py` · 테스트: `ml/tests/test_distinctiveness.py`(40건)·`test_descriptive_candidates.py`(2건) · 브랜치 `feat/distinctiveness-v0` → `feat/descriptive-terms` → `feat/review-ui` → `feat/review-wrapup` → `feat/pretrain-cleanup`
+- 기준일: 2026-11-23 (v0 2026-10-09 → v0.1 같은 날 3호 초안 → v0.2 2026-10-11 사람 승인 반영 + 결합 규칙 → v0.3 2026-10-11 붙여쓴 결합어 규칙 → **v0.4 2026-11-23 약한 토큰열 결합을 두 이름 모두에서 붙어 있는 구간으로 좁힘(견고성 점검 R-P0-2, §4-3)**) · 상태: **v0.4 — 3호 기술적 표장 사람 승인 완료(상대어 380 전부·절대어 57, 해제 12, §3-3), 결합 규칙 v0.2·v0.4(약한 토큰 2개 이상이 두 이름 모두에서 붙어 있는 같은 구간이면 요부 후보 — v0.2–v0.3 은 같은 순서면 사이 낱말이 있어도 묶음)·v0.3(붙여쓴 결합어 SLIMLINE·혹달린신발·QUICKPATH 대 띄어쓴 토큰열 — 2015후1690 결합상태, §4-1·§4-2), 사람 검토 제외(overrides)는 통계 약화만 건너뜀** · 구현: `ml/src/axes/distinctiveness.py` · 집계·산출물: `ml/scripts/distinctiveness_build.py` → `shared/distinctiveness/`(`token_stats.json`·`weak_tokens.json`·`report.md`), 3호 후보·분류: `ml/scripts/descriptive_candidates.py`(+ `descriptive_judgements.json`) → `descriptive_candidates.md`·`descriptive_terms.json`, 사람 검토 화면: `backend/scripts/review_ui.py` · 테스트: `ml/tests/test_distinctiveness.py`(43건)·`test_descriptive_candidates.py`(2건)·`test_weak_run_adjacent.py`(8건 — v0.4 확인 표본 스크립트) · 브랜치 `feat/distinctiveness-v0` → `feat/descriptive-terms` → `feat/review-ui` → `feat/review-wrapup` → `feat/pretrain-cleanup` → `fix/weak-run-adjacent`
 - 역할: X1 호칭·X2 문자 외관(철자)·X3 관념이 `extra_generic` 으로 넘겨받을 "식별력 없는 토큰"을 공급하고, 이름에 요부(식별력 있는 부분)가 하나도 없는지(`has_distinctive_part`)를 판정한다. 축 함수가 아니므로 공통-2 규약(파일 없음)은 적용하지 않고 `goods_map` 처럼 집계 파일을 적재한다. 학습 없음, KIPRIS 호출 없음.
 - 관련 문서: [X1 설계](MarkLens_X1_호칭유사도_설계.md) §8-1, [X2 설계](MarkLens_X2_외관_설계.md) §9, [X3 설계](MarkLens_X3_관념유사도_설계.md) §7-1, [통합 모델 설계](MarkLens_통합모델_설계.md) §4-1·§4-2.
 
@@ -32,7 +32,7 @@
 ### 축 연결(`pair_generic`, `ml/scripts/pairs_features.py`)
 
 - 쌍의 유사군 = `goods_codes_this ∪ goods_codes_prior`(없으면 전역). 두 이름 각각 `has_distinctive_part` 이면 그 이름의 약한 토큰을 모아 `extra_generic` 으로 X1·X2 철자·X3 에 넘긴다 → `x1_d`·`x2_text_d`·`x3_d`. 요부가 없는 이름은 토큰을 넘기지 않는다(2000후2453).
-- **결합 규칙 v0.2**(`combined_weak_run`, 2026-10-11): 양쪽 이름의 약한 토큰열(이름 순서)의 가장 긴 공통 부분열이 2개 이상이면 그 토큰들은 결합된 요부 후보로 보아 넘기지 않는다(2015후1690 결합상태). Cool Touch / 쿨터치 COOL TOUCH → (cool, touch) 결합이라 `extra_generic` 비어 전체 대비 1.0 유지, Q-FIRE / Q-FIRE 500MP → (q, fire) 결합·mp 만 넘김. 공통 약한 토큰이 하나뿐이면(Zorbix Gate / Hello Gate 의 gate) 그대로 넘기고, 순서가 다르면(Touch Cool / Cool Touch) 적용하지 않는다.
+- **결합 규칙 v0.2 → v0.4**(`combined_weak_run`, 2026-10-11 → 2026-11-23): 약한 토큰 2개 이상이 두 이름 모두에서 붙어 있는 같은 구간(연속 공통 구간, 여럿이면 모두)이면 그 토큰들은 결합된 요부 후보로 보아 넘기지 않는다(2015후1690 결합상태). Cool Touch / 쿨터치 COOL TOUCH → (cool, touch) 결합이라 `extra_generic` 비어 전체 대비 1.0 유지, Q-FIRE / Q-FIRE 500MP → (q, fire) 결합·mp 만 넘김. 공통 약한 토큰이 하나뿐이면(Zorbix Gate / Hello Gate 의 gate) 그대로 넘기고, 순서가 다르면(Touch Cool / Cool Touch) 적용하지 않는다. 어느 한쪽에서라도 사이에 다른 낱말(약하든 아니든)이 끼면 묶지 않는다 — 맛있는 커피 전문점 / 맛있는 만두 전문점 장수손만두 1976 의 맛있는·전문점(v0.4, 견고성 점검 R-P0-2 — §4-3). v0.2–v0.3(규칙 1)은 양쪽 약한 토큰열(이름 순서)의 가장 긴 공통 부분열이라 사이 낱말을 보지 않았다 — `combined_weak_run(…, version=1)`·`pair_generic(…, weak_run_version=1)` 로 남긴다(지금 계수가 학습된 특징의 규칙, `pairs_features.py` 의 `WEAK_RUN_VERSION`). 서비스 엔진은 계수 JSON 의 `weak_run.version` 을 쓴다(통합 모델 v1.4.3 부터 2, 없으면 1).
 - **결합 규칙 v0.3**(`combined_single_match`, 2026-10-11): 한쪽 이름의 토큰 하나(붙여쓴 결합어)가 다른 쪽의 연속 토큰 2개 이상(약한 토큰 포함)을 이어 붙인 것과 같으면 그 토큰열의 약한 토큰(결합어가 약하면 그것도)을 넘기지 않는다. "같다"는 ① 정규화 철자 동일(SLIMLINE = slim+line, 혹달린신발 = 혹+달린+신발) ② 철자 편집거리 유사도 ≥ `COMBINED_SIMILARITY` 0.9(자모 단위, 토큰으로 다시 나누지 않음) ③ 토큰별 X1 읽기를 이어 붙인 호칭이 결합어의 읽기와 동일(슬림라인 = 슬림+라인, 퀵패스 = QUICKPATH 의 읽기) ④ 읽기 유사도 ≥ 0.9. ROYALEBEE / ROYAL BEE 는 0.889 로 임계 미달이고 쿨터치 / COOL TOUCH 는 X1 이 touch 를 ‘타우치’로 읽어 미달이지만, 두 쌍 모두 토큰이 전부 약해 v0 규칙(2000후2453)으로 이미 전체 대비다. 어순이 바뀐 에어부산 / BUSAN AIR 는 적용하지 않는다.
 - X1 의 "제거 전 전체 결합" 후보는 X1 이 그대로 유지한다(전체관찰). X2 철자는 제거 후 토큰만 비교하므로 효과가 더 크다.
 
@@ -173,6 +173,28 @@
 - 6건 중 2건(혹달린신발·QUICKPATH)과 참고 1건(SLIMLINE)이 돌아왔다. x1_d 는 X1 이 제거 전 전체 결합 후보를 유지하므로 변화가 없고 효과는 X2 철자 축에 난다. 남은 4건의 원인은 어순(1), 임계 0.9 미달(2 — 0.889), X1 영문 읽기(1)다. 임계를 0.88 로 내리면 2건이 더 돌아오지만 X1 상수·예외 사전과 같이 사람 결정 사항으로 둔다(§4-1 결정 대기).
 - 재측정(표장 라벨, 355행, v0.2 → v0.3): `x1_d` (a) 0.59 → 0.60 (0.53–0.66) · (b) 0.61 → 0.61, `x2_text_d` (a) 0.58 → 0.58 · (b) 0.73 → 0.71, `x3_d` 0.51 → 0.51. 식별력으로 값이 바뀐 쌍 x1 19 → 21(이름 B 유사군 변화 포함) · x2_text 55 → 50 · x3 40 → 38, 유사 쌍 부작용 x2_text 14 → 8. distinct_drop 을 같은 기준으로 다시 세면 12 → **8**(SLIMLINE·혹달린신발·QUICKPATH·Q-FIRE 해소). 테스트 3건(세 쌍 유지·단일 토큰 무영향·무관한 쌍 무영향) 추가.
 
+### 4-3. 결합 규칙 v0.4 — 두 이름 모두에서 붙어 있는 약한 토큰열만 (2026-11-23, `fix/weak-run-adjacent`)
+
+견고성 점검 R-P0-2: "맛있는 커피 전문점" + 카페 세트가 "맛있는 만두 전문점 장수손만두 1976"과 호칭 1.0·'위험'이었다. 질의는 요부가 없어(낱말이 모두 약함) 약한
+토큰을 넘기지 않고, 후보 쪽 약한 토큰 가운데 맛있는·전문점 은 v0.2 결합 규칙이 같은 순서의 공통 부분열(사이에 커피/만두가 있어도)로 묶어 넘기지 않았다 —
+X1 이 공통 부분을 같은 호칭으로 봐 1.0. v0.4 는 두 이름 모두에서 붙어 있는 구간만 결합으로 본다(통합 모델 설계 §7-10 — 확인 표본·채택 조건은 그쪽).
+
+| 쌍 | v0.2–v0.3(규칙 1) | v0.4(규칙 2) |
+|---|---|---|
+| Cool Touch / 쿨터치 COOL TOUCH | (cool, touch) | (cool, touch) — 그대로 |
+| Q-FIRE / Q-FIRE 500MP | (q, fire) | (q, fire) — 그대로 |
+| 맛있는 커피 전문점 / 맛있는 만두 전문점 장수손만두 1976 | (맛있는, 전문점) — 후보 쪽에서 둘을 넘기지 않음 | () — 맛있는·전문점·만두 를 넘김 |
+| Cool Zorbix Touch / Cool Touch Qwzy(시험용 사전) | (cool, touch) | () |
+
+- 학습 특징(심결 597·쉬운 음성 700)을 규칙 2 로 다시 만들어도 바뀌는 행이 0이다. 학습 쌍 1,164 중 규칙 1 이 걸린 20쌍 = 두 이름 모두에서 붙어 있음 11(규칙
+  2 에서도 전부 걸림)·떨어짐 9(모두 Pet in garden / PET GARDEN, 유사군만 다름 — 규칙 2 에서 빠지지만 두 이름 모두 요부가 없어 `pair_generic` 이 규칙과 상관없이
+  비어 전체 대비). 그래서 통합 모델 계수를 다시 학습하지 않고 서비스에만 켰다(v1.4.3 `weak_run`).
+- 결과(실제 엔진, 전·후): 재현 입력 위험 → 주의, 업종 없는 "맛있는 김밥 전문점" 검토 권장 → 주의, 약한 낱말만으로 만든 이름 200 × 2방식에서 떨어진
+  묶음 때문에 검토 권장 이상 2 → 0, 지어낸 이름 대조군·심결 인용상표·심결 쌍 등급·시나리오 16종 변화 0, 심사 전 표장 184질의 중 1질의(WONSANDO COFFEE
+  wosando coffee 대 무관한 COMPOSE COFFEE — 양쪽에 떨어져 있는 coffee…coffee 를 규칙 1 이 묶음) 위험 → 검토 권장.
+- 남은 것(§6): 질의에 요부가 없으면 전체 대비라, 후보 쪽 약한 토큰과 겹치는 낱말 하나로도 호칭·철자가 높게 나올 수 있다(약한 낱말만의 이름 200 중 이름만
+  35% 가 다른 후보와의 단독 규칙으로 여전히 검토 권장 이상).
+
 ## 5. 유명 브랜드 예외·3호 확장 슬롯
 
 - 유명 브랜드: `famous_tokens()` = `korean_brands.KOREAN_BRAND_ROMANIZATION` 키·값(101) + `shared/famous_brands.txt`(DRAFT 39개 출원인명 + 2026-10-11 브랜드 토큰 줄 4: 갤럭시·GALAXY·오리온·ORION — 주지·저명 상표의 호칭, 한글·영문을 줄 하나씩) 각 줄을 X1 정규화한 첫 토큰(회사 형태·국적·법인 표기 토큰은 `_FAMOUS_SKIP` 으로 건너뜀) → 235개. 목록 파일이 바뀌면 다음 적재 때 반영된다. 2026-11-19 확정본부터 파일은 `[브랜드]` 표(수집용) + `[식별력 토큰]` 절로 나뉘고 `famous_token_lines` 가 토큰 절만 읽는다 — 토큰 절은 2026-10-12 목록 그대로라 토큰은 257개 그대로다(브랜드 표를 바꿔도 식별력 출력은 그대로, 새 목록에 맞출지는 재학습 때 결정; 절 머리가 없는 옛 형식은 주석 아닌 모든 줄). 유명 브랜드 토큰은 다수 등록·일반어 계수와 무관하게 1.0 이다(삼성·현대처럼 A 가 큰 하우스마크 보호). 브랜드 토큰 줄은 출원인명이 아니므로 `collect_pipeline --applicants-file` 에는 쓰지 않는다(파일 주석).
@@ -182,7 +204,7 @@
 ## 6. 한계(v0)
 
 - **3호는 사람 승인 목록(449항목)에 한정** — 상대어 378 은 일괄 승인이라 분류 초안의 류 판정이 그대로 쓰인다. 도안화가 글자를 압도하는 경우(X2 유형 판정 과제), 거래실정(실제 사용례), 암시·강조 판단의 주관성은 사람 승인에 기대며, 상품 미상 쌍(163)에서는 상대어가 0.5 상한에 머물러 제거되지 않는다(§3-3).
-- **강한 인상·전체 비중·결합으로 인한 새 관념은 결합 규칙 v0.2·v0.3 만큼만 반영**(2015후1690). 양쪽에 같은 순서로 있는 약한 토큰열과 붙여쓴 결합어 대 띄어쓴 토큰열(철자·읽기 동일 또는 유사도 ≥ 0.9)만 결합으로 본다. 어순이 바뀐 결합(에어부산 / BUSAN AIR), 임계 미달(ROYALEBEE 0.889), X1 영문 읽기가 다른 쌍(어반정글 / Urban Jungle), 단일 공통 토큰을 심결이 요부로 본 경우(rainbow 류 3건)는 못 본다(§4-1·§4-2). X1 v1.6 이 "약한 토큰만으로 된 이름"의 포함 검사는 막았지만, 요부 없는 이름끼리의 전체 대비에서 전체 비중(28지킴이 / 지킴이)은 여전히 반영하지 못한다.
+- **강한 인상·전체 비중·결합으로 인한 새 관념은 결합 규칙 v0.2–v0.4 만큼만 반영**(2015후1690). 두 이름 모두에서 붙어 있는 약한 토큰열(v0.4 — 사이에 다른 낱말이 끼면 결합으로 보지 않음)과 붙여쓴 결합어 대 띄어쓴 토큰열(철자·읽기 동일 또는 유사도 ≥ 0.9)만 결합으로 본다. 어순이 바뀐 결합(에어부산 / BUSAN AIR), 임계 미달(ROYALEBEE 0.889), X1 영문 읽기가 다른 쌍(어반정글 / Urban Jungle), 단일 공통 토큰을 심결이 요부로 본 경우(rainbow 류 3건)는 못 본다(§4-1·§4-2). X1 v1.6 이 "약한 토큰만으로 된 이름"의 포함 검사는 막았지만, 요부 없는 이름끼리의 전체 대비에서 전체 비중(28지킴이 / 지킴이)은 여전히 반영하지 못한다. 질의에 요부가 없으면(낱말이 모두 약함) 전체 대비라 후보 쪽 약한 토큰과 겹치는 낱말 하나로도 호칭·철자가 높게 나올 수 있다(약한 낱말만의 이름 200 중 이름만 35% 가 다른 후보와의 단독 규칙으로 검토 권장 이상 — §4-3, 통합 모델 설계 §7-10).
 - A·N 은 심판 목록 표본(42k)이라 실제 등록원부보다 훨씬 작다. GATE 처럼 실제로는 수백 건 등록된 부분이 A 4 로 잡힌다. 민감도 표의 θ_A 5 가 이를 일부 보정하지만 유사 쌍 부작용이 함께 는다.
 - 1호 판정은 공백 없는 단일 고시 명칭·별칭만 대조한다. 영문 고시 명칭과 두 토큰 이상 명칭("커피 음료")은 못 본다.
 - 지명·성 목록은 손으로 쓴 목록이다(읍·면, 희귀 성, 단어와 겹치는 로마자 성 제외).
@@ -209,7 +231,8 @@ token_score("커피", {"G0301"})           # 0.0  — 커피 유사군이면 1�
 salient_tokens("스타벅스 커피")            # [("스타벅스", 1.0)]
 has_distinctive_part("GATE")             # 토큰 점수에 따라 False 면 전체 대비
 pair_generic("Zorbix Gate", "Hello Gate")  # frozenset({"gate"}) → X1·X2 철자·X3 의 extra_generic
-combined_weak_run("Cool Touch", "쿨터치 COOL TOUCH")  # ("cool", "touch") — 결합 규칙 v0.2, pair_generic 은 비어 전체 대비
+combined_weak_run("Cool Touch", "쿨터치 COOL TOUCH")  # ("cool", "touch") — 결합 규칙(두 이름 모두에서 붙어 있음), pair_generic 은 비어 전체 대비
+combined_weak_run("맛있는 커피 전문점", "맛있는 만두 전문점 장수손만두 1976", {"G0301"})  # () — v0.4(사이에 낱말이 낌); version=1 이면 ("맛있는", "전문점")
 combined_single_match("SLIMLINE", "Slim Line")        # frozenset({"line"}) — 결합 규칙 v0.3(붙여쓴 결합어)
 ```
 
@@ -217,6 +240,11 @@ combined_single_match("SLIMLINE", "Slim Line")        # frozenset({"line"}) — 
 
 ## 8. 변경 이력
 
+- **v0.4 (2026-11-23, `fix/weak-run-adjacent`)**: 결합 규칙 `combined_weak_run` 규칙 2(기본) — 두 이름 모두에서 연속으로 붙어 있는 공통 약한 토큰 구간(2개 이상)만
+  요부 후보로 묶음(어느 한쪽에서라도 다른 낱말이 끼면 묶지 않음, 구간이 여럿이면 모두). 규칙 1(v0.2–v0.3 부분열)은 `version=1`·`pair_generic(…,
+  weak_run_version=1)` 로 남김, 상수 `WEAK_RUN_VERSIONS`·`DEFAULT_WEAK_RUN_VERSION`. `pair_axes.compute_pair_axes(…, weak_run_version=)`, 엔진은 계수 JSON
+  `weak_run.version`(통합 모델 v1.4.3 부터 2), 학습 특징 스크립트는 규칙 1 그대로(`--weak-run-version`). 견고성 점검 R-P0-2 — 학습 특징 변화 0, 확인 표본
+  채택 조건 ①–⑤ 통과(§4-3, 통합 모델 설계 §7-10). 테스트 +1(두 규칙)·옛 단언은 두 규칙으로.
 - **v0.3 (2026-11-22, 속도만, `perf/long-name-latency`)**: 결합 규칙 v0.3 계산 가속 — 판정·출력 그대로. 유사도 ≥ `COMBINED_SIMILARITY` 를 같은 부동소수 식의
   정수 거리 상한 `_max_distance` 와 띠 편집거리 `_within_distance` 로, 맞아도 더할 토큰이 없는 비교는 건너뛰고, `_combined_match_cached`·
   `_joined_readings_cached`·`_readings`·`_jamo` 를 LRU(`COMBINED_CACHE_SIZE` 20만)로. 긴 상표명 요청의 축 단계 95% 0.90–1.00 → 0.13–0.16초. 같은 입력의

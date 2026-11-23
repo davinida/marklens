@@ -1,14 +1,14 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
-  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1; 견고성 점검 P1 — `name` 의 보이지 않는 서식 문자 정리·빈 이미지 400·429·503 고정 문구·`/health` 의 검색 가능 여부 2026-11-23 — §1·§4-1·§5-1·§5-6·§5-7) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1; 이름 축의 약한 토큰열 결합을 두 이름 모두에서 붙어 있는 구간만 `weak_run`(통합 모델 v1.4.3, 식별력 v0.4, 견고성 점검 R-P0-2) 2026-11-23 — §2-2 `salient.removed`·`model_version`·§3; 견고성 점검 P1 — `name` 의 보이지 않는 서식 문자 정리·빈 이미지 400·429·503 고정 문구·`/health` 의 검색 가능 여부 2026-11-23 — §1·§4-1·§5-1·§5-6·§5-7) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
   §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약)·§7-4(v1.4 이름 없는 계수 집합, §7-4-4 실제 검색 기준 하한), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
   README "다음 단계"(서비스 연결 범위).
 - 코드 근거(2026-10-24 현재): 런타임 `ml/src/model/risk_model.py`(`risk_score → RiskResult(prob, grade, contributions, figure_caveat)`),
-  계수 `shared/model/risk_model_v1.4.2.json`(version `risk_model_v1.4.2`, 2026-11-23 부터 — v1.4.1 `risk_model_v1.4.1.json` 에 `logo_floor` 표시만 더함(§2-4 6항, 계수·하한 그대로); v1.4.1 은 v1.4 `risk_model_v1.4.json` 에서 이름 있는 판단의 검토 권장 하한만 바꾼 것; 이름 있는 계수는 v1.3 `risk_model_v1.json` 과 같음), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
+  계수 `shared/model/risk_model_v1.4.3.json`(version `risk_model_v1.4.3`, 2026-11-23 부터 — v1.4.2 `risk_model_v1.4.2.json` 에 `weak_run` 표시만 더함(이름 축의 식별력 결합 규칙 v0.4, 계수·하한 그대로); v1.4.2 는 v1.4.1 `risk_model_v1.4.1.json` 에 `logo_floor` 표시만 더한 것(§2-4 6항); v1.4.1 은 v1.4 `risk_model_v1.4.json` 에서 이름 있는 판단의 검토 권장 하한만 바꾼 것; 이름 있는 계수는 v1.3 `risk_model_v1.json` 과 같음), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
   `pair_generic`·`judge`), 축 함수 X1 `phonetic_similarity`·X2 철자 `orthographic_similarity`·X3 `semantic_similarity`·X4
   `goods_similarity`, 프론트-6 선택 지정상품 `frontend/lib/goods.ts`(`SelectedGood`·`goodsCodeUnion`).
 - §3 의 숫자는 위 코드로 **실제 계산한 값**이다(모델 한계도 그대로 드러난다 — §3-2, §5-3).
@@ -132,7 +132,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | `risk.pattern` | string | 아니오 | 쓰인 계수 집합: 이름 있는 판단 `base`·`x2_whole`·`x4`·`x2_whole+x4`, 이름 없는 판단 `noname:x2_whole`·`noname:x2_whole+x4`. 이름 있는 질의도 상표명이 없는 후보(순수 도형)와는 이름 없는 판단이 된다 — 화면은 요청 상태가 아니라 이 값으로 판별한다(§4-4) |
 | `salient.query_tokens` | string[] | 아니오 | 입력 상표명의 **요부 후보**(식별력 점수 ≥ θ 0.5, 이름 순서, NFKC·소문자 정규화). 이름이 없으면 빈 배열. 비어 있고 이름이 있으면 "요부 없음 → 전체 대비"(2000후2453) |
 | `salient.candidate_tokens` | string[] | 아니오 | 후보 상표명의 요부 후보(같은 규칙) |
-| `salient.removed[]` | `{ "token": s, "reason": s, "side": "query" \| "candidate" \| "both" }` | 아니오(빈 배열 가능) | 이 쌍의 비교에서 **실제로 뺀 토큰**(`pair_generic(query, title, goods_codes)` 결과)과 판정 사유(`judge().reasons` 를 `·` 로 이음: `1호 보통명칭`, `3호 기술적 표장:원재료(류 30,35,43)`, `4호 지명`, `5호 흔한 성`, `6호 간단 표장`, `일반어(zipf 4.6)`, `다수 등록(A=53, N=54)`). 결합 규칙 v0.2·v0.3 이 요부로 되돌린 토큰은 여기 없다(비교에 쓰였으므로) |
+| `salient.removed[]` | `{ "token": s, "reason": s, "side": "query" \| "candidate" \| "both" }` | 아니오(빈 배열 가능) | 이 쌍의 비교에서 **실제로 뺀 토큰**(`pair_generic(query, title, goods_codes)` 결과)과 판정 사유(`judge().reasons` 를 `·` 로 이음: `1호 보통명칭`, `3호 기술적 표장:원재료(류 30,35,43)`, `4호 지명`, `5호 흔한 성`, `6호 간단 표장`, `일반어(zipf 4.6)`, `다수 등록(A=53, N=54)`). 결합 규칙 v0.2·v0.3 이 요부로 되돌린 토큰은 여기 없다(비교에 쓰였으므로). 약한 토큰열 결합은 계수 JSON 의 `weak_run`(v1.4.3 부터 규칙 2 — 두 이름 모두에서 붙어 있는 구간만, 사이에 다른 낱말이 끼면 결합이 아니라 뺀다; 없으면 규칙 1 — 같은 순서면 사이 낱말이 있어도 결합)을 따른다 |
 | `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`) — 형식(G/S + 숫자 4–6자리)에 맞는 코드만(수집 원본의 형식이 다른 코드는 무시, 2026-11-20 기준 7건 108개). DB 보유 1,383/1,383건 — 없으면 빈 배열이고 `x4` 는 null |
 | `goods.jaccard` | 0–1 | `x4` 와 같은 조건으로 null | `axes.x4` 와 같은 값(지정상품 요약 영역용 중복 제공) |
 
@@ -140,7 +140,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4.2"`(2026-11-23 부터; v1.4.1 에 `logo_floor`(§2-4 6항)만 더함 — v1.4.1 은 v1.4 에서 이름 있는 판단의 검토 권장 하한만 바뀐 것, 계수는 v1.3 그대로. 2026-11-23 그 전은 `"risk_model_v1.4.1"`, 2026-11-20–22 는 `"risk_model_v1.4"`) |
+| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4.3"`(2026-11-23 부터; v1.4.2 에 `weak_run`(이름 축의 약한 토큰열 결합 규칙 — `salient.removed`)만 더함 — v1.4.2 는 v1.4.1 에 `logo_floor`(§2-4 6항)를, v1.4.1 은 v1.4 에서 이름 있는 판단의 검토 권장 하한만 바꾼 것, 계수는 v1.3 그대로. 2026-11-23 그 전은 `"risk_model_v1.4.2"`·`"risk_model_v1.4.1"`, 2026-11-20–22 는 `"risk_model_v1.4"`) |
 | `grade_precision` | 0–1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF, 행마다 자기 결측 패턴)에서 "위험"으로 분류된 152쌍 중 심결이 유사로 본 107쌍 → 0.7039 ≈ **0.70**(v1.3, 설계 §7-3; v1.2.1 은 159쌍 중 109 → 0.6855). 엔진은 JSON `meta.grade_precision` 을 읽는다(E-6) |
 | `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.5059, "위험": 0.5902 }` | **이름 있는 판단**의 등급 하한 p(JSON `grade_thresholds` — 이름 있는 계수 집합 4벌 공통). 안전은 0–0.0902. 검토 권장 0.5059 는 실제 검색 기준(2026-11-23, 통합 모델 설계 §7-6-2): 지어낸 상표명 대조군에서 무관한 후보 중 최고 위험도가 검토 권장 이상인 질의가 네 집합 모두 10% 이하가 되는 가장 낮은 공통 값(2026-11-22 까지 0.1805 — 심결 쌍 OOF 기준). 주의·위험은 v1.3 그대로 — 위험 0.5902 는 "정밀도 0.8 이상인 가장 낮은 p(지지 30)" 규칙이 미달해 쓴 대체값(그때의 검토 권장 하한 0.1805 와 1.0 의 중간) |
 | `thresholds.nameless` | `{ "noname:x2_whole": { "주의": 0.3677, "검토 권장": 0.491, "위험": 0.5724 }, "noname:x2_whole+x4": { "주의": 0.2944, "검토 권장": 0.4441, "위험": 0.7892 } }` | **이름 없는 판단**의 계수 집합(`risk.pattern`)별 등급 하한(JSON `nameless_patterns[키].grade_thresholds`). null 인 등급은 위험도로는 닿지 않는다. 값과 산출 방법은 §2-4 2항 |
@@ -231,9 +231,9 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 
 ## 3. 예시 JSON
 
-두 예시 모두 2026-11-23 현재 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,383건, 통합 모델 v1.4.2)이 낸 응답 그대로다
+두 예시 모두 2026-11-23 현재 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,383건, 통합 모델 v1.4.3)이 낸 응답 그대로다
 (`engine.multi_search`, 첫 호출 준비를 한 번 한 뒤의 호출 — `elapsed_ms` 는 그때 값; 2026-11-20 의 v1.4 예시와 다른 곳은 `model_version`·`thresholds.grade`
-검토 권장·문자상표 예시 3·4위 등급(검토 권장 → 주의)·`elapsed_ms` 뿐 — 두 예시는 이름 + 이미지 질의가 아니라 v1.4.2 의 `logo_floor` 가 걸리지 않아, 같은 날 v1.4.1 예시와는 `model_version`·`elapsed_ms` 만 다르다). `image_url` 만 브라우저 측 값(`/api/images/…`)으로
+검토 권장·문자상표 예시 3·4위 등급(검토 권장 → 주의)·`elapsed_ms` 뿐 — 두 예시는 이름 + 이미지 질의가 아니라 v1.4.2 의 `logo_floor` 가 걸리지 않아, 같은 날 v1.4.1 예시와는 `model_version`·`elapsed_ms` 만 다르다; v1.4.3 의 `weak_run` 도 두 예시에서 결과를 바꾸지 않아 v1.4.2 예시와 `model_version`·`elapsed_ms` 만 다르다). `image_url` 만 브라우저 측 값(`/api/images/…`)으로
 바꿨다. 프론트는 이 두 응답을 Vitest 픽스처(`frontend/test/fixtures/search-v2-{text,image}.json`, 블록과 바이트 단위로 같음)로,
 백엔드는 스키마·키 집합 시험에 그대로 쓴다.
 
@@ -511,7 +511,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4.2",
+    "model_version": "risk_model_v1.4.3",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
@@ -548,7 +548,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 20,
       "total": 64
     },
-    "elapsed_ms": 66
+    "elapsed_ms": 57
   },
   "dataset_info": {
     "총_상표수": 1383,
@@ -766,7 +766,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4.2",
+    "model_version": "risk_model_v1.4.3",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
@@ -803,7 +803,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 0,
       "total": 20
     },
-    "elapsed_ms": 281
+    "elapsed_ms": 267
   },
   "dataset_info": {
     "총_상표수": 1383,

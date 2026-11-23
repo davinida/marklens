@@ -1,4 +1,4 @@
-"""식별력·요부 v0.3 — 상표명 토큰마다 식별력 점수(0 약함 ~ 1 강함)를 매기고 요부(식별력 있는
+"""식별력·요부 v0.4 — 상표명 토큰마다 식별력 점수(0 약함 ~ 1 강함)를 매기고 요부(식별력 있는
 부분)를 고른다. X1·X2 문자 외관·X3 가 `extra_generic` 으로 넘겨받을 "식별력 없는 토큰"을 공급하는
 필터다(작업가이드 다빈-3). 축 함수가 아니므로 공통-2 규약(파일 없음)은 적용하지 않고, goods_map
 처럼 집계 파일(`shared/distinctiveness/token_stats.json`)을 적재한다. 학습 없음, KIPRIS 호출 없음.
@@ -21,6 +21,10 @@
       v0.3: 한쪽의 붙여쓴 토큰(SLIMLINE·혹달린신발·QUICKPATH)이 다른 쪽의 연속 토큰열(Slim Line·
       혹 달린 신발·QUICK PASS)을 이어 붙인 것과 철자·읽기(토큰별 X1 읽기 연결)로 같거나 유사도
       ≥ 0.9 이면 그 결합도 요부로 본다(`combined_single_match`).
+      v0.4(2026-11-23, 견고성 점검 R-P0-2): `combined_weak_run` 은 두 이름 모두에서 연속으로 붙어
+      있는 공통 약한 토큰 구간만 묶는다 — 어느 한쪽에서라도 다른 낱말이 끼면 묶지 않는다("맛있는
+      커피 전문점" / "맛있는 만두 전문점 장수손만두" 의 맛있는·전문점은 결합이 아님). v0.2–v0.3 의
+      부분열 정의는 version 1 로 남긴다(엔진은 계수 JSON 의 weak_run.version 을 쓴다).
     - 상표법 33조 1항: 1호 보통명칭(goods_codes 가 있으면 그 류·유사군의 고시 명칭과 일치할 때만,
       없으면 전역 고시 단일 명칭 일치), 4호 현저한 지리적 명칭(X1 지명표 34 + 시·군·구 목록),
       5호 흔한 성(상위 30 + "~네/~가네/~씨네"), 6호 간단하고 흔한 표장(영문 2자 이하·숫자 2자 이하·
@@ -41,7 +45,7 @@
         다수 등록 계수 = 1 − min(1, A/θ_A) × min(1, N/θ_N)                  (A·N 둘 다 커야 0)
     요부 후보 = 점수 ≥ θ(0.5) 인 토큰. 하나도 없으면 요부 없음(전체 대비).
 
-알려진 한계(v0.3): 3호는 사람이 승인한 목록(상대어 378·절대어 57)만, 강한 인상·전체 비중·결합으로
+알려진 한계(v0.4): 3호는 사람이 승인한 목록(상대어 378·절대어 57)만, 강한 인상·전체 비중·결합으로
 인한 새 관념 미반영(결합 규칙은 양쪽 토큰열의 공통 부분열과 붙여쓴 결합어 대응만 — 어순이 바뀐
 결합(에어부산 / BUSAN AIR)과 X1 읽기가 다른 영문(touch → 타우치)은 미적용), A·N 은 등록원부가
 아니라 심판 목록 표본이라 실제보다 작다, 영문 고시 명칭 미대조, 한자 토큰은 버린다.
@@ -75,6 +79,7 @@ __all__ = [
     "goods_index", "read_descriptive_terms", "validate_descriptive_terms", "unapproved_terms",
     "update_descriptive_approvals", "read_weak_overrides", "update_weak_overrides",
     "DESCRIPTIVE_TERMS", "DESCRIPTIVE_KINDS", "THETA", "THETA_A", "THETA_N",
+    "WEAK_RUN_VERSIONS", "DEFAULT_WEAK_RUN_VERSION",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -107,6 +112,11 @@ COMBINED_SIMILARITY = 0.9  # v0.3 결합어 판정: 붙여쓴 토큰 vs 이어 �
 COMBINED_READINGS_CAP = 64  # 토큰별 읽기 조합 상한(조합 폭발 방지)
 # (붙여쓴 토큰, 토큰열) 판정 LRU 상한 — 요청을 넘나들며 같은 쌍을 다시 재지 않는다
 COMBINED_CACHE_SIZE = 200_000
+# 결합 규칙의 약한 토큰열(combined_weak_run) 정의 — 1: v0.2–v0.3(양쪽 약한 토큰열의 가장 긴 공통
+# 부분열, 사이에 다른 낱말이 있어도 묶음), 2: v0.4(2026-11-23 — 두 이름 모두에서 연속으로 붙어 있는
+# 공통 약한 토큰 구간만). 엔진은 계수 JSON 의 weak_run.version 을 쓰고(없으면 1), 기본값은 2.
+WEAK_RUN_VERSIONS = (1, 2)
+DEFAULT_WEAK_RUN_VERSION = 2
 SUFFIX_MIN_SYLLABLES = 2  # 접미 분리(E-3): 고시 단일 명칭 접미는 2음절 이상
 SUFFIX_MIN_PREFIX = 2  # 접미 분리: 앞부분도 2음절 이상(1음절 앞부분은 오분리가 많아 나누지 않는다)
 JUDGE_CACHE_SIZE = 200_000  # 토큰 판정 캐시 상한(넘으면 비운다)
@@ -644,15 +654,27 @@ class Distinctiveness:
         return bool(self.salient_tokens(name, goods_codes))
 
     def combined_weak_run(
-        self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+        self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None, *,
+        version: int = DEFAULT_WEAK_RUN_VERSION,
     ) -> tuple[str, ...]:
-        """결합 규칙 v0.2(2015후1690 결합상태): 약한 토큰 2개 이상이 같은 순서로 양쪽 이름에
-        있으면 그 결합을 하나의 요부 후보로 본다. 양쪽 약한 토큰열(이름 순서)의 가장 긴 공통
-        부분열을 돌려주고, 2개 미만이면 ()."""
-        weak_a = [j.token for j in self.judge_name(name_a, goods_codes) if j.score < self.theta]
-        weak_b = [j.token for j in self.judge_name(name_b, goods_codes) if j.score < self.theta]
-        run = _common_subsequence(weak_a, weak_b)
-        return run if len(run) >= 2 else ()
+        """결합 규칙(2015후1690 결합상태): 양쪽 이름에 같은 순서로 있는 약한 토큰 2개 이상의 결합을
+        하나의 요부 후보로 본다. 2개 미만이면 ().
+
+        version 2(v0.4, 기본): 두 이름 모두에서 연속으로 붙어 있는 공통 약한 토큰 구간(2개 이상)의
+        토큰만 — 어느 한쪽에서라도 다른 낱말(약하든 아니든)이 끼면 묶지 않는다. 그런 구간이 여럿이면
+        모두(이름 A 순서, 중복 없이). version 1(v0.2–v0.3): 양쪽 약한 토큰열(이름 순서)의 가장 긴
+        공통 부분열 — 사이 낱말은 보지 않는다."""
+        if version not in WEAK_RUN_VERSIONS:
+            raise ValueError(f"combined_weak_run version 은 {WEAK_RUN_VERSIONS} 중 하나입니다")
+        judged_a = self.judge_name(name_a, goods_codes)
+        judged_b = self.judge_name(name_b, goods_codes)
+        if version == 1:
+            weak_a = [j.token for j in judged_a if j.score < self.theta]
+            weak_b = [j.token for j in judged_b if j.score < self.theta]
+            run = _common_subsequence(weak_a, weak_b)
+            return run if len(run) >= 2 else ()
+        return _adjacent_weak_runs([(j.token, j.score < self.theta) for j in judged_a],
+                                   [(j.token, j.score < self.theta) for j in judged_b])
 
     def combined_single_match(
         self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
@@ -698,18 +720,20 @@ class Distinctiveness:
         return frozenset(withheld)
 
     def pair_generic(
-        self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+        self, name_a: str, name_b: str, goods_codes: Iterable[str] | None = None, *,
+        weak_run_version: int = DEFAULT_WEAK_RUN_VERSION,
     ) -> frozenset[str]:
         """축 연결용: 두 이름의 약한 토큰 합집합. 요부가 하나도 없는 이름은 토큰을 넘기지 않는다
         (전부 식별력이 없으면 전체로 대비 — 2000후2453). 양쪽에 같은 순서로 있는 약한 토큰
-        2개 이상의 결합(`combined_weak_run`, v0.2)과 붙여쓴 결합어에 대응하는 토큰열
-        (`combined_single_match`, v0.3)은 요부 후보로 보아 넘기지 않는다. X1 의 제거 전 전체 결합
-        후보는 X1 이 유지한다."""
+        2개 이상의 결합(`combined_weak_run` — weak_run_version 2 는 두 이름 모두에서 붙어 있는
+        구간만, 1 은 v0.2–v0.3 부분열)과 붙여쓴 결합어에 대응하는 토큰열(`combined_single_match`,
+        v0.3)은 요부 후보로 보아 넘기지 않는다. X1 의 제거 전 전체 결합 후보는 X1 이 유지한다."""
         generic: set[str] = set()
         for name in (name_a, name_b):
             if self.has_distinctive_part(name, goods_codes):
                 generic |= self.weak_tokens(name, goods_codes)
-        generic -= set(self.combined_weak_run(name_a, name_b, goods_codes))
+        generic -= set(self.combined_weak_run(name_a, name_b, goods_codes,
+                                              version=weak_run_version))
         generic -= self.combined_single_match(name_a, name_b, goods_codes)
         return frozenset(generic)
 
@@ -848,6 +872,26 @@ def combined_single_match(
     return load_distinctiveness().combined_single_match(name_a, name_b, goods_codes)
 
 
+def _adjacent_weak_runs(left: list[tuple[str, bool]],
+                        right: list[tuple[str, bool]]) -> tuple[str, ...]:
+    """두 (토큰, 약함) 열에서 연속으로 붙어 있는 공통 약한 토큰 구간(2개 이상)의 토큰 — 이름 A
+    순서, 중복 없이(결합 규칙 v0.4). 구간 안의 토큰은 양쪽 모두 약하고 같은 자리 순서로 같아야
+    한다 — 어느 한쪽에서라도 다른 낱말이 끼면 구간이 끊긴다."""
+    out: list[str] = []
+    for i in range(len(left)):
+        for j in range(len(right)):
+            length = 0
+            while (i + length < len(left) and j + length < len(right)
+                   and left[i + length][1] and right[j + length][1]
+                   and left[i + length][0] == right[j + length][0]):
+                length += 1
+            if length >= 2:
+                for token, _ in left[i:i + length]:
+                    if token not in out:
+                        out.append(token)
+    return tuple(out)
+
+
 def _common_subsequence(left: list[str], right: list[str]) -> tuple[str, ...]:
     """두 토큰열의 가장 긴 공통 부분열(순서 유지, 인접 불요). 길이가 같은 후보가 여럿이면 앞쪽
     토큰을 우선한다(결정적)."""
@@ -942,15 +986,18 @@ def has_distinctive_part(name: str, goods_codes: Iterable[str] | None = None) ->
 
 
 def pair_generic(
-    name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+    name_a: str, name_b: str, goods_codes: Iterable[str] | None = None, *,
+    weak_run_version: int = DEFAULT_WEAK_RUN_VERSION,
 ) -> frozenset[str]:
-    return load_distinctiveness().pair_generic(name_a, name_b, goods_codes)
+    return load_distinctiveness().pair_generic(name_a, name_b, goods_codes,
+                                               weak_run_version=weak_run_version)
 
 
 def combined_weak_run(
-    name_a: str, name_b: str, goods_codes: Iterable[str] | None = None
+    name_a: str, name_b: str, goods_codes: Iterable[str] | None = None, *,
+    version: int = DEFAULT_WEAK_RUN_VERSION,
 ) -> tuple[str, ...]:
-    return load_distinctiveness().combined_weak_run(name_a, name_b, goods_codes)
+    return load_distinctiveness().combined_weak_run(name_a, name_b, goods_codes, version=version)
 
 
 def split_goods_suffix(name: str) -> str:

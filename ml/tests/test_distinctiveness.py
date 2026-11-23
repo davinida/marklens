@@ -232,10 +232,30 @@ def test_combined_weak_run_requires_same_order():
     assert generic == frozenset({"cool", "touch"})
     assert phonetic_similarity("Touch Cool Zorbix", "Cool Touch Qwzy") == 1.0  # 공통 토큰 분리관찰
     assert phonetic_similarity("Touch Cool Zorbix", "Cool Touch Qwzy", extra_generic=generic) < 0.6
-    # 인접하지 않아도 순서가 같으면 결합(공통 부분열)
-    assert model.combined_weak_run("Cool Zorbix Touch", "Cool Touch Qwzy") == ("cool", "touch")
+    # v0.4(규칙 2, 기본): 어느 한쪽에서라도 다른 낱말이 끼면 결합이 아니다(견고성 점검 R-P0-2).
+    # v0.2–v0.3(규칙 1)은 인접하지 않아도 순서가 같으면 결합(공통 부분열) — 옛 계산 재현용
+    assert model.combined_weak_run("Cool Zorbix Touch", "Cool Touch Qwzy") == ()
+    assert model.combined_weak_run("Cool Zorbix Touch", "Cool Touch Qwzy", version=1) == (
+        "cool", "touch")
     assert dx._common_subsequence(["a", "b", "c"], ["b", "c", "a"]) == ("b", "c")
     assert dx._common_subsequence([], ["a"]) == ()
+
+
+def test_combined_weak_run_v04_joins_only_runs_adjacent_in_both_names():
+    """식별력 v0.4(견고성 점검 R-P0-2): 두 이름 모두에서 연속으로 붙어 있는 공통 약한 토큰 구간만
+    묶는다 — 구간이 여럿이면 모두(이름 A 순서), 어느 한쪽에서라도 다른 낱말이 끼면 끊긴다."""
+    model = _model_with_weak("cool", "touch", "fresh", "juice")
+    assert model.combined_weak_run("Fresh Juice Zorbix Cool Touch", "Fresh Juice Cool Touch") == (
+        "fresh", "juice", "cool", "touch")
+    assert model.combined_weak_run("Cool Fresh Touch", "Cool Touch Qwzy") == ()  # 약한 낱말이 낌
+    assert model.combined_weak_run("Cool Zorbix Touch", "Cool Touch Qwzy") == ()  # 요부가 낌
+    assert model.combined_weak_run("Cool Touch Zorbix", "Qwzy Cool Touch") == ("cool", "touch")
+    assert model.pair_generic("Cool Zorbix Touch", "Cool Touch Qwzy") == frozenset(
+        {"cool", "touch"})
+    assert model.pair_generic("Cool Zorbix Touch", "Cool Touch Qwzy",
+                              weak_run_version=1) == frozenset()
+    with pytest.raises(ValueError):
+        model.combined_weak_run("Cool Touch", "Cool Touch", version=3)
 
 
 def test_combined_single_match_keeps_joined_pairs():

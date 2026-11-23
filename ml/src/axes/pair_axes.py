@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from . import x3_semantic as x3
-from .distinctiveness import Distinctiveness
+from .distinctiveness import DEFAULT_WEAK_RUN_VERSION, Distinctiveness
 from .x1_phonetic import has_pronunciation, phonetic_similarity
 from .x2_ortho import DEFAULT_SPELLING_VERSION, has_spelling, orthographic_similarity
 from .x4_goods import goods_similarity, has_goods
@@ -131,6 +131,7 @@ def compute_pair_axes(
     goods_b: Iterable[str] | str | None = None,
     x3_enabled: bool = True,
     spelling_version: int = DEFAULT_SPELLING_VERSION,
+    weak_run_version: int = DEFAULT_WEAK_RUN_VERSION,
 ) -> PairAxes:
     """질의 이름 A 와 후보 이름 B 의 축 점수·요부 정보. 이름이 비면 호출하지 않는다(엔진이 결측
     처리).
@@ -138,12 +139,15 @@ def compute_pair_axes(
     x3_enabled=False(MARKLENS_X3_ENABLED=0)면 x3 는 None·has_meaning_both False 로 두어 모델이
     관념을
     결측으로 본다. spelling_version 은 x2_text 의 철자 정의(기본 1 — v1.3·v1.4 와 지금 서비스).
+    weak_run_version 은 식별력 결합 규칙의 약한 토큰열 정의(기본 2 = v0.4 붙어 있는 구간만,
+    1 = v0.2–v0.3 부분열 — 서비스는 통합 모델 JSON 의 weak_run.version,
+    `risk_model.weak_run_version`).
     """
     a = model.split_goods_suffix(clean_name(name_a))
     b = model.split_goods_suffix(clean_name(name_b))
     codes_a, codes_b = normalize_codes(goods_a), normalize_codes(goods_b)
     goods = (codes_a | codes_b) or None
-    generic = model.pair_generic(a, b, goods)
+    generic = model.pair_generic(a, b, goods, weak_run_version=weak_run_version)
 
     x1_raw = phonetic_similarity(a, b, extra_generic=generic)
     x2_raw = orthographic_similarity(a, b, extra_generic=generic, version=spelling_version)
