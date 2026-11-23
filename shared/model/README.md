@@ -22,13 +22,22 @@
 
 재학습(프로젝트 루트, KIPRIS 호출 0, 기본 2방법 약 13초): `ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images`(쉬운 음성 이미지 축, 5초) →
 `ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-23 부터 서비스 기본 모델은 아래
-`risk_model_v1.4.1.json`(런타임 `MODEL_VERSION` risk_model_v1.4.1, `DEFAULT_MODEL_PATH`; 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
+`risk_model_v1.4.2.json`(런타임 `MODEL_VERSION` risk_model_v1.4.2, `DEFAULT_MODEL_PATH`; 같은 날 그 전은 `risk_model_v1.4.1.json`, 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
 (패턴 없는 JSON 은 최상위 계수 집합 하나로, 없는 키는 규칙 미적용).
 
-## `risk_model_v1.4.1.json` — v1.4.1 (이름 있는 판단의 검토 권장 하한), 서비스 기본 모델 (2026-11-23)
+## `risk_model_v1.4.2.json` — v1.4.2 (같은 로고 + 다른 이름 — 이미지만 판단과 견주기), 서비스 기본 모델 (2026-11-23)
 
-**2026-11-23 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V141_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
-파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.json` 에서 최상위 `grade_thresholds` 의 검토 권장만 0.1805 → **0.5059** 로 바꾼 것이다(이름 있는 계수 집합 4벌이
+**2026-11-23 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V142_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
+파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.1.json` 에 `logo_floor` 표시(`{"enabled": true, …}` — 적용 범위·근거 문장 포함)만 더한 것이다 — 계수·
+하한·단독 임계값·도형 규칙·결합 제약·`grade_precision` 은 v1.4.1 그대로. 표시가 켜져 있으면 엔진이 이미지가 있는 이름 있는 질의(질의 이미지가 사진이 아니고 유형을
+도형계로 고치지 않은 것)에서 후보마다 이름도 업종도 뺀 이미지만 판단(`noname:x2_whole`)과 견줘 높은 등급·정렬 위치를 쓴다(`rule_triggers` `nameless_floor`,
+API 계약 v2 §2-4 6항, 견고성 점검 R-P0-1, 통합 모델 설계 §7-9). 표시가 없는 v1.4.1 JSON 을 `MARKLENS_RISK_MODEL` 로 지정하면 예전 동작이다(런타임
+`logo_floor_enabled`, 형식은 `validate_model` 이 검사). `ml/scripts/logo_floor_image_only.py apply` 가 v1.4.1 JSON 에서 만든다 — v1.4.1 과 다른 키는 `version`·
+`logo_floor`·`meta.logo_floor`(원본 버전·설정 sha256·스크립트)뿐이고 `ml/tests/test_risk_model.py` 가 이를 고정한다. v1.4.1 JSON 을 다시 쓰면 이 파일도 다시 만들어야 한다.
+
+## `risk_model_v1.4.1.json` — v1.4.1 (이름 있는 판단의 검토 권장 하한), v1.4.2 의 원본 (2026-11-23)
+
+**2026-11-23 그 전 서비스가 읽던 기본 모델이고, 지금은 v1.4.2 의 원본이다**(런타임 `V141_MODEL_PATH`). 아래 `risk_model_v1.4.json` 에서 최상위 `grade_thresholds` 의 검토 권장만 0.1805 → **0.5059** 로 바꾼 것이다(이름 있는 계수 집합 4벌이
 같이 쓰는 하한 — 주의 0.0902·위험 0.5902·계수·이름 없는 집합과 그 하한·단독 임계값·도형 규칙·결합 제약·`grade_precision` 은 v1.4 그대로). 값은 실제 검색 기준이다 —
 지어낸 상표명 대조군에서 무관한 후보 중 최고 위험도가 검토 권장 이상인 질의가 네 집합 모두 10% 이하가 되는 가장 낮은 공통 값(통합 모델 설계 §7-6-2).
 `ml/scripts/named_shared_threshold.py apply` 가 v1.4 JSON 에서 만든다 — v1.4 와 다른 키는 `version`·`grade_thresholds`·`grade_basis`·`meta.named_grade_thresholds`(출처·설정

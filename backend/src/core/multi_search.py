@@ -35,7 +35,10 @@ multi_search 가 ModelNotReadyError 를 낸다. 발음·관념 캐시는 phoneti
 사진 판정(src.photo_mark): 질의 이미지가 사진이면 caveat PHOTO_QUERY — 이름이 있으면 이미지 축을
 관측 없음으로 계산(학습에서 사진 쌍의 이미지를 뺀 것과 같게), 이름이 없으면 계산은 그대로.
 유형을 도형계로 고친 질의(type_override)에 이름과 이미지가 있으면 같은 입력에서 이름을 뺀 판단의
-등급이 더 높을 때 그쪽을 쓴다(rule_triggers 에 nameless_floor — 자동 유형에는 적용하지 않는다).
+등급이 더 높을 때 그쪽을 쓴다(rule_triggers 에 nameless_floor). 계수 JSON 이 logo_floor 를 켜면
+(v1.4.2, 2026-11-23) 그 밖의 이미지가 있는 이름 있는 질의도 후보마다 이름도 업종도 뺀 "이미지만"
+판단(유형은 이름 없이 넣었을 때의 유형)과 견줘 높은 등급·위치를 쓴다(같은 nameless_floor — 업종이
+들어간 이름 없는 판단은 쓰지 않는다). 질의 이미지가 사진이면 이 비교를 하지 않는다.
 
 규약: 동기 함수(CPU 작업은 API 가 기존 스레드 풀로 돌린다, asyncio 없음), 로그에 검색어·이미지
 미기록(풀
@@ -112,7 +115,7 @@ CAVEAT_X3_DISABLED = "관념 축이 꺼져 있어(MARKLENS_X3_ENABLED=0) 관념 
 CAVEAT_NAME_SUGGESTED = ("이미지에서 '{text}'를 읽었습니다 — 상표명으로 넣으면 호칭·철자·관념도 "
                          "비교합니다")
 GOODS_CODE_PATTERN = re.compile(r"^[GS]\d{4,6}$")  # 유사군 코드 형식(G/S + 숫자 4~6자리)
-NAMELESS_FLOOR = "nameless_floor"  # 유형을 도형계로 고친 질의에서 이름 없는 판단이 쓰였다
+NAMELESS_FLOOR = "nameless_floor"  # 이름 있는 이미지 질의에서 로고만 판단의 등급이 쓰였다
 GOODS_FLOOR = "goods_floor"  # 업종이 겹치는 이름 없는 판단에서 이미지만 판단의 등급이 쓰였다
 # search_pool 단계별 시간(PoolResult.timings 키) — 축 = compute_pair_axes(관념 축 MiniLM 포함),
 # 모델 = 그 밖의 채점(risk_score·nameless_floor 비교·기여도)
@@ -585,6 +588,13 @@ def _nameless_features(features: dict) -> dict:
             "has_distinctive_part_a": True, "has_distinctive_part_b": True}
 
 
+def _image_only_features(x2_img: float, level: str) -> dict:
+    """이름도 업종도 뺀 이미지만 입력(엔진의 이름 없는 이미지 질의와 같은 꼴)."""
+    return {"x1_d": None, "x2_text_d": None, "x2_whole": x2_img, "x3_d": None, "x4": None,
+            "has_meaning_both": False, "has_distinctive_part_a": True,
+            "has_distinctive_part_b": True, "mark_type": level}
+
+
 def _clip01(value: float) -> float:
     return min(1.0, max(0.0, float(value)))
 
@@ -651,22 +661,43 @@ class QueryContext:
     query_type: QueryType
     photo: bool  # 질의 이미지가 사진(src.photo_mark)
     nameless_floor: bool  # 유형을 도형계로 고친 질의 + 이름 + 이미지(계약 §2-4 6항)
+    logo_floor: bool  # 그 밖의 이름 + 이미지(사진 아님) — 계수 JSON 이 켤 때(v1.4.2)
+    nameless_level: str  # 같은 입력에서 이름을 뺀 질의의 유형(이미지만 판단에 쓴다)
     x3_on: bool
     model: dict
     distinct: object
 
 
+def nameless_level(query_type: QueryType) -> str:
+    """같은 입력에서 이름을 뺀 질의가 받을 유형(계약 §2-4 5항) — 이미지만 판단(logo_floor)에
+    쓴다. 사용자 유형은 이름 없이 고른 것과 같게(결합 → 결합-도형요부, 문자·도형 그대로), 자동
+    유형은 이름 없는 이미지 질의처럼 OCR 글자 영역 ≥ 0.05 면 결합-도형요부, 그 밖·OCR 실패면 도형.
+    이름 없는 계수 집합은 도형계에만 ×도형계 항이 있어, 이름 있는 질의의 유형(문자계)을 그대로
+    쓰면 같은 로고가 0.634(위험) 대신 0.556(검토 권장)이 된다."""
+    if query_type.source == "user":
+        return "결합-도형요부" if query_type.type.startswith("결합") else query_type.type
+    text_ratio = (query_type.detail or {}).get("text_ratio")
+    if text_ratio is not None and float(text_ratio) >= mt.TEXT_RATIO_FIGURE:
+        return "결합-도형요부"
+    return "도형"
+
+
 def make_context(name: str | None, goods: frozenset[str] | None, embedding: np.ndarray | None,
                  query_type: QueryType, x3_on: bool) -> QueryContext:
-    """질의 맥락. 사진 판정과 이름 없는 판단 비교(type_override 도형계 + 이름 + 이미지 — 자동 유형은
-    이름이 있으면 문자계라 해당 없음)를 여기서 정한다."""
+    """질의 맥락. 사진 판정과 이름을 뺀 판단과의 비교 두 가지 — nameless_floor(유형을 도형계로 고친
+    질의 + 이름 + 이미지, 예전 그대로)·logo_floor(그 밖의 이름 + 이미지, 사진 아님, 계수 JSON 이 켤
+    때 — 이미지만 판단)를 여기서 정한다."""
     if state.model is None or state.distinct is None:
         raise ModelNotReadyError(state.error or "통합 모델이 준비되지 않았습니다.")
+    photo = is_photo_query(embedding)
+    named_image = name is not None and embedding is not None
+    user_figure = query_type.source == "user" and query_type.type in rm.FIGURE_FAMILY
     return QueryContext(
-        name=name, goods=goods, embedding=embedding, query_type=query_type,
-        photo=is_photo_query(embedding),
-        nameless_floor=(query_type.source == "user" and query_type.type in rm.FIGURE_FAMILY
-                        and name is not None and embedding is not None),
+        name=name, goods=goods, embedding=embedding, query_type=query_type, photo=photo,
+        nameless_floor=user_figure and named_image,
+        logo_floor=(rm.logo_floor_enabled(state.model) and named_image and not user_figure
+                    and not photo),
+        nameless_level=nameless_level(query_type),
         x3_on=x3_on, model=state.model, distinct=state.distinct,
     )
 
@@ -770,6 +801,16 @@ def score_record(record: Record, ctx: QueryContext,
             if rm.GRADES.index(other.result.grade) > rm.GRADES.index(judged.result.grade):
                 judged = Judgment(other.result, other.values, other.triggers + (NAMELESS_FLOOR,),
                                   other.rank)  # 같으면 이름 있는 쪽
+    if ctx.logo_floor and x2_img is not None:
+        # 이름도 업종도 뺀 "이미지만" 판단(유형은 이름 없이 넣었을 때의 유형)과 견준다 — 상표명
+        # 없는 후보도. 업종이 들어간 이름 없는 판단은 쓰지 않는다(업종 겹침에 기대 무관한 로고도
+        # 올리므로, 설계 §7-7·§7-9). 정렬 위치는 둘 중 높은 쪽, 등급이 같으면 원래 판단
+        level = ctx.nameless_level
+        other = _judge(_image_only_features(x2_img, level), model, level)
+        rank = max(rank, other.rank)
+        if rm.GRADES.index(other.result.grade) > rm.GRADES.index(judged.result.grade):
+            judged = Judgment(other.result, other.values, other.triggers + (NAMELESS_FLOOR,),
+                              other.rank)
     result, values, triggers = judged.result, judged.values, judged.triggers
     contributions, missing = _group_contributions(result.contributions)
     return CandidateResult(
