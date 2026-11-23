@@ -1,10 +1,14 @@
 """견고성 점검(2026-11-23, docs/MarkLens_견고성_보안_점검.md) — 오류는 아니지만 결과가 이상한 입력의
 회귀 시험. 실제 식별력 모델(shared/distinctiveness)과 배포 계수 JSON 으로 쌍 하나를 채점한다
 (CLIP·X3 없이 — 관념 축은 결측으로 둔다). 지금 고쳐지지 않은 항목은 strict xfail, 사유에 점검 문서의
-항목 번호.
+항목 번호(R-P1-6 은 2026-11-23 고쳐 통과 시험).
 """
 
 from __future__ import annotations
+
+import json
+import unicodedata
+from pathlib import Path
 
 import pytest
 from src.axes import pair_axes as pa
@@ -51,9 +55,8 @@ def test_descriptive_only_name_with_one_shared_weak_word_stays_low(dist):
     assert axes.x1_raw < 0.5 and result.grade in ("안전", "주의")
 
 
-@pytest.mark.xfail(strict=True, reason="R-P1-6: 이름 속 보이지 않는 서식 문자(U+200B 등)가 토큰을 "
-                                       "갈라 축 점수·등급이 바뀜")
 def test_invisible_format_characters_do_not_change_the_judgment(dist):
+    """R-P1-6(고침, 2026-11-23): clean_name 이 서식 문자(Cf)를 지워 원본과 같은 판단."""
     plain_axes, plain = _score(dist, "블루커피", "BLU hands")
     differ = {}
     for label, char in INVISIBLE.items():
@@ -65,6 +68,38 @@ def test_invisible_format_characters_do_not_change_the_judgment(dist):
             differ[label] = seen
     assert not differ, differ
 
+
+def test_clean_input_name_removes_format_characters_and_composes_nfc():
+    """R-P1-6: API·엔진 공통 정리 — 서식 문자(Cf: 폭 없는 공백·BOM·부드러운 붙임표·양방향 제어 문자)
+    제거, NFC, 앞뒤 공백. 호환 문자·대소문자는 그대로(상표명 확인은 원문 질의), 엔진의 clean_name 은
+    그 뒤 NFKC."""
+    import unicodedata
+
+    for char in (*INVISIBLE.values(), "\u202e", "\u2066", "\u200e"):
+        assert pa.clean_input_name(f" 블{char}루커피 ") == "블루커피"
+    assert pa.clean_input_name(unicodedata.normalize("NFD", "블루커피")) == "블루커피"
+    assert pa.clean_input_name("\u200b\ufeff") == ""
+    assert pa.clean_input_name("ＳＴＡＲ Bucks") == "ＳＴＡＲ Bucks"  # 호환 문자는 그대로
+    assert pa.clean_name("ＳＴＡＲ\u200b  Bucks") == "STAR Bucks"  # 엔진은 NFKC·공백 정리까지
+
+
+
+SHARED_CASES = (Path(__file__).resolve().parents[2] / "shared" / "text"
+                / "clean_input_name_cases.json")
+
+
+def test_clean_input_name_matches_the_shared_cases():
+    """B14·U3: 프런트 frontend/lib/markName.ts 의 cleanInputName 과 같은 공용 사례(Vitest
+    markName.test.ts 도 같은 파일) — 결과가 같고, 사례 파일의 서식 문자·공백 집합이 지금 파이썬과
+    같다(파이썬을 올려 유니코드 판이 바뀌면 이 시험이 알린다 — 사례 파일과 markName.ts 를 다시
+    만든다)."""
+    data = json.loads(SHARED_CASES.read_text(encoding="utf-8"))
+    for case in data["cases"]:
+        assert pa.clean_input_name(case["input"]) == case["expected"], case["note"]
+    assert data["python_unicode_version"] == unicodedata.unidata_version
+    assert data["format_code_points"] == [
+        cp for cp in range(0x110000) if unicodedata.category(chr(cp)) == "Cf"]
+    assert data["strip_code_points"] == [cp for cp in range(0x110000) if chr(cp).isspace()]
 
 def test_case_width_and_spacing_variants_give_the_same_judgment(dist):
     """가드 — 대소문자·전각·앞뒤 공백·NFD 는 지금도 같은 판단(점검 2 의 같아야 하는 입력)."""

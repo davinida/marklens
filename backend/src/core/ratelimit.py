@@ -22,6 +22,32 @@ from slowapi.util import get_remote_address
 # '429 + 명확한 메시지'에는 불필요한 침습이라 채택하지 않는다.
 limiter = Limiter(key_func=get_remote_address)
 
+# 429 문구의 한도 표기(견고성 점검 R-P1-5 — slowapi 의 영어 "10 per 1 minute" 대신). 숫자는 설정한
+# 한도(config.*_RATE_LIMIT 문자열을 slowapi 가 읽은 값)에서, 무엇을 할 수 있는지는 경로에서.
+_UNIT_KO = {"second": "초", "minute": "분", "hour": "시간", "day": "일", "month": "달",
+            "year": "년"}
+_ACTION_KO = (
+    ("/search", "검색할"),
+    ("/name-check", "상표명을 확인할"),
+    ("/phonetic-search", "발음이 비슷한 상표를 찾을"),
+    ("/semantic-search", "뜻이 비슷한 상표를 찾을"),
+    ("/goods", "지정상품을 찾을"),
+    ("/images", "이미지를 불러올"),
+)
+
+
+def _limit_text(request: Request, exc: RateLimitExceeded) -> str:
+    """'1분에 10번까지 검색할 수 있어요' — 한도를 읽지 못하면 빈 문자열."""
+    item = getattr(getattr(exc, "limit", None), "limit", None)
+    try:
+        amount, multiples = int(item.amount), int(item.multiples)
+        unit = _UNIT_KO[item.GRANULARITY.name]
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return ""
+    path = request.url.path
+    action = next((verb for prefix, verb in _ACTION_KO if path.startswith(prefix)), "요청할")
+    return f"{multiples}{unit}에 {amount}번까지 {action} 수 있어요"
+
 
 async def rate_limit_exceeded_handler(
     request: Request, exc: RateLimitExceeded
@@ -33,13 +59,12 @@ async def rate_limit_exceeded_handler(
     (Retry-After / X-RateLimit-*)는 기본 핸들러와 동일하게 주입해 클라이언트가
     재시도 시점을 알 수 있게 한다.
     """
+    limit = _limit_text(request, exc)
     response = JSONResponse(
         status_code=429,
         content={
-            "detail": (
-                "요청이 너무 많습니다. 잠시 후 다시 시도하세요. "
-                f"(허용 한도: {exc.detail})"
-            )
+            "detail": "요청이 너무 많습니다. 잠시 후 다시 시도하세요."
+            + (f" ({limit})" if limit else "")
         },
     )
     # decorator 가 요청 처리 중 set 한 한도 정보. 방어적으로 존재 확인 후 헤더 주입.

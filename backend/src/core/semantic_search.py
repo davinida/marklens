@@ -31,6 +31,7 @@ if str(paths.ML_ROOT) not in sys.path:
     sys.path.insert(0, str(paths.ML_ROOT))
 
 from src.axes import x3_semantic as x3  # noqa: E402
+from src.axes.pair_axes import clean_input_name  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -212,8 +213,10 @@ def _scores(query_vector: np.ndarray) -> np.ndarray:
 
 
 def search(name: str, top_k: int, min_score: float) -> SemanticSearchResult:
-    """입력 상표명과 캐시된 상표명의 X3 유사도 상위 top_k. 입력 정규화·게이트는 X3 에 맡긴다."""
-    query = name.strip()
+    """입력 상표명과 캐시된 상표명의 X3 유사도 상위 top_k. 입력 정규화·게이트는 X3 에 맡긴다(보이지
+    않는 서식 문자 제거·NFC 는 통합 검색·상표명 확인과 같은 clean_input_name — 견고성 점검
+    R-P1-6)."""
+    query = clean_input_name(name)
     if not query:
         raise ValueError("상표명이 비어 있습니다.")
     if not state.enabled:

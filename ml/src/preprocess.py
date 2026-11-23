@@ -30,6 +30,14 @@ MIN_CHANNEL_RANGE = 4.0
 MIN_CHANNEL_STDDEV = 1.0
 
 
+class BlankImageError(ValueError):
+    """No visible mark: fully transparent or effectively uniform (robustness review R-P1-1).
+
+    Subclasses ValueError so existing callers keep working; the API maps only this error to
+    400 with a user-facing Korean message (API contract v2 §5-1).
+    """
+
+
 @dataclass(frozen=True)
 class ContentMetrics:
     width: int
@@ -128,12 +136,12 @@ def validate_visual_content(image: Image.Image) -> ContentMetrics:
     """Reject empty-alpha, blank, and effectively uniform inputs."""
     metrics = inspect_image_content(image)
     if metrics.has_alpha and metrics.alpha_max == 0:
-        raise ValueError("Image alpha channel is fully transparent")
+        raise BlankImageError("Image alpha channel is fully transparent")
     if (
         metrics.max_channel_range < MIN_CHANNEL_RANGE
         or metrics.max_channel_stddev < MIN_CHANNEL_STDDEV
     ):
-        raise ValueError(
+        raise BlankImageError(
             "Image has insufficient visual contrast; upload a non-blank mark "
             f"(range={metrics.max_channel_range:.2f}, "
             f"stddev={metrics.max_channel_stddev:.2f})"

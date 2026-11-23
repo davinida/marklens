@@ -1,6 +1,8 @@
 import type { PixelCrop } from "react-image-crop";
 
 const MAX_OUTPUT_DIMENSION = 2048;
+// 서버가 받는 최소 치수(계약 v2 §5-1, backend config.MIN_IMAGE_DIM) — 축소해도 짧은 변이 이 아래로 가지 않게
+const MIN_OUTPUT_DIMENSION = 32;
 const MAX_OUTPUT_BYTES = 10 * 1024 * 1024;
 
 function outputName(name: string): string {
@@ -38,9 +40,14 @@ export async function cropImageFile(
     throw new Error("자를 영역은 가로와 세로가 각각 32px 이상이어야 해요.");
   }
 
+  // 긴 변을 2048 로 줄이되, 짧은 변이 서버 최소(32px) 아래로 내려가면 그만큼 덜 줄인다 — 원본이 서버
+  // 허용 범위(32–4096)면 이 축소 때문에 거절되지 않는다(견고성 점검 R-P1-4: 4000×32 → 2048×16 → 400).
   const outputScale = Math.min(
     1,
-    MAX_OUTPUT_DIMENSION / Math.max(sourceWidth, sourceHeight),
+    Math.max(
+      MAX_OUTPUT_DIMENSION / Math.max(sourceWidth, sourceHeight),
+      MIN_OUTPUT_DIMENSION / Math.min(sourceWidth, sourceHeight),
+    ),
   );
   const canvas = document.createElement("canvas");
   canvas.width = Math.max(1, Math.round(sourceWidth * outputScale));

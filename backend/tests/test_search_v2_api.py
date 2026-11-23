@@ -163,7 +163,7 @@ def test_error_mapping_and_private_logs(api, monkeypatch, caplog, error, code):
     monkeypatch.setattr(search.engine, "multi_search", fail)
     response = client.post("/search/v2", data={"name": "sensitive"})
     assert response.status_code == code
-    if type(error) is ValueError or isinstance(error, multi_search.ModelNotReadyError):
+    if type(error) is ValueError:  # 모델 미준비 503 은 고정 문구(견고성 점검 R-P1-3, 2026-11-23)
         assert response.json()["detail"] == str(error)
     else:
         assert "sensitive" not in response.text

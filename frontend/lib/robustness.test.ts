@@ -51,7 +51,7 @@ describe("자르기 결과 치수(crop.ts)", () => {
     expect(created[0].height).toBe(1536);
   });
 
-  it.fails("R-P1-4: 가늘고 긴 4000×32 를 줄여도 짧은 변이 서버 최소 32px 아래로 내려가지 않는다", async () => {
+  it("R-P1-4(고침): 가늘고 긴 4000×32 를 줄여도 짧은 변이 서버 최소 32px 아래로 내려가지 않는다", async () => {
     mockCanvas();
     await cropImageFile(image(4000, 32), crop(4000, 32), "thin.png");
     expect(Math.min(created[0].width, created[0].height)).toBeGreaterThanOrEqual(32);

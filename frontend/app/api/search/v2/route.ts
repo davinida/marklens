@@ -11,6 +11,7 @@ import {
   verifyTurnstile,
 } from "@/lib/server/turnstile";
 import { getRequestId } from "@/lib/server/request-id";
+import { cleanInputName } from "@/lib/markName";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,7 +77,8 @@ export async function POST(request: Request): Promise<Response> {
     }
   }
 
-  const name = (form.get("name") as string | null)?.trim() ?? "";
+  // 백엔드와 같은 정리(서식 문자 제거 → NFC → 앞뒤 공백) 뒤에 길이를 센다 — 견고성 점검 B14
+  const name = cleanInputName(form.get("name") as string | null);
   if (Array.from(name).length > 100) {
     return jsonError(422, "상표명은 100자 이하로 입력해 주세요.", requestId);
   }

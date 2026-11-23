@@ -82,7 +82,7 @@ const RULE_TRIGGER_TEXT: Record<string, string> = {
   standalone_x2_text: "철자가 매우 비슷해 검토 권장으로 올렸습니다",
   standalone_x3: "뜻이 매우 비슷해 검토 권장으로 올렸습니다",
   figure_x2_img: "도형이 매우 비슷해 검토 권장으로 올렸습니다(검증 데이터 부족, 참고용)",
-  nameless_floor: "도형으로 고친 질의라 로고만으로 본 판단의 등급을 썼습니다",
+  nameless_floor: "로고만으로 본 판단의 등급이 더 높아 그 등급을 썼어요",
   goods_floor: "업종이 겹쳐 로고만으로 본 등급을 유지했어요",
 };
 

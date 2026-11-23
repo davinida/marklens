@@ -353,7 +353,7 @@ describe("ResultViewV2 — 이름 있는·없는 판단이 섞인 응답(v1.4, �
     );
     await user.click(screen.getByRole("button", { name: /블루커피/ }));
     expect(
-      screen.getByText("도형으로 고친 질의라 로고만으로 본 판단의 등급을 썼습니다"),
+      screen.getByText("로고만으로 본 판단의 등급이 더 높아 그 등급을 썼어요"),
     ).toBeVisible();
   });
 });

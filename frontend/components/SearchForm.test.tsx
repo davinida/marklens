@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchForm from "@/components/SearchForm";
@@ -135,6 +135,24 @@ describe("SearchForm OCR 제안 이름 (nameFromSuggestion)", () => {
     expect(
       screen.queryByText("이미지에서 읽은 글자예요 — 틀린 부분이 있으면 고쳐 주세요."),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("SearchForm search button", () => {
+  it("보이지 않는 글자만인 상표명이면 검색 버튼을 끈다(견고성 점검 U3 — 백엔드와 같은 정리)", async () => {
+    const invisible = String.fromCodePoint(0x200b, 0xfeff, 0x2060, 0x00ad);
+    render(
+      <SearchForm
+        onSubmit={vi.fn()}
+        initialValue={{ file: null, markName: `블${invisible}`, topK: 5 }}
+      />,
+    );
+    const search = screen.getByRole("button", { name: "비슷한 상표 찾아보기" });
+    await waitFor(() => expect(search).toBeEnabled()); // 자동 요청 확인 토큰이 왔고 이름은 '블'
+    fireEvent.change(screen.getByRole("textbox", { name: "상표 이름" }), {
+      target: { value: invisible },
+    });
+    expect(search).toBeDisabled();
   });
 });
 
