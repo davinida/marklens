@@ -8,7 +8,7 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 
 ## 현재 상태
 
-기준일 2026-11-22. 여러 절에서 쓰는 수치(테스트 수·유사군 보유·모델 버전·정답 쌍 수 등)는 이 표에만 적고,
+기준일 2026-11-23. 여러 절에서 쓰는 수치(테스트 수·유사군 보유·모델 버전·정답 쌍 수 등)는 이 표에만 적고,
 다른 절은 이 표를 가리킵니다. 상태는 완료 / 진행 중 / 예정 / 보류 넷입니다.
 
 | 구성 | 상태 | 핵심 수치 |
@@ -22,15 +22,17 @@ MarkLens는 상표(도형·결합상표)의 출처 혼동 위험도를 외관·�
 | [등록상표 DB](#등록상표-db) | 완료 | 1,383건 = 기존 수집 1,100 + 유명 브랜드 283 · generation `20261119T111642Z-3b0759a08391`(2026-11-19) · 유사군 보유 1,383/1,383건 · 기동 캐시 X1 발음 1,195건·X3 관념 710건·X2 철자 1,246건·상품 변환표 91,591건 |
 | [유명 브랜드 DB 추가](#유명-브랜드-목록) | 완료 | 유명 브랜드 30개(13개 업종) 283건 — 상표명에 브랜드명이 든 표장 215건 · 2026-11-19 운영 반영(승격·색인 재생성·유형 사전) |
 | [정답 데이터(심결례)](#정답-데이터) | 완료 | 라벨 776행 = 유사 369·비유사 228·제외 179 · 도형계 유사·비유사 110행(양쪽 이미지 106)·문자계 447행 · 학습 특징 597행(1차 350·2차 247, 이름 축 1차 313·2차 178행) |
-| [테스트](#검증-명령) | 완료 | Python `1503 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(21 파일) · Playwright `15 passed` |
+| [테스트](#검증-명령) | 완료 | Python `1513 passed, 26 skipped`(가짜 ML 모드) · X3 실제 모델 `219 passed` · Vitest `204 passed`(21 파일) · Playwright `15 passed` |
 | [CI](#ci) | 완료 | GitHub Actions 4잡(python · frontend · deployment-config · backend-image) 통과 |
 | [공개 배포](#공개-배포-준비) | 보류 | 템플릿만 제공 — 실제 도메인·TLS·계정 배포는 하지 않음 |
 
-마지막 갱신 2026-11-22 — `main` = `develop` = `b265657`(PR #104 긴 상표명 응답 시간 단축 병합) 위에 손그림 입력 실현성 실험(브랜치
-`exp/sketch-feasibility` — 평가 스크립트만, 판정 진행·방법 B, [X2 외관](#x2-외관)). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
+마지막 갱신 2026-11-23 — `main` = `develop` = `e2d9ac6`(PR #106 UI 평가 병합) 위에 이름 있는 입력의 등급 하한을 실제 검색 기준으로 다시 맞추는
+시도(브랜치 `feat/named-search-thresholds` — 채택 조건 미달로 멈춤, 하한·서비스는 그대로, [통합 모델](#통합-모델)). 남은 일은 [다음 단계](#다음-단계)에 있습니다.
 
 <details>
 <summary>이력</summary>
+
+- 마지막 갱신 기록(2026-11-23, 이름 있는 하한 시도 전): "마지막 갱신 2026-11-22 — `main` = `develop` = `b265657`(PR #104 긴 상표명 응답 시간 단축 병합) 위에 손그림 입력 실현성 실험(브랜치 `exp/sketch-feasibility` — 평가 스크립트만, 판정 진행·방법 B, [X2 외관](#x2-외관)). 남은 일은 [다음 단계](#다음-단계)에 있습니다." 그때 칸: 기준일 2026-11-22 · 테스트 Python `1503 passed, 26 skipped`.
 
 - 마지막 갱신 기록(2026-11-22, 손그림 실험 전): "마지막 갱신 2026-11-22 — `main` = `develop` = `837b257`(PR #87 Next.js 16.4.5 병합) 위에 긴 상표명 응답 시간 단축(브랜치 `perf/long-name-latency` — 식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속). 남은 일은 [다음 단계](#다음-단계)에 있습니다." 그때 칸: 테스트 Python `1474 passed, 26 skipped`.
 
@@ -376,7 +378,7 @@ has_goods(set())                                                               #
 4축 점수를 로지스틱 회귀로 결합해 출처 혼동 위험도(0–1)와 등급을 내는 모델입니다. 가중치는 심결례 정답 데이터(1차 라벨의 학습 특징 + 쉬운 음성 700 — 행 수는 [현재 상태](#현재-상태) 표)로 학습했고(`ml/scripts/train_risk_model.py`), 런타임 `ml/src/model/risk_model.py` 의 `risk_score(features)` 가 계수 JSON(`shared/model/risk_model_v1.json`)을 읽어 위험도·등급·근거 축 기여도를 냅니다. 엔진 `multi_search` 가 적재합니다. 구조는 판례를 따릅니다.
 
 - 상태: 완료 — v1.3 학습 완료(2026-10-25, PR #67) — 엔진 PR #65·API PR #69·화면 PR #72 연결 완료 (분배 항목 프론트-9 통합 모델·재보정). 2026-11-20 부터 서비스 기본 모델은 v1.4(`shared/model/risk_model_v1.4.json` — 이름 있는 입력은 v1.3 그대로, 이름 없는 입력용 계수 집합 2벌; 아래 "2차 학습").
-- 위치: `ml/src/model/risk_model.py`, `ml/scripts/train_risk_model.py`, `ml/scripts/train_risk_model_v14_nameless.py`(2차 학습 — 채택분)·`train_risk_model_v14.py`(2차 학습 1차 시도, 재현용), `ml/scripts/nameless_search_thresholds.py`(이름 없는 입력의 등급 하한 — 실제 검색 기준, 2026-11-20)·`nameless_grade_thresholds.py`(쉬운 음성 기준 — 앞의 방식, 재현용), `ml/scripts/photo_mark_service_check.py`(사진 판정 서비스 경로 확인), `ml/scripts/pairs_features.py`(`--fill-easy-images`·`--refresh-easy`), `ml/src/photo_mark.py`(사진 표장 판정), `ml/requirements-experiments.txt`, `shared/model/risk_model_v1.4.json`(서비스 기본)·`risk_model_v1.json`(v1.3 — 이름 있는 계수의 원본)·`shared/applicant_aliases.json`(출원인 별칭 표)·`photo_direction_v1.json`, `ml/tests/test_risk_model.py`(24)·`test_train_risk_model.py`(12)·`test_train_risk_model_v14.py`(15)·`test_nameless_grade_thresholds.py`(7)·`test_nameless_search_thresholds.py`(9)·`test_pairs_features.py`(15)·`test_photo_mark.py`(5), `docs/MarkLens_통합모델_설계.md` §7–§7-4
+- 위치: `ml/src/model/risk_model.py`, `ml/scripts/train_risk_model.py`, `ml/scripts/train_risk_model_v14_nameless.py`(2차 학습 — 채택분)·`train_risk_model_v14.py`(2차 학습 1차 시도, 재현용), `ml/scripts/nameless_search_thresholds.py`(이름 없는 입력의 등급 하한 — 실제 검색 기준, 2026-11-20)·`nameless_grade_thresholds.py`(쉬운 음성 기준 — 앞의 방식, 재현용), `ml/scripts/named_search_thresholds.py`(이름 있는 입력의 등급 하한 — 실제 검색 기준 시도, 채택 조건 미달로 멈춤, 2026-11-23), `ml/scripts/photo_mark_service_check.py`(사진 판정 서비스 경로 확인), `ml/scripts/pairs_features.py`(`--fill-easy-images`·`--refresh-easy`), `ml/src/photo_mark.py`(사진 표장 판정), `ml/requirements-experiments.txt`, `shared/model/risk_model_v1.4.json`(서비스 기본)·`risk_model_v1.json`(v1.3 — 이름 있는 계수의 원본)·`shared/applicant_aliases.json`(출원인 별칭 표)·`photo_direction_v1.json`, `ml/tests/test_risk_model.py`(24)·`test_train_risk_model.py`(12)·`test_train_risk_model_v14.py`(15)·`test_nameless_grade_thresholds.py`(7)·`test_nameless_search_thresholds.py`(9)·`test_named_search_thresholds.py`(10)·`test_pairs_features.py`(15)·`test_photo_mark.py`(5), `docs/MarkLens_통합모델_설계.md` §7–§7-6
 - 요약: 4축 점수를 판례 사전분포 + 단조 제약 로지스틱 회귀(유형·요부 교호작용)로 결합해 출처 혼동 위험도 p(0–1)·등급 4단계(안전/주의/검토 권장/위험)·근거 축 기여도. 축 하나가 단독 임계값(정밀도 0.7) 이상이면 등급 하한 "검토 권장", 도형계 입력은 참고용 표시(x2_whole ≥ 0.9 면 검토 권장, 미검증). 심결례 정답 데이터로 가중치 학습. 결측(이미지·상품)은 지시변수가 아니라 관측 조합별 계수 집합 + 결합 제약(v1.3).
 - v1.3: 이미지·상품 결측을 지시변수 대신 관측 조합(base / 이미지 / 상품 / 둘 다)별 계수 집합으로 두고 결합 제약을 걸어 **축을 하한값(현실 분포 비유사 평균 이미지 0.35·상품 0.03) 이상으로 더 관측하면 p 가 내려가지 않는다**(적재 때 검증).
 - 실측 "블루커피" / BLU hands: 이름만 0.530 → 셋 다 0.531 — 입력을 더 줘도 위험도가 내려가지 않습니다.
@@ -389,6 +391,7 @@ has_goods(set())                                                               #
   - 이름 없는 입력도 이제 위험 등급에 닿습니다 — 이름을 알 때 위험인 쌍이 실제 검색에서도 있기 때문입니다(이미지만 0.23%·이미지+상품 0.28%). 이미지만은 이미지 유사도 0.896 이상이면 위험(같은 로고 0.634), 이미지+상품은 위험 하한이 0.7892 라 상품이 많이 겹쳐야 하지만, 업종 하한(`goods_floor`)으로 상품 겹침이 결합 하한 0.0252 이상이면 이미지만 판단의 등급을 유지합니다 — 같은 로고 + 업종 세트도 위험(시나리오 N2). 업종이 다르면(겹침 < 0.0252) 내려가도 되는 것으로 둡니다(설계 §7-4-4). 화면은 이름 없는 판단의 위험도 %를 보이지 않고 등급과 이미지 유사도를 보입니다. 도형 caveat "참고용"은 유지합니다(문구 "로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요").
   - 1차 시도(여섯 계수 집합을 모두 다시 학습하고 "이름을 무관한 상표 수준 이상으로 더 주면 내려가지 않음"을 건 것)는 이름 있는 입력의 변별력이 내려가 채택하지 않았습니다(설계 §7-4-1).
 - 철자 v2 + 이름 있는 계수 재학습(2026-11-20): 시도했지만 첫 단계인 철자 축 측정에서 미리 정한 진행 조건에 못 미쳐 멈췄습니다 — 이름 있는 입력의 계수는 v1.3(= v1.4) 그대로이고 v1.5 는 없습니다([X2 문자 외관](#x2-문자-외관), 설계 §7-5). 계수 JSON 이 학습된 철자 정의를 `axis_versions` 로 밝히고 엔진·런타임이 그 버전으로 계산·검사하는 장치는 남아 있습니다(지금 모델은 모두 v1).
+- 이름 있는 입력의 등급 하한을 실제 검색 기준으로(2026-11-23, 설계 §7-6): 지어낸 상표명도 전체 등급이 거의 늘 검토 권장 이상인 문제(UI 평가 P0-1)를 하한만 바꿔 고치려 했지만 미리 정한 채택 조건 둘을 넘지 못해 멈췄습니다 — 하한은 위 "현재 값" 그대로입니다. 지어낸 이름 200개(단독 축 규칙이 걸리지 않는 것만)로 원인을 보면 검토 권장 이상이 된 무관한 후보의 99% 이상이 모델 위험도 하한 때문이고, 가장 비슷하게 들리는 DB 이름(호칭 0.5–0.7)이 위험도를 올립니다. 계수 집합마다 다시 맞춘 하한(검토 권장 0.46–0.51)은 ① DB 질의 300건(다른 출원인의 비슷한 상표가 섞임)에서 목표를 크게 넘고 ③ 업종을 넣으면 검토 권장이 주의로 내려가는 입력을 만들어(업종 있는 집합의 하한이 더 높음) 채택하지 않았습니다. 위험 정밀도(0.70 그대로)와 인용상표 쪽 조건은 통과했습니다. 다음 시도의 선택지는 설계 §6 맨 위에 있습니다.
 
 구조가 따르는 판례:
 
@@ -871,7 +874,7 @@ Browser
 
 - `frontend/`: Next.js UI, 수동 크롭, Turnstile 검증, BFF(`app/api/*`)
 - `backend/`: FastAPI, 업로드 검증, 검색·명칭 확인·발음 유사도·관념 유사도·상품 검색 API(`src/api/`), 세 입력 통합 검색 엔진(`src/core/multi_search.py`, 질의 유형 OCR `src/core/ocr.py` — 계약 v2), 기동 시 캐시(`src/core/phonetic_search.py`·`semantic_search.py`)와 변환표(`src/core/goods.py`), KIPRIS 수집 스크립트(`scripts/`), 심결례 수집·보강 스크립트(`scripts/trials_collect.py`·`trials_enrich.py`)
-- `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구, 통합 모델 런타임(`src/model/risk_model.py`)·학습(`scripts/train_risk_model.py`, 2차 학습 `scripts/train_risk_model_v14_nameless.py` — 채택분·`scripts/train_risk_model_v14.py` — 1차 시도, 이름 없는 입력의 등급 하한 `scripts/nameless_search_thresholds.py`(실제 검색 기준)·`scripts/nameless_grade_thresholds.py`(앞의 쉬운 음성 기준), 사진 판정 서비스 경로 확인 `scripts/photo_mark_service_check.py`), 유형 사전 계산(`scripts/precompute_types.py`), 유형 규칙(`src/mark_type.py`), 사진 표장 판정(`src/photo_mark.py`)
+- `ml/`: 전처리, 임베딩, 검색, 점수, 인덱스 빌드, 평가 도구, 통합 모델 런타임(`src/model/risk_model.py`)·학습(`scripts/train_risk_model.py`, 2차 학습 `scripts/train_risk_model_v14_nameless.py` — 채택분·`scripts/train_risk_model_v14.py` — 1차 시도, 이름 없는 입력의 등급 하한 `scripts/nameless_search_thresholds.py`(실제 검색 기준)·`scripts/nameless_grade_thresholds.py`(앞의 쉬운 음성 기준), 이름 있는 입력의 등급 하한 시도 `scripts/named_search_thresholds.py`(멈춤), 사진 판정 서비스 경로 확인 `scripts/photo_mark_service_check.py`), 유형 사전 계산(`scripts/precompute_types.py`), 유형 규칙(`src/mark_type.py`), 사진 표장 판정(`src/photo_mark.py`)
 - `ml/src/axes/`: 다축 모델의 축 함수 — X1 호칭 유사도(`x1_phonetic.py`, 브랜드·지명 로마자표 `korean_brands.py`), X2 문자 외관(철자) `x2_ortho.py`, X3 관념 유사도(`x3_semantic.py`), X4 상품 견련성(`x4_goods.py`), 변환표 로더(`goods_map.py`), 식별력 필터(`distinctiveness.py`), 쌍별 4축 공용 계산(`pair_axes.py` — 서비스와 학습이 같은 식)
 - `ml/evaluation/`: 200-pair 라벨링 팩과 강건성 평가 계약
 - `shared/`: 프런트·백엔드 공용 자산 — `goods_map/`(상품↔유사군 변환표 파서·검증기, 변환표 `goods_map.json.gz` 1.86MB 저장소 포함), `famous_brands.txt`(유명 브랜드 목록 — 브랜드 표 + 식별력 토큰 절), `types/goods.ts`(변환표 타입)
@@ -1319,6 +1322,9 @@ ml/venv/bin/python ml/scripts/train_risk_model_v14_nameless.py      # 채택분(
 ml/venv/bin/python ml/scripts/nameless_grade_thresholds.py          # 이름 없는 입력의 등급 하한만 다시(1초, 계수는 그대로; --dry-run 은 JSON 을 쓰지 않음) → ml/data/trials/risk_model_v1.4_thresholds_{report.md,results.json}
 ml/venv/bin/python ml/scripts/nameless_search_thresholds.py --precheck  # 서비스 v1.4 하한 0단계: 표본 A·B 사전 점검(4.5분, 하한 계산 없음) → ml/data/trials/nameless_search_ab_precheck.{md,json}
 ml/venv/bin/python ml/scripts/nameless_search_thresholds.py         # 이름 없는 입력의 등급 하한 — 실제 검색 기준(표본 A 채택·B 확인, 16분; --dry-run·--limit) → shared/model/risk_model_v1.4.json + ml/data/trials/nameless_search_ab_{report.md,results.json}
+ml/venv/bin/python ml/scripts/named_search_thresholds.py freeze   # 이름 있는 입력의 등급 하한 시도(설계 §7-6) 0단계: 규칙 해시 → ml/data/trials/named_search_thresholds_rule.json(있으면 종료 코드 4)
+ml/venv/bin/python ml/scripts/named_search_thresholds.py control  # 1단계: 지어낸 상표명 대조군(DB 상표명과 단독 축 규칙 대조, 1.5분) → …_control.json
+ml/venv/bin/python ml/scripts/named_search_thresholds.py run      # 2단계: 진단·하한·채택 조건 ①–④(실제 검색 2,584회, 15분; 계수 JSON 은 쓰지 않음, 미달이면 종료 코드 3) → …_{results.json,report.md,searches.json.gz}
 ml/venv/bin/python ml/scripts/search_latency_benchmark.py --out <폴더>  # 응답 시간 벤치(표본 A·B × 세 방식, 약 10분, 하한·모델은 안 건드림) → results.json·report.md
 ml/venv/bin/python ml/scripts/photo_mark_service_check.py           # 사진 판정이 서비스 CLIP 경로에서도 학습 때와 같은지 + DB 사진 판정 비율(1분, 파일 안 고침) → ml/data/trials/photo_mark_service_check.{md,json}
 ml/venv/bin/python ml/scripts/train_risk_model_v14.py               # 1차 시도(재현용, 채택 안 됨 — 종료 코드 3, 약 40초) → ml/data/trials/risk_model_v1.4_{report.md,results.json,candidate.json}
@@ -1567,10 +1573,12 @@ TLS edge는 외부의 `X-MarkLens-Client-IP`를 제거한 뒤 검증한 원격 I
 유형 규칙)은 끝났습니다. 남은 일은 두 갈래입니다(식별력 유명 브랜드 토큰을 새 목록에 맞출지는 통합 모델 재학습 때 정합니다).
 
 1. **서비스 연결 마무리** — 남은 것은 운영 배포 검증입니다(DB 모드 배포는 1,383건 세대를 `migrate_json_to_db --prune` 으로 먼저 적재). v1 이미지 검색(`POST /search`·BFF `/api/search`)은 2026-11-21 제거했고, 발음·관념 엔드포인트(`/phonetic-search`·`/semantic-search`)와 BFF 는 상표명 확인 패널용으로 유지합니다(계약 v2 §5-5). 등급 명칭·화면 표기 같은 결정 대기 항목은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md)에 사유와 함께 있습니다.
-2. **11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 긴 상표명 요청의 응답 시간은 2026-11-22 줄였습니다(식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속 — [세 입력 통합 검색 엔진](#세-입력-통합-검색-엔진)의 응답 시간). 남은 꼬리(OCR·처음 보는 이름의 발음 풀)를 더 줄일지는 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위. 프런트는 Next.js 16.4.5(PR #87)로 보안 권고 7건이 해소됐고 첫 `next dev` 가 업그레이드 안내로 멈추지 않습니다(`eslint-config-next` 는 16.4.3 그대로).
+2. **11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 긴 상표명 요청의 응답 시간은 2026-11-22 줄였습니다(식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속 — [세 입력 통합 검색 엔진](#세-입력-통합-검색-엔진)의 응답 시간). 남은 꼬리(OCR·처음 보는 이름의 발음 풀)를 더 줄일지는 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위. UI 평가(2026-11-22)의 P0-1 — 지어낸 상표명도 전체 등급이 거의 늘 검토 권장 이상 — 을 이름 있는 입력의 등급 하한만 바꿔 고치는 시도는 채택 조건 미달로 멈췄습니다(2026-11-23, 설계 §7-6). 다음 방법(네 계수 집합에 같은 하한을 쓸지, 이름 있는 판단에도 업종 하한을 둘지, 확인 표본을 무엇으로 볼지)은 사람 결정입니다(설계 §6 맨 위). 프런트는 Next.js 16.4.5(PR #87)로 보안 권고 7건이 해소됐고 첫 `next dev` 가 업그레이드 안내로 멈추지 않습니다(`eslint-config-next` 는 16.4.3 그대로).
 
 <details>
 <summary>이력</summary>
+
+- 2026-11-23(`feat/named-search-thresholds`): 이름 있는 입력의 등급 하한 시도를 채택 조건 미달로 멈췄습니다(설계 §7-6). 이 항목의 이전 문구: "**11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 긴 상표명 요청의 응답 시간은 2026-11-22 줄였습니다(식별력 결합 규칙·X1 음절 DP 를 결과 불변으로 가속 — [세 입력 통합 검색 엔진](#세-입력-통합-검색-엔진)의 응답 시간). 남은 꼬리(OCR·처음 보는 이름의 발음 풀)를 더 줄일지는 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위. 프런트는 Next.js 16.4.5(PR #87)로 보안 권고 7건이 해소됐고 첫 `next dev` 가 업그레이드 안내로 멈추지 않습니다(`eslint-config-next` 는 16.4.3 그대로)."
 
 - 2026-11-22(`perf/long-name-latency`): 긴 상표명 응답 시간을 줄였고 Next.js 16.4.5(PR #87)가 병합됐습니다. 이 항목의 이전 문구: "**11월** — 통합 모델 v1.4 서비스 반영은 끝났습니다(2026-11-20, 설계 §7-4-4 — 업종 하한 `goods_floor` 포함). 남은 결정은 [통합 모델 설계 §6](docs/MarkLens_통합모델_설계.md) 맨 위 — 긴 상표명 요청의 응답 시간(식별력 결합 규칙의 편집 거리)을 줄일지. 프런트는 Next.js 16.4.3 에 보안 권고 7건(전부 moderate, 16.4.4 이하 — 16.4.5 부터 고쳐짐)이 있어 `npm audit --omit=dev --audit-level=high`(CI 기준)는 통과하지만, AI 에이전트 환경(`AI_AGENT`·`CLAUDECODE` 환경변수)에서 돌리면 Next 의 업그레이드 안내 기능이 첫 `next build`·`next dev` 를 멈춥니다(5분 안에 다시 실행하면 진행, CI·사람 터미널은 해당 없음) — 업그레이드는 별도 PR."
 
