@@ -124,16 +124,65 @@ def fake_engine(fake_ml_mode):
         yield
 
 
-@pytest.mark.xfail(strict=True, reason="R-P0-1: 이름이 있으면 같은 로고(이미지 1.0) 후보가 "
-                                       "이름 있는 판단만 받아 낮은 등급 — 실제 DB 에선 상위 20 "
-                                       "밖으로 밀려 안 보임")
 def test_identical_logo_with_unrelated_name_is_flagged(fake_engine, monkeypatch):
+    """R-P0-1(2026-11-23 고침, v1.4.2 logo_floor): 이름이 달라도 같은 로고(이미지 1.0)는 이미지만
+    판단과 견줘 검토 권장 이상으로 남는다(전엔 이름 있는 판단만 받아 실제 DB 에선 상위 20 밖)."""
     monkeypatch.setattr(config, "OCR_ENABLED", True)
     data = engine.multi_search(image=Image.new("RGB", (64, 64), (200, 40, 40)), name="블루커피",
                                top_k=5).to_dict()
     same = [c for c in data["candidates"] if c["axes"]["x2_img"] == 1.0]
     assert same, "같은 로고 후보가 상위 5 밖"
     assert GRADES.index(same[0]["risk"]["grade"]) >= GRADES.index("검토 권장"), same[0]["risk"]
+
+
+def _same_logo(data: dict) -> dict:
+    return next(c for c in data["candidates"] if c["axes"]["x2_img"] == 1.0)
+
+
+def test_logo_floor_compares_with_image_only_even_when_goods_are_given(fake_engine, monkeypatch):
+    """업종이 들어간 이름 없는 판단은 쓰지 않는다 — 같은 로고 후보는 이미지만 판단
+    (noname:x2_whole)."""
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    data = engine.multi_search(image=Image.new("RGB", (64, 64), (200, 40, 40)), name="블루커피",
+                               goods_codes=["S0101"], top_k=9).to_dict()
+    top = _same_logo(data)
+    assert "nameless_floor" in top["risk"]["rule_triggers"]
+    assert top["risk"]["pattern"] == "noname:x2_whole" and top["risk"]["grade"] == "위험"
+
+
+def test_logo_floor_skips_photo_queries(fake_engine, monkeypatch):
+    """질의 이미지가 사진이면 견주지 않는다(사진 규칙 그대로)."""
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(multi_search, "is_photo_query", lambda embedding: True)
+    data = engine.multi_search(image=Image.new("RGB", (64, 64), (200, 40, 40)), name="블루커피",
+                               top_k=9).to_dict()
+    assert all("nameless_floor" not in c["risk"]["rule_triggers"] for c in data["candidates"])
+
+
+def test_logo_floor_is_off_without_the_model_flag(fake_engine, monkeypatch):
+    """v1.4.1 JSON(logo_floor 없음)으로 돌리면 예전 동작 — 버전과 동작이 같이 간다."""
+    import json as _json
+
+    from src.model import risk_model as rm
+
+    old = _json.loads(rm.V141_MODEL_PATH.read_text(encoding="utf-8"))
+    monkeypatch.setattr(config, "OCR_ENABLED", True)
+    monkeypatch.setattr(multi_search.state, "model", old)
+    data = engine.multi_search(image=Image.new("RGB", (64, 64), (200, 40, 40)), name="블루커피",
+                               top_k=9).to_dict()
+    assert data["meta"]["model_version"] == "risk_model_v1.4.1"
+    assert all("nameless_floor" not in c["risk"]["rule_triggers"] for c in data["candidates"])
+
+
+@pytest.mark.parametrize("source,level,detail,expected", [
+    ("user", "도형", None, "도형"), ("user", "문자", None, "문자"),
+    ("user", "결합-문자요부", None, "결합-도형요부"),
+    ("ocr", "결합-문자요부", {"text_ratio": 0.2, "fig_ratio": 0.5}, "결합-도형요부"),
+    ("ocr", "결합-문자요부", {"text_ratio": 0.0, "fig_ratio": 0.7}, "도형"),
+    ("fallback", "문자", None, "도형")])
+def test_nameless_level_is_the_type_without_the_name(source, level, detail, expected):
+    query_type = multi_search.QueryType(level, source, detail)
+    assert multi_search.nameless_level(query_type) == expected
 
 
 def test_identical_logo_without_name_is_danger(fake_engine, monkeypatch):

@@ -48,12 +48,13 @@ v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·�
 시도 — 이름을 쉬운 음성 평균 이상으로 더 관측하면 비감소; 채택되지 않은 형식이고 그 학습 스크립트의
 재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다.
 
-서비스 기본 모델(2026-11-23, §7-6-2): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.1.json`
-(MODEL_VERSION risk_model_v1.4.1) — v1.4 에서 이름 있는 판단의 검토 권장 하한만 0.1805 → 0.5059
-로 바꾼 것(실제 검색 기준, `ml/scripts/named_shared_threshold.py apply`가 v1.4 JSON 에서 만든다).
-v1.4 파일(`risk_model_v1.4.json`)은 V14_MODEL_PATH 로, v1.3 파일(`risk_model_v1.json`)은
-V13_MODEL_PATH 로 남는다 — v1.4 학습·이름 없는 하한 스크립트는 v1.4 파일을, v1.3 학습 스크립트는
-v1.3 파일을 쓴다(기본 경로를 덮어쓰지 않게). 2026-11-20–22 의 기본 모델은 v1.4 였다.
+서비스 기본 모델(2026-11-23, §7-9): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.2.json`
+(MODEL_VERSION risk_model_v1.4.2) — v1.4.1 에 `logo_floor` 표시만 더한 것(계수·하한 그대로):
+엔진이 이름 있는 이미지 질의를 이미지만 판단과 견준다(견고성 점검 R-P0-1,
+`ml/scripts/logo_floor_image_only.py apply`). v1.4.1(`risk_model_v1.4.1.json`, V141_MODEL_PATH —
+2026-11-23 서비스 기본, v1.4 에서 이름 있는 판단의 검토 권장 하한만 0.1805 → 0.5059, §7-6-2)·
+v1.4(V14_MODEL_PATH)·v1.3(`risk_model_v1.json`, V13_MODEL_PATH) 파일은 남는다 — 학습·하한
+스크립트는 그 파일을 쓴다(기본 경로를 덮어쓰지 않게). 2026-11-20–22 의 기본 모델은 v1.4 였다.
 
 이름 없는 입력의 등급 하한(§7-4-3): 이름 없는 계수 집합은 `grade_thresholds` 를 따로 둘 수 있고,
 그 집합이 쓰인 입력의 등급은 그 하한으로 매긴다(`grade_thresholds_for`; 없으면 최상위 하한). 하한이
@@ -81,26 +82,30 @@ __all__ = [
     "grade_for", "axis_contributions", "mark_type_level", "monotone_violations",
     "coupling_violations", "coupling_vertices", "select_pattern", "pattern_key", "pattern_keys",
     "block_logit", "GRADES", "TYPE_LEVELS", "AXIS_INPUTS", "FIGURE_FAMILY", "PATTERN_BASE_KEY",
-    "DEFAULT_MODEL_PATH", "V13_MODEL_PATH", "V14_MODEL_PATH", "V141_MODEL_PATH", "ENV_MODEL_PATH",
+    "DEFAULT_MODEL_PATH", "V13_MODEL_PATH", "V14_MODEL_PATH", "V141_MODEL_PATH",
+    "V142_MODEL_PATH", "ENV_MODEL_PATH",
     "NAMELESS_KEY",
     "NAMELESS_PREFIX", "NAME_AXES", "is_nameless_pattern", "nameless_grade_thresholds",
     "SEARCH_THRESHOLDS_METHOD", "OverwriteRefused", "search_calibrated", "check_nameless_overwrite",
     "NAME_FLOOR_AXES", "NAME_DERIVED_TERMS", "name_missing", "nameless_vertices",
     "name_coupling_vertices", "SAME_NAME_KEY", "type_with_name", "same_name_input",
     "grade_thresholds_for", "AXIS_VERSIONS_KEY", "SPELLING_AXIS", "SPELLING_VERSION_INPUT",
-    "SUPPORTED_SPELLING_VERSIONS", "spelling_version",
+    "SUPPORTED_SPELLING_VERSIONS", "spelling_version", "LOGO_FLOOR_KEY", "logo_floor_enabled",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 V13_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"  # v1.3(이름 있는 계수)
 V14_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"  # v1.4.1 의 원본
-V141_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.1.json"
-DEFAULT_MODEL_PATH = V141_MODEL_PATH  # 서비스 기본 모델(2026-11-23 부터 v1.4.1)
+V141_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.1.json"  # v1.4.2 의 원본
+V142_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.2.json"
+DEFAULT_MODEL_PATH = V142_MODEL_PATH  # 서비스 기본 모델(2026-11-23 부터 v1.4.2)
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1.4.1"  # 서비스 기본 모델의 버전
+MODEL_VERSION = "risk_model_v1.4.2"  # 서비스 기본 모델의 버전
 SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2", "risk_model_v1.2.1",
-                      "risk_model_v1.3", "risk_model_v1.4", "risk_model_v1.4.1", "risk_model_v1.5")
+                      "risk_model_v1.3", "risk_model_v1.4", "risk_model_v1.4.1",
+                      "risk_model_v1.4.2", "risk_model_v1.5")
 AXIS_VERSIONS_KEY = "axis_versions"  # 계수가 학습된 축 정의의 버전(없으면 모두 1)
+LOGO_FLOOR_KEY = "logo_floor"  # 이름 있는 이미지 질의에 이미지만 판단 비교를 켜는 표시(v1.4.2)
 SPELLING_AXIS = "x2_text"
 SPELLING_VERSION_INPUT = "x2_text_version"  # 입력이 x2_text_d 를 계산한 철자 버전(없으면 1)
 SUPPORTED_SPELLING_VERSIONS = (1, 2)  # = ml/src/axes/x2_ortho.SPELLING_VERSIONS(테스트로 고정)
@@ -622,9 +627,20 @@ def validate_model(data: dict) -> dict:
         if threshold is not None and not (isinstance(threshold, (int, float))
                                           and 0.0 <= float(threshold) <= 1.0):
             raise ValueError("risk_model: figure_rule.threshold 는 null 또는 0~1")
+    logo_floor = data.get(LOGO_FLOOR_KEY)
+    if logo_floor is not None and not (isinstance(logo_floor, dict)
+                                       and isinstance(logo_floor.get("enabled"), bool)):
+        raise ValueError(f"risk_model: {LOGO_FLOOR_KEY} 는 enabled(true/false)를 가진 객체여야 "
+                         "합니다")
     if data.get("patterns") is not None:
         _validate_patterns(data, known)
     return data
+
+
+def logo_floor_enabled(model: dict) -> bool:
+    """계수 JSON 이 이름 있는 이미지 질의의 "이미지만" 판단 비교(엔진 logo_floor — 견고성 점검
+    R-P0-1, 설계 §7-9)를 켰는가. 키가 없는 JSON(≤ v1.4.1)은 꺼짐 — 예전 동작 그대로."""
+    return bool((model.get(LOGO_FLOOR_KEY) or {}).get("enabled"))
 
 
 def monotone_violations(coefficients: dict, tolerance: float = 1e-9) -> list[str]:
@@ -668,7 +684,7 @@ def _load_cached(path_text: str) -> dict:
 
 def load_model(path: str | os.PathLike[str] | None = None) -> dict:
     """계수 JSON 적재(경로: 인자 > MARKLENS_RISK_MODEL > DEFAULT_MODEL_PATH = shared/model/
-    risk_model_v1.4.1.json). 프로세스 캐시 — 파일을 바꾸면 서버를 다시 띄운다."""
+    risk_model_v1.4.2.json). 프로세스 캐시 — 파일을 바꾸면 서버를 다시 띄운다."""
     return _load_cached(str(resolve_model_path(path)))
 
 

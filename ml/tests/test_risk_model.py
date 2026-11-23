@@ -270,8 +270,8 @@ def test_versions_accepted():
     assert _model(version="risk_model_v1.1")["version"] == "risk_model_v1.1"
     assert _model(version="risk_model_v1.2")["version"] == "risk_model_v1.2"
     assert _model(version="risk_model_v1.2.1")["version"] == "risk_model_v1.2.1"
-    assert rm.MODEL_VERSION == "risk_model_v1.4.1"  # 서비스 기본 모델(2026-11-23 부터)
-    assert rm.DEFAULT_MODEL_PATH == rm.V141_MODEL_PATH
+    assert rm.MODEL_VERSION == "risk_model_v1.4.2"  # 서비스 기본 모델(2026-11-23 부터)
+    assert rm.DEFAULT_MODEL_PATH == rm.V142_MODEL_PATH
     assert rm.V13_MODEL_PATH.name == "risk_model_v1.json"
     with pytest.raises(ValueError):
         _model(version="risk_model_v2")
@@ -589,9 +589,10 @@ def test_v14_validate_nameless_patterns():
     # name_floors 가 없는 v1.4 JSON 은 이름 결합을 검사하지 않는다(이름 없는 패턴 사이만)
     without_floors = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
     assert without_floors and all("(이름" not in v for v in without_floors)
-    assert rm.MODEL_VERSION == "risk_model_v1.4.1"  # 서비스 기본 모델(2026-11-23 부터 v1.4.1)
+    assert rm.MODEL_VERSION == "risk_model_v1.4.2"  # 서비스 기본 모델(2026-11-23 부터 v1.4.2)
     assert "risk_model_v1.4" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.1" in rm.SUPPORTED_VERSIONS
+    assert "risk_model_v1.4.2" in rm.SUPPORTED_VERSIONS
 
 
 def test_shipped_v13_scores_nameless_input_with_named_pattern():
@@ -939,8 +940,8 @@ def test_shipped_v141_changes_only_the_named_review_cut():
         pytest.skip("v1.4.1 계수 파일 없음")
     base = json.loads(V14_MODEL_PATH.read_text(encoding="utf-8"))
     new = json.loads(rm.V141_MODEL_PATH.read_text(encoding="utf-8"))
-    assert rm.DEFAULT_MODEL_PATH == rm.V141_MODEL_PATH
-    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.1"
+    assert rm.V141_MODEL_PATH.name == "risk_model_v1.4.1.json"  # v1.4.2 의 원본(2026-11-23)
+    assert new["version"] == "risk_model_v1.4.1"
     assert new["grade_thresholds"] == {"주의": 0.0902, "검토 권장": 0.5059, "위험": 0.5902}
     assert {k: v for k, v in new["grade_thresholds"].items() if k != "검토 권장"} == {
         k: v for k, v in base["grade_thresholds"].items() if k != "검토 권장"}
@@ -962,3 +963,22 @@ def test_shipped_v141_changes_only_the_named_review_cut():
     assert rm.nameless_grade_thresholds(model) == rm.nameless_grade_thresholds(
         rm.load_model(V14_MODEL_PATH))
 
+
+
+def test_shipped_v142_only_adds_the_logo_floor_flag():
+    """서비스 기본 v1.4.2(설계 §7-9, 2026-11-23): v1.4.1 JSON 에 logo_floor 표시(엔진이 이름 있는
+    이미지 질의를 이미지만 판단과 견줌 — 견고성 점검 R-P0-1)와 그 출처 meta 만 더했다. 계수·하한·
+    규칙은 v1.4.1 그대로 — v1.4.1 을 다시 쓰면 이 시험이 v1.4.2 도 다시 만들라고 알린다
+    (logo_floor_image_only.py)."""
+    if not rm.V142_MODEL_PATH.exists() or not rm.V141_MODEL_PATH.exists():
+        pytest.skip("v1.4.2 계수 파일 없음")
+    base = json.loads(rm.V141_MODEL_PATH.read_text(encoding="utf-8"))
+    new = json.loads(rm.V142_MODEL_PATH.read_text(encoding="utf-8"))
+    assert rm.DEFAULT_MODEL_PATH == rm.V142_MODEL_PATH
+    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.2"
+    assert rm.logo_floor_enabled(new) and not rm.logo_floor_enabled(base)
+    assert {k for k in set(base) | set(new) if base.get(k) != new.get(k)} == {
+        "version", rm.LOGO_FLOOR_KEY, "meta"}
+    assert {k for k in set(base["meta"]) | set(new["meta"])
+            if base["meta"].get(k) != new["meta"].get(k)} == {"logo_floor"}
+    assert new["meta"]["logo_floor"]["derived_from"] == base["version"]

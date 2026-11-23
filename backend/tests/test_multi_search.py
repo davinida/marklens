@@ -76,7 +76,7 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.4.1"  # 서비스 기본 모델(2026-11-23)
+    assert ms.state.model["version"] == "risk_model_v1.4.2"  # 서비스 기본 모델(2026-11-23)
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
     # 가짜 ML 은 사진 판정을 끈다(임베딩이 의미 없음)
     assert ms.state.goods_ignored == 0 and ms.state.photo_direction is None
@@ -422,7 +422,7 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     from src.axes.x2_ortho import orthographic_similarity
 
     query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
-    assert ms.state.model["version"] == "risk_model_v1.4.1"
+    assert ms.state.model["version"] == "risk_model_v1.4.2"
     results = {}
     for version in (1, 2):
         monkeypatch.setattr(ms.state, "model", _spelling_model(version))
@@ -521,7 +521,8 @@ def test_mixed_basis_orders_by_grade_position_not_raw_risk():
 
 def test_type_override_figure_uses_higher_nameless_grade(client, ocr_on):
     """유형을 도형계로 고친 질의(이름 + 이미지)는 이름을 뺀 판단의 등급이 더 높으면 그쪽을 쓴다
-    (계약 v2 §2-4 6항, rule_triggers 에 nameless_floor). 자동 유형(이름 있으면 문자계)에는 없다."""
+    (계약 v2 §2-4 6항, rule_triggers 에 nameless_floor). 자동 유형은 v1.4.2 부터 이미지만 판단과
+    견준다."""
     data = engine.multi_search(image=_image(), name="블루커피", type_override="도형",
                                top_k=9).to_dict()
     assert data["overall"]["query_type"] == {**data["overall"]["query_type"], "type": "도형",
@@ -538,8 +539,11 @@ def test_type_override_figure_uses_higher_nameless_grade(client, ocr_on):
             assert not candidate["risk"]["pattern"].startswith("noname:")
     auto = engine.multi_search(image=_image(), name="블루커피", top_k=9).to_dict()
     assert auto["overall"]["query_type"]["source"] != "user"
-    assert all("nameless_floor" not in c["risk"]["rule_triggers"] for c in auto["candidates"])
-    assert all(not c["risk"]["pattern"].startswith("noname:") for c in auto["candidates"])
+    # v1.4.2(logo_floor): 자동 유형도 이미지만 판단과 견준다 — 같은 이미지 후보는 이미지만 판단
+    same = [c for c in auto["candidates"] if c["axes"]["x2_img"] == 1.0]
+    assert same and "nameless_floor" in same[0]["risk"]["rule_triggers"]
+    assert all(c["risk"]["pattern"] == "noname:x2_whole" for c in auto["candidates"]
+               if c["risk"]["pattern"].startswith("noname:"))  # 업종 든 이름 없는 판단은 안 씀
 
 
 def test_goods_floor_boundary_on_shipped_model():
