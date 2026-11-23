@@ -76,7 +76,7 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.4"  # 서비스 기본 모델(2026-11-20)
+    assert ms.state.model["version"] == "risk_model_v1.4.1"  # 서비스 기본 모델(2026-11-23)
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
     # 가짜 ML 은 사진 판정을 끈다(임베딩이 의미 없음)
     assert ms.state.goods_ignored == 0 and ms.state.photo_direction is None
@@ -422,7 +422,7 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     from src.axes.x2_ortho import orthographic_similarity
 
     query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
-    assert ms.state.model["version"] == "risk_model_v1.4"
+    assert ms.state.model["version"] == "risk_model_v1.4.1"
     results = {}
     for version in (1, 2):
         monkeypatch.setattr(ms.state, "model", _spelling_model(version))
@@ -491,19 +491,29 @@ def test_same_basis_order_equals_risk_order(pattern):
 
 def test_mixed_basis_orders_by_grade_position_not_raw_risk():
     """이름 있는 판단과 이름 없는 판단이 섞이면 p 대신 (p 로 정한 등급, 등급 안 위치)로 견준다 —
-    이름 있는 "검토 권장" 바로 위 후보가 이름 없는 "주의" 맨 위 후보보다 앞(p 는 반대일 수 있다)."""
+    이름 있는 판단의 어느 등급 바로 위 후보가 이름 없는 판단의 한 등급 아래 맨 위 후보보다 앞(p 는
+    반대일 수 있다). 기본 모델의 하한에서 p 가 반대가 되는 (등급, 이름 없는 집합) 짝을 골라 쓴다
+    (v1.4.1 은 이름 있는 검토 권장 0.5059 — 이름 있는 위험 대 이미지+상품 이름 없는 검토 권장)."""
     from src.model import risk_model as rm
 
     model = rm.load_model()
     named = rm.grade_thresholds_for(model, "x2_whole+x4")
-    nameless = rm.grade_thresholds_for(model, "noname:x2_whole")
-    assert nameless["주의"] is not None
-    top_of_caution = (nameless["검토 권장"] or 1.0) - 0.001
-    first = _ranked("x2_whole+x4", named["검토 권장"] + 0.001, grade="검토 권장", x2_img=0.5,
+    pairs = []
+    for grade in ("검토 권장", "위험"):
+        below = rm.GRADES[rm.GRADES.index(grade) - 1]
+        for pattern in ("noname:x2_whole", "noname:x2_whole+x4"):
+            nameless = rm.grade_thresholds_for(model, pattern)
+            top_below = (nameless[grade] or 1.0) - 0.001
+            if nameless[below] is not None and top_below > named[grade] + 0.001:
+                pairs.append((grade, below, pattern, top_below))
+    assert pairs  # p 가 반대가 되는 짝이 하나는 있다
+    grade, below, pattern, top_below = pairs[0]
+    first = _ranked("x2_whole+x4", named[grade] + 0.001, grade=grade, x2_img=0.5,
                     appno="4000000000001", model=model)
-    second = _ranked("noname:x2_whole", top_of_caution, grade="주의", x2_img=0.9,
+    second = _ranked(pattern, top_below, grade=below, x2_img=0.9,
                      appno="4000000000002", model=model)
-    assert first.rank[0] == 2 and second.rank[0] == 1
+    assert first.rank[0] == rm.GRADES.index(grade)
+    assert second.rank[0] == rm.GRADES.index(below)
     ordered = sorted([second, first], key=ms._candidate_sort_key)
     assert [c.id for c in ordered] == ["4000000000001", "4000000000002"]
     assert second.prob > first.prob  # 위험도만으로 줄 세우면 반대 순서
