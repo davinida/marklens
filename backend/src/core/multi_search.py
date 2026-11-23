@@ -69,6 +69,7 @@ from src.axes import x3_semantic as x3  # noqa: E402
 from src.axes.distinctiveness import Distinctiveness, load_distinctiveness  # noqa: E402
 from src.axes.pair_axes import (  # noqa: E402
     PairAxes,
+    clean_input_name,  # noqa: F401 — API 가 같은 정리를 쓰도록 여기서 내보낸다(견고성 점검 R-P1-6)
     clean_name,
     compute_pair_axes,
     normalize_codes,
@@ -77,6 +78,7 @@ from src.axes.x1_phonetic import has_pronunciation  # noqa: E402
 from src.axes.x2_ortho import has_spelling, orthographic_similarity  # noqa: E402
 from src.axes.x4_goods import goods_similarity  # noqa: E402
 from src.model import risk_model as rm  # noqa: E402
+from src.preprocess import BlankImageError  # noqa: E402, F401 — 빈 이미지(API 400, 계약 §5-6)
 from src.scoring import score_results  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -481,6 +483,25 @@ def _ensure_fresh() -> None:
         if state.ready and state.load_token == engine.state.load_token:
             return
         load_all()
+
+
+def unavailable_reason() -> str | None:
+    """통합 검색을 할 수 없는 이유 코드 — /health 가 쓴다(계약 v2 §5-7, 견고성 점검 R-P1-2). 할 수
+    있으면 None. 원인 원문(state.error — 파일 경로·예외 문구가 들어 있을 수 있음)은 내보내지 않는다
+    (원인은 기동 로그에). 기동 중에는 lifespan 이 끝나기 전이라 /health 자체가 응답하지 않는다."""
+    if not engine.state.ready:
+        return "ENGINE_LOADING"
+    if engine.state.index is None or int(engine.state.index.ntotal) == 0:
+        return "INDEX_EMPTY"
+    if not state.ready:
+        return "SEARCH_LOADING"
+    if state.model is None:
+        return "RISK_MODEL_UNAVAILABLE"
+    if state.distinct is None:
+        return "DISTINCTIVENESS_UNAVAILABLE"
+    if not state.records:
+        return "CANDIDATES_UNAVAILABLE"
+    return None
 
 
 # ---- 유형·caveat --------------------------------------------------------------------------------

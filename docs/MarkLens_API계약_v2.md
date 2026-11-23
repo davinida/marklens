@@ -1,7 +1,7 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
-  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1; 견고성 점검 P1 — `name` 의 보이지 않는 서식 문자 정리·빈 이미지 400·429·503 고정 문구·`/health` 의 검색 가능 여부 2026-11-23 — §1·§4-1·§5-1·§5-6·§5-7) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
@@ -43,7 +43,7 @@
 | 필드 | 형식 | 필수 | 설명 |
 |---|---|---|---|
 | `image` | PNG/JPEG/WebP, 최대 10 MiB, 32..4096px | 셋 중 하나 이상 | v1 `file` 과 같은 검증(413/415/400). 수동 크롭 결과를 그대로 보낸다 |
-| `name` | string | 〃 | 상표명. 앞뒤 공백 제거 후 1..100자(공백만이면 없는 것으로 본다). NFKC·대소문자 정규화는 서버가 한다 |
+| `name` | string | 〃 | 상표명. 보이지 않는 서식 문자(유니코드 Cf — 폭 없는 공백·BOM·부드러운 붙임표·양방향 제어 문자 등)를 지우고 NFC 로 맞춘 뒤 앞뒤 공백을 떼고 1..100자(공백·서식 문자만이면 없는 것으로 본다 — 2026-11-23 부터, `pair_axes.clean_input_name`; 상표명 확인·발음·관념 검색도 같은 정리. 중계 BFF 의 100자 검사와 화면의 검색 버튼도 같은 규칙의 TS 구현 `frontend/lib/markName.ts` 뒤에 센다 — 두 구현이 같은 결과인지는 공용 사례 `shared/text/clean_input_name_cases.json` 으로 pytest·Vitest 가 본다). NFKC·대소문자 정규화는 서버가 한다 |
 | `goods_codes` | string, **반복 필드**(`goods_codes=G0502&goods_codes=S120602`) 또는 쉼표로 이은 1개 | 〃 | 유사군 코드 `^[GS][0-9]{4,6}$`, 대소문자 무시, 중복 제거, 최대 60개(프론트-6 선택 20개의 유사군 합집합 `goodsCodeUnion`) |
 | `type_override` | `문자` \| `도형` \| `결합` | 아니오 | 사용자가 결과 화면에서 유형을 고쳐 다시 요청할 때. 있으면 `query_type.source = "user"` |
 
@@ -828,10 +828,10 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 - 축 값 표기는 `axes.*` 를 백분율 정수로("호칭 89%") — **내림**(0.7499 → 74%: 시각 상태 0.75·도형 규칙 0.9·단독 임계값 같은
   기준을 넘지 않은 값이 넘은 것처럼 보이지 않게, 위험도 %·지정상품 겹침 %도 같다, 2026-11-21), 바는 기여도로 — 둘을 섞지 않는다(점수가 높아도 계수가 작으면 기여도가 작다: X3).
 - `rule_triggers` 가 있으면 등급 옆에 한 줄: `standalone_x1` "호칭이 거의 같아 검토 권장으로 올렸습니다", `standalone_x2_text` "철자가
-  매우 비슷해 …", `standalone_x3` "뜻이 매우 비슷해 …", `figure_x2_img` "도형이 매우 비슷해 …(검증 데이터 부족, 참고용)", `nameless_floor` "도형으로 고친 질의라 로고만으로 본 판단의 등급을
-  썼습니다", `goods_floor` "업종이 겹쳐 로고만으로 본 등급을 유지했어요". `nameless_floor` 는 v1.4.2(`logo_floor`, §2-4 6항)부터 유형을 고치지
-  않은 이름 + 이미지 질의에도 붙는다(등록 로고를 그대로 쓰고 이름만 다른 입력 — 견고성 점검 R-P0-1). 지금 문구의 "도형으로 고친 질의라"는 그 경우에 맞지 않아,
-  바꿀 문구안은 "로고만으로 본 판단의 등급이 더 높아 그 등급을 썼어요"(두 경우 공통 — 화면 `ResultViewV2.tsx` 반영은 지원님, 2026-11-23 미반영).
+  매우 비슷해 …", `standalone_x3` "뜻이 매우 비슷해 …", `figure_x2_img` "도형이 매우 비슷해 …(검증 데이터 부족, 참고용)", `nameless_floor` "로고만으로 본 판단의 등급이
+  더 높아 그 등급을 썼어요", `goods_floor` "업종이 겹쳐 로고만으로 본 등급을 유지했어요". `nameless_floor` 는 v1.4.2(`logo_floor`, §2-4 6항)부터
+  유형을 고치지 않은 이름 + 이미지 질의에도 붙어(등록 로고를 그대로 쓰고 이름만 다른 입력 — 견고성 점검 R-P0-1) 두 경우에 맞는 문구로 바꿨다(2026-11-23,
+  `ResultViewV2.tsx` — 그 전 문구 "도형으로 고친 질의라 로고만으로 본 판단의 등급을 썼습니다").
 
 ### 4-2. 요부·제외 토큰(`salient`)
 
@@ -906,10 +906,11 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 |---:|---|---|
 | 400 | `image`·`name`·`goods_codes` 가 모두 없음(공백 `name`, 빈 `goods_codes` 포함) | `image, name, goods_codes 중 하나는 있어야 합니다.` |
 | 400 | 빈 파일·치수·콘텐츠 품질 | 공용 이미지 검증(`backend/src/core/validation.py`)의 메시지 |
+| 400 | 빈 이미지 — 완전 투명·거의 한 가지 색(전처리 `BlankImageError`; 2026-11-23 부터, 그 전에는 422 + 영어 전처리 문구) | `이미지에서 로고를 찾지 못했어요. 로고가 보이는 이미지를 올려 주세요.` |
 | 413 / 415 | 이미지 크기·형식 | 공용 이미지 검증의 메시지 |
 | 422 | `top_k` 범위, `name` 100자 초과, `goods_codes` 형식(`^[GS][0-9]{4,6}$`)·60개 초과, `type_override` 열거값 밖 | 필드별 메시지 |
-| 429 | 한도(`search` 묶음, `MARKLENS_SEARCH_RATELIMIT`) | — |
-| 503 | 엔진·인덱스 미준비(`RuntimeError`), 계수 JSON·식별력 모델 적재 실패(`ModelNotReadyError`). X3 비활성(`MARKLENS_X3_ENABLED=0`)은 **503 이 아니라** `x3` null + caveat `X3_DISABLED` 로 진행 | — |
+| 429 | 한도(`search` 묶음, `MARKLENS_SEARCH_RATELIMIT`) | `요청이 너무 많습니다. 잠시 후 다시 시도하세요. (1분에 10번까지 검색할 수 있어요)` — 괄호의 숫자·단위는 설정한 한도에서(2026-11-23 부터; 그 전 괄호는 slowapi 영어 `허용 한도: 10 per 1 minute`). 다른 엔드포인트도 같은 꼴(`상표명을 확인할`·`발음이 비슷한 상표를 찾을` 등) |
+| 503 | 엔진·인덱스 미준비(`RuntimeError`), 계수 JSON·식별력 모델 적재 실패(`ModelNotReadyError`). X3 비활성(`MARKLENS_X3_ENABLED=0`)은 **503 이 아니라** `x3` null + caveat `X3_DISABLED` 로 진행 | 모델 미준비는 고정 문구 `위험도 모델을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.`(원인은 서버 기동 로그에만 — 2026-11-23 부터, §5-6). 같은 상태면 `/health` 도 503(§5-7) |
 
 ### 5-2. OCR 실패·유형
 
@@ -950,11 +951,34 @@ deprecated 필드(`grade_code`·`grade_name`)도 함께 없어졌다. `POST /pho
 |---|---|---|---:|
 | `multi_search.EmptyQueryError`(ValueError) | `image`·`name`(공백만 포함)·`goods_codes`(빈 값만 포함)가 모두 없음 | `image, name, goods_codes 중 하나는 있어야 합니다.` | 400 |
 | `ValueError` | `top_k` 가 1–20 밖, `type_override` 가 문자·도형·결합 밖 | `top_k 는 1~20 정수여야 합니다 (받은 값: …).` / `type_override 는 문자·도형·결합 중 하나여야 합니다.` | 422 |
-| `multi_search.ModelNotReadyError`(RuntimeError) | 계수 JSON(`shared/model/risk_model_v1.json`, `meta.grade_precision` 포함) 또는 식별력 모델을 기동 때 못 읽음 — 서버는 떠 있고 이 기능만 | `multi_search.state.error`(원인 목록) | 503 |
+| `multi_search.ModelNotReadyError`(RuntimeError) | 계수 JSON(기본 `shared/model/risk_model_v1.4.2.json`, `meta.grade_precision` 포함) 또는 식별력 모델을 기동 때 못 읽음 — 서버는 떠 있고 이 기능만(`/health` 도 503, §5-7) | **그대로 내지 않는다** — 고정 문구 `위험도 모델을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요.`. 원인(`multi_search.state.error` — 파일 경로·예외 원문)은 기동 때 서버 로그에만(2026-11-23, 견고성 점검 R-P1-3; 그 전에는 원인 목록을 `detail` 로) | 503 |
 | `RuntimeError` | 엔진(인덱스·CLIP) 미준비 | `Engine 이 아직 초기화되지 않았습니다.` | 503 |
 | (이미지 디코딩 `ValueError`) | API 의 `validation.validate_and_decode` 단계에서 — 엔진은 검증된 PIL 이미지를 받는다 | 검증 메시지 그대로, 그 밖의 디코딩 오류는 `이미지를 디코딩할 수 없습니다.` | 400 |
+| `multi_search.BlankImageError`(ValueError — `src.preprocess`) | 이미지 임베딩 전처리에서 완전 투명·거의 한 가지 색(로고가 보이지 않음) | `이미지에서 로고를 찾지 못했어요. 로고가 보이는 이미지를 올려 주세요.`(2026-11-23, 견고성 점검 R-P1-1; 그 전에는 422 + 영어 전처리 문구) | 400 |
 
 OCR 실패·시간 초과·비활성(`MARKLENS_OCR_ENABLED=0`)은 예외가 아니라 `query_type.source = "fallback"` + caveat 로 진행한다(§5-2).
+
+### 5-7. 상태 확인 `GET /health` — 검색을 할 수 있을 때만 200 (2026-11-23, 견고성 점검 R-P1-2)
+
+통합 검색(`POST /search/v2`)을 할 수 있으면 200, 할 수 없으면 **503** 과 이유 코드(`reason`)를 낸다. 응답에는 내부 경로·예외
+원문을 넣지 않는다(원인은 서버 기동 로그). 그 전에는 계수 JSON 이 없거나 깨져도 `status: "ok"`·200 이었다.
+
+| 필드 | 뜻 |
+|---|---|
+| `status` | `ok`(검색 가능) · `loading`(엔진·검색 캐시 적재 전) · `error`(적재 실패) |
+| `engine_ready` | 엔진(색인·CLIP) 준비 — 예전과 같은 뜻 |
+| `search_ready` | 통합 검색을 할 수 있음. false 면 HTTP 503 |
+| `reason` | 검색을 할 수 없는 이유 코드, 할 수 있으면 null: `ENGINE_LOADING` · `INDEX_EMPTY` · `SEARCH_LOADING` · `RISK_MODEL_UNAVAILABLE`(계수 JSON 없음·깨짐·검증 실패) · `DISTINCTIVENESS_UNAVAILABLE`(식별력 모델) · `CANDIDATES_UNAVAILABLE`(후보 캐시) |
+| `index_size`·`trademark_count`·`storage_mode`·`artifact_generation_id` | 예전과 같음 |
+
+- 상품↔유사군 변환표(`/goods/*`)나 관념 검색(`/semantic-search`)만 못 쓰는 경우는 통합 검색에 지장이 없어 200 이다(그 엔드포인트만 503).
+- 기동 중(lifespan 의 모델 적재)에는 서버가 아직 연결을 받지 않아 503 이 아니라 연결 실패다 — 엔진은 기동 뒤 다시 적재하지 않는다.
+- 배포: `deploy/backend.Dockerfile` 의 HEALTHCHECK 는 200 이 아니면 실패로 센다(`--start-period=180s` 안의 실패는 세지 않고, 그 뒤 3번
+  연속이면 unhealthy). compose 의 `restart: unless-stopped` 는 프로세스가 끝날 때만 다시 띄우고 unhealthy 로는 재시작하지 않는다 — 모델
+  적재 중이나 모델 파일 문제로 재시작이 되풀이되지 않는다. 계수 JSON 이 깨진 채 배포하면 backend 가 unhealthy 가 되어
+  `depends_on: condition: service_healthy` 인 frontend 가 뜨지 않는다(배포 단계에서 알아챔). CI 는 `/health` 를 쓰지 않는다.
+- 프런트 BFF `GET /api/health` 는 백엔드가 200 이 아니면 그 상태 코드로 `서비스 상태를 확인할 수 없어요.` 를 낸다(이유 코드는 넘기지
+  않음) — 프런트 컨테이너 HEALTHCHECK 도 검색 불가를 알아챈다.
 
 ## 6. 구현 분담표
 

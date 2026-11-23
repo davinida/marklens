@@ -2,7 +2,8 @@
 
 지금 고쳐지지 않은 항목은 strict xfail 로 두고 사유에 점검 문서의 항목 번호를 적는다(고치면 XPASS 로
 실패해 xfail 을 지우라고 알린다). 통과하는 시험은 지금 동작을 지키는 가드다. 실제 CLIP·KIPRIS
-호출 없음.
+호출 없음. R-P0-1(2026-11-23, v1.4.2)·R-P1-1·R-P1-2·R-P1-3·R-P1-5·R-P1-6(2026-11-23,
+fix/robustness-p1)은 고쳐 통과 시험이 됐다.
 """
 
 import io
@@ -44,6 +45,7 @@ def search_api(monkeypatch):
     holder = {"raise": None}
 
     def run(**kwargs):
+        holder["kwargs"] = kwargs
         if holder["raise"] is not None:
             raise holder["raise"]
         return SimpleNamespace(to_dict=lambda: {"overall": {}, "candidates": []})
@@ -58,45 +60,92 @@ def search_api(monkeypatch):
     limiter.reset()
 
 
-@pytest.mark.xfail(strict=True, reason="R-P1-1: 하얀·완전 투명 이미지가 계약 §5-1 의 400 대신 "
-                                       "422 + 영어 전처리 문구")
 def test_blank_image_is_400_with_user_facing_korean(search_api):
+    """R-P1-1(고침): 전처리의 빈 이미지 예외(BlankImageError — ValueError)는 422 영어가 아니라
+    400 한국어."""
     client, holder = search_api
-    holder["raise"] = ValueError(PREPROCESS_BLANK)
+    holder["raise"] = multi_search.BlankImageError(PREPROCESS_BLANK)
     response = client.post("/search/v2", files={"image": ("white.png", _png(), "image/png")})
     detail = response.json()["detail"]
     assert response.status_code == 400
     assert re.search(r"[가-힣]", detail) and not re.search(r"[A-Za-z]{4,}", detail)
 
 
-@pytest.mark.xfail(strict=True, reason="R-P1-3: 모델 적재 실패 503 문구에 내부 경로·파이썬 "
-                                       "오류가 그대로 나감")
-def test_model_not_ready_detail_hides_internal_paths(search_api):
+def test_blank_and_transparent_images_raise_blank_image_error():
+    """R-P1-1: 하얀·완전 투명·거의 한 가지 색이면 BlankImageError(ValueError 를 이어받아 기존
+    호출부는 그대로), 보통 로고는 통과."""
+    from src.preprocess import validate_visual_content
+
+    with pytest.raises(multi_search.BlankImageError):
+        validate_visual_content(Image.new("RGB", (64, 64), "white"))
+    with pytest.raises(multi_search.BlankImageError):
+        validate_visual_content(Image.new("RGBA", (64, 64), (255, 0, 0, 0)))
+    assert issubclass(multi_search.BlankImageError, ValueError)
+    logo = Image.new("RGB", (64, 64), "white")
+    logo.paste((200, 40, 40), (16, 16, 48, 48))
+    validate_visual_content(logo)
+
+
+def test_model_not_ready_detail_hides_internal_paths(search_api, caplog):
+    """R-P1-3(고침): 응답은 고정 문구. 원인(경로·예외 원문)은 기동 때 multi_search.load_all 이
+    서버 로그에 남기고, 요청 때 로그에는 예외 본문을 다시 쓰지 않는다(검색어가 섞일 수 있는 본문
+    금지)."""
     client, holder = search_api
-    holder["raise"] = multi_search.ModelNotReadyError(
-        "계수 JSON: [Errno 2] No such file or directory: '/var/folders/x/missing.json'")
-    response = client.post("/search/v2", files={"name": (None, "블루커피")})
+    cause = "계수 JSON: [Errno 2] No such file or directory: '/var/folders/x/missing.json'"
+    holder["raise"] = multi_search.ModelNotReadyError(cause)
+    with caplog.at_level(logging.ERROR):
+        response = client.post("/search/v2", files={"name": (None, "블루커피")})
     assert response.status_code == 503
     detail = response.json()["detail"]
-    assert "/" not in detail and "Errno" not in detail
+    assert "/" not in detail and "Errno" not in detail and re.search(r"[가-힣]", detail)
+    assert "준비되지 않아 503" in caplog.text and cause not in caplog.text
 
 
-@pytest.mark.xfail(strict=True, reason="R-P1-2: 모델 JSON 적재에 실패해도 /health 는 status ok·"
-                                       "engine_ready true")
-def test_health_reports_unusable_search(monkeypatch):
+def _health_app(monkeypatch, multi_state) -> TestClient:
     app = FastAPI()
     app.include_router(health.router)
     monkeypatch.setattr(health.engine, "state", SimpleNamespace(
         ready=True, index=SimpleNamespace(ntotal=10), trademark_count=10, storage_mode="file",
         artifact_generation_id="x"))
-    monkeypatch.setattr(multi_search, "state", SimpleNamespace(model=None, ready=False,
-                                                              error="계수 JSON: 깨짐"))
-    body = TestClient(app).get("/health").json()
-    assert body["status"] != "ok" or body["engine_ready"] is False
+    monkeypatch.setattr(multi_search, "state", multi_state)
+    return TestClient(app)
 
 
-@pytest.mark.xfail(strict=True, reason="R-P1-5: 429 문구 끝에 slowapi 영어 한도 문자열"
-                                       "(예: 10 per 1 minute)")
+def test_health_reports_unusable_search(monkeypatch):
+    """R-P1-2(고침): 계수 JSON 을 못 읽어 검색을 할 수 없으면 /health 도 503 + 이유 코드(내부 경로
+    없이)."""
+    client = _health_app(monkeypatch, SimpleNamespace(
+        model=None, distinct=object(), records=[object()], ready=True,
+        error="계수 JSON: [Errno 2] No such file or directory: '/var/folders/x/missing.json'"))
+    response = client.get("/health")
+    body = response.json()
+    assert response.status_code == 503
+    assert body["status"] == "error" and body["search_ready"] is False
+    assert body["reason"] == "RISK_MODEL_UNAVAILABLE" and body["engine_ready"] is True
+    assert "/var/" not in response.text and "Errno" not in response.text
+
+
+@pytest.mark.parametrize("multi_state,reason", [
+    (SimpleNamespace(model={}, distinct=None, records=[object()], ready=True, error="식별력"),
+     "DISTINCTIVENESS_UNAVAILABLE"),
+    (SimpleNamespace(model={}, distinct=object(), records=[], ready=True, error="후보 캐시"),
+     "CANDIDATES_UNAVAILABLE"),
+    (SimpleNamespace(model=None, distinct=None, records=[], ready=False, error=""),
+     "SEARCH_LOADING"),
+])
+def test_health_reason_codes(monkeypatch, multi_state, reason):
+    response = _health_app(monkeypatch, multi_state).get("/health")
+    assert response.status_code == 503 and response.json()["reason"] == reason
+
+
+def test_health_is_200_when_search_is_ready(fake_engine):
+    """가드 — 가짜 모델 모드(MARKLENS_FAKE_ML)로 정상 기동하면 /health 200·search_ready true."""
+    response = TestClient(app).get("/health")
+    body = response.json()
+    assert response.status_code == 200
+    assert body["status"] == "ok" and body["search_ready"] is True and body["reason"] is None
+
+
 def test_rate_limit_message_has_no_english_fragment():
     own = Limiter(key_func=get_remote_address)
     app = FastAPI()
@@ -112,7 +161,9 @@ def test_rate_limit_message_has_no_english_fragment():
     client.get("/ping")
     response = client.get("/ping")
     assert response.status_code == 429
-    assert not re.search(r"\bper\b|\bminute\b", response.json()["detail"])
+    detail = response.json()["detail"]
+    assert not re.search(r"\bper\b|\bminute\b", detail)  # R-P1-5(고침)
+    assert "1분에 1번까지" in detail  # 숫자는 설정한 한도에서
 
 
 @pytest.fixture(scope="module")
@@ -184,6 +235,50 @@ def test_nameless_level_is_the_type_without_the_name(source, level, detail, expe
     query_type = multi_search.QueryType(level, source, detail)
     assert multi_search.nameless_level(query_type) == expected
 
+
+def test_search_v2_cleans_invisible_format_characters_in_name(search_api):
+    """R-P1-6: 검색 API 가 이름의 서식 문자(Cf)를 지우고 NFC 로 맞춰 엔진에 넘긴다 — 서식 문자만이면
+    이름 없음(다른 입력도 없으면 400)."""
+    import unicodedata
+
+    client, holder = search_api
+    client.post("/search/v2", files={"name": (None, "블\u200b루커\u00ad피")})
+    assert holder["kwargs"]["name"] == "블루커피"
+    client.post("/search/v2", files={"name": (None, unicodedata.normalize("NFD", "블루커피"))})
+    assert holder["kwargs"]["name"] == "블루커피"
+    response = client.post("/search/v2", files={"name": (None, "\u200b\ufeff")})
+    assert response.status_code == 400
+
+
+def test_name_check_cleans_invisible_format_characters(fake_engine, monkeypatch):
+    """R-P1-6: 상표명 확인도 같은 정리 — 서식 문자만이면 400, 섞여 있으면 지운 이름으로 묻는다
+    (KIPRIS 는 모의 응답, 호출 0)."""
+    from backend.src.api import namecheck
+
+    seen: list[str] = []
+    _mock_kipris(monkeypatch, seen)
+    with pytest.raises(namecheck.HTTPException) as empty:
+        namecheck._run_name_check("\u200b\u2060")
+    assert empty.value.status_code == 400 and not seen
+    try:
+        namecheck._run_name_check("블\u200b루커피상표")
+    except namecheck.HTTPException:
+        pass
+    assert seen and "블루커피상표" in httpx.URL(seen[0]).params.values()
+
+
+def test_phonetic_and_semantic_search_clean_invisible_format_characters(fake_engine):
+    """R-P1-6: 상표명 확인 패널의 발음·관념 검색도 같은 정리 — 서식 문자만이면 '상표명이 비어
+    있습니다'(400), 섞여 있으면 지운 이름과 같은 결과."""
+    from backend.src.core import phonetic_search, semantic_search
+
+    with pytest.raises(ValueError):
+        phonetic_search.search("\u200b", 5, 0.0)
+    plain = phonetic_search.search("블루커피", 5, 0.0)
+    mixed = phonetic_search.search("블\u200b루커피", 5, 0.0)
+    assert [m.entry.name for m in mixed.matches] == [m.entry.name for m in plain.matches]
+    with pytest.raises(ValueError):
+        semantic_search.search("\ufeff", 5, 0.0)
 
 def test_identical_logo_without_name_is_danger(fake_engine, monkeypatch):
     """가드 — 이름 없이 같은 로고만 넣으면 지금도 '위험'(이름 없는 판단, 계약 §3-2)."""

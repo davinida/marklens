@@ -234,6 +234,18 @@ describe("POST /api/search/v2", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("counts the name after the backend's cleaning — format characters out, NFC (robustness B14)", async () => {
+    const nfd = "블".repeat(40).normalize("NFD"); // 코드 포인트 120, NFC 로 40자
+    expect((await searchV2(request(nameForm(nfd)))).status).toBe(200);
+    expect((vi.mocked(fetch).mock.calls[0][1]?.body as FormData).get("name")).toBe("블".repeat(40));
+    vi.mocked(fetch).mockClear();
+    const zwsp = String.fromCodePoint(0x200b);
+    expect((await searchV2(request(nameForm(`${"가".repeat(100)}${zwsp}`)))).status).toBe(200);
+    vi.mocked(fetch).mockClear();
+    expect((await searchV2(request(nameForm(`${zwsp}${String.fromCodePoint(0xfeff)}`)))).status).toBe(400);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it.each(["G123", "G1234567", "X1234", "G12a4", "G１２３４"])("rejects malformed goods code %s", async (code) => {
     const form = nameForm();
     form.append("goods_codes", code);

@@ -59,6 +59,10 @@ TECH_WORDS = [
 ]
 
 
+# 빈 이미지(완전 투명·한 가지 색) — 처음 점검(2026-11-23)은 200 을 기대해 "기대와 다름"이었다
+BLANK_NOTE = "빈 이미지는 계약 v2 §5-1 의 콘텐츠 품질 400(R-P1-1)"
+
+
 def default_out() -> Path:
     return Path.home() / "marklens-archive" / f"robustness-{date.today():%Y%m%d}"
 
@@ -368,7 +372,8 @@ def build_cases(images: Path) -> list[Case]:
             "이미지",
             "완전 투명 PNG",
             fields=[img("fully_transparent.png")],
-            expect=both(200),
+            expect=both(400),
+            note=BLANK_NOTE,
         ),
         Case("E20", "이미지", "팔레트 PNG", fields=[img("palette.png")], expect=both(200)),
         Case("E21", "이미지", "EXIF 회전 JPEG", fields=[img("exif_rotated.jpg")], expect=both(200)),
@@ -382,7 +387,12 @@ def build_cases(images: Path) -> list[Case]:
             "E26", "이미지", "가늘고 긴 32×4000", fields=[img("thin_32x4000.png")], expect=both(200)
         ),
         Case(
-            "E27", "이미지", "4096×4096(경계, 흰색)", fields=[img("max_4096.png")], expect=both(200)
+            "E27",
+            "이미지",
+            "4096×4096(경계, 흰색)",
+            fields=[img("max_4096.png")],
+            expect=both(400),
+            note=BLANK_NOTE,
         ),
         Case(
             "E28", "이미지", "4097×64(상한 + 1)", fields=[img("over_4097x64.png")], expect=both(400)
@@ -399,7 +409,8 @@ def build_cases(images: Path) -> list[Case]:
             "이미지",
             "4096×4096 회색조 폭탄(허용 범위)",
             fields=[img("bomb_4096_gray.png")],
-            expect=both(200),
+            expect=both(400),
+            note=BLANK_NOTE,
         ),
         Case("E31", "이미지", "약 17MB(상한 초과)", fields=[img("big_12mb.png")], expect=both(413)),
         Case(

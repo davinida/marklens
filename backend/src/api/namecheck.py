@@ -15,7 +15,7 @@ from typing import Iterator
 from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException, Request, status
 
-from ..core import appno, config, engine, kipris_client, storage
+from ..core import appno, config, engine, kipris_client, multi_search, storage
 from ..core.ratelimit import limiter
 from ..schemas.namecheck import NameCheckCandidate, NameCheckRequest, NameCheckResponse
 
@@ -235,13 +235,15 @@ def _build_candidates(
 
 def _run_name_check(name: str) -> NameCheckResponse:
     """POST/GET 공통 상표명 확인 로직."""
-    query = name.strip()
+    # 보이지 않는 서식 문자(Cf) 제거·NFC·trim — 통합 검색·엔진과 같은 정리(견고성 점검 R-P1-6).
+    query = multi_search.clean_input_name(name)
     if not query:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="상표명이 비어 있습니다."
         )
     # KIPRIS가 대소문자·전각·호환문자를 동일한 검색으로 처리한다는 공급자 계약이
-    # 없다. 서로 다른 원문 질의의 결과를 섞지 않도록 trim 이외에는 정규화하지 않는다.
+    # 없다. 서로 다른 원문 질의의 결과를 섞지 않도록 위 정리 외에는 정규화하지 않는다
+    # (서식 문자는 보이지 않고, NFC 는 같은 글자의 표기 차이만 맞춘다).
     # 게시 데이터 식별자를 함께 묶어 인덱스 재게시 시 캐시가 자연 무효화되게 한다.
     cache_key = f"{query}\x1f{_engine_state_token()}"
 

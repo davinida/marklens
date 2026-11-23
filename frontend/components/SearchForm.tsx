@@ -25,6 +25,7 @@ import type {
   SemanticSearchResponse,
 } from "@/lib/contracts";
 import { goodsCodeUnion, type SelectedGood } from "@/lib/goods";
+import { cleanInputName } from "@/lib/markName";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
@@ -285,7 +286,8 @@ export default function SearchForm({
     }
   };
 
-  const trimmedName = markName.trim();
+  // 백엔드와 같은 정리(서식 문자 제거 → NFC → 앞뒤 공백) — 보이지 않는 글자만이면 이름이 없는 것(견고성 점검 U3)
+  const trimmedName = cleanInputName(markName);
   const hasAnyInput = Boolean(file || trimmedName || goodsCodes.length > 0);
 
   const submit = () => {

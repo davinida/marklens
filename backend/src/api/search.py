@@ -15,6 +15,10 @@ from ..schemas.search_v2 import SearchV2Response
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# 사용자에게 보이는 고정 문구(계약 v2 §5-1·§5-6, 견고성 점검 R-P1-1·R-P1-3)
+BLANK_IMAGE_DETAIL = "이미지에서 로고를 찾지 못했어요. 로고가 보이는 이미지를 올려 주세요."
+MODEL_NOT_READY_DETAIL = "위험도 모델을 준비하지 못했어요. 잠시 뒤 다시 시도해 주세요."
+
 
 # CPU 바운드 검색의 동시 실행 상한 리미터.
 # 이벤트 루프가 아닌 워커 스레드에서 실행되지만, CLIP 인코딩을 동시에 여러 개
@@ -68,7 +72,8 @@ async def search_v2_endpoint(
         image_file = form.get("image")
         if image_file is not None and not isinstance(image_file, StarletteUploadFile):
             raise HTTPException(415, "image는 파일이어야 합니다.")
-        name = (form.get("name") or "").strip() or None
+        # 보이지 않는 서식 문자(Cf) 제거·NFC — 엔진·상표명 확인과 같은 정리(R-P1-6)
+        name = multi_search.clean_input_name(form.get("name") or "") or None
         if name and len(name) > 100:
             raise HTTPException(422, "name은 100자 이하여야 합니다.")
         goods = list(dict.fromkeys(
@@ -112,10 +117,16 @@ async def search_v2_endpoint(
         raise
     except multi_search.EmptyQueryError:
         raise HTTPException(400, "image, name, goods_codes 중 하나는 있어야 합니다.") from None
+    except multi_search.BlankImageError:
+        # 완전 투명·거의 한 가지 색 — 콘텐츠 품질은 400(계약 v2 §5-1). ValueError 보다 먼저
+        raise HTTPException(400, BLANK_IMAGE_DETAIL) from None
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from None
-    except multi_search.ModelNotReadyError as exc:
-        raise HTTPException(503, str(exc)) from None
+    except multi_search.ModelNotReadyError:
+        # 원인(파일 경로·예외 원문)은 기동 때 multi_search.load_all 이 서버 로그에 남겼다 — 응답은
+        # 고정 문구, 여기서는 예외 본문을 다시 남기지 않는다(검색어가 섞일 수 있는 본문 금지 규약)
+        logger.error("통합 검색 모델이 준비되지 않아 503 — 원인은 기동 로그")
+        raise HTTPException(503, MODEL_NOT_READY_DETAIL) from None
     except RuntimeError as exc:
         if str(exc) == "Engine 이 아직 초기화되지 않았습니다.":
             raise HTTPException(503, str(exc)) from None

@@ -37,15 +37,27 @@ from .x1_phonetic import has_pronunciation, phonetic_similarity
 from .x2_ortho import DEFAULT_SPELLING_VERSION, has_spelling, orthographic_similarity
 from .x4_goods import goods_similarity, has_goods
 
-__all__ = ["RemovedToken", "PairAxes", "clean_name", "compute_pair_axes", "normalize_codes"]
+__all__ = ["RemovedToken", "PairAxes", "clean_input_name", "clean_name", "compute_pair_axes",
+           "normalize_codes"]
 
 _SPACES = re.compile(r"\s+")
 
 
+def clean_input_name(name: object) -> str:
+    """입력 상표명의 공통 정리 — 보이지 않는 서식 문자(유니코드 Cf: 폭 없는 공백·폭 없는 (비)결합자·
+    낱말 결합자·BOM·부드러운 붙임표·양방향 제어 문자 등)를 지우고 NFC 로 맞춘 뒤 앞뒤 공백을 뗀다
+    (계약 v2 §1 `name`, 견고성 점검 R-P1-6). API(검색·상표명 확인·발음·관념)와 엔진(clean_name)이
+    같이 쓴다. 호환 문자·대소문자는 바꾸지 않는다 — 상표명 확인은 이 결과를 KIPRIS 에 그대로
+    묻는다."""
+    text = "" if name is None else str(name)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    return unicodedata.normalize("NFC", text).strip()
+
+
 def clean_name(name: object) -> str:
-    """상표명 정리 — NFKC 정규화 + 연속 공백 하나로 + 앞뒤 공백 제거(계약 §1 `name` 처리). 토큰화·
-    대소문자는 축 함수의 normalize_name 에 맡긴다."""
-    text = unicodedata.normalize("NFKC", "" if name is None else str(name))
+    """상표명 정리 — clean_input_name(서식 문자 제거·NFC) 뒤 NFKC 정규화 + 연속 공백 하나로 + 앞뒤
+    공백 제거(계약 §1 `name` 처리). 토큰화·대소문자는 축 함수의 normalize_name 에 맡긴다."""
+    text = unicodedata.normalize("NFKC", clean_input_name(name))
     return _SPACES.sub(" ", text).strip()
 
 

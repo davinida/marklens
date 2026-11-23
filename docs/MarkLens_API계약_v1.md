@@ -431,6 +431,7 @@ BFF가 새 ID를 생성합니다. 응답과 운영 로그는 같은 ID로 추적
 ## 상태 확인
 
 - 브라우저·외부 모니터: `GET /api/health`
-- 내부 FastAPI: `GET /health`
+- 내부 FastAPI: `GET /health` — 통합 검색을 할 수 있을 때만 200, 못 하면 503 + 이유 코드(`search_ready`·`reason`, 2026-11-23 —
+  [API 계약 v2](MarkLens_API계약_v2.md) §5-7)
 
 외부 응답은 현재 artifact generation과 준비 상태 확인에 필요한 필드만 전달합니다.
