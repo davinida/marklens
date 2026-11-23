@@ -21,14 +21,23 @@
 | `meta` | n·CV AUC(심결 0.6184·현실 0.9113)·Brier·채택 규칙·입력 정의·`sigma_selection`·`risk_min_support`·`grade_precision`·`pattern_choice`·`coupling_floors`·`monotonicity`(학습 행 검사)·`indicator_reference`(지시변수 구조 참고 모델 — miss_x2img 0.56) |
 
 재학습(프로젝트 루트, KIPRIS 호출 0, 기본 2방법 약 13초): `ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images`(쉬운 음성 이미지 축, 5초) →
-`ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-20 부터 서비스 기본 모델은 아래
-`risk_model_v1.4.json`(런타임 `MODEL_VERSION` risk_model_v1.4, `DEFAULT_MODEL_PATH`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
+`ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-23 부터 서비스 기본 모델은 아래
+`risk_model_v1.4.1.json`(런타임 `MODEL_VERSION` risk_model_v1.4.1, `DEFAULT_MODEL_PATH`; 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
 (패턴 없는 JSON 은 최상위 계수 집합 하나로, 없는 키는 규칙 미적용).
 
-## `risk_model_v1.4.json` — v1.4 (2차 학습), 서비스 기본 모델 (2026-11-19 학습 · 2026-11-20 서비스 반영)
+## `risk_model_v1.4.1.json` — v1.4.1 (이름 있는 판단의 검토 권장 하한), 서비스 기본 모델 (2026-11-23)
 
-**2026-11-20 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 — 파일을 바꾸면 서버를 다시
-띄운다). `risk_model_v1.4.json`(version `risk_model_v1.4`)은 v1.3 JSON 에 이름 없는 입력용 계수 집합 2벌을 덧붙인 것으로, `ml/scripts/train_risk_model_v14_nameless.py` 가
+**2026-11-23 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V141_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
+파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.json` 에서 최상위 `grade_thresholds` 의 검토 권장만 0.1805 → **0.5059** 로 바꾼 것이다(이름 있는 계수 집합 4벌이
+같이 쓰는 하한 — 주의 0.0902·위험 0.5902·계수·이름 없는 집합과 그 하한·단독 임계값·도형 규칙·결합 제약·`grade_precision` 은 v1.4 그대로). 값은 실제 검색 기준이다 —
+지어낸 상표명 대조군에서 무관한 후보 중 최고 위험도가 검토 권장 이상인 질의가 네 집합 모두 10% 이하가 되는 가장 낮은 공통 값(통합 모델 설계 §7-6-2).
+`ml/scripts/named_shared_threshold.py apply` 가 v1.4 JSON 에서 만든다 — v1.4 와 다른 키는 `version`·`grade_thresholds`·`grade_basis`·`meta.named_grade_thresholds`(출처·설정
+sha256·집합별 값·이전 값)뿐이고 `ml/tests/test_risk_model.py` 가 이를 고정한다. v1.4 JSON 을 다시 쓰면(이름 없는 하한 재계산 등) 이 파일도 다시 만들어야 한다(설정을 다시
+고정한 뒤 `run`·`apply`).
+
+## `risk_model_v1.4.json` — v1.4 (2차 학습), v1.4.1 의 원본 (2026-11-19 학습 · 2026-11-20–22 서비스 기본 모델)
+
+**2026-11-20–22 서비스가 읽던 기본 모델이고, 지금은 v1.4.1 의 원본이다**(런타임 `V14_MODEL_PATH` — 이름 없는 하한 스크립트·v1.4 학습 스크립트가 이 파일을 쓴다). `risk_model_v1.4.json`(version `risk_model_v1.4`)은 v1.3 JSON 에 이름 없는 입력용 계수 집합 2벌을 덧붙인 것으로, `ml/scripts/train_risk_model_v14_nameless.py` 가
 결과 전에 고정한 채택 기준 ①–④를 모두 채웠을 때만 쓴다(통합 모델 설계 §7-4-2). 이름 없는 입력의 등급 하한은 `ml/scripts/nameless_search_thresholds.py` 가 실제 검색
 기준으로 쓴다(설계 §7-4-4) — 학습 스크립트·옛 하한 스크립트(`nameless_grade_thresholds.py`, §7-4-3)는 같은 값을 옛 방식으로 쓰므로 meta 에 실제 검색 기준
 하한이 있으면 `--force` 없이는 쓰지 않는다(종료 코드 4). 런타임 엔진은 이름 없는 이미지+상품 판단에 업종 하한(`goods_floor`, 상품 겹침 ≥ `coupling.floors.x4`
@@ -52,7 +61,7 @@
   저장소의 `ml/data/trials/risk_model_v1.4_attempt2_{report.md,results.json}`.
 - 1차 시도(`ml/scripts/train_risk_model_v14.py` — 여섯 집합을 모두 다시 학습 + `coupling.name_floors`)는 채택 기준 ①·② 미달로 채택하지 않았다(설계 §7-4-1). 런타임은 그
   형식(`name_floors`)도 적재할 수 있지만 재현용이고, 이 디렉터리에 그 파일은 없다.
-- 런타임 `MODEL_VERSION`·`DEFAULT_MODEL_PATH` 는 v1.3 그대로다. v1.4 를 읽으려면 경로를 명시한다(`rm.load_model(path)` 또는 환경변수 `MARKLENS_RISK_MODEL`).
+- 런타임 `MODEL_VERSION`·`DEFAULT_MODEL_PATH` 는 v1.4.1(2026-11-23 부터; 2026-11-20–22 는 v1.4). 다른 파일을 읽으려면 경로를 명시한다(`rm.load_model(path)` 또는 환경변수 `MARKLENS_RISK_MODEL`).
 - 축 계산 버전(2026-11-20): 계수 JSON 은 `axis_versions`(예: `{"x2_text": 2}`)로 그 계수가 학습된 축 정의를 밝힐 수 있다 — 없으면 모두 1(v1.3·v1.4). 입력의
   `x2_text_version`(`pair_axes.model_features` 가 싣는다, 없으면 1)이 다르면 `risk_score` 가 ValueError 를 내고, 엔진은 모델이 요구하는 철자 버전으로 축을 계산한다.
   철자 v2 를 요구하는 JSON 은 아직 없다(통합 모델 설계 §7-5 — 철자 v2 는 측정의 진행 조건 미달로 v1 유지).

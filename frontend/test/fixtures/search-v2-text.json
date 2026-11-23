@@ -160,7 +160,7 @@
       },
       "risk": {
         "prob": 0.378,
-        "grade": "검토 권장",
+        "grade": "주의",
         "contributions": {
           "X1": 2.208,
           "X2": 0.171,
@@ -222,7 +222,7 @@
       },
       "risk": {
         "prob": 0.339,
-        "grade": "검토 권장",
+        "grade": "주의",
         "contributions": {
           "X1": 0.858,
           "X2": 0.0,
@@ -259,12 +259,12 @@
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4",
+    "model_version": "risk_model_v1.4.1",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
         "주의": 0.0902,
-        "검토 권장": 0.1805,
+        "검토 권장": 0.5059,
         "위험": 0.5902
       },
       "nameless": {
@@ -296,7 +296,7 @@
       "goods": 20,
       "total": 64
     },
-    "elapsed_ms": 139
+    "elapsed_ms": 56
   },
   "dataset_info": {
     "총_상표수": 1383,

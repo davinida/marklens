@@ -270,8 +270,8 @@ def test_versions_accepted():
     assert _model(version="risk_model_v1.1")["version"] == "risk_model_v1.1"
     assert _model(version="risk_model_v1.2")["version"] == "risk_model_v1.2"
     assert _model(version="risk_model_v1.2.1")["version"] == "risk_model_v1.2.1"
-    assert rm.MODEL_VERSION == "risk_model_v1.4"  # 서비스 기본 모델(2026-11-20 부터)
-    assert rm.DEFAULT_MODEL_PATH == rm.V14_MODEL_PATH
+    assert rm.MODEL_VERSION == "risk_model_v1.4.1"  # 서비스 기본 모델(2026-11-23 부터)
+    assert rm.DEFAULT_MODEL_PATH == rm.V141_MODEL_PATH
     assert rm.V13_MODEL_PATH.name == "risk_model_v1.json"
     with pytest.raises(ValueError):
         _model(version="risk_model_v2")
@@ -589,8 +589,9 @@ def test_v14_validate_nameless_patterns():
     # name_floors 가 없는 v1.4 JSON 은 이름 결합을 검사하지 않는다(이름 없는 패턴 사이만)
     without_floors = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
     assert without_floors and all("(이름" not in v for v in without_floors)
-    assert rm.MODEL_VERSION == "risk_model_v1.4"  # 서비스 기본 모델(2026-11-20 부터 v1.4)
+    assert rm.MODEL_VERSION == "risk_model_v1.4.1"  # 서비스 기본 모델(2026-11-23 부터 v1.4.1)
     assert "risk_model_v1.4" in rm.SUPPORTED_VERSIONS
+    assert "risk_model_v1.4.1" in rm.SUPPORTED_VERSIONS
 
 
 def test_shipped_v13_scores_nameless_input_with_named_pattern():
@@ -732,13 +733,14 @@ V14_MODEL_PATH = rm.REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"
 
 def test_shipped_v14_adds_nameless_blocks_without_changing_named_outputs():
     """채택된 v1.4(2차 시도, 설계 §7-4): 이름 있는 4벌·등급 하한·단독 임계값·grade_precision 은 v1.3
-    그대로, 이름 없는 2벌만 더했다. 서비스 기본 모델 경로는 v1.3 그대로다."""
+    그대로, 이름 없는 2벌만 더했다. 2026-11-23 부터 서비스 기본 모델은 이 파일에서 이름 있는 검토
+    권장 하한만 바꾼 v1.4.1 이다(아래 test_shipped_v141_…)."""
     if not V14_MODEL_PATH.exists() or not rm.V13_MODEL_PATH.exists():
         pytest.skip("v1.4 계수 파일 없음")
     old = rm.load_model(rm.V13_MODEL_PATH)
     new = rm.load_model(V14_MODEL_PATH)
     assert old["version"] == "risk_model_v1.3"
-    assert rm.DEFAULT_MODEL_PATH == V14_MODEL_PATH  # 2026-11-20 부터 서비스 기본 모델
+    assert rm.V14_MODEL_PATH == V14_MODEL_PATH  # v1.4.1 의 원본(2026-11-20–22 서비스 기본)
     assert new["version"] == "risk_model_v1.4" and rm.coupling_violations(new) == []
     for key in ("patterns", "features", "coefficients", "intercept", "grade_thresholds",
                 "standalone_thresholds", "standalone_precision", "pattern_axes",
@@ -926,3 +928,37 @@ def test_validate_nameless_grade_thresholds():
     # 최상위 하한은 여전히 null 을 허용하지 않는다(이름 있는 입력)
     with pytest.raises((ValueError, TypeError)):
         _model_v13(grade_thresholds={"주의": 0.06, "검토 권장": None, "위험": 0.56})
+
+
+def test_shipped_v141_changes_only_the_named_review_cut():
+    """서비스 기본 v1.4.1(설계 §7-6-2, 2026-11-23): v1.4 JSON 에서 이름 있는 판단의 검토 권장 하한만
+    0.1805 → 0.5059(이름 있는 4벌 공통 — 최상위 grade_thresholds)로 바꿨다. 계수·이름 없는 집합과 그
+    하한·단독 임계값·도형 규칙·결합 제약·위험 정밀도는 v1.4 그대로 — v1.4 를 다시 쓰면 이 시험이
+    v1.4.1 도 다시 만들라고 알린다(named_shared_threshold.py)."""
+    if not rm.V141_MODEL_PATH.exists() or not V14_MODEL_PATH.exists():
+        pytest.skip("v1.4.1 계수 파일 없음")
+    base = json.loads(V14_MODEL_PATH.read_text(encoding="utf-8"))
+    new = json.loads(rm.V141_MODEL_PATH.read_text(encoding="utf-8"))
+    assert rm.DEFAULT_MODEL_PATH == rm.V141_MODEL_PATH
+    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.1"
+    assert new["grade_thresholds"] == {"주의": 0.0902, "검토 권장": 0.5059, "위험": 0.5902}
+    assert {k: v for k, v in new["grade_thresholds"].items() if k != "검토 권장"} == {
+        k: v for k, v in base["grade_thresholds"].items() if k != "검토 권장"}
+    named = new["meta"]["named_grade_thresholds"]
+    assert named["previous"] == base["grade_thresholds"]
+    assert named["derived_from"] == base["version"]
+    assert named["adopted"] is True and len(named["rule_sha256"]) == 64
+    review = new["grade_thresholds"]["검토 권장"]
+    assert named["per_set"] and max(named["per_set"].values()) == review
+    same = {k: v for k, v in new.items() if k not in ("version", "grade_thresholds", "grade_basis",
+                                                     "meta")}
+    assert same == {k: v for k, v in base.items() if k not in (
+        "version", "grade_thresholds", "grade_basis", "meta")}
+    assert {k: v for k, v in new["meta"].items() if k != "named_grade_thresholds"} == base["meta"]
+    model = rm.load_model(rm.V141_MODEL_PATH)
+    assert rm.coupling_violations(model) == []
+    for pattern in model["patterns"]:
+        assert rm.grade_thresholds_for(model, pattern) == new["grade_thresholds"]
+    assert rm.nameless_grade_thresholds(model) == rm.nameless_grade_thresholds(
+        rm.load_model(V14_MODEL_PATH))
+

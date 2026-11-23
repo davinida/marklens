@@ -1,14 +1,14 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
-  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
   §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약)·§7-4(v1.4 이름 없는 계수 집합, §7-4-4 실제 검색 기준 하한), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
   README "다음 단계"(서비스 연결 범위).
 - 코드 근거(2026-10-24 현재): 런타임 `ml/src/model/risk_model.py`(`risk_score → RiskResult(prob, grade, contributions, figure_caveat)`),
-  계수 `shared/model/risk_model_v1.4.json`(version `risk_model_v1.4`, 2026-11-20 부터 — 이름 있는 판단은 v1.3 `risk_model_v1.json` 과 같음), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
+  계수 `shared/model/risk_model_v1.4.1.json`(version `risk_model_v1.4.1`, 2026-11-23 부터 — v1.4 `risk_model_v1.4.json` 에서 이름 있는 판단의 검토 권장 하한만 바꿈; 이름 있는 계수는 v1.3 `risk_model_v1.json` 과 같음), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
   `pair_generic`·`judge`), 축 함수 X1 `phonetic_similarity`·X2 철자 `orthographic_similarity`·X3 `semantic_similarity`·X4
   `goods_similarity`, 프론트-6 선택 지정상품 `frontend/lib/goods.ts`(`SelectedGood`·`goodsCodeUnion`).
 - §3 의 숫자는 위 코드로 **실제 계산한 값**이다(모델 한계도 그대로 드러난다 — §3-2, §5-3).
@@ -140,9 +140,9 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4"`(2026-11-20 부터; 이름 있는 판단의 계수·하한은 v1.3 그대로) |
+| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4.1"`(2026-11-23 부터; v1.4 에서 이름 있는 판단의 검토 권장 하한만 바뀜, 계수는 v1.3 그대로. 2026-11-20–22 는 `"risk_model_v1.4"`) |
 | `grade_precision` | 0–1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF, 행마다 자기 결측 패턴)에서 "위험"으로 분류된 152쌍 중 심결이 유사로 본 107쌍 → 0.7039 ≈ **0.70**(v1.3, 설계 §7-3; v1.2.1 은 159쌍 중 109 → 0.6855). 엔진은 JSON `meta.grade_precision` 을 읽는다(E-6) |
-| `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.1805, "위험": 0.5902 }` | **이름 있는 판단**의 등급 하한 p(JSON `grade_thresholds`, v1.3 그대로). 안전은 0–0.0902. 위험 0.5902 는 "정밀도 0.8 이상인 가장 낮은 p(지지 30)" 규칙이 미달해 쓴 대체값(검토 권장 하한과 1.0 의 중간) |
+| `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.5059, "위험": 0.5902 }` | **이름 있는 판단**의 등급 하한 p(JSON `grade_thresholds` — 이름 있는 계수 집합 4벌 공통). 안전은 0–0.0902. 검토 권장 0.5059 는 실제 검색 기준(2026-11-23, 통합 모델 설계 §7-6-2): 지어낸 상표명 대조군에서 무관한 후보 중 최고 위험도가 검토 권장 이상인 질의가 네 집합 모두 10% 이하가 되는 가장 낮은 공통 값(2026-11-22 까지 0.1805 — 심결 쌍 OOF 기준). 주의·위험은 v1.3 그대로 — 위험 0.5902 는 "정밀도 0.8 이상인 가장 낮은 p(지지 30)" 규칙이 미달해 쓴 대체값(그때의 검토 권장 하한 0.1805 와 1.0 의 중간) |
 | `thresholds.nameless` | `{ "noname:x2_whole": { "주의": 0.3677, "검토 권장": 0.491, "위험": 0.5724 }, "noname:x2_whole+x4": { "주의": 0.2944, "검토 권장": 0.4441, "위험": 0.7892 } }` | **이름 없는 판단**의 계수 집합(`risk.pattern`)별 등급 하한(JSON `nameless_patterns[키].grade_thresholds`). null 인 등급은 위험도로는 닿지 않는다. 값과 산출 방법은 §2-4 2항 |
 | `thresholds.standalone` | `{ "x1": 0.98, "x2_text": 0.75, "x2_img": null, "x3": 0.7707, "x4": null }` | 단독 임계값 τ(JSON `standalone_thresholds`, 정밀도 ≥ 0.7 지점). null 은 비활성 |
 | `thresholds.figure` | 0.9 | 도형 규칙 τ(JSON `figure_rule.threshold`, 미검증) |
@@ -161,8 +161,8 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
    하나를 쌍 전체에 쓴다(학습이 이 사건 표장의 유형으로 했으므로). v1.4: 호칭·철자가 둘 다 결측이고 이미지가 있으면 이름 없는
    계수 집합(이미지만 `noname:x2_whole` / 이미지+상품 `noname:x2_whole+x4`, 설계 §7-4) — 이름 없는 입력에 후보와 같은 이름을
    더하면 위험도가 내려가지 않는다(결합 제약 `same_name`, 적재 때 검증).
-2. `grade` 는 그 판단의 하한으로. 이름 있는 판단은 `meta.thresholds.grade` — 0.5902 이상 위험, 0.1805 이상 검토 권장, 0.0902
-   이상 주의, 그 아래 안전(v1.3 그대로; 위험은 정밀도 0.8 목표 미달 대체값). 이름 없는 판단은
+2. `grade` 는 그 판단의 하한으로. 이름 있는 판단은 `meta.thresholds.grade` — 0.5902 이상 위험, 0.5059 이상 검토 권장, 0.0902
+   이상 주의, 그 아래 안전(검토 권장은 2026-11-23 실제 검색 기준 — 그 전 0.1805; 주의·위험은 v1.3 그대로, 위험은 정밀도 0.8 목표 미달 대체값). 이름 없는 판단은
    `meta.thresholds.nameless[pattern]` — 실제 검색 기준(2026-11-20, 설계 §7-4-4): 심사를 거치지 않은 표장(정답 데이터의
    거절결정불복 출원 표장·권리범위확인 확인대상표장 중 DB 에 없는 것)으로 검색한 후보 쌍에서, 이름 없는 판단이 그 등급 이상인
    비율이 같은 쌍을 이름을 알고 채점했을 때 그 등급 이상인 비율과 같아지는 위험도 — 이미지만 0.3677 / 0.491 / 0.5724(이미지
@@ -225,8 +225,9 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 
 ## 3. 예시 JSON
 
-두 예시 모두 2026-11-20 현재 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,383건, 통합 모델 v1.4)이 낸 응답 그대로다
-(`engine.multi_search`, 첫 호출 준비를 한 번 한 뒤의 호출 — `elapsed_ms` 는 그때 값). `image_url` 만 브라우저 측 값(`/api/images/…`)으로
+두 예시 모두 2026-11-23 현재 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,383건, 통합 모델 v1.4.1)이 낸 응답 그대로다
+(`engine.multi_search`, 첫 호출 준비를 한 번 한 뒤의 호출 — `elapsed_ms` 는 그때 값; 2026-11-20 의 v1.4 예시와 다른 곳은 `model_version`·`thresholds.grade`
+검토 권장·문자상표 예시 3·4위 등급(검토 권장 → 주의)·`elapsed_ms` 뿐). `image_url` 만 브라우저 측 값(`/api/images/…`)으로
 바꿨다. 프론트는 이 두 응답을 Vitest 픽스처(`frontend/test/fixtures/search-v2-{text,image}.json`, 블록과 바이트 단위로 같음)로,
 백엔드는 스키마·키 집합 시험에 그대로 쓴다.
 
@@ -239,8 +240,8 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 판정 흐름: 입력 토큰 `블루`는 요부 후보로 남고 `커피`(3호 기술적 표장 원재료·1호 보통명칭)는 제외된다. 이미지가 없고 상품이 있어
 이름 있는 계수 집합 `x4`(절편 -3.4535 → `missing_adjustment` 0.018)를 쓴다. 1·2위 BLU hands(같은 출원인의 두 등록)는 후보 쪽 `hands`
 (일반어·다수 등록)가 빠져 `블루` ↔ `blu` 로 비교되고 호칭 1.0·관념 0.9186 이라 단독 규칙(`standalone_x1`·`standalone_x3`)이 걸린다 —
-위험도 0.524(정밀도 0.8 목표 미달 대체값인 위험 하한 0.5902 아래)라 "검토 권장". 3·4위는 지정상품이 겹치는(자카드 0.6·0.75) 커피
-관련 상표로 위험도 0.378·0.339 "검토 권장". 유사군 보유가 1,383/1,383건이라 `GOODS_COVERAGE` 는 나오지 않는다(§2-5).
+위험도 0.524(검토 권장 하한 0.5059 이상, 정밀도 0.8 목표 미달 대체값인 위험 하한 0.5902 아래)라 "검토 권장". 3·4위는 지정상품이 겹치는
+(자카드 0.6·0.75) 커피 관련 상표로 위험도 0.378·0.339 — 검토 권장 하한 0.5059 아래라 "주의"(v1.4 의 하한 0.1805 에서는 검토 권장이었다). 유사군 보유가 1,383/1,383건이라 `GOODS_COVERAGE` 는 나오지 않는다(§2-5).
 
 ```json
 {
@@ -405,7 +406,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       },
       "risk": {
         "prob": 0.378,
-        "grade": "검토 권장",
+        "grade": "주의",
         "contributions": {
           "X1": 2.208,
           "X2": 0.171,
@@ -467,7 +468,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       },
       "risk": {
         "prob": 0.339,
-        "grade": "검토 권장",
+        "grade": "주의",
         "contributions": {
           "X1": 0.858,
           "X2": 0.0,
@@ -504,12 +505,12 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4",
+    "model_version": "risk_model_v1.4.1",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
         "주의": 0.0902,
-        "검토 권장": 0.1805,
+        "검토 권장": 0.5059,
         "위험": 0.5902
       },
       "nameless": {
@@ -541,7 +542,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 20,
       "total": 64
     },
-    "elapsed_ms": 139
+    "elapsed_ms": 56
   },
   "dataset_info": {
     "총_상표수": 1383,
@@ -759,12 +760,12 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4",
+    "model_version": "risk_model_v1.4.1",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
         "주의": 0.0902,
-        "검토 권장": 0.1805,
+        "검토 권장": 0.5059,
         "위험": 0.5902
       },
       "nameless": {
@@ -796,7 +797,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 0,
       "total": 20
     },
-    "elapsed_ms": 215
+    "elapsed_ms": 269
   },
   "dataset_info": {
     "총_상표수": 1383,
