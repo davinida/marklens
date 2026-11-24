@@ -76,7 +76,7 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.4.3"  # 서비스 기본 모델(2026-11-23)
+    assert ms.state.model["version"] == "risk_model_v1.4.5"  # 서비스 기본 모델(2026-11-24)
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
     # 가짜 ML 은 사진 판정을 끈다(임베딩이 의미 없음)
     assert ms.state.goods_ignored == 0 and ms.state.photo_direction is None
@@ -422,7 +422,7 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     from src.axes.x2_ortho import orthographic_similarity
 
     query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
-    assert ms.state.model["version"] == "risk_model_v1.4.3"
+    assert ms.state.model["version"] == "risk_model_v1.4.5"
     results = {}
     for version in (1, 2):
         monkeypatch.setattr(ms.state, "model", _spelling_model(version))
@@ -491,32 +491,41 @@ def test_same_basis_order_equals_risk_order(pattern):
 
 def test_mixed_basis_orders_by_grade_position_not_raw_risk():
     """이름 있는 판단과 이름 없는 판단이 섞이면 p 대신 (p 로 정한 등급, 등급 안 위치)로 견준다 —
-    이름 있는 판단의 어느 등급 바로 위 후보가 이름 없는 판단의 한 등급 아래 맨 위 후보보다 앞(p 는
-    반대일 수 있다). 기본 모델의 하한에서 p 가 반대가 되는 (등급, 이름 없는 집합) 짝을 골라 쓴다
-    (v1.4.1 은 이름 있는 검토 권장 0.5059 — 이름 있는 위험 대 이미지+상품 이름 없는 검토 권장)."""
+    한 판단의 어느 등급 바로 위 후보가 다른 판단의 한 등급 아래 맨 위 후보보다 앞(p 는 반대일 수
+    있다). 기본 모델의 하한에서 p 가 반대가 되는 (등급, 이름 없는 집합) 짝을 두 방향 모두 찾아 쓴다
+    — 이름 없는 쪽 하한이 더 높으면 이름 있는 쪽이 위(v1.4.3 의 이미지+상품 위험 0.7892 대 이름 있는
+    0.5902), 이름 있는 쪽 하한이 더 높으면 이름 없는 쪽이 위(v1.4.5 의 이름 없는 검토 권장 0.491 대
+    이름 있는 0.5059)."""
     from src.model import risk_model as rm
 
     model = rm.load_model()
-    named = rm.grade_thresholds_for(model, "x2_whole+x4")
-    pairs = []
+    named_key = "x2_whole+x4"
+    named = rm.grade_thresholds_for(model, named_key)
+    pairs = []  # (앞에 올 판단, 그 위험도, 등급) · (뒤에 올 판단, 그 위험도, 한 등급 아래)
     for grade in ("검토 권장", "위험"):
         below = rm.GRADES[rm.GRADES.index(grade) - 1]
         for pattern in ("noname:x2_whole", "noname:x2_whole+x4"):
             nameless = rm.grade_thresholds_for(model, pattern)
+            if nameless[below] is None:
+                continue
             top_below = (nameless[grade] or 1.0) - 0.001
-            if nameless[below] is not None and top_below > named[grade] + 0.001:
-                pairs.append((grade, below, pattern, top_below))
+            if top_below > named[grade] + 0.001:  # 이름 없는 쪽 하한이 더 높다
+                pairs.append(((named_key, named[grade] + 0.001, grade),
+                              (pattern, top_below, below)))
+            if nameless[grade] is not None and named[grade] - 0.001 > nameless[grade] + 0.001:
+                pairs.append(((pattern, nameless[grade] + 0.001, grade),
+                              (named_key, named[grade] - 0.001, below)))
     assert pairs  # p 가 반대가 되는 짝이 하나는 있다
-    grade, below, pattern, top_below = pairs[0]
-    first = _ranked("x2_whole+x4", named[grade] + 0.001, grade=grade, x2_img=0.5,
-                    appno="4000000000001", model=model)
-    second = _ranked(pattern, top_below, grade=below, x2_img=0.9,
-                     appno="4000000000002", model=model)
-    assert first.rank[0] == rm.GRADES.index(grade)
-    assert second.rank[0] == rm.GRADES.index(below)
-    ordered = sorted([second, first], key=ms._candidate_sort_key)
-    assert [c.id for c in ordered] == ["4000000000001", "4000000000002"]
-    assert second.prob > first.prob  # 위험도만으로 줄 세우면 반대 순서
+    for (front_key, front_p, front_grade), (back_key, back_p, back_grade) in pairs:
+        first = _ranked(front_key, front_p, grade=front_grade, x2_img=0.5,
+                        appno="4000000000001", model=model)
+        second = _ranked(back_key, back_p, grade=back_grade, x2_img=0.9,
+                         appno="4000000000002", model=model)
+        assert first.rank[0] == rm.GRADES.index(front_grade)
+        assert second.rank[0] == rm.GRADES.index(back_grade)
+        ordered = sorted([second, first], key=ms._candidate_sort_key)
+        assert [c.id for c in ordered] == ["4000000000001", "4000000000002"]
+        assert second.prob > first.prob  # 위험도만으로 줄 세우면 반대 순서
 
 
 def test_type_override_figure_uses_higher_nameless_grade(client, ocr_on):
@@ -548,12 +557,14 @@ def test_type_override_figure_uses_higher_nameless_grade(client, ocr_on):
 
 def test_goods_floor_boundary_on_shipped_model():
     """업종 하한(계약 v2 §2-4 8항): 이름 없는 이미지+상품 판단은 상품 겹침 x4 가 결합 하한(0.0252)
-    이상이면 상품을 가린 이미지만 판단과 견줘 등급이 높은 쪽 — 하한 바로 아래면 그대로."""
+    이상이면 상품을 가린 이미지만 판단과 견줘 등급이 높은 쪽 — 하한 바로 아래면 그대로. v1.4.5 는
+    곱하기 항이라 같은 로고(이미지 1.0)는 겹침이 작아도 이미 이미지만 판단 이상이고(아래 끝),
+    하한이 등급을 바꾸는 곳은 이미지가 조금 덜 닮은 쪽(0.9)이다."""
     from src.model import risk_model as rm
 
     model = rm.load_model()
     assert ms.goods_floor_value(model) == 0.0252
-    base = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x2_whole": 1.0,
+    base = {"x1_d": None, "x2_text_d": None, "x3_d": None, "x2_whole": 0.9,
             "has_meaning_both": False, "has_distinctive_part_a": True,
             "has_distinctive_part_b": True, "mark_type": "도형"}
     at, at_rank = ms._nameless_judgment({**base, "x4": 0.0252}, model, "도형")
@@ -569,6 +580,9 @@ def test_goods_floor_boundary_on_shipped_model():
     high, _ = ms._nameless_judgment({**base, "x4": 1.0}, model, "도형")
     assert high.result.pattern == "noname:x2_whole+x4" and high.result.grade == "위험"
     assert "goods_floor" not in high.triggers
+    same, _ = ms._nameless_judgment({**base, "x2_whole": 1.0, "x4": 0.0252}, model, "도형")
+    assert same.result.pattern == "noname:x2_whole+x4" and same.result.grade == "위험"
+    assert "goods_floor" not in same.triggers  # 같은 로고는 업종 하한 없이도 위험
 
 
 def _goods_for_jaccard(denominator: int) -> list[str]:
@@ -577,9 +591,15 @@ def _goods_for_jaccard(denominator: int) -> list[str]:
     return ["S0101"] + [f"G{index:04d}" for index in range(1, denominator)]
 
 
-def test_goods_floor_in_engine_and_with_nameless_floor(client, ocr_on):
+def test_goods_floor_in_engine_and_with_nameless_floor(client, ocr_on, monkeypatch):
     """이미지+상품 이름 없는 질의 — 겹침 1/39(0.0256 ≥ 0.0252)면 goods_floor, 1/40(0.025)면 그대로.
-    유형을 도형으로 고친 질의의 이름 없는 판단도 업종 하한을 적용한 뒤의 판단이다."""
+    유형을 도형으로 고친 질의의 이름 없는 판단도 업종 하한을 적용한 뒤의 판단이다. 가짜 CLIP 은 같은
+    이미지가 1.0 이라, 그 점에서 하한이 등급을 바꾸는 v1.4.3 계수로 엔진 동작을 본다(v1.4.5 는 같은
+    로고면 하한 없이도 위험 — 끝의 배포 모델 단언, 하한 경계는 위 시험)."""
+    from src.model import risk_model as rm
+
+    shipped = ms.state.model
+    monkeypatch.setattr(ms.state, "model", rm.load_model(rm.V143_MODEL_PATH))
     applied = engine.multi_search(image=_image(), goods_codes=_goods_for_jaccard(39),
                                   top_k=3).to_dict()
     top = applied["candidates"][0]
@@ -597,3 +617,11 @@ def test_goods_floor_in_engine_and_with_nameless_floor(client, ocr_on):
     top = both["candidates"][0]
     assert {"goods_floor", "nameless_floor"} <= set(top["risk"]["rule_triggers"])
     assert top["risk"]["pattern"] == "noname:x2_whole" and top["risk"]["grade"] == "위험"
+    monkeypatch.setattr(ms.state, "model", shipped)  # 배포 모델(v1.4.5) — 곱하기 항
+    assert shipped["version"] == "risk_model_v1.4.5"
+    product = engine.multi_search(image=_image(), goods_codes=_goods_for_jaccard(39),
+                                  top_k=3).to_dict()
+    top = product["candidates"][0]
+    assert top["axes"]["x2_img"] == 1.0 and "goods_floor" not in top["risk"]["rule_triggers"]
+    assert top["risk"]["pattern"] == "noname:x2_whole+x4" and top["risk"]["grade"] == "위험"
+    assert top["risk"]["contributions"]["X4"] > 0.0  # 곱하기 항까지 업종의 몫(X4)
