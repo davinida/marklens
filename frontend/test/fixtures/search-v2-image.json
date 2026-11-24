@@ -191,7 +191,7 @@
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4.5",
+    "model_version": "risk_model_v1.4.6",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
@@ -228,7 +228,7 @@
       "goods": 0,
       "total": 20
     },
-    "elapsed_ms": 273
+    "elapsed_ms": 268
   },
   "dataset_info": {
     "총_상표수": 1383,

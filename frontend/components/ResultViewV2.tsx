@@ -84,6 +84,7 @@ const RULE_TRIGGER_TEXT: Record<string, string> = {
   figure_x2_img: "도형이 매우 비슷해 검토 권장으로 올렸습니다(검증 데이터 부족, 참고용)",
   nameless_floor: "로고만으로 본 판단의 등급이 더 높아 그 등급을 썼어요",
   goods_floor: "업종이 겹쳐 로고만으로 본 등급을 유지했어요",
+  goods_cap: "업종이 달라 업종 없이 본 등급까지만 썼어요",
 };
 
 // API 계약 v2 §2-5 FIGURE_LOW_DATA·§4-5 — 후보 카드의 도형 참고 문구(응답 caveat 과 같은 문장)
