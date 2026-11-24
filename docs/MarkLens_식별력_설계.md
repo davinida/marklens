@@ -240,6 +240,7 @@ combined_single_match("SLIMLINE", "Slim Line")        # frozenset({"line"}) — 
 
 ## 8. 변경 이력
 
+- **선택 인자만 (2026-11-24, `feat/famous-check`)**: `Distinctiveness.judge(token, goods, *, famous_exception=True)` — `famous_exception=False` 면 유명 브랜드 예외(1.0 고정)를 건너뛰고 나머지 판정을 그대로 한다. 유명 상표 확인 단계(`ml/src/famous_check.py`, 통합 모델 설계 §7-14)가 "유명하지 않았다면 이 낱말이 그 업종에서 식별력이 있는가"를 볼 때만 쓴다. 기본값은 지금까지의 판정과 같아 출력·캐시 키·학습 특징이 바뀌지 않는다(학습 특징 597 + 700 다시 만들어 바이트 같음, 식별력 시험 그대로 통과). 버전은 v0.4 그대로.
 - **v0.4 (2026-11-23, `fix/weak-run-adjacent`)**: 결합 규칙 `combined_weak_run` 규칙 2(기본) — 두 이름 모두에서 연속으로 붙어 있는 공통 약한 토큰 구간(2개 이상)만
   요부 후보로 묶음(어느 한쪽에서라도 다른 낱말이 끼면 묶지 않음, 구간이 여럿이면 모두). 규칙 1(v0.2–v0.3 부분열)은 `version=1`·`pair_generic(…,
   weak_run_version=1)` 로 남김, 상수 `WEAK_RUN_VERSIONS`·`DEFAULT_WEAK_RUN_VERSION`. `pair_axes.compute_pair_axes(…, weak_run_version=)`, 엔진은 계수 JSON

@@ -1,0 +1,6 @@
+{
+ "version": "famous_registry_overrides_v1",
+ "purpose": "유명 상표 등록부(shared/famous_registry.json)에서 사람이 정하는 값. ml/scripts/famous_registry.py build 가 읽어 자동 값을 덮어쓴다. brands: {브랜드 이름(표의 첫 표기): {\"protection\": \"업종 불문\" | \"같은·가까운 업종 중심\"}} — 없으면 \"업종 불문\". marks: {출원번호: {\"role\": \"브랜드 로고\" | \"제외\"}} — \"브랜드 로고\"는 도형·다른 이름 표장을 그 브랜드의 로고로 확정, \"제외\"는 브랜드 표장에서 뺀다. 표기를 더하려면 shared/famous_brands.txt 의 [브랜드] 표를 고친다(등록부는 새 표기를 지어내지 않는다).",
+ "brands": {},
+ "marks": {}
+}
