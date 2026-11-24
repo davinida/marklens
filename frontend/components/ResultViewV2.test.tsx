@@ -332,6 +332,30 @@ describe("ResultViewV2 — 이름 있는·없는 판단이 섞인 응답(v1.4, �
     expect(screen.getByText("업종이 겹쳐 로고만으로 본 등급을 유지했어요")).toBeVisible();
   });
 
+  it("goods_cap 규칙 문구를 보여준다(업종 상한, v1.4.6)", async () => {
+    const user = userEvent.setup();
+    render(
+      <ResultViewV2
+        result={{
+          ...SEARCH_V2_FIGURE_FIXTURE,
+          candidates: [
+            {
+              ...nameless,
+              axes: { ...nameless.axes, x4: 0 },
+              risk: { ...nameless.risk, rule_triggers: ["goods_cap"] },
+            },
+          ],
+        }}
+        queryPreview={null}
+        queryHasName={false}
+        onReset={vi.fn()}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /이름 미등록 상표/ }));
+    expect(screen.getByText("업종이 달라 업종 없이 본 등급까지만 썼어요")).toBeVisible();
+    expect(screen.queryByText("goods_cap")).not.toBeInTheDocument();
+  });
+
   it("nameless_floor 규칙 문구를 보여준다", async () => {
     const user = userEvent.setup();
     render(

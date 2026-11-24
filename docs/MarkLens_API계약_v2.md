@@ -1,14 +1,14 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
-  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1; 이름 축의 약한 토큰열 결합을 두 이름 모두에서 붙어 있는 구간만 `weak_run`(통합 모델 v1.4.3, 식별력 v0.4, 견고성 점검 R-P0-2) 2026-11-23 — §2-2 `salient.removed`·`model_version`·§3; 견고성 점검 P1 — `name` 의 보이지 않는 서식 문자 정리·빈 이미지 400·429·503 고정 문구·`/health` 의 검색 가능 여부 2026-11-23 — §1·§4-1·§5-1·§5-6·§5-7; 이름 없는 이미지+업종 판단에 로고 유사도 × 업종 겹침의 곱하기 항(통합 모델 v1.4.5 — 채택 조건 ③ 미달, 사람 결정) 2026-11-24 — §2-2 `risk.contributions`·`model_version`·`thresholds.nameless`·§2-4 1·2·8항·§3) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1; 이름 축의 약한 토큰열 결합을 두 이름 모두에서 붙어 있는 구간만 `weak_run`(통합 모델 v1.4.3, 식별력 v0.4, 견고성 점검 R-P0-2) 2026-11-23 — §2-2 `salient.removed`·`model_version`·§3; 견고성 점검 P1 — `name` 의 보이지 않는 서식 문자 정리·빈 이미지 400·429·503 고정 문구·`/health` 의 검색 가능 여부 2026-11-23 — §1·§4-1·§5-1·§5-6·§5-7; 이름 없는 이미지+업종 판단에 로고 유사도 × 업종 겹침의 곱하기 항(통합 모델 v1.4.5 — 채택 조건 ③ 미달, 사람 결정) 2026-11-24 — §2-2 `risk.contributions`·`model_version`·`thresholds.nameless`·§2-4 1·2·8항·§3; 업종이 다르면 업종 없는 짝 판단의 등급 이하로 두는 업종 상한 `goods_cap`(통합 모델 v1.4.6) 2026-11-24 — §2-2 `rule_triggers`·`model_version`·§2-4 8·9항·§3) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
   §3(입력)·§7-2(등급·단독·도형 규칙)·§7-3(v1.3 결측 패턴별 계수·결합 제약)·§7-4(v1.4 이름 없는 계수 집합, §7-4-4 실제 검색 기준 하한), [식별력 설계](MarkLens_식별력_설계.md) §2(요부·약한 토큰·결합 규칙),
   README "다음 단계"(서비스 연결 범위).
 - 코드 근거(2026-10-24 현재): 런타임 `ml/src/model/risk_model.py`(`risk_score → RiskResult(prob, grade, contributions, figure_caveat)`),
-  계수 `shared/model/risk_model_v1.4.5.json`(version `risk_model_v1.4.5`, 2026-11-24 부터 — v1.4.3 `risk_model_v1.4.3.json` 에서 이름 없는 이미지+업종 계수 집합만 로고 유사도 × 업종 겹침의 곱하기 항으로 다시 학습하고 그 하한을 이미지만과 같게(통합 모델 설계 §7-12); v1.4.3 은 v1.4.2 `risk_model_v1.4.2.json` 에 `weak_run` 표시만 더함(이름 축의 식별력 결합 규칙 v0.4, 계수·하한 그대로); v1.4.2 는 v1.4.1 `risk_model_v1.4.1.json` 에 `logo_floor` 표시만 더한 것(§2-4 6항); v1.4.1 은 v1.4 `risk_model_v1.4.json` 에서 이름 있는 판단의 검토 권장 하한만 바꾼 것; 이름 있는 계수는 v1.3 `risk_model_v1.json` 과 같음), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
+  계수 `shared/model/risk_model_v1.4.6.json`(version `risk_model_v1.4.6`, 2026-11-24 부터 — v1.4.5 `risk_model_v1.4.5.json` 에 업종 상한 `goods_cap` 만 켬(§2-4 9항, 통합 모델 설계 §7-13); v1.4.5 는 v1.4.3 `risk_model_v1.4.3.json` 에서 이름 없는 이미지+업종 계수 집합만 로고 유사도 × 업종 겹침의 곱하기 항으로 다시 학습하고 그 하한을 이미지만과 같게(통합 모델 설계 §7-12); v1.4.3 은 v1.4.2 `risk_model_v1.4.2.json` 에 `weak_run` 표시만 더함(이름 축의 식별력 결합 규칙 v0.4, 계수·하한 그대로); v1.4.2 는 v1.4.1 `risk_model_v1.4.1.json` 에 `logo_floor` 표시만 더한 것(§2-4 6항); v1.4.1 은 v1.4 `risk_model_v1.4.json` 에서 이름 있는 판단의 검토 권장 하한만 바꾼 것; 이름 있는 계수는 v1.3 `risk_model_v1.json` 과 같음), 식별력 `ml/src/axes/distinctiveness.py`(`salient_tokens`·
   `pair_generic`·`judge`), 축 함수 X1 `phonetic_similarity`·X2 철자 `orthographic_similarity`·X3 `semantic_similarity`·X4
   `goods_similarity`, 프론트-6 선택 지정상품 `frontend/lib/goods.ts`(`SelectedGood`·`goodsCodeUnion`).
 - §3 의 숫자는 위 코드로 **실제 계산한 값**이다(모델 한계도 그대로 드러난다 — §3-2, §5-3).
@@ -128,7 +128,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | `risk.contributions` | `{ "X1": n, "X2": n, "X3": n, "X4": n, "요부": n }` | 아니오 | 축별 **로짓 기여도**(계수×값, 양·음 가능). 점수 항만 모은다 — `x1`·`x1×문자계`·`x1×요부없음` → X1, `x2_text`·`x2_img`·`x2_img×도형계` → X2, `x3` → X3, `x4`·곱하기 항(`x2_whole×x4`·`x2_whole×도형계×x4` — v1.4.5 이름 없는 이미지+업종 판단에서 업종 겹침이 더한 몫) → X4, `any_no_distinctive` → 요부. 결측 보정(`miss_pattern`)은 넣지 않는다(아래 `missing_adjustment`). 런타임 `axis_contributions()` 는 결측 항을 포함하므로 엔진이 `miss_` 항을 떼어 낸다 |
 | `risk.missing_adjustment` | number | 아니오 | 결측 패턴 절편 보정 = 쓰인 패턴의 절편 − 기준 절편(기준 = 이미지·상품 모두 관측한 패턴 `x2_whole+x4`, 절편 -3.4712). v1.3 패턴 절편: base -3.6361·x2_whole -3.8103·x4 -3.4535 → 보정 -0.165·-0.339·0.018·0(음수 가능, 결측 지시변수 아님). `intercept(-3.4712) + Σcontributions + missing_adjustment = logit(prob)` 가 성립해야 한다(엔진 테스트 조건; §3 예시는 소수 3자리로 반올림했으므로 되계산한 p 는 ±0.001 안) |
 | `risk.figure_caveat` | bool | 아니오 | 유형이 도형계(도형·결합-도형요부)면 true — `RiskResult.figure_caveat` |
-| `risk.rule_triggers` | string[] | 아니오(빈 배열 가능) | 등급 하한을 "검토 권장"으로 올린 규칙: `standalone_x1`(x1 ≥ 0.98), `standalone_x2_text`(≥ 0.75), `standalone_x3`(≥ 0.7707), `figure_x2_img`(도형계이고 x2_img ≥ 0.9). `x2_img`·`x4` 의 단독 임계값은 null(비활성)이라 없다. 규칙이 걸려도 `prob` 는 바뀌지 않는다. `nameless_floor`(v1.4): 유형을 도형계로 고친 질의(`type_override`)에서 이름 없는 판단의 등급이 더 높아 그쪽을 썼다 — v1.4.2(`logo_floor`)부터는 그 밖의 이름 + 이미지 질의(사진 아님)에서 이름도 업종도 뺀 이미지만 판단(`noname:x2_whole`)의 등급이 더 높아 그쪽을 쓴 경우도 같은 값(§2-4 6항 — 이때 `prob`·기여도·`pattern` 은 그 판단의 것). `goods_floor`(v1.4): 이름 없는 이미지+상품 판단에서 상품 겹침이 결합 하한 이상이라 상품을 가린 이미지만 판단과 견줘 그 등급이 더 높아 그쪽을 썼다(§2-4 8항 — `prob`·기여도·`pattern`(`noname:x2_whole`)·등급 눈금은 이미지만 판단의 것, `axes.x4` 는 관측값 그대로). 값은 자유 문자열 목록이다(스키마는 열거하지 않는다) |
+| `risk.rule_triggers` | string[] | 아니오(빈 배열 가능) | 등급 하한을 "검토 권장"으로 올린 규칙: `standalone_x1`(x1 ≥ 0.98), `standalone_x2_text`(≥ 0.75), `standalone_x3`(≥ 0.7707), `figure_x2_img`(도형계이고 x2_img ≥ 0.9). `x2_img`·`x4` 의 단독 임계값은 null(비활성)이라 없다. 규칙이 걸려도 `prob` 는 바뀌지 않는다. `nameless_floor`(v1.4): 유형을 도형계로 고친 질의(`type_override`)에서 이름 없는 판단의 등급이 더 높아 그쪽을 썼다 — v1.4.2(`logo_floor`)부터는 그 밖의 이름 + 이미지 질의(사진 아님)에서 이름도 업종도 뺀 이미지만 판단(`noname:x2_whole`)의 등급이 더 높아 그쪽을 쓴 경우도 같은 값(§2-4 6항 — 이때 `prob`·기여도·`pattern` 은 그 판단의 것). `goods_floor`(v1.4): 이름 없는 이미지+상품 판단에서 상품 겹침이 결합 하한 이상이라 상품을 가린 이미지만 판단과 견줘 그 등급이 더 높아 그쪽을 썼다(§2-4 8항 — `prob`·기여도·`pattern`(`noname:x2_whole`)·등급 눈금은 이미지만 판단의 것, `axes.x4` 는 관측값 그대로). `goods_cap`(v1.4.6): 업종이 다른(상품 겹침 < 결합 하한) 업종 판단의 등급이 업종 없는 짝 판단(이름 없는 이미지+상품 ↔ 이미지만, 이름+상품 ↔ 이름만, 이름+이미지+상품 ↔ 이름+이미지)보다 높아 짝 판단을 썼다(§2-4 9항 — `prob`·기여도·`pattern`·등급 눈금·정렬 위치는 짝 판단의 것, `axes.x4` 는 관측값 그대로). 값은 자유 문자열 목록이다(스키마는 열거하지 않는다) |
 | `risk.pattern` | string | 아니오 | 쓰인 계수 집합: 이름 있는 판단 `base`·`x2_whole`·`x4`·`x2_whole+x4`, 이름 없는 판단 `noname:x2_whole`·`noname:x2_whole+x4`. 이름 있는 질의도 상표명이 없는 후보(순수 도형)와는 이름 없는 판단이 된다 — 화면은 요청 상태가 아니라 이 값으로 판별한다(§4-4) |
 | `salient.query_tokens` | string[] | 아니오 | 입력 상표명의 **요부 후보**(식별력 점수 ≥ θ 0.5, 이름 순서, NFKC·소문자 정규화). 이름이 없으면 빈 배열. 비어 있고 이름이 있으면 "요부 없음 → 전체 대비"(2000후2453) |
 | `salient.candidate_tokens` | string[] | 아니오 | 후보 상표명의 요부 후보(같은 규칙) |
@@ -140,7 +140,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 
 | 필드 | 형식 | 뜻 |
 |---|---|---|
-| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4.5"`(2026-11-24 부터; v1.4.3 에서 이름 없는 이미지+업종 계수 집합만 로고 유사도 × 업종 겹침의 곱하기 항으로 다시 학습 — §2-4 1·2·8항. v1.4.3 은 v1.4.2 에 `weak_run`(이름 축의 약한 토큰열 결합 규칙 — `salient.removed`)만 더함 — v1.4.2 는 v1.4.1 에 `logo_floor`(§2-4 6항)를, v1.4.1 은 v1.4 에서 이름 있는 판단의 검토 권장 하한만 바꾼 것, 이름 있는 계수는 v1.3 그대로. 2026-11-23 은 `"risk_model_v1.4.3"`·`"risk_model_v1.4.2"`·`"risk_model_v1.4.1"`, 2026-11-20–22 는 `"risk_model_v1.4"`) |
+| `model_version` | string | 계수 JSON `version` — `"risk_model_v1.4.6"`(2026-11-24 부터; v1.4.5 에 업종 상한 `goods_cap` 만 켬 — §2-4 9항. v1.4.5(같은 날 PR #112 의 기본)는 v1.4.3 에서 이름 없는 이미지+업종 계수 집합만 로고 유사도 × 업종 겹침의 곱하기 항으로 다시 학습 — §2-4 1·2·8항. v1.4.3 은 v1.4.2 에 `weak_run`(이름 축의 약한 토큰열 결합 규칙 — `salient.removed`)만 더함 — v1.4.2 는 v1.4.1 에 `logo_floor`(§2-4 6항)를, v1.4.1 은 v1.4 에서 이름 있는 판단의 검토 권장 하한만 바꾼 것, 이름 있는 계수는 v1.3 그대로. 2026-11-23 은 `"risk_model_v1.4.3"`·`"risk_model_v1.4.2"`·`"risk_model_v1.4.1"`, 2026-11-20–22 는 `"risk_model_v1.4"`) |
 | `grade_precision` | 0–1 | **"위험" 등급의 정밀도** = 검증 데이터(심결 314행 + 쉬운 음성 700, 사건 단위 5겹×3반복 OOF, 행마다 자기 결측 패턴)에서 "위험"으로 분류된 152쌍 중 심결이 유사로 본 107쌍 → 0.7039 ≈ **0.70**(v1.3, 설계 §7-3; v1.2.1 은 159쌍 중 109 → 0.6855). 엔진은 JSON `meta.grade_precision` 을 읽는다(E-6) |
 | `thresholds.grade` | `{ "주의": 0.0902, "검토 권장": 0.5059, "위험": 0.5902 }` | **이름 있는 판단**의 등급 하한 p(JSON `grade_thresholds` — 이름 있는 계수 집합 4벌 공통). 안전은 0–0.0902. 검토 권장 0.5059 는 실제 검색 기준(2026-11-23, 통합 모델 설계 §7-6-2): 지어낸 상표명 대조군에서 무관한 후보 중 최고 위험도가 검토 권장 이상인 질의가 네 집합 모두 10% 이하가 되는 가장 낮은 공통 값(2026-11-22 까지 0.1805 — 심결 쌍 OOF 기준). 주의·위험은 v1.3 그대로 — 위험 0.5902 는 "정밀도 0.8 이상인 가장 낮은 p(지지 30)" 규칙이 미달해 쓴 대체값(그때의 검토 권장 하한 0.1805 와 1.0 의 중간) |
 | `thresholds.nameless` | `{ "noname:x2_whole": { "주의": 0.3677, "검토 권장": 0.491, "위험": 0.5724 }, "noname:x2_whole+x4": { "주의": 0.3677, "검토 권장": 0.491, "위험": 0.5724 } }` | **이름 없는 판단**의 계수 집합(`risk.pattern`)별 등급 하한(JSON `nameless_patterns[키].grade_thresholds`). null 인 등급은 위험도로는 닿지 않는다. 값과 산출 방법은 §2-4 2항(v1.4.5 부터 이미지+업종 = 이미지만 값 — v1.4.3 까지 0.2944·0.4441·0.7892) |
@@ -217,7 +217,17 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
    위험 → 검토 권장으로 내려갔다(설계 §7-4-4). v1.4.5 는 두 집합의 하한이 같지만 곱하기 항 때문에 이미지가 덜 닮은 쪽에서는 업종이
    조금 겹쳐도 이미지+상품 위험도가 이미지만보다 낮을 수 있어(예: 도형계 이미지 0.9·겹침 0.0252 → 검토 권장 0.550, 이미지만 위험
    0.575) 하한이 그대로 필요하다. 겹침이 하한 아래면 이미지+상품 판단은 이미지만 판단보다 높지 않다(겹침 0 은 `goods_rule` 로 보장,
-   0–0.0252 는 채택 때 격자·실제 후보로 확인 — 설계 §7-12). 이미지만 쪽이 쓰이면 `rule_triggers` 에 `goods_floor`.
+   0–0.0252 는 채택 때 격자·실제 후보로 확인 — 설계 §7-12; v1.4.6 부터는 9항의 업종 상한이 등급으로도 보장). 이미지만 쪽이 쓰이면
+   `rule_triggers` 에 `goods_floor`.
+9. **업종 상한**(v1.4.6, 2026-11-24, `goods_cap`): 계수 JSON 의 `goods_cap.enabled` 가 참이면 업종이 다를 때(후보의 상품 겹침
+   `x4` < 결합 하한 0.0252) 업종 판단의 등급을 업종 없는 짝 판단의 등급 이하로 내린다 — 이름 없는 이미지+상품(`noname:x2_whole+x4`)
+   ↔ 이미지만(`noname:x2_whole`), 이름+상품(`x4`) ↔ 이름만(`base`), 이름+이미지+상품(`x2_whole+x4`) ↔ 이름+이미지(`x2_whole`).
+   짝 판단의 등급은 단독 축·도형 규칙 등 그 판단에 걸리는 규칙까지 반영한 등급이고, 상한은 내리기만 한다 — 업종 판단이 짝
+   판단보다 높을 때만 짝 판단을 쓰고 `rule_triggers` 에 `goods_cap`(`prob`·기여도·`pattern`·정렬 위치는 짝 판단의 것). 8항(업종이
+   겹치면 이미지만 판단 이상)·결합 제약(이름 있는 쪽은 겹침이 하한 이상이면 업종 없는 판단 이상)과 함께 "업종이 겹치면 업종 없는
+   판단의 등급 이상, 다르면 그 이하"가 등급에서 지켜진다. 6항(이미지만 판단과 견주기)은 상한 뒤에 걸린다. 이유: 이름 있는 업종
+   집합은 v1.3 의 더하기 구조라 업종이 달라도 짝 판단보다 높은 후보가 있었다(통합 모델 설계 §7-13 — 대조군 확인용·표본 A 후보
+   1,502). 계수·기준은 v1.4.5 그대로다.
 
 ### 2-5. `caveats` 문구 표(응답은 문구 문자열만 싣는다)
 
@@ -239,9 +249,9 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 
 ## 3. 예시 JSON
 
-두 예시 모두 2026-11-24 현재 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,383건, 통합 모델 v1.4.5)이 낸 응답 그대로다
+두 예시 모두 2026-11-24 현재 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,383건, 통합 모델 v1.4.6)이 낸 응답 그대로다
 (`engine.multi_search`, 첫 호출 준비를 한 번 한 뒤의 호출 — `elapsed_ms` 는 그때 값; 2026-11-20 의 v1.4 예시와 다른 곳은 `model_version`·`thresholds.grade`
-검토 권장·문자상표 예시 3·4위 등급(검토 권장 → 주의)·`elapsed_ms` 뿐 — 두 예시는 이름 + 이미지 질의가 아니라 v1.4.2 의 `logo_floor` 가 걸리지 않아, 같은 날 v1.4.1 예시와는 `model_version`·`elapsed_ms` 만 다르다; v1.4.3 의 `weak_run` 도 두 예시에서 결과를 바꾸지 않아 v1.4.2 예시와 `model_version`·`elapsed_ms` 만 다르다; v1.4.5 의 곱하기 항은 두 예시에 이름 없는 이미지+업종 판단이 없어 후보를 바꾸지 않아, v1.4.3 예시와 `model_version`·`meta.thresholds.nameless` 의 이미지+업종 하한·`elapsed_ms` 만 다르다). `image_url` 만 브라우저 측 값(`/api/images/…`)으로
+검토 권장·문자상표 예시 3·4위 등급(검토 권장 → 주의)·`elapsed_ms` 뿐 — 두 예시는 이름 + 이미지 질의가 아니라 v1.4.2 의 `logo_floor` 가 걸리지 않아, 같은 날 v1.4.1 예시와는 `model_version`·`elapsed_ms` 만 다르다; v1.4.3 의 `weak_run` 도 두 예시에서 결과를 바꾸지 않아 v1.4.2 예시와 `model_version`·`elapsed_ms` 만 다르다; v1.4.5 의 곱하기 항은 두 예시에 이름 없는 이미지+업종 판단이 없어 후보를 바꾸지 않아, v1.4.3 예시와 `model_version`·`meta.thresholds.nameless` 의 이미지+업종 하한·`elapsed_ms` 만 다르다; v1.4.6 의 업종 상한도 두 예시의 결과를 바꾸지 않아 — 문자상표 예시의 BLU hands 는 업종 겹침 0 이지만 짝 판단(이름만)도 단독 규칙으로 검토 권장이라 그대로 — v1.4.5 예시와 `model_version`·`elapsed_ms` 만 다르다). `image_url` 만 브라우저 측 값(`/api/images/…`)으로
 바꿨다. 프론트는 이 두 응답을 Vitest 픽스처(`frontend/test/fixtures/search-v2-{text,image}.json`, 블록과 바이트 단위로 같음)로,
 백엔드는 스키마·키 집합 시험에 그대로 쓴다.
 
@@ -519,7 +529,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4.5",
+    "model_version": "risk_model_v1.4.6",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
@@ -556,7 +566,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 20,
       "total": 64
     },
-    "elapsed_ms": 57
+    "elapsed_ms": 59
   },
   "dataset_info": {
     "총_상표수": 1383,
@@ -774,7 +784,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4.5",
+    "model_version": "risk_model_v1.4.6",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
@@ -811,7 +821,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 0,
       "total": 20
     },
-    "elapsed_ms": 273
+    "elapsed_ms": 268
   },
   "dataset_info": {
     "총_상표수": 1383,

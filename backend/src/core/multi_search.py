@@ -119,6 +119,10 @@ CAVEAT_NAME_SUGGESTED = ("이미지에서 '{text}'를 읽었습니다 — 상표
 GOODS_CODE_PATTERN = re.compile(r"^[GS]\d{4,6}$")  # 유사군 코드 형식(G/S + 숫자 4~6자리)
 NAMELESS_FLOOR = "nameless_floor"  # 이름 있는 이미지 질의에서 로고만 판단의 등급이 쓰였다
 GOODS_FLOOR = "goods_floor"  # 업종이 겹치는 이름 없는 판단에서 이미지만 판단의 등급이 쓰였다
+# 업종이 겹치는 이름 있는 업종 판단(x4·x2_whole+x4)에서 업종 없는 짝 판단의 등급이 쓰였다(§7-13)
+GOODS_FLOOR_NAMED = "goods_floor_named"
+# 업종이 다른(겹침 < 결합 하한) 업종 판단에서 업종 없는 짝 판단의 등급까지만 썼다(업종 상한, §7-13)
+GOODS_CAP = "goods_cap"
 # search_pool 단계별 시간(PoolResult.timings 키) — 축 = compute_pair_axes(관념 축 MiniLM 포함),
 # 모델 = 그 밖의 채점(risk_score·nameless_floor 비교·기여도)
 STAGES = ("유형(OCR)", "이미지 임베딩", "이미지 풀", "발음 풀", "철자 풀", "관념 풀", "상품 풀",
@@ -585,12 +589,16 @@ def _thresholds(model: dict) -> dict:
     집합(risk.pattern)별 하한(위험 null = 위험도로는 닿지 않음; 이름 없는 집합이 없는 JSON 은
     {})."""
     standalone = model.get("standalone_thresholds") or {}
-    return {
+    out = {
         "grade": {key: float(value) for key, value in model["grade_thresholds"].items()},
         "nameless": rm.nameless_grade_thresholds(model),
         "standalone": {AXIS_KEYS[axis]: standalone.get(axis) for axis in AXIS_KEYS},
         "figure": (model.get("figure_rule") or {}).get("threshold"),
     }
+    named = rm.named_grade_thresholds(model)
+    if named:  # 이름 있는 계수 집합 중 자기 하한이 있는 것(§7-13) — 없으면 키를 싣지 않는다
+        out["named"] = named
+    return out
 
 
 def is_photo_query(embedding: np.ndarray | None) -> bool:
@@ -756,12 +764,51 @@ def _nameless_judgment(features: dict, model: dict,
     rank = judged.rank
     x4, floor = features.get("x4"), goods_floor_value(model)
     if (rm.is_nameless_pattern(judged.result.pattern) and features.get("x2_whole") is not None
-            and x4 is not None and floor is not None and float(x4) >= floor):
-        image_only = _judge({**features, "x4": None}, model, query_type)
-        rank = max(rank, image_only.rank)
-        if rm.GRADES.index(image_only.result.grade) > rm.GRADES.index(judged.result.grade):
-            judged = Judgment(image_only.result, image_only.values,
-                              image_only.triggers + (GOODS_FLOOR,), image_only.rank)
+            and x4 is not None and floor is not None):
+        if float(x4) >= floor:
+            image_only = _judge({**features, "x4": None}, model, query_type)
+            rank = max(rank, image_only.rank)
+            if rm.GRADES.index(image_only.result.grade) > rm.GRADES.index(judged.result.grade):
+                judged = Judgment(image_only.result, image_only.values,
+                                  image_only.triggers + (GOODS_FLOOR,), image_only.rank)
+        elif rm.goods_cap_enabled(model):  # 업종 상한(§7-13) — 업종이 다르면 이미지만 판단 이하
+            image_only = _judge({**features, "x4": None}, model, query_type)
+            if rm.GRADES.index(judged.result.grade) > rm.GRADES.index(image_only.result.grade):
+                judged = Judgment(image_only.result, image_only.values,
+                                  image_only.triggers + (GOODS_CAP,), image_only.rank)
+                rank = image_only.rank
+    return judged, rank
+
+
+def _named_judgment(features: dict, model: dict,
+                    query_type: str) -> tuple[Judgment, tuple[int, float]]:
+    """이름 있는 판단(업종 규칙 적용 뒤)과 정렬 위치(§7-13). 업종 집합(x4·x2_whole+x4)에
+    goods_rule 이 있으면 업종이 겹칠 때(x4 ≥ 결합 하한) 업종 없는 짝 판단(x4 → base, x2_whole+x4 →
+    x2_whole)과 등급을 견줘 높은 쪽(같으면 업종 집합 쪽; 짝 쪽이면 goods_floor_named, 정렬 위치는 둘
+    중 높은 쪽). 업종 상한이 켜져 있으면 업종이 다를 때(x4 < 하한) 짝 판단보다 높지 않게(goods_cap,
+    정렬 위치도 짝 판단). 둘 다 없는 JSON(≤ v1.4.5)은 그대로."""
+    judged = _judge(features, model, query_type)
+    rank = judged.rank
+    pattern = judged.result.pattern
+    x4, floor = features.get("x4"), goods_floor_value(model)
+    if (not pattern or rm.is_nameless_pattern(pattern) or x4 is None or floor is None
+            or rm.goods_pair_key(pattern, model.get("pattern_axes") or ()) is None):
+        return judged, rank
+    floor_on = ((model.get("patterns") or {}).get(pattern) or {}).get(
+        rm.GOODS_RULE_KEY) == rm.GOODS_RULE_NO_RAISE
+    if float(x4) >= floor:
+        if not floor_on:
+            return judged, rank
+        pair = _judge({**features, "x4": None}, model, query_type)
+        rank = max(rank, pair.rank)
+        if rm.GRADES.index(pair.result.grade) > rm.GRADES.index(judged.result.grade):
+            judged = Judgment(pair.result, pair.values, pair.triggers + (GOODS_FLOOR_NAMED,),
+                              pair.rank)
+    elif rm.goods_cap_enabled(model):
+        pair = _judge({**features, "x4": None}, model, query_type)
+        if rm.GRADES.index(judged.result.grade) > rm.GRADES.index(pair.result.grade):
+            judged = Judgment(pair.result, pair.values, pair.triggers + (GOODS_CAP,), pair.rank)
+            rank = pair.rank
     return judged, rank
 
 
@@ -809,11 +856,10 @@ def score_record(record: Record, ctx: QueryContext,
             token for token, _ in distinct.salient_tokens(record.title, ctx.goods)
         ) if record.title else ()
         removed = ()
-    if axes is None:  # 이름 없는 판단 — 업종 하한(goods_floor)까지 적용
+    if axes is None:  # 이름 없는 판단 — 업종 하한(goods_floor)·상한(goods_cap)까지 적용
         judged, rank = _nameless_judgment(features, model, ctx.query_type.type)
-    else:
-        judged = _judge(features, model, ctx.query_type.type)
-        rank = judged.rank
+    else:  # 이름 있는 판단 — 업종 집합이면 이름 있는 업종 하한·상한까지(§7-13)
+        judged, rank = _named_judgment(features, model, ctx.query_type.type)
         if ctx.nameless_floor:
             # 이름을 뺀 판단(업종 하한 적용 뒤)과 견준다. 정렬 위치는 모든 판단 중 높은 쪽 — 등급이
             # 같아 이름 있는 판단을 보여 줄 때도 로고만의 판단이 더 높은 위치면 그 자리에 둔다

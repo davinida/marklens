@@ -22,19 +22,42 @@
 
 재학습(프로젝트 루트, KIPRIS 호출 0, 기본 2방법 약 13초): `ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images`(쉬운 음성 이미지 축, 5초) →
 `ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-24 부터 서비스 기본 모델은 아래
-`risk_model_v1.4.5.json`(런타임 `MODEL_VERSION` risk_model_v1.4.5, `DEFAULT_MODEL_PATH`; 2026-11-23 은 `risk_model_v1.4.3.json`·`risk_model_v1.4.2.json`·`risk_model_v1.4.1.json`, 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
+`risk_model_v1.4.6.json`(런타임 `MODEL_VERSION` risk_model_v1.4.6, `DEFAULT_MODEL_PATH`; 같은 날 PR #112 는 `risk_model_v1.4.5.json`, 2026-11-23 은 `risk_model_v1.4.3.json`·`risk_model_v1.4.2.json`·`risk_model_v1.4.1.json`, 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
 (패턴 없는 JSON 은 최상위 계수 집합 하나로, 없는 키는 규칙 미적용).
 
-런타임은 이름 없는 이미지+업종 집합(`nameless_patterns["x2_whole+x4"]`)에 한해 **곱하기 항**도 읽는다(2026-11-24, 설계 §7-12 — 서비스 기본
+런타임은 이름 없는 이미지+업종 집합(`nameless_patterns["x2_whole+x4"]`)의 **곱하기 항**도 읽는다(2026-11-24, 설계 §7-12 — 서비스 기본
 v1.4.5 가 선형 곱을 쓴다, 아래): `features` 의 `x2_whole×x4`·`x2_whole×도형계×x4`(선형 곱)나 `hinge(x2_whole;c문자계;c도형계)×x4`·
 `…×도형계×x4`(꺾인 곱 — max(0, x2_whole − c)·x4, c 는 유형 묶음별), 계수 ≥ 0, 기여도는 X4. 그 집합에 `goods_rule:
 "no_raise_without_overlap"` 가 있으면 적재 검증이 이미지만 → 이미지+업종 결합(겹침 하한에서 이상) 대신 "업종 겹침 0 에서 이미지만
 이하"를 본다(업종이 겹칠 때 이미지만 등급 아래로 내려가지 않는 것은 엔진 업종 하한이 맡음). 곱하기 항이 없는 JSON 은 예전과 같다.
 
-## `risk_model_v1.4.5.json` — v1.4.5 (이름 없는 이미지+업종 판단의 로고 유사도 × 업종 겹침 곱하기 항), 서비스 기본 모델 (2026-11-24)
+이름 있는 업종 두 벌(`patterns["x4"]`·`patterns["x2_whole+x4"]`)의 곱하기 항·업종 규칙과 업종 상한 표시도 읽는다(2026-11-24, 설계
+§7-13 — 이름 있는 쪽 곱하기 항·`goods_rule`·자기 하한은 4-b 시도(미채택)의 형식이라 **지금 쓰는 JSON 은 없고**, 최상위 `goods_cap` 은
+v1.4.6 이 켠다): 이름 곱 `x1_d×x4`·`x2_text_d×x4`·`x3_d×x4`·
+`x1_d×문자계×x4`·`x1_d×any_no_distinctive×x4`(x2_whole+x4 는 이미지 곱 `x2_whole×x4`·`x2_whole×도형계×x4` 도), 짝 위험도 곱
+`pair(base)×x4`·`pair(x2_whole)×x4`(짝 계수 집합의 위험도 × 겹침 — 그 짝일 때만), 계수 ≥ 0, 기여도는 X4. 그 집합의 `goods_rule:
+"no_raise_without_overlap"` 은 적재 검증이 짝 → 그 집합 결합(겹침 하한에서 이상) 대신 "겹침 0 에서 짝 이하"를 보게 하고, 엔진은 업종이
+겹치면(겹침 ≥ `coupling.floors.x4`) 짝 판단의 등급 아래로 내려가지 않게 한다(rule_triggers `goods_floor_named`). 그 집합의
+`grade_thresholds` 는 그 집합만의 등급 하한이다(응답 `meta.thresholds.named`). 최상위 `goods_cap: {"enabled": true}` 는 엔진의 업종
+상한이다 — 업종이 다르면(겹침 < `coupling.floors.x4`) 이름 없는 이미지+업종·이름 있는 업종 두 벌 모두 짝 판단의 등급 이하(rule_triggers
+`goods_cap`; 짝 판단의 등급은 단독 축·도형 규칙까지 반영한 등급, 상한은 내리기만 함). 이 키들이 없는 JSON(v1.4.5 까지)은 예전과 같다.
 
-**2026-11-24 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V145_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
-파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.3.json` 에서 이름 없는 이미지+업종 집합(`nameless_patterns["x2_whole+x4"]`)만 바꾼 것이다 — 이름
+## `risk_model_v1.4.6.json` — v1.4.6 (업종 상한), 서비스 기본 모델 (2026-11-24)
+
+**2026-11-24 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V146_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
+파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.5.json` 에 최상위 `goods_cap: {"enabled": true}` 만 켠 것이다 — 계수·기준·단독 임계값·도형 규칙·
+`logo_floor`·`weak_run`·이름 없는 이미지+업종 집합의 `goods_rule`·`grade_precision` 은 v1.4.5 그대로. 엔진은 업종이 다를 때(겹침 < `coupling.floors.x4`
+0.0252) 업종 집합의 등급을 업종 없는 짝 판단의 등급 이하로 내린다 — 이름 없는 이미지+업종 ↔ 이미지만, 이름+업종(`x4`) ↔ 이름만(`base`),
+이름+이미지+업종(`x2_whole+x4`) ↔ 이름+이미지(`x2_whole`); 짝 판단 등급은 단독 축·도형 규칙까지 반영한 등급이고 상한은 내리기만 한다(rule_triggers
+`goods_cap`, 계약 v2 §2-4 9항). 이름 있는 업종 두 벌에 곱하기 항을 넣는 4-b 시도는 채택 조건 ④ 미달·시연 스타벅수 하락으로 사람 결정 미채택이고
+그 대신 켠 것이다(설계 §7-13). 미리 고정한 확인 조건 ①–④(시연 넷 그대로·질의 전체 등급은 내려간 것만 — 2,180 중 2·표본 A 인용상표 70.7% 그대로·원칙
+상설 시험 통과)를 모두 넘었다(`meta.goods_cap` 에 결정 문구·설정 sha256·확인 결과). `ml/scripts/goods_cap.py apply` 가 v1.4.5 JSON 과 그 실행의
+후보에서 만든다 — v1.4.5 와 다른 키는 `version`·`goods_cap`·`meta.goods_cap` 뿐이고 `ml/tests/test_risk_model.py` 가 이를 고정한다. v1.4.5 JSON 을
+다시 쓰면 이 파일도 다시 만들어야 한다.
+
+## `risk_model_v1.4.5.json` — v1.4.5 (이름 없는 이미지+업종 판단의 로고 유사도 × 업종 겹침 곱하기 항), v1.4.6 의 원본 (2026-11-24)
+
+2026-11-24 PR #112 의 서비스 기본 모델이었고(`V145_MODEL_PATH`) 같은 날 v1.4.6(업종 상한)의 원본이 됐다. 아래 `risk_model_v1.4.3.json` 에서 이름 없는 이미지+업종 집합(`nameless_patterns["x2_whole+x4"]`)만 바꾼 것이다 — 이름
 있는 4벌·이미지만 집합·등급 하한·단독 임계값·도형 규칙·`logo_floor`·`weak_run`·`grade_precision` 은 v1.4.3 그대로. 그 집합은 로고 유사도 × 업종 겹침의
 곱하기 항(변형 L)으로 다시 학습했다 — 절편 −3.2887, `x2_whole` 3.5147·`x2_whole×도형계` 0.3229·`x4` 0.506·`x2_whole×x4` 0.9857·`x2_whole×도형계×x4` 0
 (학습 데이터에 같은 업종 음성 449 포함, 이름 있는 4벌·이미지만 집합은 고정). 업종의 효과가 로고가 닮은 만큼만 생긴다 — 도형계 위험도는 이미지

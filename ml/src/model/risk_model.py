@@ -48,8 +48,12 @@ v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·�
 시도 — 이름을 쉬운 음성 평균 이상으로 더 관측하면 비감소; 채택되지 않은 형식이고 그 학습 스크립트의
 재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다.
 
-서비스 기본 모델(2026-11-24, §7-12): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.5.json`
-(MODEL_VERSION risk_model_v1.4.5) — v1.4.3 에서 이름 없는 이미지+업종 집합만 바꾼 것: 로고
+서비스 기본 모델(2026-11-24, §7-13): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.6.json`
+(MODEL_VERSION risk_model_v1.4.6) — v1.4.5 에 업종 상한(`goods_cap.enabled`)만 켠 것: 업종이
+다르면(겹침 < 결합 하한) 엔진이 업종 집합의 등급을 업종 없는 짝 판단의 등급 이하로 내린다(계수·
+기준·다른 규칙 그대로; `ml/scripts/goods_cap.py apply`, 4-b 곱하기 항은 채택하지 않음).
+v1.4.5(`risk_model_v1.4.5.json`, V145_MODEL_PATH — 2026-11-24 PR #112 의 기본, §7-12)는
+v1.4.3 에서 이름 없는 이미지+업종 집합만 바꾼 것: 로고
 유사도 × 업종 겹침의 곱하기 항(변형 L)을 넣어 다시 학습해 업종의 효과가 로고가 닮은 만큼만 생기고,
 그 집합의 `goods_rule` "no_raise_without_overlap"(업종이 안 겹치면 이미지만 판단 이하 — 적재 때
 검사)과 이미지만 판단과 같은 기준을 둔다(채택 조건 ③ 미달 — 사람 결정으로 채택,
@@ -92,7 +96,7 @@ __all__ = [
     "coupling_violations", "coupling_vertices", "select_pattern", "pattern_key", "pattern_keys",
     "block_logit", "GRADES", "TYPE_LEVELS", "AXIS_INPUTS", "FIGURE_FAMILY", "PATTERN_BASE_KEY",
     "DEFAULT_MODEL_PATH", "V13_MODEL_PATH", "V14_MODEL_PATH", "V141_MODEL_PATH",
-    "V142_MODEL_PATH", "V143_MODEL_PATH", "V145_MODEL_PATH", "ENV_MODEL_PATH",
+    "V142_MODEL_PATH", "V143_MODEL_PATH", "V145_MODEL_PATH", "V146_MODEL_PATH", "ENV_MODEL_PATH",
     "NAMELESS_KEY",
     "NAMELESS_PREFIX", "NAME_AXES", "is_nameless_pattern", "nameless_grade_thresholds",
     "SEARCH_THRESHOLDS_METHOD", "OverwriteRefused", "search_calibrated", "check_nameless_overwrite",
@@ -102,7 +106,9 @@ __all__ = [
     "SUPPORTED_SPELLING_VERSIONS", "spelling_version", "LOGO_FLOOR_KEY", "logo_floor_enabled",
     "WEAK_RUN_KEY", "SUPPORTED_WEAK_RUN_VERSIONS", "weak_run_version",
     "PRODUCT_TERMS", "HINGE_TERM", "is_product_term", "hinge_term_name", "term_value", "term_axis",
-    "GOODS_RULE_KEY", "GOODS_RULE_NO_RAISE",
+    "GOODS_RULE_KEY", "GOODS_RULE_NO_RAISE", "NAME_PRODUCT_BASES", "NAME_PRODUCT_TERMS",
+    "PAIR_TERM", "pair_term_name", "GOODS_CAP_KEY", "goods_cap_enabled", "named_grade_thresholds",
+    "goods_pair_key",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -111,14 +117,15 @@ V14_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"  # v1.4
 V141_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.1.json"  # v1.4.2 의 원본
 V142_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.2.json"  # v1.4.3 의 원본
 V143_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.3.json"  # v1.4.5 의 원본
-V145_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.5.json"
-DEFAULT_MODEL_PATH = V145_MODEL_PATH  # 서비스 기본 모델(2026-11-24 부터 v1.4.5)
+V145_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.5.json"  # v1.4.6 의 원본
+V146_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.6.json"  # 업종 상한(§7-13)
+DEFAULT_MODEL_PATH = V146_MODEL_PATH  # 서비스 기본 모델(2026-11-24 부터 v1.4.6)
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1.4.5"  # 서비스 기본 모델의 버전
+MODEL_VERSION = "risk_model_v1.4.6"  # 서비스 기본 모델의 버전
 SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2", "risk_model_v1.2.1",
                       "risk_model_v1.3", "risk_model_v1.4", "risk_model_v1.4.1",
                       "risk_model_v1.4.2", "risk_model_v1.4.3", "risk_model_v1.4.5",
-                      "risk_model_v1.5")
+                      "risk_model_v1.4.6", "risk_model_v1.5")
 AXIS_VERSIONS_KEY = "axis_versions"  # 계수가 학습된 축 정의의 버전(없으면 모두 1)
 LOGO_FLOOR_KEY = "logo_floor"  # 이름 있는 이미지 질의에 이미지만 판단 비교를 켜는 표시(v1.4.2)
 # 서비스가 이름 축을 계산할 때 쓰는 식별력 결합 규칙의 약한 토큰열 버전(없으면 1 — v1.4.3 부터 2).
@@ -169,6 +176,19 @@ HINGE_TERM = re.compile(r"^hinge\(x2_whole;(?P<text>[01](?:\.\d{1,6})?);"
 # 이미지만 등급 아래로 내려가지 않는 것은 엔진의 업종 하한(goods_floor)이 맡는다.
 GOODS_RULE_KEY = "goods_rule"
 GOODS_RULE_NO_RAISE = "no_raise_without_overlap"
+# 이름 있는 업종 두 벌(x4 ↔ 짝 base, x2_whole+x4 ↔ 짝 x2_whole)의 곱하기 항(2026-11-24,
+# 설계 §7-13) — 4-a(이름 없는 이미지+업종)와 같은 원칙. 선형 곱(변형 L): 표장 항(이름 축·이미지
+# 항, 모델이 쓰는 꼴) × x4 — 이미지 항의 곱은 PRODUCT_TERMS. 짝 위험도 곱(변형 S): 업종 없는 짝
+# 집합의 위험도(0–1) × x4 — 항 이름 "pair(<짝 키>)×x4", 값은 그 짝 계수 집합으로 계산한다(모델이
+# 있어야 함). 같은 집합에 goods_rule 이 있으면 이름 있는 쪽도 결합 하한 대신 "겹침 0 이면 짝
+# 이하"를 적재 때 검사하고, 엔진이 이름 있는 업종 하한(겹치면 짝 등급 이상)을 쓴다.
+NAME_PRODUCT_BASES = ("x1_d", "x2_text_d", "x3_d", "x1_d×문자계", "x1_d×any_no_distinctive")
+NAME_PRODUCT_TERMS = tuple(f"{name}×x4" for name in NAME_PRODUCT_BASES)
+PAIR_TERM = re.compile(r"^pair\((?P<key>[a-z0-9_]+(?:\+[a-z0-9_]+)*)\)×x4$")
+# 업종 상한(2026-11-24, 설계 §7-13·§6): 켜면 엔진이 업종이 다를 때(겹침 < 결합 하한) 업종
+# 집합의 최종 등급을 업종 없는 짝 판단의 등급 이하로 둔다 — 이름 없는·이름 있는 판단 모두. 키가
+# 없으면 꺼짐.
+GOODS_CAP_KEY = "goods_cap"
 
 # 기여도를 "근거 축"으로 묶을 때의 항 → 축
 TERM_AXIS = {
@@ -273,6 +293,8 @@ def design_values(features: dict) -> dict[str, float]:
     values["x1_d×no_distinctive"] = values["x1_d×any_no_distinctive"]  # v1.1 보조 항 이름
     values["x2_whole×x4"] = values["x2_whole"] * values["x4"]  # 선형 곱(§7-12)
     values["x2_whole×도형계×x4"] = values["x2_whole×도형계"] * values["x4"]
+    for name in NAME_PRODUCT_BASES:  # 이름 있는 업종 집합의 선형 곱(§7-13)
+        values[f"{name}×x4"] = values[name] * values["x4"]
     return values
 
 
@@ -281,15 +303,35 @@ def hinge_term_name(c_text: float, c_figure: float, *, figure: bool = False) -> 
     return (f"hinge(x2_whole;{c_text:g};{c_figure:g})×" + ("도형계×x4" if figure else "x4"))
 
 
+def pair_term_name(key: str) -> str:
+    """짝 위험도 곱 항 이름 — 업종 없는 짝 집합 `key` 의 위험도 × x4(변형 S, §7-13)."""
+    return f"pair({key})×x4"
+
+
 def is_product_term(name: str) -> bool:
-    return name in PRODUCT_TERMS or HINGE_TERM.match(name) is not None
+    return (name in PRODUCT_TERMS or name in NAME_PRODUCT_TERMS
+            or HINGE_TERM.match(name) is not None or PAIR_TERM.match(name) is not None)
 
 
-def term_value(name: str, values: dict[str, float]) -> float:
-    """설계 항 하나의 값 — design_values 에 있으면 그 값, 꺾인 곱 항이면 이름의 c 로 계산. 모르는
-    항은 ValueError."""
+def _special_term(name: str) -> bool:
+    """design_values 에 없고 이름으로 계산하는 항(꺾인 곱·짝 위험도 곱)."""
+    return HINGE_TERM.match(name) is not None or PAIR_TERM.match(name) is not None
+
+
+def term_value(name: str, values: dict[str, float], model: dict | None = None) -> float:
+    """설계 항 하나의 값 — design_values 에 있으면 그 값, 꺾인 곱 항이면 이름의 c 로, 짝 위험도 곱
+    항이면 그 짝 계수 집합(model.patterns)의 위험도 × x4 로 계산. 모르는 항은 ValueError."""
     if name in values:
         return values[name]
+    pair = PAIR_TERM.match(name)
+    if pair is not None:
+        if values["x4"] == 0.0:
+            return 0.0
+        block = ((model or {}).get("patterns") or {}).get(pair["key"])
+        if block is None:
+            raise ValueError(f"짝 위험도 항 {name} 은 그 짝 계수 집합이 있는 모델이 있어야 합니다")
+        logit = block_logit(block, values, model)
+        return values["x4"] / (1.0 + math.exp(-logit)) if logit > -700 else 0.0
     match = HINGE_TERM.match(name)
     if match is None:
         raise ValueError(f"모르는 설계 항: {[name]}")
@@ -309,13 +351,15 @@ def term_axis(name: str) -> str | None:
     return axis
 
 
-def design_vector(features: dict, names: list[str] | tuple[str, ...]) -> list[float]:
-    """계수 JSON 의 features 순서대로 값 목록. 모르는 항 이름이면 ValueError."""
+def design_vector(features: dict, names: list[str] | tuple[str, ...],
+                  model: dict | None = None) -> list[float]:
+    """계수 JSON 의 features 순서대로 값 목록. 모르는 항 이름이면 ValueError. 짝 위험도 곱 항이
+    있으면 model(그 짝 계수 집합)이 있어야 한다."""
     values = design_values(features)
-    unknown = [name for name in names if name not in values and not HINGE_TERM.match(name)]
+    unknown = [name for name in names if name not in values and not _special_term(name)]
     if unknown:
         raise ValueError(f"모르는 설계 항: {unknown}")
-    return [term_value(name, values) for name in names]
+    return [term_value(name, values, model) for name in names]
 
 
 # ---- v1.3 결측 패턴 ---------------------------------------------------------------------------
@@ -361,12 +405,21 @@ def select_pattern(model: dict, values: dict[str, float]) -> tuple[str, dict]:
     return key, patterns[key]
 
 
-def block_logit(block: dict, values: dict[str, float]) -> float:
-    """계수 집합(features·coefficients·intercept) 하나의 로짓."""
+def block_logit(block: dict, values: dict[str, float], model: dict | None = None) -> float:
+    """계수 집합(features·coefficients·intercept) 하나의 로짓(짝 위험도 곱 항은 model 로)."""
     coefficients = block["coefficients"]
     return float(block["intercept"]) + sum(
-        float(coefficients[name]) * term_value(name, values) for name in block["features"]
+        float(coefficients[name]) * term_value(name, values, model) for name in block["features"]
     )
+
+
+def goods_pair_key(key: str, axes: Iterable[str]) -> str | None:
+    """업종 집합의 짝 — 업종(x4)을 뺀 패턴 키(x4 → base, x2_whole+x4 → x2_whole). 업종이 없으면
+    None."""
+    present = pattern_present(key)
+    if "x4" not in present:
+        return None
+    return pattern_key([axis for axis in present if axis != "x4"], axes)
 
 
 def coupling_vertices(sub_features: Iterable[str]) -> list[dict]:
@@ -470,16 +523,16 @@ def _nameless_coupling_violations(model: dict, tolerance: float) -> list[str]:
             floor = float(floors[axis])
             if axis == "x4" and upper.get(GOODS_RULE_KEY) == GOODS_RULE_NO_RAISE:
                 for vertex in nameless_vertices(lower["features"]):  # 업종 겹침 0 → 이미지만 이하
-                    low = block_logit(lower, design_values(vertex))
-                    high = block_logit(upper, design_values({**vertex, axis: 0.0}))
+                    low = block_logit(lower, design_values(vertex), model)
+                    high = block_logit(upper, design_values({**vertex, axis: 0.0}), model)
                     if high > low + tolerance:
                         out.append(f"{NAMELESS_PREFIX}{key} ({axis} = 0) > "
                                    f"{NAMELESS_PREFIX}{lower_key} {round(high - low, 6)} @ "
                                    f"{_where(vertex)}")
                 continue
             for vertex in nameless_vertices(lower["features"]):
-                low = block_logit(lower, design_values(vertex))
-                high = block_logit(upper, design_values({**vertex, axis: floor}))
+                low = block_logit(lower, design_values(vertex), model)
+                high = block_logit(upper, design_values({**vertex, axis: floor}), model)
                 if high < low - tolerance:
                     out.append(f"{NAMELESS_PREFIX}{lower_key} → {NAMELESS_PREFIX}{key} "
                                f"({axis} = {floor}) {round(high - low, 6)} @ {_where(vertex)}")
@@ -488,9 +541,9 @@ def _nameless_coupling_violations(model: dict, tolerance: float) -> list[str]:
         for key, lower in nameless.items():
             upper = patterns[key]
             for vertex in name_coupling_vertices(lower["features"]):
-                low = block_logit(lower, design_values(vertex))
+                low = block_logit(lower, design_values(vertex), model)
                 high = block_logit(upper, design_values({**vertex, **named,
-                                                         "has_meaning_both": True}))
+                                                         "has_meaning_both": True}), model)
                 if high < low - tolerance:
                     out.append(f"{NAMELESS_PREFIX}{key} → {key} (이름 = {named}) "
                                f"{round(high - low, 6)} @ {_where(vertex)}, "
@@ -500,10 +553,10 @@ def _nameless_coupling_violations(model: dict, tolerance: float) -> list[str]:
         for key, lower in nameless.items():
             upper = patterns[key]
             for vertex in nameless_vertices(lower["features"]):
-                low = block_logit(lower, design_values(vertex))
+                low = block_logit(lower, design_values(vertex), model)
                 for distinctive in (True, False):
                     high = block_logit(upper, design_values(
-                        same_name_input(vertex, same_name, distinctive=distinctive)))
+                        same_name_input(vertex, same_name, distinctive=distinctive)), model)
                     if high < low - tolerance:
                         out.append(f"{NAMELESS_PREFIX}{key} → {key} (같은 이름) "
                                    f"{round(high - low, 6)} @ {_where(vertex)}, "
@@ -528,9 +581,18 @@ def coupling_violations(model: dict, tolerance: float = 1e-9) -> list[str]:
             lower_key = pattern_key([a for a in present if a != axis], axes)
             lower = patterns[lower_key]
             floor = float(floors[axis])
+            if axis == "x4" and upper.get(GOODS_RULE_KEY) == GOODS_RULE_NO_RAISE:
+                for vertex in coupling_vertices(lower["features"]):  # 겹침 0 → 짝 이하(§7-13)
+                    low = block_logit(lower, design_values(vertex), model)
+                    high = block_logit(upper, design_values({**vertex, axis: 0.0}), model)
+                    if high > low + tolerance:
+                        out.append(f"{key} ({axis} = 0) > {lower_key} {round(high - low, 6)} @ "
+                                   f"{_where(vertex)}, 요부없음="
+                                   f"{not vertex['has_distinctive_part_b']}")
+                continue
             for vertex in coupling_vertices(lower["features"]):
-                low = block_logit(lower, design_values(vertex))
-                high = block_logit(upper, design_values({**vertex, axis: floor}))
+                low = block_logit(lower, design_values(vertex), model)
+                high = block_logit(upper, design_values({**vertex, axis: floor}), model)
                 if high < low - tolerance:
                     where = ", ".join(
                         f"{k}={v}" for k, v in vertex.items()
@@ -551,7 +613,7 @@ def _validate_block(block: dict, label: str, known: dict) -> None:
     names = block.get("features")
     if not isinstance(names, list) or not names or len(set(names)) != len(names):
         raise ValueError(f"{label}: features 는 비어 있지 않은 고유 이름 목록이어야 합니다")
-    unknown = [name for name in names if name not in known and not HINGE_TERM.match(name)]
+    unknown = [name for name in names if name not in known and not _special_term(name)]
     if unknown:
         raise ValueError(f"{label}: 모르는 설계 항 {unknown}")
     coefficients = block.get("coefficients")
@@ -577,10 +639,7 @@ def _validate_patterns(data: dict, known: dict) -> None:
         raise ValueError(f"risk_model: patterns 키는 {expected} 여야 합니다")
     for key, block in patterns.items():
         _validate_block(block, f"risk_model.patterns[{key}]", known)
-        products = [name for name in block["features"] if is_product_term(name)]
-        if products or GOODS_RULE_KEY in block:
-            raise ValueError(f"risk_model.patterns[{key}]: 곱하기 항·업종 규칙은 이름 없는 "
-                             f"이미지+업종 집합에만 둔다({products})")
+        _validate_named_goods(block, key, axes)
         present = pattern_present(key)
         for axis in axes:
             if axis not in present and axis in block["features"]:
@@ -630,6 +689,44 @@ def _validate_patterns(data: dict, known: dict) -> None:
             raise ValueError(f"risk_model: 결합 제약 위반 — {violation}")
 
 
+def _validate_thresholds(thresholds: object, label: str, *, allow_null: bool) -> None:
+    if not isinstance(thresholds, dict) or set(thresholds) != set(GRADE_THRESHOLD_KEYS):
+        raise ValueError(f"{label}: grade_thresholds 키는 {GRADE_THRESHOLD_KEYS} 여야 합니다")
+    cuts = [thresholds[grade] for grade in GRADE_THRESHOLD_KEYS
+            if not (allow_null and thresholds[grade] is None)]
+    if any(not isinstance(cut, (int, float)) or not 0.0 < float(cut) <= 1.0
+           for cut in cuts) or any(a > b for a, b in zip(cuts, cuts[1:])):
+        raise ValueError(f"{label}: grade_thresholds 는 (0, 1] 안의 값이고 오름차순이어야 합니다")
+
+
+def _validate_named_goods(block: dict, key: str, axes: list[str]) -> None:
+    """이름 있는 계수 집합의 곱하기 항·업종 규칙·자기 하한(§7-13). 곱하기 항은 업종이 관측되는
+    집합에만, 이미지 곱은 이미지도 관측될 때만, 이름 곱은 그 이름 항이 있을 때만, 짝 위험도 곱은 그
+    집합의 짝(업종을 뺀 키)일 때만. 꺾인 곱은 이름 없는 집합에만."""
+    label = f"risk_model.patterns[{key}]"
+    present = pattern_present(key)
+    products = [name for name in block["features"] if is_product_term(name)]
+    if (products or GOODS_RULE_KEY in block) and "x4" not in present:
+        raise ValueError(f"{label}: 곱하기 항·업종 규칙은 업종이 관측되는 집합에만 둔다"
+                         f"({products})")
+    for name in products:
+        pair = PAIR_TERM.match(name)
+        if HINGE_TERM.match(name):
+            raise ValueError(f"{label}: 꺾인 곱 {name} 은 이름 없는 집합에만 둔다")
+        if pair is not None and pair["key"] != goods_pair_key(key, axes):
+            raise ValueError(f"{label}: 짝 위험도 항 {name} 의 짝은 {goods_pair_key(key, axes)} "
+                             "여야 한다")
+        if name in PRODUCT_TERMS and "x2_whole" not in present:
+            raise ValueError(f"{label}: 이미지 곱 {name} 은 이미지가 관측되는 집합에만 둔다")
+        if name in NAME_PRODUCT_TERMS and name[:-len("×x4")] not in block["features"]:
+            raise ValueError(f"{label}: 이름 곱 {name} 의 바탕 항이 없다")
+    rule = block.get(GOODS_RULE_KEY)
+    if rule is not None and rule != GOODS_RULE_NO_RAISE:
+        raise ValueError(f"{label}: {GOODS_RULE_KEY} 는 '{GOODS_RULE_NO_RAISE}' 만 쓴다")
+    if block.get("grade_thresholds") is not None:
+        _validate_thresholds(block["grade_thresholds"], label, allow_null=False)
+
+
 def _validate_nameless(data: dict, nameless: object, known: dict) -> None:
     """v1.4 `nameless_patterns` 검증: 키는 패턴 키의 부분집합, 입력 항은 이름에서 나오는 항이 없고
     키의 패턴 축과 맞아야 한다(단조 제약도 집합마다)."""
@@ -641,7 +738,8 @@ def _validate_nameless(data: dict, nameless: object, known: dict) -> None:
     for key, block in nameless.items():
         label = f"risk_model.{NAMELESS_KEY}[{key}]"
         _validate_block(block, label, known)
-        derived = sorted(NAME_DERIVED_TERMS & set(block["features"]))
+        derived = sorted((NAME_DERIVED_TERMS | set(NAME_PRODUCT_TERMS)) & set(block["features"]))
+        derived += [name for name in block["features"] if PAIR_TERM.match(name)]
         if derived:
             raise ValueError(f"{label}: 이름에서 나오는 항 {derived} 는 둘 수 없습니다")
         present = pattern_present(key)
@@ -665,15 +763,7 @@ def _validate_nameless(data: dict, nameless: object, known: dict) -> None:
                              "이름 없는 집합이 있어야 한다")
         thresholds = block.get("grade_thresholds")
         if thresholds is not None:
-            if not isinstance(thresholds, dict) or set(thresholds) != set(GRADE_THRESHOLD_KEYS):
-                raise ValueError(f"{label}: grade_thresholds 키는 {GRADE_THRESHOLD_KEYS} 여야 "
-                                 "합니다")
-            cuts = [thresholds[grade] for grade in GRADE_THRESHOLD_KEYS
-                    if thresholds[grade] is not None]
-            if any(not isinstance(cut, (int, float)) or not 0.0 < float(cut) <= 1.0
-                   for cut in cuts) or any(a > b for a, b in zip(cuts, cuts[1:])):
-                raise ValueError(f"{label}: grade_thresholds 는 null 또는 (0, 1] 안의 값이고 "
-                                 "오름차순이어야 합니다")
+            _validate_thresholds(thresholds, label, allow_null=True)
 
 
 def validate_model(data: dict) -> dict:
@@ -684,8 +774,9 @@ def validate_model(data: dict) -> dict:
         raise ValueError(f"risk_model: version 은 {SUPPORTED_VERSIONS} 중 하나여야 합니다")
     known = design_values({})
     _validate_block(data, "risk_model", known)
-    if any(is_product_term(name) for name in data["features"]) or GOODS_RULE_KEY in data:
-        raise ValueError("risk_model: 곱하기 항·업종 규칙은 이름 없는 이미지+업종 집합에만 둔다")
+    if GOODS_RULE_KEY in data or (data.get("patterns") is None and any(
+            is_product_term(name) for name in data["features"])):
+        raise ValueError("risk_model: 곱하기 항·업종 규칙은 업종이 관측되는 계수 집합에만 둔다")
     coefficients = data["coefficients"]
     thresholds = data.get("grade_thresholds")
     if not isinstance(thresholds, dict) or set(thresholds) != set(GRADE_THRESHOLD_KEYS):
@@ -725,6 +816,11 @@ def validate_model(data: dict) -> dict:
                                        and isinstance(logo_floor.get("enabled"), bool)):
         raise ValueError(f"risk_model: {LOGO_FLOOR_KEY} 는 enabled(true/false)를 가진 객체여야 "
                          "합니다")
+    goods_cap = data.get(GOODS_CAP_KEY)
+    if goods_cap is not None and not (isinstance(goods_cap, dict)
+                                      and isinstance(goods_cap.get("enabled"), bool)):
+        raise ValueError(f"risk_model: {GOODS_CAP_KEY} 는 enabled(true/false)를 가진 객체여야 "
+                         "합니다")
     weak_run = data.get(WEAK_RUN_KEY)
     if weak_run is not None and not (
             isinstance(weak_run, dict) and isinstance(weak_run.get("version"), int)
@@ -742,6 +838,12 @@ def weak_run_version(model: dict) -> int:
     없으면 1(v0.2–v0.3 부분열). 2 는 두 이름 모두에서 붙어 있는 구간만(식별력 v0.4, 견고성 점검
     R-P0-2)."""
     return int((model.get(WEAK_RUN_KEY) or {}).get("version", 1))
+
+
+def goods_cap_enabled(model: dict) -> bool:
+    """계수 JSON 이 업종 상한(업종이 다르면 업종 집합의 최종 등급 ≤ 업종 없는 짝 판단의 등급, §7-13)
+    을 켰는가. 키가 없는 JSON(≤ v1.4.5)은 꺼짐 — 예전 동작 그대로."""
+    return bool((model.get(GOODS_CAP_KEY) or {}).get("enabled"))
 
 
 def logo_floor_enabled(model: dict) -> bool:
@@ -865,7 +967,19 @@ def grade_thresholds_for(model: dict, pattern: str = "") -> dict:
         block = (model.get(NAMELESS_KEY) or {}).get(pattern[len(NAMELESS_PREFIX):]) or {}
         if block.get("grade_thresholds"):
             return block["grade_thresholds"]
+    elif pattern:
+        block = (model.get("patterns") or {}).get(pattern) or {}
+        if block.get("grade_thresholds"):  # 이름 있는 업종 집합의 자기 하한(§7-13)
+            return block["grade_thresholds"]
     return model["grade_thresholds"]
+
+
+def named_grade_thresholds(model: dict) -> dict[str, dict]:
+    """이름 있는 계수 집합 중 자기 `grade_thresholds` 가 있는 것의 하한 — {"x4": {…}, …}. 없으면
+    빈 사전(그 집합들은 최상위 하한을 쓴다)."""
+    return {key: {grade: float(block["grade_thresholds"][grade]) for grade in GRADE_THRESHOLD_KEYS}
+            for key, block in (model.get("patterns") or {}).items()
+            if block.get("grade_thresholds")}
 
 
 def risk_score(features: dict, model: dict | None = None) -> RiskResult:
@@ -890,7 +1004,7 @@ def risk_score(features: dict, model: dict | None = None) -> RiskResult:
         contributions["miss_pattern"] = float(block["intercept"]) - float(model["intercept"])
     logit = sum(contributions.values())
     for name in block["features"]:
-        term = float(coefficients[name]) * term_value(name, values)
+        term = float(coefficients[name]) * term_value(name, values, model)
         contributions[name] = term
         logit += term
     prob = 1.0 / (1.0 + math.exp(-logit)) if logit > -700 else 0.0

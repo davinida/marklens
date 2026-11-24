@@ -32,7 +32,8 @@ def check_shared_assets() -> None:
         "model/risk_model_v1.4.1.json",  # v1.4.2 의 원본(2026-11-23 서비스 기본)
         "model/risk_model_v1.4.2.json",  # v1.4.3 의 원본(2026-11-23 서비스 기본 — logo_floor)
         "model/risk_model_v1.4.3.json",  # v1.4.5 의 원본(2026-11-23 서비스 기본 — weak_run 2)
-        "model/risk_model_v1.4.5.json",  # 서비스 기본 모델(2026-11-24 — 이미지+업종 곱하기 항)
+        "model/risk_model_v1.4.5.json",  # v1.4.6 의 원본(2026-11-24 — 이미지+업종 곱하기 항)
+        "model/risk_model_v1.4.6.json",  # 서비스 기본 모델(2026-11-24 — 업종 상한 goods_cap)
         "model/photo_direction_v1.json",  # 사진 질의 판정
         "distinctiveness/token_stats.json",
         "distinctiveness/descriptive_terms.json",
@@ -44,7 +45,9 @@ def check_shared_assets() -> None:
         assert path.is_file() and path.stat().st_size > 0, f"Missing shared asset: {relative}"
     model = load_model()
     # 명시 값 — 기본 모델을 바꿀 때 이 검사도 의식적으로 같이 고치게 하는 가드
-    assert model["version"] == "risk_model_v1.4.5", model["version"]
+    assert model["version"] == "risk_model_v1.4.6", model["version"]
+    # 업종 상한 — 업종이 다르면 업종 없는 짝 판단의 등급 이하(엔진 규칙, 계수는 v1.4.5 그대로)
+    assert model["goods_cap"]["enabled"] is True
     assert model["logo_floor"]["enabled"] is True  # 이름 있는 이미지 질의의 이미지만 판단 비교
     assert model["weak_run"]["version"] == 2  # 약한 토큰열은 두 이름 모두에서 붙어 있는 구간만
     # 이름 없는 이미지+업종 집합 — 로고 유사도 × 업종 겹침 곱하기 항, 업종이 안 겹치면 이미지만 이하

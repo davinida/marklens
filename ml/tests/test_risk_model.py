@@ -270,8 +270,8 @@ def test_versions_accepted():
     assert _model(version="risk_model_v1.1")["version"] == "risk_model_v1.1"
     assert _model(version="risk_model_v1.2")["version"] == "risk_model_v1.2"
     assert _model(version="risk_model_v1.2.1")["version"] == "risk_model_v1.2.1"
-    assert rm.MODEL_VERSION == "risk_model_v1.4.5"  # 서비스 기본 모델(2026-11-24 부터)
-    assert rm.DEFAULT_MODEL_PATH == rm.V145_MODEL_PATH
+    assert rm.MODEL_VERSION == "risk_model_v1.4.6"  # 서비스 기본 모델(2026-11-24 부터)
+    assert rm.DEFAULT_MODEL_PATH == rm.V146_MODEL_PATH
     assert rm.V13_MODEL_PATH.name == "risk_model_v1.json"
     with pytest.raises(ValueError):
         _model(version="risk_model_v2")
@@ -589,12 +589,13 @@ def test_v14_validate_nameless_patterns():
     # name_floors 가 없는 v1.4 JSON 은 이름 결합을 검사하지 않는다(이름 없는 패턴 사이만)
     without_floors = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
     assert without_floors and all("(이름" not in v for v in without_floors)
-    assert rm.MODEL_VERSION == "risk_model_v1.4.5"  # 서비스 기본 모델(2026-11-24 부터 v1.4.5)
+    assert rm.MODEL_VERSION == "risk_model_v1.4.6"  # 서비스 기본 모델(2026-11-24 부터 v1.4.6)
     assert "risk_model_v1.4" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.1" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.2" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.3" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.5" in rm.SUPPORTED_VERSIONS
+    assert "risk_model_v1.4.6" in rm.SUPPORTED_VERSIONS
 
 
 def test_shipped_v13_scores_nameless_input_with_named_pattern():
@@ -1024,17 +1025,16 @@ def test_shipped_v143_only_adds_the_weak_run_rule():
 
 
 def test_shipped_v145_only_changes_the_image_goods_set():
-    """서비스 기본 v1.4.5(설계 §7-12, 2026-11-24): v1.4.3 JSON 에서 이름 없는 이미지+업종 집합만
-    로고 유사도 × 업종 겹침의 곱하기 항(변형 L)·goods_rule·이미지만과 같은 기준으로 바꾸고 출처
-    meta 를 더했다(채택 조건 ③ 미달 — 사람 결정). 이름 있는 4벌·이미지만 집합·규칙은 v1.4.3
-    그대로 — v1.4.3 을 다시 쓰면 이 시험이 v1.4.5 도 다시 만들라고 알린다(goods_product.py
-    apply)."""
+    """v1.4.5(설계 §7-12, 2026-11-24 — v1.4.6 의 원본): v1.4.3 JSON 에서 이름 없는
+    이미지+업종 집합만 로고 유사도 × 업종 겹침의 곱하기 항(변형 L)·goods_rule·이미지만과 같은
+    기준으로 바꾸고 출처 meta 를 더했다(채택 조건 ③ 미달 — 사람 결정). 이름 있는 4벌·이미지만
+    집합·규칙은 v1.4.3 그대로 — v1.4.3 을 다시 쓰면 이 시험이 v1.4.5 도 다시 만들라고
+    알린다(goods_product.py apply)."""
     if not rm.V145_MODEL_PATH.exists() or not rm.V143_MODEL_PATH.exists():
         pytest.skip("v1.4.5 계수 파일 없음")
     base = json.loads(rm.V143_MODEL_PATH.read_text(encoding="utf-8"))
     new = json.loads(rm.V145_MODEL_PATH.read_text(encoding="utf-8"))
-    assert rm.DEFAULT_MODEL_PATH == rm.V145_MODEL_PATH
-    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.5"
+    assert new["version"] == "risk_model_v1.4.5" and not rm.goods_cap_enabled(new)
     assert {k for k in set(base) | set(new) if base.get(k) != new.get(k)} == {
         "version", rm.NAMELESS_KEY, "meta"}
     assert {k for k in set(base["meta"]) | set(new["meta"])
@@ -1063,3 +1063,31 @@ def test_shipped_v145_only_changes_the_image_goods_set():
     low = [rm.risk_score({"x2_whole": x2, "x4": x4, "mark_type": "도형"}, model).prob
            for x2 in (0.3, 0.9) for x4 in (0.0, 1.0)]
     assert low[3] - low[2] > low[1] - low[0]  # 업종의 몫은 로고가 닮을수록 크다
+
+
+def test_shipped_v146_only_turns_the_goods_cap_on():
+    """서비스 기본 v1.4.6(설계 §7-13, 2026-11-24 — 사람 결정): v1.4.5 JSON 에 업종 상한
+    `goods_cap.enabled` 만 켜고 출처 meta 를 더했다 — 계수·기준·다른 규칙은 v1.4.5 그대로(엔진이
+    업종이 다르면 업종 없는 짝 판단의 등급 이하로 내린다). v1.4.5 를 다시 쓰면 이 시험이 v1.4.6 도
+    다시 만들라고 알린다(goods_cap.py apply)."""
+    if not rm.V146_MODEL_PATH.exists() or not rm.V145_MODEL_PATH.exists():
+        pytest.skip("v1.4.6 계수 파일 없음")
+    base = json.loads(rm.V145_MODEL_PATH.read_text(encoding="utf-8"))
+    new = json.loads(rm.V146_MODEL_PATH.read_text(encoding="utf-8"))
+    assert rm.DEFAULT_MODEL_PATH == rm.V146_MODEL_PATH
+    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.6"
+    assert {k for k in set(base) | set(new) if base.get(k) != new.get(k)} == {
+        "version", rm.GOODS_CAP_KEY, "meta"}
+    assert {k for k in set(base["meta"]) | set(new["meta"])
+            if base["meta"].get(k) != new["meta"].get(k)} == {"goods_cap"}
+    assert new[rm.GOODS_CAP_KEY] == {"enabled": True}
+    provenance = new["meta"]["goods_cap"]
+    assert provenance["derived_from"] == base["version"] and len(provenance["rule_sha256"]) == 64
+    assert provenance["checks"] == {f"확인_{i}": True for i in range(1, 5)}
+    model = rm.load_model(rm.V146_MODEL_PATH)
+    assert rm.goods_cap_enabled(model) and rm.coupling_violations(model) == []
+    assert rm.logo_floor_enabled(model) and rm.weak_run_version(model) == 2
+    assert rm.named_grade_thresholds(model) == {}  # 이름 있는 집합의 자기 하한·goods_rule 없음
+    for features in ({"x1_d": 0.16, "x2_text_d": 0.7, "x4": 0.01, "mark_type": "문자"},
+                     {"x2_whole": 0.9, "x4": 0.0, "mark_type": "도형"}):
+        assert rm.risk_score(features, model) == rm.risk_score(features, base)  # 위험도는 그대로

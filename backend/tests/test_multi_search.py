@@ -76,7 +76,7 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.4.5"  # 서비스 기본 모델(2026-11-24)
+    assert ms.state.model["version"] == "risk_model_v1.4.6"  # 서비스 기본 모델(2026-11-24)
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
     # 가짜 ML 은 사진 판정을 끈다(임베딩이 의미 없음)
     assert ms.state.goods_ignored == 0 and ms.state.photo_direction is None
@@ -422,7 +422,7 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     from src.axes.x2_ortho import orthographic_similarity
 
     query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
-    assert ms.state.model["version"] == "risk_model_v1.4.5"
+    assert ms.state.model["version"] == "risk_model_v1.4.6"
     results = {}
     for version in (1, 2):
         monkeypatch.setattr(ms.state, "model", _spelling_model(version))
@@ -617,8 +617,8 @@ def test_goods_floor_in_engine_and_with_nameless_floor(client, ocr_on, monkeypat
     top = both["candidates"][0]
     assert {"goods_floor", "nameless_floor"} <= set(top["risk"]["rule_triggers"])
     assert top["risk"]["pattern"] == "noname:x2_whole" and top["risk"]["grade"] == "위험"
-    monkeypatch.setattr(ms.state, "model", shipped)  # 배포 모델(v1.4.5) — 곱하기 항
-    assert shipped["version"] == "risk_model_v1.4.5"
+    monkeypatch.setattr(ms.state, "model", shipped)  # 배포 모델(v1.4.6) — 곱하기 항·업종 상한
+    assert shipped["version"] == "risk_model_v1.4.6"
     product = engine.multi_search(image=_image(), goods_codes=_goods_for_jaccard(39),
                                   top_k=3).to_dict()
     top = product["candidates"][0]
