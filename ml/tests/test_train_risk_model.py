@@ -450,8 +450,10 @@ def test_rounded_blocks_repairs_rounding_violations(data):
 
 
 def test_shipped_model_monotone_on_training_pairs():
-    """배포 JSON(v1.3)·학습 데이터가 있을 때: 정답 데이터 전체 쌍에서 이미지·상품을 더 관측해도(값이
-    하한 이상이면) p 가 내려가지 않는다 — 결합 제약의 데이터 확인."""
+    """배포 JSON·학습 데이터가 있을 때: 정답 데이터 전체 쌍에서 이미지·상품을 더 관측해도(값이
+    하한 이상이면) p 가 내려가지 않는다 — 결합 제약의 데이터 확인. v1.4.5(설계 §7-12)의 이름 없는
+    이미지+업종 집합(`goods_rule` no_raise_without_overlap)은 이 결합 제약 대신 "업종 겹침 0 이면
+    이미지만 판단 이하"를 지킨다 — 그 쌍은 그 성질을 같은 데이터로 본다(등급은 엔진 업종 하한)."""
     if not rm.DEFAULT_MODEL_PATH.exists() or not tr.DEFAULT_FEATURES.exists():
         pytest.skip("계수 파일 또는 학습 데이터 없음")
     model = rm.load_model()
@@ -460,15 +462,26 @@ def test_shipped_model_monotone_on_training_pairs():
     floors = model["coupling"]["floors"]
     rows = [row for row in tr.load_rows(tr.DEFAULT_FEATURES, tr.DEFAULT_EASY)
             if row["최종라벨"] in ("유사", "비유사")]
-    checked = 0
+    checked = goods_rule = 0
     for row in rows:
         features = tr.row_features(row)
         for axis in model["pattern_axes"]:
             value = features.get(axis)
             if value is None or value < floors[axis]:
                 continue
-            with_axis = rm.risk_score(features, model).prob
+            result = rm.risk_score(features, model)
             without = rm.risk_score({**features, axis: None}, model).prob
-            assert with_axis >= without - 1e-9, (row["심판번호"], axis, value, with_axis, without)
+            nameless = model.get(rm.NAMELESS_KEY) or {}
+            block = (nameless.get(result.pattern[len(rm.NAMELESS_PREFIX):])
+                     if rm.is_nameless_pattern(result.pattern) else None)
+            if axis == "x4" and block and block.get(rm.GOODS_RULE_KEY) == rm.GOODS_RULE_NO_RAISE:
+                zero = rm.risk_score({**features, "x4": 0.0}, model).prob
+                assert zero <= without + 1e-9, (row["심판번호"], zero, without)
+                goods_rule += 1
+                continue
+            assert result.prob >= without - 1e-9, (row["심판번호"], axis, value, result.prob,
+                                                    without)
             checked += 1
     assert checked > 100
+    if (model.get(rm.NAMELESS_KEY) or {}).get("x2_whole+x4", {}).get(rm.GOODS_RULE_KEY):
+        assert goods_rule > 0

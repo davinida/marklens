@@ -48,10 +48,15 @@ v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·�
 시도 — 이름을 쉬운 음성 평균 이상으로 더 관측하면 비감소; 채택되지 않은 형식이고 그 학습 스크립트의
 재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다.
 
-서비스 기본 모델(2026-11-23, §7-10): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.3.json`
-(MODEL_VERSION risk_model_v1.4.3) — v1.4.2 에 `weak_run` 규칙 2 만 더한 것(계수·하한 그대로):
-엔진이 이름 축을 계산할 때 식별력 결합 규칙의 약한 토큰열을 두 이름 모두에서 붙어 있는 구간만
-묶는다(견고성 점검 R-P0-2, `ml/scripts/weak_run_adjacent.py apply`). v1.4.2
+서비스 기본 모델(2026-11-24, §7-12): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.5.json`
+(MODEL_VERSION risk_model_v1.4.5) — v1.4.3 에서 이름 없는 이미지+업종 집합만 바꾼 것: 로고
+유사도 × 업종 겹침의 곱하기 항(변형 L)을 넣어 다시 학습해 업종의 효과가 로고가 닮은 만큼만 생기고,
+그 집합의 `goods_rule` "no_raise_without_overlap"(업종이 안 겹치면 이미지만 판단 이하 — 적재 때
+검사)과 이미지만 판단과 같은 기준을 둔다(채택 조건 ③ 미달 — 사람 결정으로 채택,
+`ml/scripts/goods_product.py apply`). v1.4.3(`risk_model_v1.4.3.json`, V143_MODEL_PATH —
+2026-11-23 서비스 기본, v1.4.2 에 `weak_run` 규칙 2 만 더한 것: 엔진이 이름 축을 계산할 때 식별력
+결합 규칙의 약한 토큰열을 두 이름 모두에서 붙어 있는 구간만 묶는다, 견고성 점검 R-P0-2, §7-10)·
+v1.4.2
 (`risk_model_v1.4.2.json`, V142_MODEL_PATH — 2026-11-23 서비스 기본, v1.4.1 에 `logo_floor` 표시만
 더한 것: 엔진이 이름 있는 이미지 질의를 이미지만 판단과 견준다, 견고성 점검 R-P0-1, §7-9)·
 v1.4.1(`risk_model_v1.4.1.json`, V141_MODEL_PATH —
@@ -76,6 +81,7 @@ import functools
 import json
 import math
 import os
+import re
 from collections.abc import Iterable
 from pathlib import Path
 from typing import NamedTuple
@@ -86,7 +92,7 @@ __all__ = [
     "coupling_violations", "coupling_vertices", "select_pattern", "pattern_key", "pattern_keys",
     "block_logit", "GRADES", "TYPE_LEVELS", "AXIS_INPUTS", "FIGURE_FAMILY", "PATTERN_BASE_KEY",
     "DEFAULT_MODEL_PATH", "V13_MODEL_PATH", "V14_MODEL_PATH", "V141_MODEL_PATH",
-    "V142_MODEL_PATH", "V143_MODEL_PATH", "ENV_MODEL_PATH",
+    "V142_MODEL_PATH", "V143_MODEL_PATH", "V145_MODEL_PATH", "ENV_MODEL_PATH",
     "NAMELESS_KEY",
     "NAMELESS_PREFIX", "NAME_AXES", "is_nameless_pattern", "nameless_grade_thresholds",
     "SEARCH_THRESHOLDS_METHOD", "OverwriteRefused", "search_calibrated", "check_nameless_overwrite",
@@ -95,6 +101,8 @@ __all__ = [
     "grade_thresholds_for", "AXIS_VERSIONS_KEY", "SPELLING_AXIS", "SPELLING_VERSION_INPUT",
     "SUPPORTED_SPELLING_VERSIONS", "spelling_version", "LOGO_FLOOR_KEY", "logo_floor_enabled",
     "WEAK_RUN_KEY", "SUPPORTED_WEAK_RUN_VERSIONS", "weak_run_version",
+    "PRODUCT_TERMS", "HINGE_TERM", "is_product_term", "hinge_term_name", "term_value", "term_axis",
+    "GOODS_RULE_KEY", "GOODS_RULE_NO_RAISE",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -102,13 +110,15 @@ V13_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.json"  # v1.3(�
 V14_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.json"  # v1.4.1 의 원본
 V141_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.1.json"  # v1.4.2 의 원본
 V142_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.2.json"  # v1.4.3 의 원본
-V143_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.3.json"
-DEFAULT_MODEL_PATH = V143_MODEL_PATH  # 서비스 기본 모델(2026-11-23 부터 v1.4.3)
+V143_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.3.json"  # v1.4.5 의 원본
+V145_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.5.json"
+DEFAULT_MODEL_PATH = V145_MODEL_PATH  # 서비스 기본 모델(2026-11-24 부터 v1.4.5)
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1.4.3"  # 서비스 기본 모델의 버전
+MODEL_VERSION = "risk_model_v1.4.5"  # 서비스 기본 모델의 버전
 SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2", "risk_model_v1.2.1",
                       "risk_model_v1.3", "risk_model_v1.4", "risk_model_v1.4.1",
-                      "risk_model_v1.4.2", "risk_model_v1.4.3", "risk_model_v1.5")
+                      "risk_model_v1.4.2", "risk_model_v1.4.3", "risk_model_v1.4.5",
+                      "risk_model_v1.5")
 AXIS_VERSIONS_KEY = "axis_versions"  # 계수가 학습된 축 정의의 버전(없으면 모두 1)
 LOGO_FLOOR_KEY = "logo_floor"  # 이름 있는 이미지 질의에 이미지만 판단 비교를 켜는 표시(v1.4.2)
 # 서비스가 이름 축을 계산할 때 쓰는 식별력 결합 규칙의 약한 토큰열 버전(없으면 1 — v1.4.3 부터 2).
@@ -147,6 +157,19 @@ FIGURE_FAMILY = ("도형", "결합-도형요부")
 GRADES = ("안전", "주의", "검토 권장", "위험")
 GRADE_THRESHOLD_KEYS = ("주의", "검토 권장", "위험")  # 등급 i 의 하한 p (안전은 0)
 REVIEW_GRADE = "검토 권장"
+# 이름 없는 이미지+업종 집합의 곱하기 항(2026-11-24, 설계 §7-12) — 업종 겹침의 효과가 로고가
+# 닮은 만큼만 생기게 한다. 선형 곱: 이미지 항(x2_whole·x2_whole×도형계) × x4. 꺾인 곱:
+# max(0, x2_whole − c) × x4(그리고 × 도형계) — c 는 유형 묶음(문자계·도형계)별 값이고 항 이름에
+# 적는다("hinge(x2_whole;<문자계>;<도형계>)×x4").
+PRODUCT_TERMS = ("x2_whole×x4", "x2_whole×도형계×x4")
+HINGE_TERM = re.compile(r"^hinge\(x2_whole;(?P<text>[01](?:\.\d{1,6})?);"
+                        r"(?P<figure>[01](?:\.\d{1,6})?)\)×(?P<rest>x4|도형계×x4)$")
+# 이름 없는 집합의 업종 규칙: "no_raise_without_overlap" 이면 결합 제약(업종을 하한만큼 더하면
+# 이미지만 이상) 대신 "업종 겹침이 0 이면 이미지만 판단 이하"를 적재 때 검사한다 — 업종이 겹칠 때
+# 이미지만 등급 아래로 내려가지 않는 것은 엔진의 업종 하한(goods_floor)이 맡는다.
+GOODS_RULE_KEY = "goods_rule"
+GOODS_RULE_NO_RAISE = "no_raise_without_overlap"
+
 # 기여도를 "근거 축"으로 묶을 때의 항 → 축
 TERM_AXIS = {
     "x1_d": "X1", "miss_x1": "X1", "x1_d×문자계": "X1",
@@ -248,16 +271,51 @@ def design_values(features: dict) -> dict[str, float]:
     values["any_no_distinctive"] = no_distinctive
     values["x1_d×any_no_distinctive"] = values["x1_d"] * no_distinctive
     values["x1_d×no_distinctive"] = values["x1_d×any_no_distinctive"]  # v1.1 보조 항 이름
+    values["x2_whole×x4"] = values["x2_whole"] * values["x4"]  # 선형 곱(§7-12)
+    values["x2_whole×도형계×x4"] = values["x2_whole×도형계"] * values["x4"]
     return values
+
+
+def hinge_term_name(c_text: float, c_figure: float, *, figure: bool = False) -> str:
+    """꺾인 곱 항 이름 — max(0, x2_whole − c) × x4(figure 면 × 도형계도), c 는 유형 묶음별."""
+    return (f"hinge(x2_whole;{c_text:g};{c_figure:g})×" + ("도형계×x4" if figure else "x4"))
+
+
+def is_product_term(name: str) -> bool:
+    return name in PRODUCT_TERMS or HINGE_TERM.match(name) is not None
+
+
+def term_value(name: str, values: dict[str, float]) -> float:
+    """설계 항 하나의 값 — design_values 에 있으면 그 값, 꺾인 곱 항이면 이름의 c 로 계산. 모르는
+    항은 ValueError."""
+    if name in values:
+        return values[name]
+    match = HINGE_TERM.match(name)
+    if match is None:
+        raise ValueError(f"모르는 설계 항: {[name]}")
+    figure = values["type_도형"] + values["type_결합-도형요부"] > 0.0
+    cut = float(match["figure"] if figure else match["text"])
+    value = max(0.0, values["x2_whole"] - cut) * values["x4"]
+    if match["rest"] != "x4" and not figure:
+        value = 0.0
+    return value
+
+
+def term_axis(name: str) -> str | None:
+    """항 → 기여도 축(X1·X2·X3·X4·요부·…). 곱하기 항은 업종 겹침이 더한 몫이라 X4."""
+    axis = TERM_AXIS.get(name)
+    if axis is None and is_product_term(name):
+        return "X4"
+    return axis
 
 
 def design_vector(features: dict, names: list[str] | tuple[str, ...]) -> list[float]:
     """계수 JSON 의 features 순서대로 값 목록. 모르는 항 이름이면 ValueError."""
     values = design_values(features)
-    unknown = [name for name in names if name not in values]
+    unknown = [name for name in names if name not in values and not HINGE_TERM.match(name)]
     if unknown:
         raise ValueError(f"모르는 설계 항: {unknown}")
-    return [values[name] for name in names]
+    return [term_value(name, values) for name in names]
 
 
 # ---- v1.3 결측 패턴 ---------------------------------------------------------------------------
@@ -307,7 +365,7 @@ def block_logit(block: dict, values: dict[str, float]) -> float:
     """계수 집합(features·coefficients·intercept) 하나의 로짓."""
     coefficients = block["coefficients"]
     return float(block["intercept"]) + sum(
-        float(coefficients[name]) * values[name] for name in block["features"]
+        float(coefficients[name]) * term_value(name, values) for name in block["features"]
     )
 
 
@@ -410,6 +468,15 @@ def _nameless_coupling_violations(model: dict, tolerance: float) -> list[str]:
                 continue
             lower = nameless[lower_key]
             floor = float(floors[axis])
+            if axis == "x4" and upper.get(GOODS_RULE_KEY) == GOODS_RULE_NO_RAISE:
+                for vertex in nameless_vertices(lower["features"]):  # 업종 겹침 0 → 이미지만 이하
+                    low = block_logit(lower, design_values(vertex))
+                    high = block_logit(upper, design_values({**vertex, axis: 0.0}))
+                    if high > low + tolerance:
+                        out.append(f"{NAMELESS_PREFIX}{key} ({axis} = 0) > "
+                                   f"{NAMELESS_PREFIX}{lower_key} {round(high - low, 6)} @ "
+                                   f"{_where(vertex)}")
+                continue
             for vertex in nameless_vertices(lower["features"]):
                 low = block_logit(lower, design_values(vertex))
                 high = block_logit(upper, design_values({**vertex, axis: floor}))
@@ -484,7 +551,7 @@ def _validate_block(block: dict, label: str, known: dict) -> None:
     names = block.get("features")
     if not isinstance(names, list) or not names or len(set(names)) != len(names):
         raise ValueError(f"{label}: features 는 비어 있지 않은 고유 이름 목록이어야 합니다")
-    unknown = [name for name in names if name not in known]
+    unknown = [name for name in names if name not in known and not HINGE_TERM.match(name)]
     if unknown:
         raise ValueError(f"{label}: 모르는 설계 항 {unknown}")
     coefficients = block.get("coefficients")
@@ -510,6 +577,10 @@ def _validate_patterns(data: dict, known: dict) -> None:
         raise ValueError(f"risk_model: patterns 키는 {expected} 여야 합니다")
     for key, block in patterns.items():
         _validate_block(block, f"risk_model.patterns[{key}]", known)
+        products = [name for name in block["features"] if is_product_term(name)]
+        if products or GOODS_RULE_KEY in block:
+            raise ValueError(f"risk_model.patterns[{key}]: 곱하기 항·업종 규칙은 이름 없는 "
+                             f"이미지+업종 집합에만 둔다({products})")
         present = pattern_present(key)
         for axis in axes:
             if axis not in present and axis in block["features"]:
@@ -582,6 +653,16 @@ def _validate_nameless(data: dict, nameless: object, known: dict) -> None:
         if data.get("monotone"):
             for violation in monotone_violations(block["coefficients"]):
                 raise ValueError(f"{label}: 단조 제약 위반 — {violation}")
+        products = [name for name in block["features"] if is_product_term(name)]
+        if products and not {"x2_whole", "x4"} <= set(present):
+            raise ValueError(f"{label}: 곱하기 항 {products} 는 이미지·업종이 함께 관측되는 "
+                             "집합에만 둔다")
+        rule = block.get(GOODS_RULE_KEY)
+        if rule is not None and (rule != GOODS_RULE_NO_RAISE or "x4" not in present
+                                 or pattern_key([a for a in present if a != "x4"], axes)
+                                 not in nameless):
+            raise ValueError(f"{label}: {GOODS_RULE_KEY} 는 '{GOODS_RULE_NO_RAISE}' 이고 업종을 뺀 "
+                             "이름 없는 집합이 있어야 한다")
         thresholds = block.get("grade_thresholds")
         if thresholds is not None:
             if not isinstance(thresholds, dict) or set(thresholds) != set(GRADE_THRESHOLD_KEYS):
@@ -603,6 +684,8 @@ def validate_model(data: dict) -> dict:
         raise ValueError(f"risk_model: version 은 {SUPPORTED_VERSIONS} 중 하나여야 합니다")
     known = design_values({})
     _validate_block(data, "risk_model", known)
+    if any(is_product_term(name) for name in data["features"]) or GOODS_RULE_KEY in data:
+        raise ValueError("risk_model: 곱하기 항·업종 규칙은 이름 없는 이미지+업종 집합에만 둔다")
     coefficients = data["coefficients"]
     thresholds = data.get("grade_thresholds")
     if not isinstance(thresholds, dict) or set(thresholds) != set(GRADE_THRESHOLD_KEYS):
@@ -691,6 +774,9 @@ def monotone_violations(coefficients: dict, tolerance: float = 1e-9) -> list[str
             total = base + sum(float(coefficients[name]) for name in combo)
             if total < -tolerance:
                 out.append(f"{axis} + {' + '.join(combo)} {round(total, 4)}")
+    for name, value in coefficients.items():  # 곱하기 항(§7-12) — 계수 ≥ 0
+        if is_product_term(name) and float(value) < -tolerance:
+            out.append(f"{name} {value}")
     return out
 
 
@@ -708,7 +794,7 @@ def _load_cached(path_text: str) -> dict:
 
 def load_model(path: str | os.PathLike[str] | None = None) -> dict:
     """계수 JSON 적재(경로: 인자 > MARKLENS_RISK_MODEL > DEFAULT_MODEL_PATH = shared/model/
-    risk_model_v1.4.3.json). 프로세스 캐시 — 파일을 바꾸면 서버를 다시 띄운다."""
+    risk_model_v1.4.5.json). 프로세스 캐시 — 파일을 바꾸면 서버를 다시 띄운다."""
     return _load_cached(str(resolve_model_path(path)))
 
 
@@ -804,7 +890,7 @@ def risk_score(features: dict, model: dict | None = None) -> RiskResult:
         contributions["miss_pattern"] = float(block["intercept"]) - float(model["intercept"])
     logit = sum(contributions.values())
     for name in block["features"]:
-        term = float(coefficients[name]) * values[name]
+        term = float(coefficients[name]) * term_value(name, values)
         contributions[name] = term
         logit += term
     prob = 1.0 / (1.0 + math.exp(-logit)) if logit > -700 else 0.0
@@ -837,6 +923,6 @@ def axis_contributions(contributions: dict[str, float]) -> dict[str, float]:
     for name, value in contributions.items():
         if name == "intercept":
             continue
-        axis = TERM_AXIS.get(name, "기타")
+        axis = term_axis(name) or "기타"
         out[axis] = out.get(axis, 0.0) + value
     return out

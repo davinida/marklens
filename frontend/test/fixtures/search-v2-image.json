@@ -191,7 +191,7 @@
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4.3",
+    "model_version": "risk_model_v1.4.5",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
@@ -206,9 +206,9 @@
           "위험": 0.5724
         },
         "noname:x2_whole+x4": {
-          "주의": 0.2944,
-          "검토 권장": 0.4441,
-          "위험": 0.7892
+          "주의": 0.3677,
+          "검토 권장": 0.491,
+          "위험": 0.5724
         }
       },
       "standalone": {
@@ -228,7 +228,7 @@
       "goods": 0,
       "total": 20
     },
-    "elapsed_ms": 267
+    "elapsed_ms": 273
   },
   "dataset_info": {
     "총_상표수": 1383,

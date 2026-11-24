@@ -555,7 +555,7 @@ def _group_contributions(term_contributions: dict[str, float]) -> tuple[dict[str
         if name.startswith("miss_"):
             missing += float(value)
             continue
-        axis = rm.TERM_AXIS.get(name)
+        axis = rm.term_axis(name)  # 곱하기 항(설계 §7-12)은 X4
         if axis in grouped:
             grouped[axis] += float(value)
     return grouped, missing
