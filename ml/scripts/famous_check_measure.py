@@ -1,16 +1,19 @@
-"""유명 상표 확인 단계 — 1단계 측정(통합 모델 설계 §7-14). 엔진·계약·화면은 바꾸지 않는다.
+"""유명 상표 확인 단계 — 2-1단계 측정(통합 모델 설계 §7-14-9). 엔진·계약·화면은 바꾸지 않는다.
 
-등록부(shared/famous_registry.json)와 일치 판정 함수(src.famous_check — 엔진에서 부르지 않음)를
-표본으로 재고, 미리 정한 규칙으로 기준값을 고른다. 이번 단계에는 채택 조건이 없다. 정의·표본·
-선택 규칙은 `RULE`(실행 전에 해시를 남기고 결과를 보고 바꾸지 않는다).
+1단계 측정에서 드러난 규칙 문제를 고친 일치 판정 함수(src.famous_check — 엔진에서 부르지 않음)를
+1단계와 같은 표본의 기준용으로 다시 잰다: 기준값 다시 고르기(강한 철자·약한 소리·약한 철자, 약한
+철자의 소리 조건 S), 목표(헛일치·재현율), 기대표, 이미지 속 글자 경로, 로고 강함, 미리 보기.
+규칙·선택 규칙·목표는 `RULE`·`TARGETS`·`EXPECT`(실행 전에 해시를 남긴다).
 
     ml/venv/bin/python ml/scripts/famous_check_measure.py freeze   # 설정·표본·입력 해시
     ml/venv/bin/python ml/scripts/famous_check_measure.py run      # 측정(고정본과 다르면 4)
     ml/venv/bin/python ml/scripts/famous_check_measure.py run --smoke --out-dir <폴더>
     ml/venv/bin/python ml/scripts/famous_check_measure.py sheet    # 확인용 시트만 다시(측정 없음)
 
-확인용 표본(P2 둘째·P3 뒤 둘·N1·N3 확인용)은 정의만 고정하고 결과를 계산하지 않는다(2단계에서
-처음 본다). KIPRIS 호출 0. run 은 실제 CLIP·OCR·X3 엔진(로고·미리 보기·다른 업종 규모).
+표본은 1단계에 고정한 것 그대로다(다시 만든 표본의 sha256 이 1단계 값과 같아야 한다). 확인용 표본
+(P2 둘째·P3 뒤 둘·N1·N3 확인용)은 이번에도 계산하지 않는다 — 규칙을 다 고친 뒤 다음 단계에서 한
+번만 본다. KIPRIS 호출 0. run 은 실제 CLIP·OCR·X3 엔진(이미지 속 글자·로고·미리 보기).
+1단계 측정은 커밋 ea1d0ef 의 이 파일과 `ml/data/trials/famous_check_{rule,samples,results}.json`.
 """
 
 from __future__ import annotations
@@ -47,7 +50,9 @@ from src.axes.x4_goods import goods_similarity  # noqa: E402
 from src.model import risk_model as rm  # noqa: E402
 
 TRIALS = ML_ROOT / "data" / "trials"
-STEM = "famous_check"
+STEM = "famous_check_2_1"
+# 1단계에 고정한 표본(ml/data/trials/famous_check_samples.json)의 sha256 — 표본은 그대로 쓴다
+STAGE1_SAMPLES_SHA256 = "5bec460c4cd8c12c2cdf9ae15051d5aedf1c721842b468ba0fb322f5e7fff79c"
 EXIT_REFUSED = 4
 SEED = 0
 BASE, HOLDOUT = "기준용", "확인용"
@@ -60,16 +65,20 @@ IMAGES_DIR = ML_ROOT / "data" / "images"
 STRONG_SPELLING_GRID = (0.90, 0.95)
 WEAK_SOUND_GRID = (0.90, 0.92, 0.94, 0.96)
 WEAK_SPELLING_GRID = (0.75, 0.80, 0.85, 0.90)
+SOUND_CONDITION_GRID = (None, 0.70, 0.80)  # S 후보 — None 은 조건 없음
+# S 를 걸었을 때 보통 표기의 P2·P3 기준용 "약함 이상" 재현율이 떨어져도 되는 폭
+RECALL_DROP_MAX = 0.02
 N1_RATE_MAX, N3_RATE_MAX = 0.005, 0.02
 LOGO_N1_IMAGES = 300
-LIST_ROWS = 100
+OCR_TIMEOUT_S = 20.0  # 측정에서는 OCR 을 끝까지 기다린다(서비스 상한 2초를 넘긴 수는 따로 센다)
+OCR_SERVICE_LIMIT_MS = 2000.0
 KIND_NAMES = {"문자": "글자 위주", "결합": "결합", "도형": "도형 위주"}  # 자동 유형 → 보고 이름
 P3_PER_NOTATION = 4
 FRUIT_GOODS = (("신선한 과실", 31), ("신선한 과실 판매업(도소매·중개·대행)", 35))
 SMOKE = {"P1_브랜드": 2, "P2": 3, "P3_표기": 3, "N1": 30, "N2": 30, "N3": 10, "N4": 5,
-         "로고_표장": 6, "로고_음성": 5, "미리_보기": 6, "규모": 3}
+         "이름_표장": 6, "음성_이미지": 5, "미리_보기": 6, "기대표": 12}
 
-# P2 실제 모방 꼴 — (브랜드(등록부 이름), 기준용, 확인용). 지시의 목록 그대로.
+# P2 실제 모방 꼴 — (브랜드(등록부 이름), 기준용, 확인용). 1단계 지시의 목록 그대로.
 P2_PAIRS = (
     ("컴포즈커피", "콤포즈커피", "컴포스커피"), ("이디야커피", "이디아", "에디야"),
     ("빽다방", "백다방", "빽따방"), ("스타벅스", "스타벅수", "스타박스"),
@@ -93,7 +102,7 @@ N4_TRAPS = (
     "유토피아", "넷플러스", "야놀이터", "씨유어게인", "CUTE", "CU LATER", "텍사스 BBQ",
     "맛있는 BBQ", "서울 BBQ",
 )
-# 미리 보기 입력 — (이름, 업종 세트 id | "과일" | None). 업종은 가장 가까운 업종 세트.
+# 미리 보기 입력 — (이름, 업종 세트 id | "과일" | None). 1단계와 같은 입력.
 PREVIEW_NAMES = (
     ("BBQ", "chicken"), ("BBQ치킨", "chicken"), ("비비큐", "chicken"),
     ("텍사스 BBQ", "korean_restaurant"), ("맛있는 BBQ", "korean_restaurant"),
@@ -114,120 +123,158 @@ PREVIEW_NAMES = (
     ("애플", "과일"), ("삼성", "chicken"),
     ("@대조군1", None), ("@대조군2", None), ("@대조군3", None),
 )
-PREVIEW_HOLDOUT_SEEN = ("헤르메스",)  # P2 확인용이지만 지시의 미리 보기 목록에 있어 계산한다
+# P2 확인용이지만 지시의 목록(미리 보기·기대표)에 있어 계산한다
+PREVIEW_HOLDOUT_SEEN = ("헤르메스",)
 CHO_GROUPS = (("ㄱ", "ㄲ", "ㅋ"), ("ㄷ", "ㄸ", "ㅌ"), ("ㅂ", "ㅃ", "ㅍ"), ("ㅈ", "ㅉ", "ㅊ"),
               ("ㅅ", "ㅆ"))
 JUNG_SWAPS = (("ㅐ", "ㅔ"), ("ㅓ", "ㅗ"), ("ㅡ", "ㅜ"), ("ㅗ", "ㅜ"))
 JONG_NASALS = ("ㄴ", "ㅇ", "ㅁ")
 LETTER_SWAPS = (("a", "e"), ("i", "y"), ("c", "k"), ("s", "z"))
 
+# 기대표 — (기대, 이름, 업종: 업종 세트 id | "과일" | None | "@N1"(N1 기준용의 그 이름, 그 상표의
+# 지정상품) | "@대조군"). 일치 수준만 본다. 지시의 목록 그대로.
+E_STRONG, E_WEAK_PLUS, E_WEAK = "강함", "약함 이상(강함이면 더 좋음)", "약함 이상"
+E_NOTICE, E_NONE = "안내만", "없음"
+E_WISH_WEAK, E_WISH_NONE = "바람: 약함 또는 없음", "바람: 없음"
+EXPECT = (
+    (E_STRONG, "BBQ", "chicken"), (E_STRONG, "BBQ치킨", "chicken"),
+    (E_STRONG, "BBQ 치킨집", "chicken"), (E_STRONG, "비비큐", "chicken"),
+    (E_STRONG, "맛있는 BBQ", "korean_restaurant"), (E_STRONG, "BBQ", "clothing"),
+    (E_STRONG, "CU", "convenience"), (E_STRONG, "CU 편의점", "convenience"),
+    (E_STRONG, "씨유", "convenience"), (E_STRONG, "씨유편의점", "convenience"),
+    (E_STRONG, "GS25", "convenience"), (E_STRONG, "지에스25", "convenience"),
+    (E_STRONG, "김가네", "bunsik"), (E_STRONG, "김가네 분식집", "bunsik"),
+    (E_STRONG, "bhc", "chicken"), (E_STRONG, "BHC치킨", "chicken"),
+    (E_STRONG, "비에이치씨", "chicken"), (E_STRONG, "스타벅스", "cafe"),
+    (E_STRONG, "스타벅스", "clothing"), (E_STRONG, "스타벅스", None),
+    (E_STRONG, "STARBUCKS COFFEE", "cafe"), (E_STRONG, "스타벅스커피", None),
+    (E_STRONG, "샤넬", "chicken"), (E_STRONG, "샤넬치킨", None),
+    (E_STRONG, "샤넬옷가게", "clothing"), (E_STRONG, "네이버", "flower"),
+    (E_STRONG, "크린토피아", "cafe"), (E_STRONG, "파리 바게뜨", "bakery"),
+    (E_STRONG, "올리브영", "cosmetics"), (E_STRONG, "야 놀자", "lodging"),
+    (E_STRONG, "에어비앤비", "lodging"), (E_STRONG, "던킨빵집", "bakery"),
+    (E_STRONG, "본죽", "korean_restaurant"), (E_STRONG, "본죽식당", "korean_restaurant"),
+    (E_STRONG, "교촌치킨", "chicken"),
+    (E_WEAK_PLUS, "크린토피야", None), (E_WEAK_PLUS, "파리바게트", None),
+    (E_WEAK_PLUS, "샤낼", "cosmetics"), (E_WEAK_PLUS, "STARBUCKSS", None),
+    (E_WEAK_PLUS, "뉴스타벅스", "cafe"), (E_WEAK_PLUS, "스타벅스리", None),
+    (E_WEAK, "스타벅수", "clothing"), (E_WEAK, "스타벅수", None), (E_WEAK, "네이바", None),
+    (E_WEAK, "구굴", None), (E_WEAK, "교춘", None), (E_WEAK, "헤르메스", "clothing"),
+    (E_NOTICE, "텍사스 BBQ", "korean_restaurant"), (E_NOTICE, "서울 BBQ", "korean_restaurant"),
+    (E_NOTICE, "CU LATER", "cafe"), (E_NOTICE, "김가네", "software"),
+    (E_NONE, "GS24", "convenience"), (E_NONE, "김가내", None), (E_NONE, "비에치씨", None),
+    (E_NONE, "CUTE", None), (E_NONE, "씨유어게인", None), (E_NONE, "구글링", "software"),
+    (E_NONE, "샤넬로", None), (E_NONE, "채널", "software"), (E_NONE, "교촌마을", None),
+    (E_NONE, "파리", None), (E_NONE, "바게뜨", None), (E_NONE, "올리브", "cosmetics"),
+    (E_NONE, "비앤비", "lodging"), (E_NONE, "야놀이터", None), (E_NONE, "유토피아", None),
+    (E_NONE, "블루커피", "cafe"), (E_NONE, "애플", "과일"), (E_NONE, "삼성", "chicken"),
+    (E_NONE, "@대조군1", "@대조군"), (E_NONE, "@대조군2", "@대조군"),
+    (E_NONE, "@대조군3", "@대조군"), (E_NONE, "Airline Seoul", "@N1"),
+    (E_NONE, "BIO PHARM Dongsung", "@N1"), (E_NONE, "열매속풍요 Pungyo in Fruit", "@N1"),
+    (E_WISH_WEAK, "네이버후드", "cafe"), (E_WISH_WEAK, "네이버스", None),
+    (E_WISH_WEAK, "넷플러스", None),
+    (E_WISH_NONE, "CHANNEL", "software"), (E_WISH_NONE, "PLAY KIA", "@N1"),
+    (E_WISH_NONE, "씨츄 SeeCHU", "@N1"),
+)
+TARGETS = {
+    "N1_강함": 0, "N1_약함_최대": 2, "N2_강함": 0, "N3_일치": 0,
+    "P2_보통_약함_이상_최소": 1.0, "P3_보통_약함_이상_최소": 0.95,
+    "P1": "강함이 아닌 것은 약한 표기의 '업종 다름' 경우뿐",
+}
+
 RULE = {
     "목적": (
-        "유명 상표 확인 단계의 1단계 — 등록부를 만들고 일치 판정 함수를 서비스에 연결하지 않은 채 "
-        "측정한다. 채택 조건 없음. 막히는 항목은 '확인 못 함'과 이유를 적는다."),
-    "정리": (
-        "clean_input_name → 상표 기호 제거·NFKC·소문자 → 엔진의 상품 접미어 분리"
-        "(Distinctiveness.split_goods_suffix) → 공백·기호로 낱말. 붙여 쓴 꼴 = 한글·영문·숫자만 "
-        "이은 것, 조각 = 문자 종류 경계(X1 토큰화). 낱말 묶음 = 이어진 낱말(최대 5)을 붙인 꼴. "
-        "식별력 필터(요부 추출)는 거치지 않는다."),
-    "식별력_없는_말": (
-        "항상 유명 예외를 뺀 판정(judge(…, famous_exception=False))이 약함(< θ 0.5). 질의 업종이 "
-        "있으면 그 업종이나 브랜드 업종 중 하나에서, 없으면 브랜드 업종에서 약하거나 상품 접미어 "
-        "사전(고시 단일 명칭 goods_names)에 있는 말. 붙은 글자열은 조각이 모두 그래야 한다. "
-        "브랜드 업종(판정 맥락) = 브랜드 표장(역할 이름·도형·브랜드 로고)의 유사군 합집합, 없으면 "
-        "업종 세트의 유사군."),
-    "경로": (
-        "(가) 같음: 낱말 묶음 = 표기. (나) 품음: 한 낱말이 표기로 시작하거나 끝남 — 나머지가 "
-        "식별력 없는 말이면 품음-설명, 아니면 품음-기타(짧은 표기는 품음-설명만). (다) 소리: X1 "
-        "phonetic_similarity(extra_generic 없음), 한글·영문이 달라도 X1 발음 변환으로. 대상은 낱말 "
-        "묶음과, 중간·김 표기에 한해 한 낱말의 앞·뒤 구간으로서 나머지가 식별력 없는 말인 것. "
-        "(라) 철자: 같은 문자 종류끼리만 orthographic_similarity v1, 대상은 (다)와 같다."),
-    "길이_구간": (
-        "짧음 = 한글 2음절 이하 또는 영문·숫자 3자 이하, 중간 = 한글 3음절 또는 영문·숫자 4–5자, "
-        "김 = 그 이상. 섞인 표기(지에스25)는 한글 음절 + 0.6 × 영문·숫자 글자 수 ≤ 2 / ≤ 3 / 그 위"
-        "(순수 표기에서는 앞의 구간과 같다)."),
-    "약한_표기": (
-        "유명 예외를 뺀 판정으로 그 브랜드 자신의 업종에서 조각(접미어 분리 뒤)이 모두 약한 표기. "
-        "(가)만: 질의 조각에서 상품·업종을 나타내는 말(사유가 1호 보통명칭·3호 기술적 표장으로 "
-        "약한 말, 상품 접미어 사전의 말)을 뺀 나머지가 그 표기 하나뿐이면 일치 — 업종이 겹치거나 "
-        "없으면 강함, 다르면 설명적 사용 안내. 다른 말과 함께면 설명적 사용 안내. 해석(지시에 "
-        "없어 고정): 질의 안의 약한 표기 조각은 그 브랜드의 다른 표기와 견주지 않는다(가림) — "
-        "안 그러면 '텍사스 BBQ'의 bbq 가 '비비큐'와 소리 1.0 이라 '그 표기 하나뿐일 때만'이 "
-        "무력해진다. 낱말의 앞·뒤 구간이 약한 표기와 같을 때도 견주지 않는다."),
-    "설명적_사용": (
-        "약한 표기가 아니어도 질의 업종에서 그 표기(조각 모두)가 식별력 없는 말이고 브랜드 업종과 "
-        "겹치지 않으면 일치를 설명적 사용 안내로 바꾼다."),
-    "업종_겹침": (
-        "질의 업종과 브랜드 업종 사이 X4(자카드)가 결합 하한(계수 JSON coupling.floors.x4 = "
-        "0.0252) 이상. 브랜드 업종 = 브랜드 표장 하나하나의 유사군과 업종 세트의 유사군 — 그 "
-        "가운데 최댓값으로 본다(해석: 합집합 하나로 재면 CU 0.012·네이버 0.015·이케아 0.000 으로 "
-        "자기 업종 세트와도 '다름'이 되어, 엔진이 후보마다 재는 X4 와 같게 표장별로 본다)."),
-    "수준과_바닥": (
-        "강함 = 같음·품음-설명·소리 ≥ 강한 소리·철자 ≥ 강한 철자. 약함 = 소리·철자 ≥ 약한 기준"
-        "(표기의 길이 구간별)·품음-기타(결정 대기 — 따로 센다). 전체 등급 바닥: 업종 불문 브랜드는 "
-        "강함 → 위험·약함 → 검토 권장, 같은·가까운 업종 중심 브랜드는 업종이 겹치거나 없으면 같고 "
-        "다르면 강함 → 검토 권장·약함 → 안내만. 설명적 사용 안내는 바닥 없음. 가장 강한 것 = "
-        "수준 → 경로(같음·품음-설명·소리·철자·품음-기타) → 점수 순."),
-    "이미지_속_글자": (
-        "이름이 없는 이미지 입력은 엔진의 OCR 제안 상표명(overall.query_type.suggested_name)이 "
-        "있으면 그 글자로 (가)(나)만 판정해 '이미지 속 글자 기준'으로 표시."),
+        "유명 상표 확인 2-1단계 — 1단계 측정에서 드러난 규칙 문제를 고치고 기준용 표본으로 다시 "
+        "잰다. 일치 판정 모듈·등록부·측정 스크립트만 바꾼다. 확인용 표본(P2 둘째·P3 뒤 둘·N1·N3 "
+        "확인용)은 계산하지 않는다. 목표를 못 채우는 항목이 있어도 멈추지 않고, 구현으로 풀 수 "
+        "있는 것은 풀고 규칙 자체가 막는 것은 이유와 함께 보고한다. 목표와 기대표가 부딪치면 "
+        "헛일치 한도를 우선한다."),
+    "1_표기_종류": (
+        "약한 표기 = 1단계 정의(유명 예외를 뺀 식별력 판정으로 자기 업종에서 조각이 모두 식별력 "
+        "없음)에 더해 같은 브랜드에서 약한 표기와 소리가 0.98 이상인 표기. 머리글자 표기 = 약한 "
+        "표기가 아닌 영문 3자 이하 표기와 같은 브랜드에서 그 표기와 소리가 0.98 이상인 표기 — "
+        "같음과 품음-설명만 인정하고 소리·철자·품음-기타는 쓰지 않는다. 보통 표기 = 나머지. 여기서 "
+        "소리 = 통째 소리(4번)."),
+    "2_낱말_나누기": (
+        "공백·기호로만 나눈다. split_goods_suffix 는 쓰지 않는다. 붙여 쓴 꼴은 품음에서 나머지 "
+        "판정으로 처리한다."),
+    "3_설명_낱말": (
+        "업종 낱말 = 업종 세트 25개의 이름·별칭 전부와 가게 형태 낱말(가게·전문점·매장·샵·숍·"
+        "스토어·마트·하우스·본점·지점·직영점) — 판정 모듈 안의 사전. 질의 업종이나 브랜드 업종에서 "
+        "보통명칭·성질표시(1호·3호)로 판정되는 말(유명 예외를 뺀 판정). 4호·5호·6호로만 식별력이 "
+        "없는 말(지명·흔한 성·한 글자)은 설명 낱말이 아니다. 나머지는 설명 낱말 하나 또는 둘을 "
+        "이어 쓴 꼴까지 인정한다. 식별력 모듈의 동작과 학습 특징은 바꾸지 않는다. 해석(지시에 없어 "
+        "고정): 이름·별칭이 여러 낱말이면(커피 전문점·식당(한식)) 공백·기호로 나눈 낱말 하나하나를 "
+        "사전에 넣는다. 업종 낱말은 어느 업종의 질의에서나 설명 낱말이다."),
+    "4_통째_비교": (
+        "소리·철자는 표기 전체와 견주는 구간 전체를 통째로 견준다. 조각끼리의 최댓값을 쓰지 않고, "
+        "숫자는 숫자끼리 같아야 한다. 해석(고정): 소리 = 두 붙여 쓴 꼴 전체의 읽기(문자 종류 "
+        "조각마다 X1 의 읽기를 순서대로 이은 것)끼리 X1 음절 유사도의 최댓값 — 읽기가 여럿이면 "
+        "(25 = 이십오·이오) 전체 읽기의 변형으로만 쓰고, X1 의 분리관찰 후보와 붙여쓴 결합어 포함 "
+        "점수(_contain_sim — 한쪽이 다른 쪽의 앞·뒤 일부일 때 주는 점수)는 쓰지 않는다. 철자 = 두 "
+        "붙여 쓴 꼴 전체를 자모로 푼 편집거리 유사도(x2_ortho v1 이 전체 문자열에 쓰는 식), 토큰별 "
+        "후보는 쓰지 않는다. 숫자 조각의 열이 다르면 소리·철자 모두 0."),
+    "5_보통_표기의_경로": (
+        "같음: 낱말 묶음 = 표기. 품음: 한 낱말이 표기 + 나머지(앞이나 뒤) — 나머지가 설명 낱말이면 "
+        "품음-설명(강함), 아니면 품음-기타(약함, 짧은 표기는 인정하지 않음). 소리·철자(철자는 같은 "
+        "문자끼리): 대상은 낱말 묶음, 그리고 한 낱말의 앞·뒤 구간으로서 나머지가 설명 낱말인 것. "
+        "해석(고정): 표기에 기호·공백이 있어 질의에서 여러 낱말로 나뉘는 경우(PAIK'S카페 → paik·"
+        "s카페)를 위해 품음과 구간은 낱말 묶음에도 적용한다 — 나머지는 묶음의 끝 낱말의 뒷부분"
+        "(또는 첫 낱말의 앞부분)이어야 한다. 구간은 표기의 길이 구간과 상관없이 대상이다(1단계는 "
+        "중간·김만)."),
+    "6_약한_철자의_소리_조건": (
+        "약한 철자 일치는 같은 대상의 소리(통째)가 S 이상일 때만 인정한다. 강한 철자에는 걸지 "
+        "않는다."),
+    "7_약한_표기": (
+        "질의에서 설명 낱말(붙여 쓴 것 포함)을 뺀 나머지가 그 표기 하나뿐일 때만 일치로 본다. "
+        "업종이 없거나 브랜드 업종과 겹치면 강함. 업종이 다르고 그 표기가 그 업종에서도 식별력 "
+        "없는 말이면(5호·6호는 어느 업종에서나) 안내만. 업종이 다르고 그 업종에서는 식별력이 "
+        "있으면 보통 표기의 같음과 같게 다룬다. 다른 말과 함께 쓰였으면 안내만. 가림(약한 표기 "
+        "조각을 같은 브랜드의 다른 표기와 견주지 않음)은 1단계대로. 해석(고정): 소리가 같아 약한 "
+        "표기가 된 표기(비비큐·씨유·지에스25)의 '그 업종에서의 식별력'은 그 표기 자신이나 그것이 "
+        "따르는 약한 표기(BBQ·CU·GS25) 중 하나라도 식별력 없는 말이면 없는 것으로 본다."),
+    "8_브랜드_업종": (
+        "이름 일치용 브랜드 업종 = 업종 세트와 역할 '이름' 표장의 지정상품(표장별 겹침의 최댓값 ≥ "
+        "결합 하한 0.0252 면 겹침). 도형·다른 이름 표장의 지정상품은 쓰지 않는다. 설명 낱말 판정의 "
+        "'브랜드 업종'도 같은 유사군의 합집합. 표기 종류의 '자기 업종'(1단계 정의)은 그대로."),
+    "9_로고": "강함(이미지만 판단이 위험)만 쓰고 약함은 버린다.",
+    "10_그대로": (
+        "그 밖의 설명적 사용 안내(약한 표기가 아니어도 질의 업종에서 그 표기가 식별력 없는 말이고 "
+        "브랜드 업종과 겹치지 않으면 안내), 보호 범위에 따른 전체 등급 바닥은 1단계대로."),
     "표본": (
-        "seed 0. P1 같은 이름: 모든 표기 × {그대로, 대소문자 바꿈(영문), 띄어쓰기 바꿈(공백 있으면 "
-        "붙이고 없으면 가운데에 공백), 자기 업종 낱말을 띄어서·붙여서(업종 낱말 = 업종 세트의 첫 "
-        "별칭, 상품 낱말 = 별칭 중 상품 접미어 사전에 있는 첫 낱말 — 다르면 둘 다), 무관한 업종 "
-        "낱말(업종 세트 파일 순서로 자기 세트 + 7번째부터 브랜드 업종과 X4 가 0 인 첫 세트의 첫 "
-        "별칭 — 그런 세트가 없으면 겹침 최댓값이 가장 작은 세트)} × 업종 {없음, 자기 업종 "
-        "세트(무관한 낱말은 그 무관한 세트)}. P2 실제 모방 꼴: "
-        "지시의 28쌍(첫째 기준용·둘째 확인용), 약한 표기가 있는 브랜드는 제외(따로 표시), 업종 "
-        "없음·자기 업종, 겨냥한 표기(길이 구간 표시용) = 같은 문자 종류의 약하지 않은 표기 중 글자 "
-        "수가 가장 가까운 것. P3 비슷한 소리 변형: 약하지 않은 표기마다 한 글자를 규칙 하나로 "
-        "바꾼 것(한글: ㅐ↔ㅔ·ㅓ↔ㅗ·ㅡ↔ㅜ·ㅗ↔ㅜ, 예사·된·거센소리, 받침 ㄴ↔ㅇ↔ㅁ, 받침 ㄹ 넣기·"
-        "빼기 / "
-        "영문: 겹글자 넣기·빼기, a↔e·i↔y·c↔k·s↔z) 전체를 정렬 뒤 섞어 앞 4개(기준용 2·확인용 2), "
-        "등록부 표기·P2 의 이름·N4·미리 보기 입력과 같은 것, 앞선 표기에서 이미 나온 것은 "
-        "뺀다(확인용과 계산하는 표본이 겹치지 않게). 업종 없음·자기 업종. N1 실제 등록 상표명: "
-        "DB 에서 수집 "
-        "출처가 유명 브랜드가 아니고 출원인(별칭 표 적용)이 등록부 출원인이 아닌 상표의 이름"
-        "(상표한글명, 없으면 영문명), 질의 업종 = 그 상표의 유사군, 이름 단위로 섞어 절반씩. N2 "
-        "심결 데이터의 이름(학습 특징 심결 행의 이름A·이름B, 중복 제거, 업종 없음) — 기준 선택에 "
-        "쓰지 않음. N3 지어낸 이름 대조군(named_search_thresholds 기준용 100·확인용 100) × 업종 "
-        "{없음, 그 이름에 배정된 무작위 업종 세트}. N4 함정 낱말 38(업종 없음) — 기준 선택에 쓰지 "
-        "않음. 확인용(P2 둘째·P3 뒤 둘·N1·N3 확인용)은 정의만 고정하고 결과를 계산하지 않는다. "
-        "지시가 계산하라고 한 목록(P1·N2·N4·미리 보기)의 이름이 확인용 이름과 붙여 쓴 꼴이 같으면 "
-        "그대로 계산하고 겹친 이름을 보고한다."),
+        "1단계에 고정한 표본 그대로(다시 만든 표본의 sha256 = STAGE1_SAMPLES_SHA256). 확인용은 "
+        "계산하지 않는다. 표기 종류별 집계는 표본의 '표기'(P2 는 겨냥한 표기)를 새 등록부의 종류로 "
+        "나눈다 — 보통 표기의 P2 = 28쌍 중 김가네·GS25(약한 표기)·bhc(머리글자 표기)를 뺀 것."),
     "기준_선택": (
-        "단위는 질의(이름 × 업종). 강한 소리 = 0.98 고정. 강한 철자 = {0.90, 0.95} 중 N1·N3 "
-        "기준용에서 새로 생기는 일치(그 경로가 없으면 강한 일치가 아니던 질의가 강한 일치가 "
-        "되는 것)가 0건인 가장 낮은 값, 없으면 쓰지 않는다. 약한 소리(길이 구간별) = {0.90, 0.92, "
-        "0.94, 0.96} 중 같음·품음·강한 경로로 이미 잡힌 질의(설명적 사용 안내 포함)를 뺀 '새로 "
-        "더하는 일치'가 N1 기준용의 0.5% 이하이고 N3 기준용의 2% 이하인 가장 낮은 값 — 구간마다 "
-        "그 구간 표기만 켜고 센다. 약한 철자(길이 구간별) = {0.75, 0.80, 0.85, 0.90} 중 그 "
-        "구간의 약한 소리(고른 값)까지 켠 상태에서 같은 조건을 지키는 가장 낮은 값 — 해석: '새로 "
-        "더하는 일치'의 정의(같음·품음·강한 경로로 잡히지 않은 것)를 그대로 써서 그 구간의 약한 "
-        "소리와 약한 철자가 함께 더하는 수(누적)를 한도와 견준다. 철자만 따로 더하는 수(증분)도 "
-        "표에 적는다. 조건을 지키는 값이 없으면 그 구간에서 그 경로를 쓰지 않는다."),
-    "보고": (
-        "고른 기준에서 P2·P3 기준용 재현율(대상 브랜드와의 일치 — 길이 구간·변형 종류·업종별), "
-        "N1·N2·N3·N4 일치 목록(경로·출원인, 100행까지), 품음-기타로만 잡힌 것은 따로."),
-    "로고": (
-        "새 기준 없음. 질의 이미지와 한 브랜드의 표장(역할 이름·도형 전부) 사이의 엔진 '이미지만' "
-        "판단(ms._judge(ms._image_only_features(x2, 도형))) 등급이 위험이면 강함, 검토 권장이면 "
-        "약함(표장 가운데 가장 높은 것). 사진으로 판정된 질의(ms.is_photo_query)는 하지 않는다. "
-        "자기 확인: 표장 이미지 각각을 이름 없이 넣었을 때 자기 브랜드와 강함인 비율(자기 자신 "
-        "포함 / 자기 자신 빼고), 다른 브랜드와 약함 이상인 쌍. 음성: 대조군의 덜 닮은 이미지 92, "
-        "표본 A 질의 이미지 전부, N1 기준용 상표의 이미지 300(seed 0 — 확인용 절반은 이미지도 "
-        "건드리지 않는다) — 어느 브랜드와든 약함 이상인 비율과 목록. 글자 위주·결합·도형 위주 = "
-        "자동 유형(mark_type.auto_type — 심결 이미지는 image_parts.csv, DB 이미지는 엔진 OCR "
-        "ocr.detect 로 같은 규칙)."),
-    "미리_보기": (
-        "PREVIEW_NAMES + 이미지 넷: 지금(기본 모델, 실제 엔진 multi_search top_k 5) 전체 등급 / "
-        "일치 / 바닥을 적용한 전체 등급(둘 중 높은 등급) / 안내 종류. '헤르메스 + 의류'는 P2 "
-        "확인용이지만 지시의 목록에 있어 계산하고 표시한다."),
-    "다른_업종_규모": (
-        "업종을 넣은 질의에서 업종이 다르고(후보의 x4 < 결합 하한) 업종 없이 본 짝 판단(그 후보 "
-        "첫 판단의 입력에서 x4 를 뺀 것) 등급이 검토 권장 이상인 후보. 지어낸 이름 대조군 "
-        "기준용(이름+업종) 100, 표본 A 업종 있는 108 질의(이름+이미지+업종), 시나리오 16종 중 "
-        "업종 있는 것: 질의당 개수 분포, 최종 등급 분포, 앞 5 안팎, 예시 10."),
+        "기준용만, 1단계와 같은 격자·한도. 단위는 질의(이름 × 업종). 강한 소리 0.98 고정. 강한 "
+        "철자 {0.90, 0.95}·약한 소리 {0.90, 0.92, 0.94, 0.96}·약한 철자 {0.75, 0.80, 0.85, 0.90}을 "
+        "길이 구간별로 가장 낮은 값, 없으면 그 구간에서 그 경로를 쓰지 않는다. 해석(고정): 한도는 "
+        "1단계의 것 — 강한 철자는 N1·N3 기준용에서 새로 생기는 강한 일치가 0건(목표 'N1 강함 "
+        "0건'과 같은 뜻; 0.5%·2% 로 보면 어떤지도 표에 적는다), 약한 소리·약한 철자는 같음·품음·"
+        "강한 경로로 이미 잡힌 질의를 뺀 '새로 더하는 일치'가 N1 기준용의 0.5% 이하·N3 기준용의 2% "
+        "이하. "
+        "약한 철자는 그 구간의 약한 소리(고른 값)까지 켠 누적으로 센다(1단계와 같음). S: 먼저 조건 "
+        "없이 기준을 고른다. 그 기준에서 {조건 없음, 0.70, 0.80} 중 보통 표기의 P2·P3 기준용 '약함 "
+        "이상' 재현율이 조건 없음보다 2%p 넘게 떨어지지 않는(P2 와 P3 각각) 가장 높은 값을 S 로 "
+        "한다. 고른 S 로 약한 철자 기준만 다시 고른다."),
+    "목표": (
+        "N1 기준용 강함 0건·약함 2건 이하, N2 강함 0건(약함은 목록), N3 기준용 0건. 보통 표기의 P2 "
+        "기준용 약함 이상 100%, 보통 표기의 P3 기준용 약함 이상 95% 이상, 약한 표기·머리글자 "
+        "표기의 변형은 따로 집계. P1: 강함이 아닌 것은 약한 표기의 '업종 다름' 경우뿐 — 그 밖의 "
+        "것은 사유별 목록으로. 단위는 질의, 수준은 그 질의의 가장 강한 일치. 약함에는 품음-기타도 "
+        "센다. N3 의 0건은 강함·약함 일치(설명적 사용 안내는 바닥이 없어 따로 적는다)."),
+    "기대표": (
+        "EXPECT 의 입력마다 일치 수준만 본다(가장 강한 일치). 업종은 가장 가까운 업종 세트, 업종을 "
+        "적지 않은 것은 업종 없음, N1 의 이름(Airline Seoul 등)은 N1 기준용의 그 질의 그대로. "
+        "'헤르메스 + 의류'는 P2 확인용이지만 지시의 목록에 있어 계산한다. 바람은 못 맞춰도 "
+        "보고만."),
+    "함께_잴_것": (
+        "이미지 속 글자 경로: 역할 '이름' 표장 이미지 전부에서 OCR 제안 상표명(엔진이 이름 없는 "
+        "이미지 질의에 주는 suggested_name = ocr.detect 의 text)이 나오는 비율과 그 글자로 자기 "
+        "브랜드와 강함인 비율(업종 없음), 대조군의 덜 닮은 이미지 92장과 N1 기준용 이미지 296장"
+        "(1단계 로고 음성과 같은 300장 중 사진 판정을 뺀 것)에서 어느 브랜드와든 강함인 비율(업종 "
+        "없음 — N1 은 그 상표의 지정상품을 넣은 값도). 로고 강함 헛일치 2건이 어떤 상표끼리인지. "
+        "1단계 미리 보기 표를 같은 입력으로 다시(보호 범위는 overrides 그대로)."),
     "스모크": "일부 표본만(SMOKE), 다른 폴더에. 확인용은 스모크에서도 계산하지 않는다.",
 }
 
@@ -244,11 +291,18 @@ def file_sha256(path: Path) -> str:
 
 
 def _settings() -> dict:
-    return {"RULE": RULE, "SEED": SEED, "P2_PAIRS": P2_PAIRS, "N4_TRAPS": N4_TRAPS,
-            "PREVIEW_NAMES": PREVIEW_NAMES, "STRONG_SOUND": fc.STRONG_SOUND,
+    return {"RULE": RULE, "TARGETS": TARGETS, "EXPECT": EXPECT, "SEED": SEED,
+            "STAGE1_SAMPLES_SHA256": STAGE1_SAMPLES_SHA256, "P2_PAIRS": P2_PAIRS,
+            "N4_TRAPS": N4_TRAPS, "PREVIEW_NAMES": PREVIEW_NAMES,
+            "STRONG_SOUND": fc.STRONG_SOUND, "KIND_SOUND": fc.KIND_SOUND,
+            "INITIAL_MAX_LETTERS": fc.INITIAL_MAX_LETTERS, "SHOP_WORDS": fc.SHOP_WORDS,
+            "DESCRIPTIVE_REASONS": fc.DESCRIPTIVE_REASONS,
+            "MAX_DESCRIPTIVE_WORDS": fc.MAX_DESCRIPTIVE_WORDS,
             "STRONG_SPELLING_GRID": STRONG_SPELLING_GRID, "WEAK_SOUND_GRID": WEAK_SOUND_GRID,
-            "WEAK_SPELLING_GRID": WEAK_SPELLING_GRID, "N1_RATE_MAX": N1_RATE_MAX,
-            "N3_RATE_MAX": N3_RATE_MAX, "LOGO_N1_IMAGES": LOGO_N1_IMAGES,
+            "WEAK_SPELLING_GRID": WEAK_SPELLING_GRID,
+            "SOUND_CONDITION_GRID": SOUND_CONDITION_GRID, "RECALL_DROP_MAX": RECALL_DROP_MAX,
+            "N1_RATE_MAX": N1_RATE_MAX, "N3_RATE_MAX": N3_RATE_MAX,
+            "LOGO_N1_IMAGES": LOGO_N1_IMAGES, "OCR_TIMEOUT_S": OCR_TIMEOUT_S,
             "P3_PER_NOTATION": P3_PER_NOTATION, "MAX_BUNDLE_WORDS": fc.MAX_BUNDLE_WORDS,
             "ALNUM_WEIGHT": fc.ALNUM_WEIGHT, "FRUIT_GOODS": FRUIT_GOODS, "SMOKE": SMOKE,
             "CHO_GROUPS": CHO_GROUPS, "JUNG_SWAPS": JUNG_SWAPS, "JONG_NASALS": JONG_NASALS,
@@ -276,13 +330,14 @@ def _inputs() -> dict[str, Path]:
         "호칭": axes / "x1_phonetic.py", "철자": axes / "x2_ortho.py",
         "브랜드표_X1": axes / "korean_brands.py",
         "엔진": REPO_ROOT / "backend" / "src" / "core" / "multi_search.py",
+        "OCR": REPO_ROOT / "backend" / "src" / "core" / "ocr.py",
         "런타임": ML_ROOT / "src" / "model" / "risk_model.py",
     }
 
 
 def _paths(out_dir: Path) -> dict[str, Path]:
-    return {"rule": out_dir / f"{STEM}_rule.json", "samples": out_dir / f"{STEM}_samples.json",
-            "results": out_dir / f"{STEM}_results.json", "report": out_dir / f"{STEM}_report.md"}
+    return {"rule": out_dir / f"{STEM}_rule.json", "results": out_dir / f"{STEM}_results.json",
+            "report": out_dir / f"{STEM}_report.md"}
 
 
 def _now() -> str:
@@ -294,7 +349,26 @@ def _preset_codes(presets, preset_id: str) -> list[str]:
                    for code in good.similarity_codes})
 
 
+def goods_resolver(presets):
+    """업종 표시(업종 세트 id | "과일" | None) → (유사군, 보고용 이름)."""
+    goods_map = gm.load_goods_map()
+    fruit = sorted({code for name, nice in FRUIT_GOODS
+                    for code in goods_map.find(name, nice).similarity_codes})
+
+    def resolve(key: str | None) -> tuple[list[str] | None, str]:
+        if key is None:
+            return None, "없음"
+        if key == "과일":
+            return fruit, "과일 판매(신선한 과실·그 판매업)"
+        return _preset_codes(presets, key), key
+
+    return resolve
+
+
 # ---- 표본 --------------------------------------------------------------------------------------
+
+# 1단계(커밋 ea1d0ef)의 표본 만들기 그대로 — 약한 표기는 1단계 정의(base_weak), 업종 겹침은 1단계의
+# goods_sets 를 써서 같은 표본이 다시 나오게 한다(다시 만든 표본의 sha256 을 1단계 값과 견준다).
 
 def own_words(preset: dict, dist) -> list[tuple[str, str]]:
     """자기 업종 낱말 — (종류, 낱말): 업종 낱말 = 첫 별칭, 상품 낱말 = 사전에 있는 첫 별칭."""
@@ -422,7 +496,7 @@ def target_notation(name: str, brand: fc.Brand) -> fc.Notation:
     않은 표기 중 붙여 쓴 꼴의 글자 수가 가장 가까운 것(같으면 표의 앞쪽), 없으면 약하지 않은 첫
     표기. 유사도를 쓰지 않는다 — 확인용 이름으로는 어떤 점수도 계산하지 않는다."""
     key = fc.text_key(name)
-    usable = [n for n in brand.notations if not n.weak] or list(brand.notations)
+    usable = [n for n in brand.notations if not n.base_weak] or list(brand.notations)
     same = [n for n in usable if n.script == fc.script_label(key)]
     if same:
         return min(same, key=lambda n: abs(len(n.key) - len(key)))
@@ -437,7 +511,8 @@ def build_samples(registry: fc.Registry, dist, *, preset_list: list[dict], codes
     taken |= {fc.text_key(name) for _, first, second in P2_PAIRS for name in (first, second)}
     taken |= {fc.text_key(name) for name in N4_TRAPS}
     taken |= {fc.text_key(name) for name, _ in PREVIEW_NAMES if not name.startswith("@")}
-    weak_brands = {brand.name for brand in registry.brands if any(n.weak for n in brand.notations)}
+    weak_brands = {brand.name for brand in registry.brands
+                   if any(n.base_weak for n in brand.notations)}
     p1, p2, p3 = [], [], []
     for brand in registry.brands:
         own = codes_of[brand.preset]
@@ -453,13 +528,13 @@ def build_samples(registry: fc.Registry, dist, *, preset_list: list[dict], codes
             for kind, name in variants:
                 if name:
                     p1 += _with_goods({"이름": name, "브랜드": brand.name, "표기": text,
-                                       "약한_표기": notation.weak, "변형": kind, "반": None},
+                                       "약한_표기": notation.base_weak, "변형": kind, "반": None},
                                       own_goods)
             p1 += _with_goods(
                 {"이름": f"{text} {other_word}", "브랜드": brand.name, "표기": text,
-                 "약한_표기": notation.weak, "변형": "무관한 업종 낱말", "반": None},
+                 "약한_표기": notation.base_weak, "변형": "무관한 업종 낱말", "반": None},
                 [("없음", None), (f"무관한 업종({other['id']})", codes_of[other["id"]])])
-            if not notation.weak:
+            if not notation.base_weak:
                 for item in p3_variants(brand.name, notation, taken):
                     taken.add(fc.text_key(item["이름"]))  # 뒤 표기의 변형과 겹치지 않게
                     p3 += _with_goods(item, own_goods)
@@ -536,6 +611,8 @@ def holdout_overlap(samples: dict) -> dict:
                                              if item.get("반") != HOLDOUT]
                                       for name in ("P1", "P2", "P3", "N1", "N2", "N3", "N4")}
     computed["미리 보기"] = [name for name, _ in PREVIEW_NAMES if not name.startswith("@")]
+    computed["기대표"] = [name for _, name, goods in EXPECT
+                       if not name.startswith("@") and goods != "@N1"]
     out: dict[str, list[dict]] = {}
     for source, names in computed.items():
         seen: set[str] = set()
@@ -558,6 +635,8 @@ def base_items(items: list[dict], limit: int | None = None) -> list[dict]:
 class Matcher:
     def __init__(self, registry: fc.Registry, dist, goods_floor: float):
         self.registry, self.dist, self.floor = registry, dist, goods_floor
+        self.kinds = {(brand.name, notation.text): notation.kind
+                      for brand in registry.brands for notation in brand.notations}
         self._cache: dict[tuple, list[fc.BrandEvidence]] = {}
 
     def evidence(self, item: dict) -> list[fc.BrandEvidence]:
@@ -565,24 +644,69 @@ class Matcher:
             raise ValueError("확인용 표본은 이 단계에서 계산하지 않습니다")
         key = (item["이름"], tuple(item.get("업종") or ()))
         if key not in self._cache:
-            query = fc.prepare_query(item["이름"], item.get("업종"), self.dist)
+            query = fc.prepare_query(item["이름"], item.get("업종"))
             self._cache[key] = fc.collect_evidence(query, self.registry, self.dist, self.floor)
         return self._cache[key]
 
     def decide(self, item: dict, thresholds: fc.Thresholds) -> fc.FamousResult:
         return fc.decide(self.evidence(item), thresholds)
 
+    def kind(self, item: dict) -> str:
+        """표본 항목이 겨냥한 표기의 종류(새 등록부 기준). P2(실제 모방 꼴)의 '표기'는 1단계에서
+        약한 표기를 빼고 고른 것이라(김가내 → GIMGANE) 겨냥한 표기를 다시 정한다."""
+        if item.get("변형") == P2_VARIANT:
+            return imitated_notation(item["이름"], self.registry.brand(item["브랜드"]),
+                                     item["표기"]).kind
+        return self.kinds[(item["브랜드"], item["표기"])]
+
+    def own(self, item: dict, thresholds: fc.Thresholds) -> fc.BrandMatch | None:
+        """대상 브랜드와의 일치."""
+        result = self.decide(item, thresholds)
+        return next((match for match in result.matches if match.brand == item["브랜드"]), None)
+
+
+P2_VARIANT = "실제 모방 꼴"  # build_samples 가 P2 항목에 적는 변형 이름
+
+
+def imitated_notation(name: str, brand: fc.Brand, fallback: str) -> fc.Notation:
+    """모방 꼴이 겨냥한 표기 — 같은 문자 종류의 표기(종류를 가리지 않고) 가운데 붙여 쓴 꼴의 글자
+    수가 가장 가까운 것(같으면 표의 앞쪽), 없으면 표본에 적힌 표기. 유사도는 쓰지 않는다."""
+    key = fc.text_key(name)
+    same = [n for n in brand.notations if n.script == fc.script_label(key)]
+    if same:
+        return min(same, key=lambda n: abs(len(n.key) - len(key)))
+    return next(n for n in brand.notations if n.text == fallback)
+
 
 def match_row(match: fc.BrandMatch | None) -> dict | None:
     if match is None:
         return None
     return {"브랜드": match.brand, "수준": match.level, "경로": match.path, "표기": match.notation,
-            "점수": match.score, "바닥": match.floor, "겹침": match.overlap,
+            "종류": match.kind, "점수": match.score, "바닥": match.floor, "겹침": match.overlap,
             "결정_대기": match.pending, "메모": match.note, "기준": match.basis}
 
 
-def select_thresholds(matcher: Matcher, n1: list[dict], n3: list[dict]) -> dict:
-    """기준 선택 규칙(RULE['기준_선택'])을 적용 — 고른 기준과 근거 표."""
+def _with(base: fc.Thresholds, **changes) -> fc.Thresholds:
+    return fc.Thresholds.from_dict({**base.to_dict(), **changes})
+
+
+def _only(length: str, value: float | None) -> dict:
+    return {**{other: None for other in fc.LENGTHS}, length: value}
+
+
+def recall(matcher: Matcher, items: list[dict], thresholds: fc.Thresholds) -> float | None:
+    """대상 브랜드와 약함 이상으로 일치한 질의의 비율."""
+    if not items:
+        return None
+    hit = sum(1 for item in items if getattr(matcher.own(item, thresholds), "level", None)
+              in (fc.LEVEL_STRONG, fc.LEVEL_WEAK))
+    return hit / len(items)
+
+
+def select_thresholds(matcher: Matcher, n1: list[dict], n3: list[dict], p2: list[dict],
+                      p3: list[dict]) -> dict:
+    """기준 선택 규칙(RULE['기준_선택'])을 적용 — 고른 기준·S 와 근거 표. p2·p3 = 보통 표기의
+    P2·P3 기준용(S 선택에 쓴다)."""
     def caught(item: dict, thresholds: fc.Thresholds, strong_only: bool = False) -> bool:
         matches = matcher.decide(item, thresholds).matches
         if strong_only:
@@ -594,72 +718,105 @@ def select_thresholds(matcher: Matcher, n1: list[dict], n3: list[dict]) -> dict:
         return [item for item in items if not caught(item, before, strong_only)
                 and caught(item, after, strong_only)]
 
-    def with_(base: fc.Thresholds, **changes) -> fc.Thresholds:
-        return fc.Thresholds.from_dict({**base.to_dict(), **changes})
-
-    table: dict = {"단위": {"N1_기준용_질의": len(n1), "N3_기준용_질의": len(n3)}}
-    base = fc.Thresholds()
-    strong_rows, strong_spelling = [], None
-    for value in STRONG_SPELLING_GRID:
-        new = (count_new(n1, base, with_(base, strong_spelling=value), True)
-               + count_new(n3, base, with_(base, strong_spelling=value), True))
-        strong_rows.append({"값": value, "새로_생기는_일치": len(new),
-                            "예": [item["이름"] for item in new[:10]]})
-        if strong_spelling is None and not new:
-            strong_spelling = value
-    table["강한_철자"] = {"격자": strong_rows, "고른_값": strong_spelling}
-    base = with_(base, strong_spelling=strong_spelling)
-
     def within(new1: list, new3: list) -> tuple[float, float, bool]:
         rate1 = len(new1) / len(n1) if n1 else 0.0
         rate3 = len(new3) / len(n3) if n3 else 0.0
         return rate1, rate3, rate1 <= N1_RATE_MAX + 1e-12 and rate3 <= N3_RATE_MAX + 1e-12
 
-    def only(length: str, value: float | None) -> dict:
-        return {**{other: None for other in fc.LENGTHS}, length: value}
+    def names(items: list[dict]) -> list[str]:
+        return [item["이름"] for item in items[:8]]
 
-    # 약한 소리 — 구간마다 그 구간 표기만 켜고, 같음·품음·강한 경로(base)로 안 잡힌 질의 중 새로
+    table: dict = {"단위": {"N1_기준용_질의": len(n1), "N3_기준용_질의": len(n3),
+                          "P2_보통_표기_질의": len(p2), "P3_보통_표기_질의": len(p3)}}
+    base = fc.Thresholds()  # 같음·품음·강한 소리
+    # 1) 강한 철자 — 길이 구간별, 새로 생기는 강한 일치가 0건인 가장 낮은 값
+    strong_spelling, rows = {}, {}
+    for length in fc.LENGTHS:
+        rows[length], strong_spelling[length] = [], None
+        for value in STRONG_SPELLING_GRID:
+            trial = _with(base, strong_spelling=_only(length, value))
+            new1, new3 = count_new(n1, base, trial, True), count_new(n3, base, trial, True)
+            ok = not new1 and not new3
+            rows[length].append({
+                "값": value, "N1_새_강한_일치": len(new1), "N3_새_강한_일치": len(new3),
+                "조건(0건)": ok, "0.5%·2%_한도로_보면": within(new1, new3)[2],
+                "예": names(new1 + new3)})
+            if strong_spelling[length] is None and ok:
+                strong_spelling[length] = value
+    table["강한_철자"] = {"격자": rows, "고른_값": strong_spelling}
+    base = _with(base, strong_spelling=strong_spelling)
+    # 2) 약한 소리 — 구간마다 그 구간 표기만 켜고, 이미 잡힌 질의를 뺀 새 일치
     weak_sound, rows = {}, {}
     for length in fc.LENGTHS:
         rows[length], weak_sound[length] = [], None
         for value in WEAK_SOUND_GRID:
-            trial = with_(base, weak_sound=only(length, value))
+            trial = _with(base, weak_sound=_only(length, value))
             new1, new3 = count_new(n1, base, trial), count_new(n3, base, trial)
             rate1, rate3, ok = within(new1, new3)
             rows[length].append({
                 "값": value, "N1_새_일치": len(new1), "N1_비율": round(rate1, 4),
                 "N3_새_일치": len(new3), "N3_비율": round(rate3, 4), "조건": ok,
-                "예": [item["이름"] for item in (new1 + new3)[:8]]})
+                "예": names(new1 + new3)})
             if weak_sound[length] is None and ok:
                 weak_sound[length] = value
     table["약한_소리"] = {"격자": rows, "고른_값": weak_sound}
-    # 약한 철자 — 그 구간의 약한 소리(고른 값)까지 켠 누적으로 같은 한도. 증분 = 약한 소리(모든
-    # 구간)까지 정한 상태에서 철자만 따로 더하는 수(참고)
-    sounded = with_(base, weak_sound=weak_sound)
-    weak_spelling, rows = {}, {}
-    for length in fc.LENGTHS:
-        rows[length], weak_spelling[length] = [], None
-        for value in WEAK_SPELLING_GRID:
-            trial = with_(base, weak_sound=only(length, weak_sound[length]),
-                          weak_spelling=only(length, value))
-            new1, new3 = count_new(n1, base, trial), count_new(n3, base, trial)
-            rate1, rate3, ok = within(new1, new3)
-            extra = with_(sounded, weak_spelling=only(length, value))
-            more1, more3 = count_new(n1, sounded, extra), count_new(n3, sounded, extra)
-            rows[length].append({
-                "값": value, "N1_새_일치(누적)": len(new1), "N1_비율": round(rate1, 4),
-                "N3_새_일치(누적)": len(new3), "N3_비율": round(rate3, 4), "조건": ok,
-                "N1_철자만_더함(증분)": len(more1), "N3_철자만_더함(증분)": len(more3),
-                "증분으로_보면_조건": within(more1, more3)[2],
-                "예": [item["이름"] for item in (more1 + more3)[:8]]})
-            if weak_spelling[length] is None and ok:
-                weak_spelling[length] = value
+    sounded = _with(base, weak_sound=weak_sound)
+
+    def pick_spelling(sound_floor: float | None) -> tuple[dict, dict]:
+        """약한 철자 — 그 구간의 약한 소리(고른 값)까지 켠 누적으로 같은 한도."""
+        chosen, grid = {}, {}
+        for length in fc.LENGTHS:
+            grid[length], chosen[length] = [], None
+            for value in WEAK_SPELLING_GRID:
+                trial = _with(base, weak_sound=_only(length, weak_sound[length]),
+                              weak_spelling=_only(length, value), spelling_sound=sound_floor)
+                new1, new3 = count_new(n1, base, trial), count_new(n3, base, trial)
+                rate1, rate3, ok = within(new1, new3)
+                extra = _with(sounded, weak_spelling=_only(length, value),
+                              spelling_sound=sound_floor)
+                more1, more3 = count_new(n1, sounded, extra), count_new(n3, sounded, extra)
+                grid[length].append({
+                    "값": value, "N1_새_일치(누적)": len(new1), "N1_비율": round(rate1, 4),
+                    "N3_새_일치(누적)": len(new3), "N3_비율": round(rate3, 4), "조건": ok,
+                    "N1_철자만_더함(증분)": len(more1), "N3_철자만_더함(증분)": len(more3),
+                    "예": names(more1 + more3)})
+                if chosen[length] is None and ok:
+                    chosen[length] = value
+        return chosen, grid
+
+    # 3) 약한 철자 — 먼저 소리 조건 없이
+    free_spelling, rows = pick_spelling(None)
+    table["약한_철자(조건_없음)"] = {"격자": rows, "고른_값": free_spelling}
+    first = _with(sounded, weak_spelling=free_spelling)
+    # 4) S — 보통 표기의 P2·P3 기준용 "약함 이상" 재현율이 2%p 넘게 떨어지지 않는 가장 높은 값
+    reference = (recall(matcher, p2, first), recall(matcher, p3, first))
+    chosen_sound: float | None = None
+    rows_sound = []
+    for value in SOUND_CONDITION_GRID:
+        trial = _with(first, spelling_sound=value)
+        now = (recall(matcher, p2, trial), recall(matcher, p3, trial))
+        drops = [None if ref is None or got is None else ref - got
+                 for ref, got in zip(reference, now)]
+        ok = all(drop is None or drop <= RECALL_DROP_MAX + 1e-12 for drop in drops)
+        new1, new3 = count_new(n1, base, trial), count_new(n3, base, trial)
+        rows_sound.append({
+            "S": value, "P2_재현율": None if now[0] is None else round(now[0], 4),
+            "P3_재현율": None if now[1] is None else round(now[1], 4),
+            "P2_떨어진_폭": None if drops[0] is None else round(drops[0], 4),
+            "P3_떨어진_폭": None if drops[1] is None else round(drops[1], 4), "조건": ok,
+            "N1_새_일치(전체)": len(new1), "N3_새_일치(전체)": len(new3)})
+        if value is not None and ok:
+            chosen_sound = value  # 격자가 오름차순이라 마지막으로 통과한 값이 가장 높은 값
+    table["S"] = {"격자": rows_sound, "고른_값": chosen_sound}
+    # 5) 고른 S 로 약한 철자만 다시
+    weak_spelling, rows = pick_spelling(chosen_sound)
     table["약한_철자"] = {"격자": rows, "고른_값": weak_spelling}
-    final = with_(sounded, weak_spelling=weak_spelling)
+    final = _with(sounded, weak_spelling=weak_spelling, spelling_sound=chosen_sound)
     total1, total3 = count_new(n1, base, final), count_new(n3, base, final)
     table["고른_기준에서_새로_더한_일치(전체)"] = {
         "N1": len(total1), "N1_비율": round(len(total1) / len(n1), 4) if n1 else None,
-        "N3": len(total3), "N3_비율": round(len(total3) / len(n3), 4) if n3 else None}
+        "N3": len(total3), "N3_비율": round(len(total3) / len(n3), 4) if n3 else None,
+        "N1_이름": [item["이름"] for item in total1], "N3_이름": [item["이름"] for item in total3]}
     table["고른_기준"] = final.to_dict()
     return table
 
@@ -671,7 +828,8 @@ def recall_table(matcher: Matcher, items: list[dict], thresholds: fc.Thresholds)
         result = matcher.decide(item, thresholds)
         own = next((m for m in result.matches if m.brand == item["브랜드"]), None)
         rows.append({**{k: item[k] for k in ("이름", "브랜드", "표기", "변형", "업종_표시")},
-                     "길이": item.get("길이"), "대상_일치": match_row(own),
+                     "길이": item.get("길이"), "종류": matcher.kind(item),
+                     "대상_일치": match_row(own),
                      "다른_브랜드": [m.brand for m in result.matches if m.brand != item["브랜드"]],
                      "바닥": result.floor})
 
@@ -689,52 +847,147 @@ def recall_table(matcher: Matcher, items: list[dict], thresholds: fc.Thresholds)
 
     paths = Counter((r["대상_일치"] or {}).get("경로") or "놓침" for r in rows)
     return {"전체": rates(rows), "길이별": by("길이"), "변형별": by("변형"),
-            "업종별": by("업종_표시"), "경로": dict(paths),
+            "경로": dict(paths),
             "놓친_것": [r for r in rows if r["대상_일치"] is None
                       or r["대상_일치"]["수준"] == fc.LEVEL_NOTICE], "행": rows}
 
 
+def recall_by_kind(matcher: Matcher, items: list[dict], thresholds: fc.Thresholds) -> dict:
+    """표기 종류별 재현율 표 — 보통 표기와 약한 표기·머리글자 표기의 변형을 따로."""
+    return {kind: recall_table(matcher, [item for item in items if matcher.kind(item) == kind],
+                               thresholds) for kind in (fc.KIND_NORMAL, fc.KIND_WEAK,
+                                                        fc.KIND_INITIAL)}
+
+
 def match_list(matcher: Matcher, items: list[dict], thresholds: fc.Thresholds) -> dict:
-    """일치 목록 — 질의마다 가장 강한 일치(경로·출원인), 수준별 수, 품음-기타로만 잡힌 것 따로."""
-    rows, pending_only = [], []
+    """일치 목록 — 질의마다 가장 강한 일치(경로·출원인)와 수준별 수."""
+    rows = []
     levels: Counter = Counter()
     for item in items:
         result = matcher.decide(item, thresholds)
         if not result.matches:
             continue
-        row = {"이름": item["이름"], "업종": item.get("업종_표시"),
-               "출원인": item.get("출원인"), "출원번호": item.get("출원번호"),
-               "심판번호": item.get("심판번호"), "일치": match_row(result.strongest),
-               "그_밖": [match_row(m) for m in result.matches[1:4]], "바닥": result.floor}
-        if all(match.pending for match in result.matches):
-            pending_only.append(row)
-            levels["품음-기타만"] += 1
-        else:
-            rows.append(row)
-            levels[result.strongest.level] += 1
-    return {"질의": len(items), "일치한_질의": len(rows) + len(pending_only),
-            "수준": dict(levels), "경로": dict(Counter(r["일치"]["경로"] for r in rows)),
-            "목록": rows, "품음_기타만": pending_only}
+        levels[result.strongest.level] += 1
+        rows.append({"이름": item["이름"], "업종": item.get("업종_표시"),
+                     "출원인": item.get("출원인"), "출원번호": item.get("출원번호"),
+                     "심판번호": item.get("심판번호"), "일치": match_row(result.strongest),
+                     "품음_기타만": all(match.pending for match in result.matches),
+                     "그_밖": [match_row(m) for m in result.matches[1:4]],
+                     "바닥": result.floor})
+    return {"질의": len(items), "일치한_질의": len(rows), "수준": dict(levels),
+            "경로": dict(Counter(r["일치"]["경로"] for r in rows)), "목록": rows}
+
+
+P1_ALLOWED = "약한 표기의 업종 다름"
 
 
 def p1_table(matcher: Matcher, items: list[dict], thresholds: fc.Thresholds) -> dict:
-    rows = []
+    """P1 — 강함이 아닌 것을 사유별로. 목표는 약한 표기의 "업종 다름"(무관한 업종의 질의에서 그
+    표기가 그 업종에서도 식별력 없는 말이라 안내만) 말고는 없는 것."""
+    strong, allowed = 0, []
+    others: dict[str, list[dict]] = {}
     for item in items:
-        result = matcher.decide(item, thresholds)
-        own = next((m for m in result.matches if m.brand == item["브랜드"]), None)
-        rows.append({**{k: item[k] for k in ("이름", "브랜드", "표기", "변형", "업종_표시",
-                                             "약한_표기")}, "대상_일치": match_row(own)})
-    strong = [r for r in rows if (r["대상_일치"] or {}).get("수준") == fc.LEVEL_STRONG]
-    not_strong = [r for r in rows if r not in strong]
-    kinds = Counter((r["변형"], r["약한_표기"],
-                     (r["대상_일치"] or {}).get("수준") or "일치 없음") for r in not_strong)
-    return {"n": len(rows), "강함": len(strong), "강함_아님": len(not_strong),
-            "강함_아님_분류": [{"변형": k[0], "약한_표기": k[1], "결과": k[2], "수": v}
-                          for k, v in sorted(kinds.items(), key=lambda kv: -kv[1])],
-            "강함_아닌_목록": not_strong}
+        own = matcher.own(item, thresholds)
+        if own is not None and own.level == fc.LEVEL_STRONG:
+            strong += 1
+            continue
+        kind = matcher.kind(item)
+        foreign = item["업종_표시"].startswith("무관한 업종(")
+        row = {"이름": item["이름"], "브랜드": item["브랜드"], "표기": item["표기"],
+               "종류": kind, "변형": item["변형"], "업종": item["업종_표시"],
+               "대상_일치": match_row(own)}
+        if (kind == fc.KIND_WEAK and foreign and own is not None
+                and own.level == fc.LEVEL_NOTICE and own.note.startswith("약한 표기 — 업종이")):
+            allowed.append(row)
+            continue
+        goods = "업종 없음" if item["업종"] is None else ("무관한 업종" if foreign else "자기 업종")
+        result = "일치 없음" if own is None else f"{own.level}({own.path}; {own.note})"
+        others.setdefault(f"{kind} · {item['변형']} · {goods} → {result}", []).append(row)
+    return {"n": len(items), "강함": strong, P1_ALLOWED: len(allowed),
+            "그_밖": sum(len(rows) for rows in others.values()),
+            "그_밖_사유별": {reason: {"수": len(rows), "이름": [r["이름"] for r in rows]}
+                         for reason, rows in sorted(others.items(), key=lambda kv: -len(kv[1]))},
+            "허용_목록": allowed}
 
 
-# ---- 엔진을 쓰는 측정(로고·미리 보기·다른 업종 규모) ---------------------------------------------
+def expectation(matcher: Matcher, thresholds: fc.Thresholds, resolve, control: dict,
+                samples: dict, limit: int | None = None) -> dict:
+    """기대표 — 입력마다 가장 강한 일치의 수준이 기대와 같은지. resolve = goods_resolver."""
+    by_name: dict[str, list[dict]] = {}
+    for item in base_items(samples["N1"]):
+        by_name.setdefault(item["이름"], []).append(item)
+    base_names = control["대조군"]["이름"][BASE]
+    passes = {
+        E_STRONG: lambda level: level == fc.LEVEL_STRONG,
+        E_WEAK_PLUS: lambda level: level in (fc.LEVEL_STRONG, fc.LEVEL_WEAK),
+        E_WEAK: lambda level: level in (fc.LEVEL_STRONG, fc.LEVEL_WEAK),
+        E_NOTICE: lambda level: level == fc.LEVEL_NOTICE,
+        E_NONE: lambda level: level is None,
+        E_WISH_WEAK: lambda level: level in (None, fc.LEVEL_WEAK),
+        E_WISH_NONE: lambda level: level is None,
+    }
+    rows = []
+    for expected, name, goods_key in EXPECT[:limit] if limit else EXPECT:
+        if goods_key == "@N1":
+            queries = [(item["이름"], item["업종"], "그 상표의 지정상품(N1 기준용)")
+                       for item in by_name.get(name, [])]
+        elif goods_key == "@대조군":
+            item = base_names[int(name[-1]) - 1]
+            queries = [(item["이름"], sorted(item["유사군"]), f"{item['업종_세트']}(대조군 배정)")]
+        else:
+            codes, label = resolve(goods_key)
+            queries = [(name, codes, label)]
+        if not queries:
+            rows.append({"기대": expected, "입력": name, "업종": goods_key, "결과": "표본에 없음",
+                         "맞음": None})
+        for query_name, codes, label in queries:
+            result = matcher.decide({"이름": query_name, "업종": codes, "반": None}, thresholds)
+            strongest = result.strongest
+            level = strongest.level if strongest else None
+            rows.append({"기대": expected, "입력": query_name, "업종": label,
+                         "결과": level or "없음", "일치": match_row(strongest),
+                         "바닥": result.floor, "맞음": passes[expected](level),
+                         "확인용": query_name in PREVIEW_HOLDOUT_SEEN})
+    summary = {}
+    for label in (E_STRONG, E_WEAK_PLUS, E_WEAK, E_NOTICE, E_NONE, E_WISH_WEAK, E_WISH_NONE):
+        group = [row for row in rows if row["기대"] == label]
+        summary[label] = {"n": len(group), "맞음": sum(1 for row in group if row["맞음"]),
+                          "다름": [f"{row['입력']} + {row['업종']} → {row['결과']}"
+                                 for row in group if not row["맞음"]]}
+    stronger = [row["입력"] for row in rows if row["기대"] == E_WEAK_PLUS
+                and row["결과"] == fc.LEVEL_STRONG]
+    return {"요약": summary, "약함_이상_중_강함": stronger, "행": rows}
+
+
+def targets(results: dict) -> dict:
+    """목표(TARGETS)별 결과."""
+    def level_count(name: str, level: str) -> int:
+        return int(results[name]["수준"].get(level, 0))
+
+    p2 = results["P2"][fc.KIND_NORMAL]["전체"]
+    p3 = results["P3"][fc.KIND_NORMAL]["전체"]
+    n3 = level_count("N3", fc.LEVEL_STRONG) + level_count("N3", fc.LEVEL_WEAK)
+    rows = {
+        "N1 기준용 강함 0건": (level_count("N1", fc.LEVEL_STRONG), TARGETS["N1_강함"]),
+        "N1 기준용 약함 2건 이하": (level_count("N1", fc.LEVEL_WEAK), TARGETS["N1_약함_최대"]),
+        "N2 강함 0건": (level_count("N2", fc.LEVEL_STRONG), TARGETS["N2_강함"]),
+        "N3 기준용 0건": (n3, TARGETS["N3_일치"]),
+    }
+    out = {name: {"값": value, "한도": limit, "통과": value <= limit}
+           for name, (value, limit) in rows.items()}
+    out["보통 표기의 P2 기준용 약함 이상 100%"] = {
+        "값": p2["약함_이상_비율"], "n": p2["n"],
+        "통과": p2["n"] > 0 and p2["약함_이상_비율"] >= TARGETS["P2_보통_약함_이상_최소"]}
+    out["보통 표기의 P3 기준용 약함 이상 95% 이상"] = {
+        "값": p3["약함_이상_비율"], "n": p3["n"],
+        "통과": p3["n"] > 0 and p3["약함_이상_비율"] >= TARGETS["P3_보통_약함_이상_최소"]}
+    out["P1 강함이 아닌 것은 약한 표기의 업종 다름뿐"] = {
+        "값": results["P1"]["그_밖"], "허용": results["P1"][P1_ALLOWED],
+        "통과": results["P1"]["그_밖"] == 0}
+    return out
+
+
+# ---- 엔진을 쓰는 측정(이미지 속 글자·로고·미리 보기) ---------------------------------------------
 
 def load_context():
     from scripts import nameless_shared_threshold as ns
@@ -750,7 +1003,8 @@ def image_types() -> dict[str, str]:
 
 
 class Logo:
-    """로고 측정 — 질의 이미지와 브랜드 표장 사이의 엔진 '이미지만' 판단 등급."""
+    """로고 — 질의 이미지와 브랜드 표장(역할 이름·도형) 사이의 엔진 '이미지만' 판단 등급이 위험이면
+    강함. 약함(검토 권장)은 쓰지 않는다."""
 
     def __init__(self, context: dict, registry: fc.Registry):
         import numpy as np
@@ -760,43 +1014,27 @@ class Logo:
         self.model = self.ms.state.model
         self.direct = context["direct"]
         self.marks: list[tuple[str, fc.Mark, int]] = []
-        self.skipped: list[dict] = []
         for brand in registry.brands:
             for mark in brand.marks:
                 if mark.role not in (fc.ROLE_NAME, fc.ROLE_FIGURE):
                     continue
                 record = self.ms.state.by_appno.get(mark.appno)
                 if record is None or record.pos is None or not mark.image_exists:
-                    self.skipped.append({"브랜드": brand.name, "출원번호": mark.appno,
-                                         "이유": "색인·이미지 없음"})
                     continue
                 self.marks.append((brand.name, mark, record.pos))
         self.matrix = self.ms.state.embeddings[[pos for _, _, pos in self.marks]]
-        self.level_note = self._levels_agree()
 
-    def _grade(self, x2: float, level: str = "도형") -> str:
+    def _grade(self, x2: float) -> str:
         ms = self.ms
-        return ms._judge(ms._image_only_features(x2, level), self.model, level).result.grade  # noqa: SLF001
-
-    def _levels_agree(self) -> dict:
-        """이미지만 판단의 유형(도형·결합-도형요부)이 등급을 바꾸지 않는지 — 같으면 OCR 없이
-        도형으로 잰다."""
-        differ = [x / 1000 for x in range(1001)
-                  if self._grade(x / 1000) != self._grade(x / 1000, "결합-도형요부")]
-        return {"다른_점": len(differ), "같음": not differ}
+        features = ms._image_only_features(x2, "도형")  # noqa: SLF001
+        return ms._judge(features, self.model, "도형").result.grade  # noqa: SLF001
 
     def embed(self, image):
         return self.np.asarray(self.engine.encode_image(image),
                                dtype=self.np.float32).reshape(-1)
 
-    def auto_kind(self, image) -> str:
-        from backend.src.core import ocr
-
-        detection = ocr.detect(image, timeout=20.0)
-        return KIND_NAMES.get(detection.kind, "유형 모름") if detection else "유형 모름"
-
-    def levels(self, embedding, *, exclude: str | None = None) -> dict[str, dict]:
-        """브랜드마다 가장 닮은 표장의 (수준, 유사도, 출원번호). 약함 미만은 뺀다."""
+    def strong(self, embedding, *, exclude: str | None = None) -> dict[str, dict]:
+        """강함인 브랜드 — 브랜드마다 가장 닮은 표장의 유사도가 이미지만 판단 위험일 때."""
         scores = self.matrix @ embedding
         best: dict[str, tuple[float, fc.Mark]] = {}
         for (brand, mark, _), score in zip(self.marks, scores):
@@ -805,110 +1043,147 @@ class Logo:
             value = round(min(1.0, max(0.0, float(score))), 4)
             if brand not in best or value > best[brand][0]:
                 best[brand] = (value, mark)
-        out = {}
-        for brand, (value, mark) in best.items():
-            grade = self._grade(value)
-            level = (fc.LEVEL_STRONG if grade == fc.GRADE_RISK
-                     else fc.LEVEL_WEAK if grade == fc.GRADE_REVIEW else None)
-            if level:
-                out[brand] = {"수준": level, "유사도": value, "표장": mark.appno,
-                              "표장_이름": mark.title, "역할": mark.role}
-        return out
+        return {brand: {"유사도": value, "표장": mark.appno, "표장_이름": mark.title,
+                        "역할": mark.role, "표장_이미지": mark.image}
+                for brand, (value, mark) in best.items() if self._grade(value) == fc.GRADE_RISK}
 
-    def query(self, image) -> dict:
-        embedding = self.embed(image)
-        if self.ms.is_photo_query(embedding):
-            return {"사진": True, "일치": {}}
-        return {"사진": False, "일치": self.levels(embedding), "embedding": embedding}
+    def photo(self, embedding) -> bool:
+        return bool(self.ms.is_photo_query(embedding))
 
 
-def logo_measure(context: dict, registry: fc.Registry, samples: dict, control: dict,
-                 limit: dict | None) -> dict:
-    logo = Logo(context, registry)
-    out: dict = {"표장": len(logo.marks), "건너뜀": logo.skipped, "유형_확인": logo.level_note}
-    marks = logo.marks[:limit["로고_표장"]] if limit else logo.marks
-    self_rows, cross = [], []
-    for brand, mark, _ in marks:
-        image = logo.direct((IMAGES_DIR / mark.image).read_bytes())
-        result = logo.query(image) if image is not None else {"사진": None, "일치": {}}
-        row = {"브랜드": brand, "출원번호": mark.appno, "이름": mark.title, "역할": mark.role,
-               "사진": result["사진"]}
-        if result["사진"] is False:
-            own = result["일치"].get(brand)
-            others = logo.levels(result["embedding"], exclude=mark.appno).get(brand)
-            row.update(자기_브랜드=(own or {}).get("수준"),
-                       자기_빼고=(others or {}).get("수준"),
-                       자기_빼고_유사도=(others or {}).get("유사도"))
-            for other, hit in result["일치"].items():
-                if other != brand:
-                    cross.append({"표장_브랜드": brand, "출원번호": mark.appno,
-                                  "이름": mark.title, "다른_브랜드": other, **hit})
-        self_rows.append(row)
-    judged = [r for r in self_rows if r["사진"] is False]
-    out["자기_확인"] = {
-        "표장": len(self_rows), "사진으로_판정": sum(1 for r in self_rows if r["사진"]),
-        "읽지_못함": sum(1 for r in self_rows if r["사진"] is None), "잰_표장": len(judged),
-        "자기_브랜드와_강함": sum(1 for r in judged if r["자기_브랜드"] == fc.LEVEL_STRONG),
-        "자기_빼고_강함": sum(1 for r in judged if r["자기_빼고"] == fc.LEVEL_STRONG),
-        "자기_빼고_약함": sum(1 for r in judged if r["자기_빼고"] == fc.LEVEL_WEAK),
-        "자기_빼고_없음": [r for r in judged if not r["자기_빼고"]],
-        "사진_목록": [r for r in self_rows if r["사진"]],
-        "다른_브랜드와_약함_이상": cross}
-    kinds = image_types()
-    queries = {query.key: query for query in context["A"]}
+def read_text(image) -> dict:
+    """엔진이 이름 없는 이미지 질의에 주는 OCR 제안 상표명(ocr.detect 의 text)과 걸린 시간."""
+    from backend.src.core import ocr
 
-    def negatives(name: str, entries: list[tuple[str, Path, str | None]]) -> dict:
-        rows, photos, counts = [], 0, Counter()
-        for label, path, kind in entries:
-            image = logo.direct(path.read_bytes())
-            if image is None:
-                continue
-            result = logo.query(image)
-            if result["사진"]:
-                photos += 1
-                continue
-            if kind is None:  # DB 이미지 — 엔진 OCR 로 자동 유형(심결 이미지와 같은 규칙)
-                kind = logo.auto_kind(image)
-            counts[f"{kind} 잰 것"] += 1
-            if result["일치"]:
-                strongest = max(result["일치"].items(), key=lambda kv: kv[1]["유사도"])
-                counts[f"{kind} {strongest[1]['수준']}"] += 1
-                rows.append({"질의": label, "유형": kind, "브랜드": strongest[0],
-                             **strongest[1], "그_밖": len(result["일치"]) - 1})
-        judged_count = sum(v for k, v in counts.items() if k.endswith("잰 것"))
-        return {"이미지": len(entries), "사진으로_판정": photos, "잰_이미지": judged_count,
-                "약함_이상": len(rows),
-                "비율": round(len(rows) / judged_count, 4) if judged_count else None,
-                "유형별": dict(counts), "목록": rows}
-
-    def trial_kind(path: Path) -> str:
-        relative = path.resolve().relative_to(TRIALS.resolve()).as_posix()
-        return KIND_NAMES.get(kinds.get(relative, ""), "유형 모름")
-
-    keep = limit["로고_음성"] if limit else None
-    control_keys = control["대조군"]["이미지"][BASE] + control["대조군"]["이미지"][HOLDOUT]
-    out["음성"] = {
-        "대조군_덜_닮은_이미지": negatives("대조군", [
-            (key, queries[key].path, trial_kind(queries[key].path))
-            for key in control_keys[:keep]]),
-        "표본A_질의_이미지": negatives("표본A", [
-            (query.key, query.path, trial_kind(query.path)) for query in context["A"][:keep]]),
-    }
-    picked = logo_n1_marks(samples)
-    out["음성"]["N1_기준용_상표_이미지"] = negatives("N1", [
-        (f"{item['출원번호']} {item['이름']}", IMAGES_DIR / item["이미지"], None)
-        for item in picked[:keep]])
-    return out
+    detection = ocr.detect(image, timeout=OCR_TIMEOUT_S)
+    if detection is None:
+        return {"글자": None, "ms": None, "유형": "유형 모름"}
+    return {"글자": detection.text or None, "ms": round(float(detection.elapsed_ms), 1),
+            "유형": KIND_NAMES.get(detection.kind, "유형 모름")}
 
 
 def logo_n1_marks(samples: dict) -> list[dict]:
-    """로고 음성의 N1 — 기준용 상표(이미지 파일 있음) 가운데 300(seed 0). 확인용 절반은 이미지도
-    건드리지 않는다."""
+    """N1 기준용 상표(이미지 파일 있음) 가운데 300(seed 0) — 1단계 로고 음성과 같은 표본. 확인용
+    절반은 이미지도 건드리지 않는다."""
     pool = sorted({item["출원번호"]: item for item in samples["N1"]
                    if item.get("반") == BASE and item.get("이미지")
                    and (IMAGES_DIR / item["이미지"]).is_file()}.values(),
                   key=lambda item: item["출원번호"])
     return random.Random(f"{SEED}|로고|N1").sample(pool, min(LOGO_N1_IMAGES, len(pool)))
+
+
+def image_measure(context: dict, registry: fc.Registry, matcher: Matcher,
+                  thresholds: fc.Thresholds, samples: dict, control: dict,
+                  cut: dict | None) -> dict:
+    """이미지 속 글자 경로(OCR 제안 상표명 → 같음·품음만)와 로고 강함."""
+    logo = Logo(context, registry)
+    kinds = image_types()
+    queries = {query.key: query for query in context["A"]}
+
+    def by_text(text: str | None, codes=None) -> fc.FamousResult | None:
+        if not text:
+            return None
+        return fc.check_famous(None, codes, registry, thresholds, dist=matcher.dist,
+                               goods_floor=matcher.floor, ocr_text=text)
+
+    def strong_brands(result: fc.FamousResult | None) -> list[str]:
+        return [] if result is None else [
+            match.brand for match in result.matches if match.level == fc.LEVEL_STRONG]
+
+    # 1) 역할 "이름" 표장 이미지 전부 — 제안 상표명이 나오는가, 그 글자로 자기 브랜드와 강함인가
+    name_marks = [(brand.name, mark) for brand in registry.brands for mark in brand.marks
+                  if mark.role == fc.ROLE_NAME and mark.image_exists]
+    if cut:
+        name_marks = name_marks[:cut["이름_표장"]]
+    rows = []
+    for brand, mark in name_marks:
+        image = logo.direct((IMAGES_DIR / mark.image).read_bytes())
+        seen = read_text(image)
+        result = by_text(seen["글자"])
+        own = None if result is None else next(
+            (match for match in result.matches if match.brand == brand), None)
+        rows.append({"브랜드": brand, "출원번호": mark.appno, "상표명": mark.title,
+                     "글자": seen["글자"], "ms": seen["ms"],
+                     "자기_브랜드": own.level if own else None,
+                     "자기_경로": own.path if own else None,
+                     "다른_브랜드_강함": [name for name in strong_brands(result) if name != brand]})
+    with_text = [row for row in rows if row["글자"]]
+    own_strong = [row for row in rows if row["자기_브랜드"] == fc.LEVEL_STRONG]
+    slow = [row for row in rows if row["ms"] is not None and row["ms"] > OCR_SERVICE_LIMIT_MS]
+    per_brand = {}
+    for row in rows:
+        entry = per_brand.setdefault(row["브랜드"], {"표장": 0, "글자": 0, "자기_강함": 0})
+        entry["표장"] += 1
+        entry["글자"] += bool(row["글자"])
+        entry["자기_강함"] += row["자기_브랜드"] == fc.LEVEL_STRONG
+    out: dict = {"이름_표장": {
+        "이미지": len(rows), "제안_상표명_있음": len(with_text),
+        "제안_비율": round(len(with_text) / len(rows), 4) if rows else None,
+        "자기_브랜드와_강함": len(own_strong),
+        "강함_비율(전체)": round(len(own_strong) / len(rows), 4) if rows else None,
+        "강함_비율(글자_있는_것)": (round(len(own_strong) / len(with_text), 4)
+                             if with_text else None),
+        "자기_브랜드_수준": dict(Counter(row["자기_브랜드"] or "일치 없음" for row in with_text)),
+        "다른_브랜드와_강함": [row for row in rows if row["다른_브랜드_강함"]],
+        "서비스_상한(2초)_넘김": len(slow), "브랜드별": per_brand,
+        "글자는_있는데_강함_아님": [row for row in with_text
+                             if row["자기_브랜드"] != fc.LEVEL_STRONG], "행": rows}}
+
+    # 2) 음성 — 대조군의 덜 닮은 이미지, N1 기준용 이미지(사진 판정 제외), 표본 A(로고만)
+    def negatives(entries: list[dict], *, text: bool) -> dict:
+        measured, photos, text_rows, logo_rows = 0, 0, [], []
+        texts = slow_count = 0
+        for entry in entries:
+            image = logo.direct(entry["경로"].read_bytes())
+            if image is None:
+                continue
+            embedding = logo.embed(image)
+            if logo.photo(embedding):
+                photos += 1
+                continue
+            measured += 1
+            for brand, hit in logo.strong(embedding).items():
+                logo_rows.append({"질의": entry["표시"], "질의_이미지": str(entry["경로"]),
+                                  "유형": entry.get("유형"), "브랜드": brand, **hit})
+            if not text:
+                continue
+            seen = read_text(image)
+            texts += bool(seen["글자"])
+            slow_count += seen["ms"] is not None and seen["ms"] > OCR_SERVICE_LIMIT_MS
+            free = strong_brands(by_text(seen["글자"]))
+            with_goods = strong_brands(by_text(seen["글자"], entry.get("업종")))
+            if free or with_goods:
+                text_rows.append({"질의": entry["표시"], "글자": seen["글자"],
+                                  "강함(업종 없음)": free, "강함(그 상표의 지정상품)": with_goods})
+        result = {"이미지": len(entries), "사진으로_판정": photos, "잰_이미지": measured,
+                  "로고_강함": len({row["질의"] for row in logo_rows}), "로고_강함_목록": logo_rows}
+        if text:
+            free_count = sum(1 for row in text_rows if row["강함(업종 없음)"])
+            goods_count = sum(1 for row in text_rows if row["강함(그 상표의 지정상품)"])
+            result.update({
+                "제안_상표명_있음": texts, "서비스_상한(2초)_넘김": slow_count,
+                "글자로_강함(업종 없음)": free_count,
+                "글자로_강함_비율": round(free_count / measured, 4) if measured else None,
+                "글자로_강함(그 상표의 지정상품)": goods_count, "글자로_강함_목록": text_rows})
+        return result
+
+    def trial_kind(path: Path) -> str:
+        relative = path.resolve().relative_to(TRIALS.resolve()).as_posix()
+        return KIND_NAMES.get(kinds.get(relative, ""), "유형 모름")
+
+    keep = cut["음성_이미지"] if cut else None
+    control_keys = control["대조군"]["이미지"][BASE] + control["대조군"]["이미지"][HOLDOUT]
+    out["대조군_덜_닮은_이미지"] = negatives(
+        [{"표시": key, "경로": queries[key].path, "유형": trial_kind(queries[key].path)}
+         for key in control_keys[:keep]], text=True)
+    out["N1_기준용_상표_이미지"] = negatives(
+        [{"표시": f"{item['출원번호']} {item['이름']} ({item.get('출원인')})",
+          "경로": IMAGES_DIR / item["이미지"], "업종": item["업종"]}
+         for item in logo_n1_marks(samples)[:keep]], text=True)
+    out["표본A_질의_이미지(로고만)"] = negatives(
+        [{"표시": f"{query.key} {query.name}", "경로": query.path,
+          "유형": trial_kind(query.path)} for query in context["A"][:keep]], text=False)
+    return out
 
 
 def grade_max(*grades: str | None) -> str | None:
@@ -921,9 +1196,7 @@ def preview(context: dict, registry: fc.Registry, matcher: Matcher, thresholds: 
     from scripts import named_shared_threshold as second
 
     ms, engine = context["ms"], context["engine"]
-    goods_map = gm.load_goods_map()
-    fruit = sorted({code for name, nice in FRUIT_GOODS
-                    for code in goods_map.find(name, nice).similarity_codes})
+    resolve = goods_resolver(presets)
     scenarios = {key: (title, inputs)
                  for key, title, inputs in second.scenario_inputs(ms, context["service"])}
     rows = []
@@ -940,23 +1213,20 @@ def preview(context: dict, registry: fc.Registry, matcher: Matcher, thresholds: 
         return text
 
     def run(label: str, name: str | None, codes: list[str] | None, goods_label: str,
-            image=None, note: str = "") -> None:
-        data = engine.multi_search(image=image, name=name, goods_codes=codes,
+            note: str = "") -> None:
+        data = engine.multi_search(image=None, name=name, goods_codes=codes,
                                    top_k=5).to_dict()
         overall = data["overall"]
-        suggested = overall["query_type"].get("suggested_name")
         result = fc.check_famous(name, codes, registry, thresholds, dist=matcher.dist,
-                                 goods_floor=matcher.floor, ocr_text=suggested)
-        floor = result.floor
-        row = {"입력": label, "업종": goods_label, "지금_등급": overall["grade"],
-               "지금_위험도": overall["prob"], "지금_1위": (data["candidates"][0]["title"]
-                                                    if data["candidates"] else None),
-               "일치": match_row(result.strongest),
-               "그_밖의_일치": [match_row(m) for m in result.matches[1:3]],
-               "OCR_제안": suggested, "바닥": floor,
-               "바닥_적용_등급": grade_max(overall["grade"], floor), "안내": notice_of(result),
-               "메모": note}
-        rows.append(row)
+                                 goods_floor=matcher.floor)
+        rows.append({"입력": label, "업종": goods_label, "지금_등급": overall["grade"],
+                     "지금_위험도": overall["prob"],
+                     "지금_1위": (data["candidates"][0]["title"] if data["candidates"] else None),
+                     "일치": match_row(result.strongest),
+                     "그_밖의_일치": [match_row(m) for m in result.matches[1:3]],
+                     "바닥": result.floor,
+                     "바닥_적용_등급": grade_max(overall["grade"], result.floor),
+                     "안내": notice_of(result), "메모": note})
 
     entries = PREVIEW_NAMES[:limit] if limit else PREVIEW_NAMES
     base_names = control["대조군"]["이름"][BASE]
@@ -969,15 +1239,12 @@ def preview(context: dict, registry: fc.Registry, matcher: Matcher, thresholds: 
             title, inputs = scenarios[name[1:]]
             run(inputs["name"], inputs["name"], inputs.get("goods_codes"), title,
                 note=f"시연 입력 그대로({name[1:]})")
-        elif preset_id == "과일":
-            run(name, name, fruit, "과일 판매(신선한 과실·그 판매업)",
-                note="등록부에 없음 — 한계 확인용")
         else:
-            codes = _preset_codes(presets, preset_id) if preset_id else None
+            codes, label = resolve(preset_id)
             note = "P2 확인용 — 지시의 목록이라 계산" if name in PREVIEW_HOLDOUT_SEEN else ""
-            if name == "삼성":
+            if name in ("삼성", "애플"):
                 note = "등록부에 없음 — 한계 확인용"
-            run(name, name, codes, preset_id or "없음", note=note)
+            run(name, name, codes, label, note=note)
     return rows
 
 
@@ -1012,88 +1279,21 @@ def preview_images(context: dict, registry: fc.Registry, matcher: Matcher,
         suggested = overall["query_type"].get("suggested_name")
         result = fc.check_famous(name, codes, registry, thresholds, dist=matcher.dist,
                                  goods_floor=matcher.floor, ocr_text=suggested)
-        seen = logo.query(image)
-        logo_hits = {brand: {k: v for k, v in hit.items()} for brand, hit in seen["일치"].items()}
-        best = max(logo_hits.items(), key=lambda kv: kv[1]["유사도"]) if logo_hits else None
-        logo_floor = None
-        if best:
-            logo_floor = (fc.GRADE_RISK if best[1]["수준"] == fc.LEVEL_STRONG
-                          else fc.GRADE_REVIEW)
+        embedding = logo.embed(image)
+        photo = logo.photo(embedding)
+        hits = {} if photo else logo.strong(embedding)
+        best = max(hits.items(), key=lambda kv: kv[1]["유사도"]) if hits else None
+        logo_floor = fc.GRADE_RISK if best else None
         rows.append({
             "입력": label, "업종": preset_id or "없음", "지금_등급": overall["grade"],
             "지금_위험도": overall["prob"],
             "지금_1위": data["candidates"][0]["title"] if data["candidates"] else None,
             "OCR_제안": suggested, "글자_일치": match_row(result.strongest),
-            "글자_기준": result.basis, "글자_바닥": result.floor,
-            "사진": seen["사진"],
-            "로고_일치": ({"브랜드": best[0], **best[1]} if best else None),
+            "글자_기준": result.basis, "글자_바닥": result.floor, "사진": photo,
+            "로고_강함": ({"브랜드": best[0], **best[1]} if best else None),
             "로고_바닥(같은 대응을 쓴다면)": logo_floor,
             "바닥_적용_등급": grade_max(overall["grade"], result.floor, logo_floor)})
     return rows
-
-
-def other_industry_scale(context: dict, presets, control: dict, limit: int | None) -> dict:
-    """업종이 다르고(x4 < 결합 하한) 업종 없이 본 짝 판단 등급이 검토 권장 이상인 후보."""
-    from scripts import named_goods_product as ngp
-    from scripts import named_shared_threshold as second
-
-    ms = context["ms"]
-    model = ms.state.model
-    floor = float(model["coupling"]["floors"]["x4"])
-    review = fc.GRADES.index(fc.GRADE_REVIEW)
-    capture = ngp.Capture(ms)
-    out: dict = {}
-
-    def measure(name: str, runs: list[tuple[str, dict]]) -> None:
-        per_query, grades, in_top, examples = [], Counter(), Counter(), []
-        for label, inputs in runs:
-            capture.take()
-            pooled = ms.search_pool(**inputs)
-            features = capture.take()
-            hits = 0
-            for rank, candidate in enumerate(pooled.candidates, start=1):
-                first = features.get(candidate.id)
-                if not first or first.get("x4") is None or float(first["x4"]) >= floor:
-                    continue
-                level = pooled.query_type.type
-                pair = ms._judge({**first, "x4": None}, model, level)  # noqa: SLF001
-                if fc.GRADES.index(pair.result.grade) < review:
-                    continue
-                hits += 1
-                grades[candidate.grade] += 1
-                in_top["앞 5 안" if rank <= 5 else "앞 5 밖"] += 1
-                if len(examples) < 10:
-                    examples.append({
-                        "질의": label, "후보": candidate.title, "출원번호": candidate.id,
-                        "순위": rank, "겹침": first["x4"], "짝_등급": pair.result.grade,
-                        "짝_위험도": round(pair.result.prob, 3), "최종_등급": candidate.grade,
-                        "최종_위험도": round(float(candidate.prob), 3),
-                        "집합": candidate.pattern, "규칙": list(candidate.rule_triggers)})
-            per_query.append(hits)
-        distribution = Counter(per_query)
-        out[name] = {
-            "질의": len(runs), "후보_수": sum(per_query),
-            "있는_질의": sum(1 for value in per_query if value),
-            "질의당_분포": {str(k): distribution[k] for k in sorted(distribution)},
-            "최종_등급": dict(grades), "앞5": dict(in_top), "예시": examples}
-
-    try:
-        names = control["대조군"]["이름"][BASE][:limit]
-        measure("지어낸 이름 대조군 기준용(이름+업종)", [
-            (item["이름"], {"name": item["이름"], "goods_codes": sorted(item["유사군"])})
-            for item in names if item["유사군"]])
-        sample = [query for query in context["A"] if query.goods][:limit]
-        measure("표본 A 업종 있는 질의(이름+이미지+업종)", [
-            (query.key, {"image": context["service"](query.path.read_bytes()),
-                         "name": query.name, "goods_codes": sorted(query.goods)})
-            for query in sample])
-        runs = [(f"{key} {title}", inputs)
-                for key, title, inputs in second.scenario_inputs(ms, context["service"])
-                if inputs.get("goods_codes")]  # 업종 없는 7종(S3·S4·S5·N1·N3·N4·N5)은 해당 없음
-        measure("시나리오 16종 중 업종 있는 것", runs[:limit] if limit else runs)
-    finally:
-        capture.close()
-    return out
 
 
 # ---- 확인용 시트 -------------------------------------------------------------------------------
@@ -1115,7 +1315,7 @@ def _thumb(path: Path, size: int = 120) -> str | None:
 
 
 def review_html(registry: fc.Registry, out_path: Path, limit: int | None = None) -> dict:
-    """사람이 볼 시트 — 브랜드마다 표기·출원인·업종·보호 범위·근거, 표장 썸네일을 역할별로."""
+    """사람이 볼 시트 — 브랜드마다 표기(종류)·출원인·업종·보호 범위·근거, 표장 썸네일을 역할별로."""
     order = [fc.ROLE_NAME, fc.ROLE_LOGO, fc.ROLE_FIGURE, fc.ROLE_OTHER, fc.ROLE_EXCLUDED]
     parts = ["""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1138,40 +1338,41 @@ border:1px solid var(--line)}figure.look img{outline:3px solid var(--warn)}
 a{color:inherit}</style></head><body>
 <h1>유명 상표 등록부 확인</h1>
 <p class="sub">shared/famous_registry.json 초안. <span class="warn">주황 테두리</span>는 사람이 볼
-"도형"·"다른 이름" 표장입니다. 정한 값은 shared/famous_registry_overrides.json 에 적습니다.</p>"""]
+"도형"·"다른 이름" 표장입니다. 정한 값은 shared/famous_registry_overrides.json 에 적습니다.
+표기 종류: <span class=flag>약한 표기</span>는 그 표기 하나뿐일 때만 일치,
+<span class=flag>머리글자 표기</span>는 같음·품음-설명만 인정합니다.</p>"""]
     brands = registry.brands[:limit] if limit else registry.brands
     index = []
     for number, brand in enumerate(brands):
         roles = Counter(mark.role for mark in brand.marks)
-        weak = ", ".join(n.text for n in brand.notations if n.weak)
+        special = ", ".join(f"{n.text}({n.kind})" for n in brand.notations
+                            if n.kind != fc.KIND_NORMAL)
         index.append(
             f'<tr><td class=n><a href="#b{number}">{html.escape(brand.name)}</a></td>'
             f"<td>{html.escape(' · '.join(n.text for n in brand.notations))}</td>"
             f"<td class=n>{brand.preset}</td><td class=n>{roles.get(fc.ROLE_NAME, 0)}</td>"
             f"<td class=n>{roles.get(fc.ROLE_FIGURE, 0) or ''}</td>"
             f"<td class=n>{roles.get(fc.ROLE_OTHER, 0) or ''}</td>"
-            f"<td class=n>{html.escape(weak)}</td></tr>")
+            f"<td>{html.escape(special)}</td></tr>")
     parts.append(
         "<div class=scroll><table><tr><th>브랜드</th><th>표기</th><th class=n>업종 세트</th>"
         "<th class=n>이름</th><th class=n>도형</th><th class=n>다른 이름</th>"
-        "<th class=n>약한 표기</th></tr>" + "".join(index) + "</table></div>")
+        "<th>약한·머리글자 표기</th></tr>" + "".join(index) + "</table></div>")
     for number, brand in enumerate(brands):
-        weak = [n.text for n in brand.notations if n.weak]
         rows = "".join(
             f"<tr><td>{html.escape(n.text)}</td><td class=n>{n.script}</td>"
-            f"<td class=n>{n.length}</td>"
-            f"<td>{'<span class=flag>약한 표기</span> ' if n.weak else ''}"
-            f"{html.escape(_reasons(n))}</td></tr>" for n in brand.notations)
+            f"<td class=n>{n.length}</td><td class=n>"
+            + (f"<span class=flag>{n.kind}</span>" if n.kind != fc.KIND_NORMAL else n.kind)
+            + f"</td><td>{html.escape(n.kind_reason or _reasons(n))}</td></tr>"
+            for n in brand.notations)
         links = " ".join(f'<a href="{html.escape(url)}">근거</a>' for url in brand.evidence_urls)
         parts.append(
             f'<h2 id="b{number}">{html.escape(brand.name)}</h2><p class=sub>출원인 '
             f"{html.escape(' / '.join(brand.applicants))} · 업종 세트 {brand.preset}"
             f"({html.escape(brand.preset_label or '')}) · 보호 범위 <b>{brand.protection}</b>"
-            f" · 식별력 판정 맥락 {brand.goods_source} · {links}<br>"
-            f"{html.escape(_strip_urls(brand.evidence))}</p>"
+            f" · {links}<br>{html.escape(_strip_urls(brand.evidence))}</p>"
             "<table><tr><th>표기</th><th class=n>문자</th><th class=n>길이</th>"
-            f"<th>식별력(유명 예외 뺌)</th></tr>{rows}</table>"
-            + (f"<p class=warn>약한 표기: {html.escape(', '.join(weak))}</p>" if weak else ""))
+            f"<th class=n>종류</th><th>근거(유명 예외를 뺀 식별력)</th></tr>{rows}</table>")
         for role in order:
             marks = [mark for mark in brand.marks if mark.role == role]
             if not marks:
@@ -1235,26 +1436,44 @@ def sample_summary(samples: dict) -> dict:
     return out
 
 
+def kind_summary(registry: fc.Registry) -> dict:
+    return {kind: [f"{brand.name}: {notation.text}" for brand in registry.brands
+                   for notation in brand.notations if notation.kind == kind]
+            for kind in (fc.KIND_WEAK, fc.KIND_INITIAL)} | {
+        fc.KIND_NORMAL: sum(1 for brand in registry.brands for notation in brand.notations
+                            if notation.kind == fc.KIND_NORMAL)}
+
+
+def _same_samples(samples: dict) -> bool:
+    """표본이 1단계에 고정한 것과 같은가."""
+    if canonical_sha256(samples) == STAGE1_SAMPLES_SHA256:
+        return True
+    print("거절: 다시 만든 표본이 1단계에 고정한 표본과 다릅니다"
+          f"({canonical_sha256(samples)[:12]}… ≠ {STAGE1_SAMPLES_SHA256[:12]}…)", file=sys.stderr)
+    return False
+
+
 def command_freeze(args) -> int:
     paths = _paths(args.out_dir)
     if paths["rule"].exists() and not args.force:
         print(f"거절: {paths['rule']} 가 있습니다(--force)", file=sys.stderr)
         return EXIT_REFUSED
     registry, _, _, _, samples = _load_static()
+    if not _same_samples(samples):
+        return EXIT_REFUSED
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    paths["samples"].write_text(json.dumps(samples, ensure_ascii=False, indent=1) + "\n",
-                                encoding="utf-8")
     frozen = {"설정_sha256": rule_sha256(), "스크립트_sha256": file_sha256(Path(__file__)),
               "표본_sha256": canonical_sha256(samples), "표본_수": sample_summary(samples),
               "확인용과_겹치는_이름": holdout_overlap(samples),
               "입력_sha256": {k: file_sha256(p) for k, p in _inputs().items()},
               "등록부": {"브랜드": len(registry.brands),
-                       "표장": sum(len(b.marks) for b in registry.brands)},
+                       "표장": sum(len(b.marks) for b in registry.brands),
+                       "표기_종류": kind_summary(registry)},
               "고정": _now(), "설정": _settings()}
     paths["rule"].write_text(json.dumps(frozen, ensure_ascii=False, indent=1) + "\n",
                              encoding="utf-8")
     print(f"설정 sha256 {frozen['설정_sha256']} · 스크립트 sha256 {frozen['스크립트_sha256']} · "
-          f"표본 sha256 {frozen['표본_sha256']}")
+          f"표본 sha256 {frozen['표본_sha256']}(1단계와 같음)")
     print(json.dumps(frozen["표본_수"], ensure_ascii=False))
     return 0
 
@@ -1285,6 +1504,8 @@ def command_run(args) -> int:
         print("거절: 스모크는 --out-dir 로 다른 폴더에", file=sys.stderr)
         return EXIT_REFUSED
     registry, dist, presets, control, samples = _load_static()
+    if not _same_samples(samples):
+        return EXIT_REFUSED
     frozen = _check_frozen(paths, samples)
     if frozen is None:
         return EXIT_REFUSED
@@ -1304,17 +1525,16 @@ def command_run(args) -> int:
                      "스크립트_sha256(고정 때)": frozen["스크립트_sha256"],
                      "스크립트_sha256(잴 때)": file_sha256(Path(__file__)),
                      "기본_모델": rm.MODEL_VERSION, "결합_하한": floor,
-                     "표본_수": sample_summary(samples),
+                     "표본_sha256": frozen["표본_sha256"], "표본_수": sample_summary(samples),
                      "확인용과_겹치는_이름": holdout_overlap(samples),
-                     "약한_표기_브랜드": samples["약한_표기_브랜드"]}
+                     "표기_종류": kind_summary(registry),
+                     "업종_낱말_수": len(fc.industry_words())}
     began = time.perf_counter()
     p1 = base_items(samples["P1"])
     if smoke:
         keep = {brand.name for brand in registry.brands[:cut["P1_브랜드"]]}
         p1 = [item for item in p1 if item["브랜드"] in keep]
-    p2_all = base_items(samples["P2"], cut.get("P2", 0) * 2 or None)
-    p2 = [item for item in p2_all if not item["약한_표기_브랜드"]]
-    p2_excluded = [item for item in p2_all if item["약한_표기_브랜드"]]
+    p2 = base_items(samples["P2"], cut.get("P2", 0) * 2 or None)
     p3 = base_items(samples["P3"])
     if smoke:
         keep_notations = sorted({(i["브랜드"], i["표기"]) for i in p3})[:cut["P3_표기"]]
@@ -1323,21 +1543,24 @@ def command_run(args) -> int:
     n2 = base_items(samples["N2"], cut.get("N2"))
     n3 = base_items(samples["N3"], cut.get("N3", 0) * 2 or None)
     n4 = base_items(samples["N4"], cut.get("N4"))
-    for item in p1 + p2_all + p3 + n1 + n2 + n3 + n4:
+    for item in p1 + p2 + p3 + n1 + n2 + n3 + n4:
         matcher.evidence(item)
-    results["계산한_질의"] = {"P1": len(p1), "P2": len(p2), "P2_제외(약한 표기 브랜드)":
-                          len(p2_excluded), "P3": len(p3), "N1": len(n1), "N2": len(n2),
-                          "N3": len(n3), "N4": len(n4)}
+    normal = fc.KIND_NORMAL
+    p2_normal = [item for item in p2 if matcher.kind(item) == normal]
+    p3_normal = [item for item in p3 if matcher.kind(item) == normal]
+    results["계산한_질의"] = {
+        "P1": len(p1), "P2": len(p2), "P2_보통_표기": len(p2_normal), "P3": len(p3),
+        "P3_보통_표기": len(p3_normal), "N1": len(n1), "N2": len(n2), "N3": len(n3),
+        "N4": len(n4)}
     tick("일치 근거", began)
 
     began = time.perf_counter()
-    selection = select_thresholds(matcher, n1, n3)
+    selection = select_thresholds(matcher, n1, n3, p2_normal, p3_normal)
     thresholds = fc.Thresholds.from_dict(selection["고른_기준"])
     results["기준_선택"] = selection
     results["P1"] = p1_table(matcher, p1, thresholds)
-    results["P2"] = recall_table(matcher, p2, thresholds)
-    results["P2_제외(약한 표기 브랜드)"] = recall_table(matcher, p2_excluded, thresholds)
-    results["P3"] = recall_table(matcher, p3, thresholds)
+    results["P2"] = recall_by_kind(matcher, p2, thresholds)
+    results["P3"] = recall_by_kind(matcher, p3, thresholds)
     results["N1"] = match_list(matcher, n1, thresholds)
     results["N2"] = match_list(matcher, n2, thresholds)
     results["N3"] = match_list(matcher, n3, thresholds)
@@ -1346,23 +1569,24 @@ def command_run(args) -> int:
          "일치": match_row(matcher.decide(item, thresholds).strongest),
          "그_밖": [match_row(m) for m in matcher.decide(item, thresholds).matches[1:3]],
          "바닥": matcher.decide(item, thresholds).floor} for item in n4]}
-    tick("기준 선택·표", began)
+    results["목표"] = targets(results)
+    results["기대표"] = expectation(matcher, thresholds, goods_resolver(presets), control,
+                                 samples, cut.get("기대표"))
+    tick("기준 선택·목표·기대표", began)
 
     began = time.perf_counter()
     context = load_context()
     tick("엔진", began)
     began = time.perf_counter()
-    results["로고"] = logo_measure(context, registry, samples, control, cut or None)
-    tick("로고", began)
+    results["이미지"] = image_measure(context, registry, matcher, thresholds, samples, control,
+                                   cut or None)
+    tick("이미지 속 글자·로고", began)
     began = time.perf_counter()
     results["미리_보기"] = preview(context, registry, matcher, thresholds, presets, control,
                                cut.get("미리_보기"))
     results["미리_보기_이미지"] = preview_images(context, registry, matcher, thresholds, presets,
                                           control, 1 if smoke else None)
     tick("미리 보기", began)
-    began = time.perf_counter()
-    results["다른_업종_규모"] = other_industry_scale(context, presets, control, cut.get("규모"))
-    tick("다른 업종 규모", began)
     began = time.perf_counter()
     review_path = (args.out_dir / "review.html") if smoke else (REVIEW_DIR / "review.html")
     results["확인용_시트"] = review_html(registry, review_path, 2 if smoke else None)
@@ -1372,24 +1596,32 @@ def command_run(args) -> int:
                                 encoding="utf-8")
     paths["report"].write_text(report_text(results), encoding="utf-8")
     print(json.dumps({"고른_기준": selection["고른_기준"]}, ensure_ascii=False))
+    print(json.dumps({name: row["통과"] for name, row in results["목표"].items()},
+                     ensure_ascii=False))
     print(f"→ {paths['results']}")
     return 0
 
 
 def report_text(results: dict) -> str:
     chosen = results["기준_선택"]["고른_기준"]
-    lines = [f"# 유명 상표 확인 1단계 측정 ({results.get('끝', '')})", "",
+    lines = [f"# 유명 상표 확인 2-1단계 측정 ({results.get('끝', '')})", "",
              f"- 설정 sha256 `{results['설정_sha256']}`, 스모크 {results['스모크']}, 기본 모델 "
              f"{results['기본_모델']}",
              f"- 고른 기준: {json.dumps(chosen, ensure_ascii=False)}",
-             f"- 계산한 질의: {json.dumps(results['계산한_질의'], ensure_ascii=False)}"]
-    for name in ("P2", "P3"):
-        lines.append(f"- {name} 기준용: {json.dumps(results[name]['전체'], ensure_ascii=False)}")
+             f"- 계산한 질의: {json.dumps(results['계산한_질의'], ensure_ascii=False)}", "",
+             "## 목표"]
+    for name, row in results["목표"].items():
+        detail = {key: value for key, value in row.items() if key != "통과"}
+        lines.append(f"- {'통과' if row['통과'] else '미달'} — {name}: "
+                     f"{json.dumps(detail, ensure_ascii=False)}")
+    lines += ["", "## 기대표"]
+    for label, row in results["기대표"]["요약"].items():
+        lines.append(f"- {label}: {row['맞음']}/{row['n']}" + (
+            f" — 다름: {'; '.join(row['다름'])}" if row["다름"] else ""))
     for name in ("N1", "N2", "N3"):
         part = results[name]
         lines.append(f"- {name}: 질의 {part['질의']} 중 일치 {part['일치한_질의']} — "
                      f"{json.dumps(part['수준'], ensure_ascii=False)}")
-    lines.append(f"- P1: {results['P1']['n']} 중 강함 {results['P1']['강함']}")
     lines.append(f"- 확인용 시트: {results['확인용_시트']['경로']}")
     return "\n".join(lines) + "\n"
 

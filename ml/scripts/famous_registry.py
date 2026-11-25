@@ -81,8 +81,11 @@ def build(*, brands_path: Path = fc.DEFAULT_BRANDS_PATH, plan_path: Path = DEFAU
         "overrides": "shared/famous_registry_overrides.json",
         "overrides_sha256": (_sha256(overrides_path) if Path(overrides_path).exists() else None),
         "aliases_sha256": _sha256(aliases_path),
-        "note": ("표장 역할은 자동(이름·도형·다른 이름) 뒤 overrides 로 덮는다. 약한 표기는 유명 "
-                 "예외를 뺀 식별력 판정으로 브랜드 자신의 업종에서 조각이 모두 약한 표기."),
+        "note": ("표장 역할은 자동(이름·도형·다른 이름) 뒤 overrides 로 덮는다. 표기 종류: 약한 "
+                 "표기 = 유명 예외를 뺀 식별력 판정으로 브랜드 자신의 업종에서 조각이 모두 약한 "
+                 "표기(base_weak)와 그 표기와 소리가 0.98 이상인 표기, 머리글자 표기 = 약한 표기가 "
+                 "아닌 영문 3자 이하 표기와 그 표기와 소리가 0.98 이상인 표기, 나머지는 보통 "
+                 "표기."),
     }
     return fc.build_registry(
         rows, plan_records=plan["records"], db_records=records, preset_codes=preset_codes,
@@ -97,10 +100,11 @@ def to_text(registry: fc.Registry) -> str:
 
 
 def summary(registry: fc.Registry) -> dict:
-    """보고용 요약 — 브랜드별 역할 수, 약한 표기, 한쪽 문자 표기만 있는 브랜드, 이름·도형 표장이
+    """보고용 요약 — 브랜드별 역할 수, 표기 종류, 한쪽 문자 표기만 있는 브랜드, 이름·도형 표장이
     없는 브랜드, 등록부 표기와 식별력 유명 토큰의 차이."""
     famous = dx.famous_tokens()
     rows, weak, one_script, no_marks, token_rows = [], [], [], [], []
+    kinds: dict[str, list[dict]] = {kind: [] for kind in fc.KINDS}
     for brand in registry.brands:
         counts: dict[str, int] = {}
         for mark in brand.marks:
@@ -111,7 +115,11 @@ def summary(registry: fc.Registry) -> dict:
                      "이미지_없음": sum(1 for mark in brand.marks if not mark.image_exists),
                      "업종_맥락": brand.goods_source})
         for notation in brand.notations:
-            if notation.weak:
+            kinds[notation.kind].append({
+                "브랜드": brand.name, "표기": notation.text, "길이": notation.length,
+                "문자": notation.script, "근거": notation.kind_reason,
+                "따르는_표기": list(notation.inherits)})
+            if notation.base_weak:
                 weak.append({"브랜드": brand.name, "표기": notation.text,
                              "사유": [f"{j['token']}: {'·'.join(j['reasons'])}"
                                     for j in notation.judgements]})
@@ -135,7 +143,10 @@ def summary(registry: fc.Registry) -> dict:
     registry_pieces = {piece for row in token_rows for piece in row["조각"]}
     return {
         "브랜드": len(registry.brands), "표기": sum(len(b.notations) for b in registry.brands),
-        "표장": sum(len(b.marks) for b in registry.brands), "브랜드별": rows, "약한_표기": weak,
+        "표장": sum(len(b.marks) for b in registry.brands), "브랜드별": rows,
+        "표기_종류": {kind: len(items) for kind, items in kinds.items()},
+        "약한_표기_목록": kinds[fc.KIND_WEAK], "머리글자_표기_목록": kinds[fc.KIND_INITIAL],
+        "약한_표기": weak,
         "한쪽_문자만": one_script, "이름_표장_없음": no_marks,
         "유명_토큰": {
             "토큰_수": len(famous),

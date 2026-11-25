@@ -1,79 +1,104 @@
-"""유명 상표 확인 — 등록부와 일치 판정(1단계 측정용: 엔진·계약·화면에서 부르지 않는다).
+"""유명 상표 확인 — 등록부와 일치 판정(측정용: 엔진·계약·화면에서 부르지 않는다).
 
 통합 모델 설계 §7-14. 유명 상표 보호는 일반 유사 판단과 근거가 달라, 업종에 따라 움직이는 판단
 앞에 따로 둔다. 질의 이름이 등록부(shared/famous_registry.json — `ml/scripts/famous_registry.py`
 가 만든다)의 브랜드 표기와 일치하는지를 **표기 기준**으로 본다. 식별력 필터(요부 추출)는
-거치지 않는다 — 설명 낱말로 빠지는 "bbq" 도 견줘야 한다.
+거치지 않는다 — 설명 낱말로 빠지는 "bbq" 도 견줘야 한다. 아래는 2-1단계(2026-11-25) 규칙.
 
 용어
     붙여 쓴 꼴(key)  정리(clean_input_name → 상표 기호 제거·NFKC·소문자) 뒤 한글·영문·숫자만
                     이은 것.
-    낱말            공백·기호로 나눈 것(접미어 분리 `split_goods_suffix` 뒤)의 붙여 쓴 꼴.
-    낱말 묶음       이어진 낱말(최대 MAX_BUNDLE_WORDS)을 붙인 꼴.
-    조각            낱말을 문자 종류(한글/영문/숫자) 경계로 나눈 것(X1 토큰화와 같은 기준).
-    식별력 없는 말  유명 예외를 뺀 식별력 판정(`judge(…, famous_exception=False)`)이 약함(< θ) —
-                    질의 업종이 있으면 그 업종이나 브랜드 업종 중 하나에서, 없으면 브랜드 업종에서
-                    약하거나 상품 접미어 사전(고시 단일 명칭)에 있는 말.
+    낱말            공백·기호로만 나눈 것의 붙여 쓴 꼴(상품 접미어 분리는 쓰지 않는다).
+    낱말 묶음       이어진 낱말(최대 MAX_BUNDLE_WORDS)을 붙인 꼴 — 표기에 기호·공백이 있어 질의
+                    에서 여러 낱말로 나뉘는 경우(PAIK'S·PARIS BAGUETTE)도 묶음으로 본다.
+    설명 낱말       ① 업종 낱말(업종 세트 25개의 이름·별칭의 낱말과 가게 형태 낱말 — 이 모듈
+                    안의 사전) ② 질의 업종이나 브랜드 업종에서 1호 보통명칭·3호 성질표시로
+                    판정되는 말(유명 예외를 뺀 판정). 4호·5호·6호로만 식별력이 없는 말(지명·
+                    흔한 성·한 글자)은 설명 낱말이 아니다. 나머지는 설명 낱말 하나 또는 둘을
+                    이어 쓴 꼴까지 인정한다.
+    브랜드 업종     이름 일치에는 업종 세트와 역할 "이름" 표장의 유사군만 쓴다(표장별 겹침의
+                    최댓값 ≥ 결합 하한 0.0252 면 겹침). 도형·다른 이름 표장의 유사군은 안 쓴다.
 
-경로(견주는 단위는 낱말 묶음과 표기의 붙여 쓴 꼴)
+표기 종류
+    약한 표기       유명 예외를 뺀 식별력 판정으로 그 브랜드 자신의 업종에서 식별력이 없는 표기
+                    (BBQ·CU·GS25·김가네)와, 같은 브랜드에서 그 표기와 소리가 0.98 이상인 표기
+                    (비비큐·씨유·지에스25).
+    머리글자 표기   약한 표기가 아닌 영문 3자 이하 표기(bhc)와, 같은 브랜드에서 그 표기와 소리가
+                    0.98 이상인 표기(비에이치씨). 같음과 품음-설명만 인정한다.
+    보통 표기       나머지.
+
+경로(보통 표기)
     (가) 같음       낱말 묶음 = 표기.
-    (나) 품음       한 낱말이 표기로 시작하거나 끝남. 나머지가 식별력 없는 말이면 "품음-설명",
-                    아니면 "품음-기타"(결정 대기). 짧은 표기는 품음-설명만.
-    (다) 소리       X1 `phonetic_similarity`(식별력 필터 없이). 대상은 낱말 묶음과, 중간·김 표기에
-                    한해 한 낱말의 앞·뒤 구간으로서 나머지가 식별력 없는 말인 것.
-    (라) 철자       같은 문자 종류끼리만 `orthographic_similarity`(v1). 대상은 (다)와 같다.
-    약한 표기       (가)만 — 질의에서 상품·업종을 나타내는 말(1호·3호로 약한 말, 상품 접미어)을 뺀
-                    나머지가 그 표기 하나뿐이면 일치(업종이 겹치거나 없으면 강함, 다르면 설명적
-                    사용 안내), 다른 말과 함께면 설명적 사용 안내. 질의 안의 약한 표기 조각은 그
-                    브랜드의 다른 표기와 견주지 않는다(가림) — "텍사스 BBQ" 의 bbq 가 "비비큐"
-                    와 소리 1.0 으로 강한 일치가 되면 "그 표기 하나뿐일 때만"이 무력해진다.
+    (나) 품음       낱말(묶음)이 표기 + 나머지(앞이나 뒤). 나머지가 설명 낱말이면 "품음-설명"
+                    (강함), 아니면 "품음-기타"(약함 — 짧은 표기는 인정하지 않음).
+    (다) 소리       표기 전체와 견주는 구간 전체를 통째로 견준다(X1 의 읽기와 음절 유사도 —
+                    조각끼리의 최댓값·붙여쓴 결합어 포함 점수는 쓰지 않고, 숫자는 숫자끼리 같아야
+                    한다). 대상은 낱말 묶음과, 낱말의 앞·뒤 구간으로서 나머지가 설명 낱말인 것.
+    (라) 철자       같은 문자 종류끼리만, 붙여 쓴 꼴 전체의 자모 편집거리(x2_ortho v1 의 식).
+                    대상은 (다)와 같다. 약한 철자 일치는 같은 대상의 소리가 S 이상일 때만.
+약한 표기           질의에서 설명 낱말(붙여 쓴 것 포함)을 뺀 나머지가 그 표기 하나뿐일 때만 일치
+                    — 업종이 없거나 겹치면 강함, 업종이 다르고 그 표기가 그 업종에서도 식별력
+                    없는 말이면 안내만, 그 업종에서는 식별력이 있으면 보통 표기의 같음처럼 강함.
+                    다른 말과 함께면 안내만. 질의 안의 약한 표기는 그 브랜드의 다른 표기와 견주지
+                    않는다(가림).
 
 수준과 바닥
-    강함 = 같음·품음-설명·소리 ≥ 강한 소리·철자 ≥ 강한 철자, 약함 = 소리·철자 ≥ 약한 기준·품음-기타.
-    업종 불문 브랜드: 강함 → 위험, 약함 → 검토 권장. 같은·가까운 업종 중심 브랜드: 업종이 겹치거나
-    없으면 같고, 다르면 강함 → 검토 권장·약함 → 안내만. 설명적 사용 안내는 바닥이 없다.
-    업종 겹침 = 질의 업종과 브랜드 업종(브랜드 표장 하나하나의 유사군, 그리고 업종 세트의 유사군)
-    사이 X4(자카드)의 최댓값 ≥ 결합 하한(계수 JSON coupling.floors.x4 = 0.0252).
+    강함 = 같음·품음-설명·소리 ≥ 강한 소리·철자 ≥ 강한 철자, 약함 = 소리·철자가 약한 기준 이상·
+    품음-기타. 업종 불문 브랜드: 강함 → 위험, 약함 → 검토 권장. 같은·가까운 업종 중심 브랜드:
+    업종이 겹치거나 없으면 같고, 다르면 강함 → 검토 권장·약함 → 안내만. 설명적 사용 안내는
+    바닥이 없다.
 """
 
 from __future__ import annotations
 
+import functools
+import itertools
 import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Iterable, Mapping
 
+from src.axes import distinctiveness as _distinctiveness
 from src.axes.distinctiveness import Distinctiveness, TokenJudgement, load_distinctiveness
 from src.axes.pair_axes import clean_input_name, normalize_codes
 from src.axes.x1_phonetic import (
+    MAX_CANDIDATES,
+    MAX_SYLLABLES,
     _basic_normalize,
     _char_class,
     _clean_chars,
+    _readings,
+    _syllable_sim,
+    _syllables_only,
     _tokenize,
-    phonetic_similarity,
 )
-from src.axes.x2_ortho import orthographic_similarity
+from src.axes.x2_ortho import _similarity as _key_similarity
+from src.axes.x2_ortho import decompose_jamo
 from src.axes.x4_goods import goods_similarity
 
 __all__ = [
     "REGISTRY_VERSION", "OVERRIDES_VERSION", "DEFAULT_REGISTRY_PATH", "DEFAULT_OVERRIDES_PATH",
     "DEFAULT_BRANDS_PATH", "PROTECT_ANY", "PROTECT_NEAR", "ROLE_NAME", "ROLE_FIGURE",
-    "ROLE_OTHER", "ROLE_LOGO", "ROLE_EXCLUDED", "LENGTHS", "LEVEL_STRONG", "LEVEL_WEAK",
-    "LEVEL_NOTICE", "PATH_EXACT", "PATH_CONTAIN_DESC", "PATH_CONTAIN_OTHER", "PATH_SOUND",
-    "PATH_SPELLING", "BASIS_NAME", "BASIS_OCR", "Notation", "Mark", "Brand", "Registry",
-    "Thresholds", "PreparedQuery", "Evidence", "BrandEvidence", "BrandMatch", "FamousResult",
-    "normalize_text", "split_pieces", "text_key", "script_label", "length_class",
-    "analyze_notation", "read_brand_table", "title_has_notation", "auto_role",
-    "build_registry", "registry_to_json", "load_registry", "load_overrides", "prepare_query",
-    "collect_evidence", "decide", "check_famous", "default_goods_floor",
+    "ROLE_OTHER", "ROLE_LOGO", "ROLE_EXCLUDED", "LENGTHS", "KIND_WEAK", "KIND_INITIAL",
+    "KIND_NORMAL", "LEVEL_STRONG", "LEVEL_WEAK", "LEVEL_NOTICE", "PATH_EXACT",
+    "PATH_CONTAIN_DESC", "PATH_CONTAIN_OTHER", "PATH_SOUND", "PATH_SPELLING", "BASIS_NAME",
+    "BASIS_OCR", "Notation", "Mark", "Brand", "Registry", "Thresholds", "PreparedQuery",
+    "Evidence", "BrandEvidence", "BrandMatch", "FamousResult", "normalize_text", "split_pieces",
+    "text_key", "script_label", "length_class", "whole_sound", "whole_spelling",
+    "industry_words", "analyze_notation", "classify_notations", "read_brand_table",
+    "title_has_notation", "auto_role", "build_registry", "registry_to_json", "load_registry",
+    "load_overrides", "prepare_query", "collect_evidence", "decide", "check_famous",
+    "default_goods_floor",
 ]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_REGISTRY_PATH = REPO_ROOT / "shared" / "famous_registry.json"
 DEFAULT_OVERRIDES_PATH = REPO_ROOT / "shared" / "famous_registry_overrides.json"
 DEFAULT_BRANDS_PATH = REPO_ROOT / "shared" / "famous_brands.txt"
-REGISTRY_VERSION = "famous_registry_v1"
+# 업종 낱말 사전의 원천 — 환경 변수로 바꾼 경로가 아니라 저장소의 업종 세트 파일 그대로
+PRESETS_PATH = REPO_ROOT / "shared" / "goods_map" / "business_presets.json"
+REGISTRY_VERSION = "famous_registry_v2"  # v2: 표기 종류(kind)·종류의 근거(inherits)
 OVERRIDES_VERSION = "famous_registry_overrides_v1"
 BRAND_SECTION = "[브랜드]"
 
@@ -90,6 +115,10 @@ SOURCE_FAMOUS, SOURCE_EXISTING = "유명 브랜드 수집", "기존 수집(같�
 LENGTH_SHORT, LENGTH_MID, LENGTH_LONG = "짧음", "중간", "김"
 LENGTHS = (LENGTH_SHORT, LENGTH_MID, LENGTH_LONG)
 ALNUM_WEIGHT = 0.6  # 길이 환산: 한글 음절 1 = 영문·숫자 1/0.6자(순수 표기에서는 지시의 구간과 같다)
+KIND_WEAK, KIND_INITIAL, KIND_NORMAL = "약한 표기", "머리글자 표기", "보통 표기"
+KINDS = (KIND_WEAK, KIND_INITIAL, KIND_NORMAL)
+KIND_SOUND = 0.98  # 같은 브랜드에서 약한·머리글자 표기와 소리가 이 이상이면 같은 종류로 본다
+INITIAL_MAX_LETTERS = 3  # 머리글자 표기: 약한 표기가 아닌 영문 이 글자 수 이하
 LEVEL_STRONG, LEVEL_WEAK, LEVEL_NOTICE = "강함", "약함", "설명적 사용 안내"
 PATH_EXACT, PATH_CONTAIN_DESC, PATH_CONTAIN_OTHER = "같음", "품음-설명", "품음-기타"
 PATH_SOUND, PATH_SPELLING = "소리", "철자"
@@ -98,9 +127,15 @@ GRADES = ("안전", "주의", "검토 권장", "위험")
 GRADE_REVIEW, GRADE_RISK = "검토 권장", "위험"
 STRONG_SOUND = 0.98  # 단독 축 기준(standalone x1)과 같다
 MAX_BUNDLE_WORDS = 5  # 낱말 묶음에 넣는 이어진 낱말 수 상한
+MAX_DESCRIPTIVE_WORDS = 2  # 나머지는 설명 낱말 하나 또는 둘을 이어 쓴 꼴까지
 WEAK_USE_ALONE, WEAK_USE_WITH_OTHERS = "단독", "다른 말과 함께"
-# 상품·업종을 나타내는 말(보통명칭·성질표시)로 보는 판정 사유의 머리
-GOODS_WORD_REASONS = ("1호 보통명칭", "3호 기술적 표장")
+# 가게 형태 낱말(업종 낱말 사전의 일부 — 업종 세트의 이름·별칭에 더한다)
+SHOP_WORDS = ("가게", "전문점", "매장", "샵", "숍", "스토어", "마트", "하우스", "본점", "지점",
+              "직영점")
+# 설명 낱말로 보는 판정 사유의 머리(보통명칭·성질표시). 4호·5호·6호만으로는 설명 낱말이 아니다
+DESCRIPTIVE_REASONS = ("1호 보통명칭", "3호 기술적 표장")
+# 근거로 남길 대상의 최소 점수 — 기준 격자의 가장 낮은 값(약한 소리 0.90·약한 철자 0.75)보다 낮게
+UNIT_MIN_SOUND, UNIT_MIN_SPELLING = 0.85, 0.70
 _LEVEL_RANK = {LEVEL_STRONG: 3, LEVEL_WEAK: 2, LEVEL_NOTICE: 1}
 _PATH_RANK = {PATH_EXACT: 5, PATH_CONTAIN_DESC: 4, PATH_SOUND: 3, PATH_SPELLING: 2,
               PATH_CONTAIN_OTHER: 1}
@@ -129,6 +164,13 @@ def text_key(text: object) -> str:
     return "".join(split_pieces(normalize_text(text)))
 
 
+def split_words(text: object) -> tuple[str, ...]:
+    """낱말 — 공백·기호로만 나눈 것의 붙여 쓴 꼴("PAIK'S 카페" → paik·s·카페). 상품 접미어
+    분리는 하지 않는다."""
+    words = ("".join(_tokenize(raw)) for raw in _clean_chars(normalize_text(text)).split())
+    return tuple(word for word in words if word)
+
+
 def script_label(key: str) -> str:
     """문자 종류 — "한글"·"영문"·"숫자" 또는 섞인 것("영문+숫자")."""
     kinds = {_SCRIPT_NAMES[c] for c in map(_char_class, key) if c in _SCRIPT_NAMES}
@@ -149,6 +191,123 @@ def length_class(key: str) -> str:
     return LENGTH_LONG
 
 
+# ---- 통째 비교(소리·철자) -----------------------------------------------------------------------
+
+def _digit_runs(key: str) -> tuple[str, ...]:
+    return tuple(token for token in _tokenize(key) if _char_class(token[0]) == "D")
+
+
+@functools.lru_cache(maxsize=65536)
+def whole_readings(key: str) -> tuple[str, ...]:
+    """붙여 쓴 꼴 전체의 한글 읽기 — 문자 종류 조각마다 X1 의 읽기(_readings: 한글 그대로·영문
+    G2P(+낱자)·숫자 읽기)를 순서대로 이은 것. 조각 하나만 떼어 낸 읽기는 만들지 않는다. 조합이
+    MAX_CANDIDATES 를 넘으면 조각마다 첫 읽기만 쓴다(X1 의 결합음과 같은 규칙)."""
+    lists = [readings for readings in map(_readings, _tokenize(key)) if readings]
+    if not lists:
+        return ()
+    total = 1
+    for readings in lists:
+        total *= len(readings)
+    if total > MAX_CANDIDATES:
+        lists = [readings[:1] for readings in lists]
+    out: list[str] = []
+    for parts in itertools.product(*lists):
+        reading = _syllables_only("".join(parts))[:MAX_SYLLABLES]
+        if reading and reading not in out:
+            out.append(reading)
+    return tuple(out)
+
+
+def whole_sound(key_a: str, key_b: str) -> float:
+    """통째 소리 — 두 붙여 쓴 꼴 전체의 읽기끼리 X1 음절 유사도(편집거리)의 최댓값. 숫자는 숫자끼리
+    같아야 하고(다르면 0), 조각끼리의 최댓값·붙여쓴 결합어 포함 점수는 쓰지 않는다. 대칭."""
+    if not key_a or not key_b or _digit_runs(key_a) != _digit_runs(key_b):
+        return 0.0
+    best = 0.0
+    for x in whole_readings(key_a):
+        for y in whole_readings(key_b):
+            score = _syllable_sim(x, y)
+            if score > best:
+                best = score
+    return best
+
+
+def whole_spelling(key_a: str, key_b: str) -> float:
+    """통째 철자 — 두 붙여 쓴 꼴 전체를 자모로 푼 편집거리 유사도(x2_ortho v1 이 전체 문자열에 쓰는
+    식). 숫자는 숫자끼리 같아야 한다(다르면 0). 문자 종류가 같은지는 부르는 쪽이 본다."""
+    if not key_a or not key_b or _digit_runs(key_a) != _digit_runs(key_b):
+        return 0.0
+    return _key_similarity(decompose_jamo(key_a), decompose_jamo(key_b))
+
+
+# ---- 설명 낱말 ---------------------------------------------------------------------------------
+
+@functools.lru_cache(maxsize=4)
+def industry_words(path: str | None = None) -> frozenset[str]:
+    """업종 낱말 사전 — 업종 세트 25개의 이름·별칭을 공백·기호로 나눈 낱말 전부와 가게 형태 낱말
+    (붙여 쓴 꼴). 이 모듈 안에서만 쓴다(식별력 모듈과 학습 특징은 그대로)."""
+    presets = json.loads(Path(path or PRESETS_PATH).read_text(encoding="utf-8"))
+    words = {text_key(word) for word in SHOP_WORDS}
+    for preset in presets:
+        for phrase in (preset.get("업종명") or "", *(preset.get("별칭") or ())):
+            words.update(split_words(phrase))
+    words.discard("")
+    return frozenset(words)
+
+
+_REASON_CACHE: dict[tuple[int, str, frozenset[str]], bool] = {}
+
+
+def _descriptive_by_judgement(dist: Distinctiveness, token: str, goods: frozenset[str]) -> bool:
+    """그 업종에서 보통명칭(1호)·성질표시(3호)로 식별력이 없다고 판정되는 말인가(유명 예외 뺌)."""
+    key = (id(dist), token, goods)
+    hit = _REASON_CACHE.get(key)
+    if hit is None:
+        if len(_REASON_CACHE) > 500_000:
+            _REASON_CACHE.clear()
+        judged = dist.judge(token, goods, famous_exception=False)
+        hit = judged.score < dist.theta and any(
+            reason.startswith(DESCRIPTIVE_REASONS) for reason in judged.reasons)
+        _REASON_CACHE[key] = hit
+    return hit
+
+
+def _descriptive_checker(dist: Distinctiveness, query_goods: frozenset[str],
+                         brand_codes: frozenset[str], words: frozenset[str]
+                         ) -> Callable[[str], bool]:
+    """설명 낱말(하나 또는 둘을 이어 쓴 꼴)인가 — 모듈 설명의 정의."""
+    contexts = tuple(codes for codes in (query_goods, brand_codes) if codes)
+    terms = dist.descriptive
+    if terms is None:
+        terms = _distinctiveness.DESCRIPTIVE_TERMS
+    names = dist.goods_names
+    single_memo: dict[str, bool] = {}
+    memo: dict[str, bool] = {}
+
+    def single(text: str) -> bool:
+        hit = single_memo.get(text)
+        if hit is None:
+            hit = text in words
+            if not hit and (text in names or text in terms):  # 1호·3호가 될 수 있는 말만 판정
+                hit = any(_descriptive_by_judgement(dist, text, codes) for codes in contexts)
+            single_memo[text] = hit
+        return hit
+
+    def descriptive(text: str) -> bool:
+        if not text:
+            return False
+        hit = memo.get(text)
+        if hit is None:
+            hit = single(text) or (MAX_DESCRIPTIVE_WORDS >= 2 and any(
+                single(text[:cut]) and single(text[cut:]) for cut in range(1, len(text))))
+            memo[text] = hit
+        return hit
+
+    return descriptive
+
+
+# ---- 등록부 ------------------------------------------------------------------------------------
+
 def _judge(dist: Distinctiveness, piece: str, goods: frozenset[str]) -> TokenJudgement:
     return dist.judge(piece, goods or None, famous_exception=False)
 
@@ -157,22 +316,72 @@ def _weak(dist: Distinctiveness, piece: str, goods: frozenset[str]) -> bool:
     return _judge(dist, piece, goods).score < dist.theta
 
 
+def _notation_pieces(text: str, dist: Distinctiveness) -> list[str]:
+    """표기의 식별력을 보는 조각 — 1단계 정의대로 상품 접미어 분리 뒤의 문자 종류 조각."""
+    return split_pieces(dist.split_goods_suffix(normalize_text(text)))
+
+
+def _plain_in(dist: Distinctiveness, text: str, goods: frozenset[str]) -> bool:
+    """그 업종에서 표기의 조각이 모두 식별력 없는 말인가(유명 예외 뺌)."""
+    pieces = _notation_pieces(text, dist)
+    return bool(pieces) and all(_weak(dist, piece, goods) for piece in pieces)
+
+
 def analyze_notation(text: str, dist: Distinctiveness, brand_codes: frozenset[str]) -> dict:
-    """표기 하나의 등록부 항목 — 붙여 쓴 꼴·조각·문자 종류·길이 구간, 그리고 "약한 표기" 여부:
-    유명 예외를 뺀 식별력 판정으로 그 브랜드 자신의 업종(brand_codes)에서 조각(접미어 분리 뒤)이
-    모두 약하면 약한 표기. 조각별 판정(점수·사유)을 함께 남긴다."""
+    """표기 하나의 등록부 항목 — 붙여 쓴 꼴·조각·문자 종류·길이 구간, 그리고 자기 업종에서의
+    식별력(base_weak): 유명 예외를 뺀 판정으로 그 브랜드 자신의 업종(brand_codes)에서 조각(접미어
+    분리 뒤)이 모두 약하면 True. 조각별 판정(점수·사유)을 함께 남긴다. 표기 종류(kind)는
+    classify_notations 가 브랜드 단위로 정한다."""
     clean = normalize_text(text)
     key = "".join(split_pieces(clean))
-    judged = [_judge(dist, piece, brand_codes)
-              for piece in split_pieces(dist.split_goods_suffix(clean))]
+    judged = [_judge(dist, piece, brand_codes) for piece in _notation_pieces(text, dist)]
     weak = bool(judged) and all(j.score < dist.theta for j in judged)
     return {"text": text, "key": key, "pieces": split_pieces(clean),
-            "script": script_label(key), "length": length_class(key), "weak": weak,
+            "script": script_label(key), "length": length_class(key), "base_weak": weak,
             "judgements": [{"token": j.token, "score": j.score, "reasons": list(j.reasons)}
                            for j in judged]}
 
 
-# ---- 등록부 ------------------------------------------------------------------------------------
+def classify_notations(items: list[dict]) -> list[dict]:
+    """한 브랜드의 표기들에 종류를 붙인다(kind·inherits·kind_reason).
+
+    약한 표기 = base_weak 인 표기와, 그 표기와 통째 소리가 KIND_SOUND 이상인 표기(inherits = 그
+    약한 표기들 — 다른 업종에서의 식별력은 그 표기의 것을 따른다). 머리글자 표기 = 약한 표기가
+    아닌 영문 INITIAL_MAX_LETTERS 자 이하 표기와, 그 표기와 소리가 KIND_SOUND 이상인 표기. 나머지는
+    보통 표기."""
+    out = [dict(item) for item in items]
+    base = [item for item in out if item["base_weak"]]
+    for item in out:
+        if item["base_weak"]:
+            reasons = "; ".join(f"{j['token']}: {'·'.join(j['reasons'])}"
+                                for j in item["judgements"])
+            item.update(kind=KIND_WEAK, inherits=[item["text"]],
+                        kind_reason=f"자기 업종에서 식별력 없음({reasons})")
+            continue
+        alike = [(other["text"], whole_sound(item["key"], other["key"])) for other in base]
+        alike = [(text, score) for text, score in alike if score >= KIND_SOUND]
+        if alike:
+            item.update(kind=KIND_WEAK, inherits=[text for text, _ in alike],
+                        kind_reason="약한 표기와 소리가 같음(" + ", ".join(
+                            f"{text} {score:.2f}" for text, score in alike) + ")")
+    initials = [item for item in out if "kind" not in item and item["script"] == "영문"
+                and len(item["key"]) <= INITIAL_MAX_LETTERS]
+    for item in initials:
+        item.update(kind=KIND_INITIAL, inherits=[item["text"]],
+                    kind_reason=f"영문 {len(item['key'])}자")
+    for item in out:
+        if "kind" in item:
+            continue
+        alike = [(other["text"], whole_sound(item["key"], other["key"])) for other in initials]
+        alike = [(text, score) for text, score in alike if score >= KIND_SOUND]
+        if alike:
+            item.update(kind=KIND_INITIAL, inherits=[text for text, _ in alike],
+                        kind_reason="머리글자 표기와 소리가 같음(" + ", ".join(
+                            f"{text} {score:.2f}" for text, score in alike) + ")")
+        else:
+            item.update(kind=KIND_NORMAL, inherits=[], kind_reason="")
+    return out
+
 
 @dataclass(frozen=True)
 class Notation:
@@ -181,8 +390,15 @@ class Notation:
     pieces: tuple[str, ...]
     script: str
     length: str
-    weak: bool
+    kind: str  # 약한 표기 | 머리글자 표기 | 보통 표기
+    base_weak: bool  # 자기 업종에서 식별력 없는 표기(1단계의 약한 표기)
+    inherits: tuple[str, ...] = ()  # 종류를 따르는 같은 브랜드의 표기(자기 자신일 수 있다)
+    kind_reason: str = ""
     judgements: tuple[dict, ...] = ()
+
+    @property
+    def weak(self) -> bool:
+        return self.kind == KIND_WEAK
 
 
 @dataclass(frozen=True)
@@ -211,7 +427,7 @@ class Brand:
     evidence: str
     evidence_urls: tuple[str, ...]
     protection: str
-    goods_codes: frozenset[str]  # 식별력 판정 맥락 — 브랜드 표장 유사군 합집합, 없으면 업종 세트
+    goods_codes: frozenset[str]  # 자기 업종의 식별력 맥락 — 브랜드 표장 유사군, 없으면 업종 세트
     goods_source: str
     marks: tuple[Mark, ...]
 
@@ -221,11 +437,24 @@ class Brand:
 
     @property
     def goods_sets(self) -> tuple[frozenset[str], ...]:
-        """업종 겹침을 볼 유사군 집합들 — 브랜드 표장 하나하나와 업종 세트."""
+        """1단계의 업종 겹침 집합(브랜드 표장 하나하나와 업종 세트) — 1단계 표본을 그대로 다시
+        만드는 데만 쓴다. 이름 일치의 업종 겹침은 name_goods_sets."""
         sets = [mark.codes for mark in self.brand_marks if mark.codes]
         if self.preset_codes:
             sets.append(self.preset_codes)
         return tuple(sets)
+
+    @property
+    def name_goods_sets(self) -> tuple[frozenset[str], ...]:
+        """이름 일치용 브랜드 업종 — 업종 세트와 역할 "이름" 표장 하나하나의 유사군."""
+        sets = [self.preset_codes] if self.preset_codes else []
+        sets += [mark.codes for mark in self.marks if mark.role == ROLE_NAME and mark.codes]
+        return tuple(sets)
+
+    @property
+    def name_goods_codes(self) -> frozenset[str]:
+        """이름 일치용 브랜드 업종의 유사군 합집합(설명 낱말 판정의 맥락)."""
+        return frozenset(code for codes in self.name_goods_sets for code in codes)
 
 
 @dataclass(frozen=True)
@@ -324,6 +553,15 @@ def _record_title(record: dict) -> str | None:
     return title or None
 
 
+def _notation(item: dict) -> Notation:
+    return Notation(
+        text=item["text"], key=item["key"], pieces=tuple(item["pieces"]),
+        script=item["script"], length=item["length"], kind=item["kind"],
+        base_weak=bool(item["base_weak"]), inherits=tuple(item.get("inherits") or ()),
+        kind_reason=item.get("kind_reason") or "",
+        judgements=tuple(item.get("judgements") or ()))
+
+
 def build_registry(
     rows: list[dict], *, plan_records: list[dict], db_records: list[dict],
     preset_codes: Mapping[str, Iterable[str]], preset_labels: Mapping[str, str],
@@ -381,11 +619,8 @@ def build_registry(
                         for code in mark.codes)
         preset = frozenset(normalize_codes(preset_codes.get(row["preset"]) or ()))
         goods_codes, goods_source = (own, "브랜드 표장") if own else (preset, "업종 세트")
-        notations = tuple(
-            Notation(text=item["text"], key=item["key"], pieces=tuple(item["pieces"]),
-                     script=item["script"], length=item["length"], weak=item["weak"],
-                     judgements=tuple(item["judgements"]))
-            for item in (analyze_notation(text, dist, goods_codes) for text in row["notations"]))
+        notations = tuple(_notation(item) for item in classify_notations(
+            [analyze_notation(text, dist, goods_codes) for text in row["notations"]]))
         protection = (overrides["brands"].get(name) or {}).get("protection") or PROTECT_ANY
         brands.append(Brand(
             name=name, notations=notations, applicants=tuple(row["applicants"]),
@@ -413,7 +648,9 @@ def registry_to_json(registry: Registry) -> dict:
         brands.append({
             "name": brand.name,
             "notations": [{"text": n.text, "key": n.key, "pieces": list(n.pieces),
-                           "script": n.script, "length": n.length, "weak": n.weak,
+                           "script": n.script, "length": n.length, "kind": n.kind,
+                           "base_weak": n.base_weak, "inherits": list(n.inherits),
+                           "kind_reason": n.kind_reason,
                            "judgements": list(n.judgements)} for n in brand.notations],
             "applicants": list(brand.applicants),
             "applicant_keys": sorted(brand.applicant_keys),
@@ -438,12 +675,12 @@ def load_registry(path: Path = DEFAULT_REGISTRY_PATH) -> Registry:
     for item in data["brands"]:
         if item["protection"] not in PROTECTIONS:
             raise ValueError(f"famous_registry: {item['name']} 의 보호 범위를 모릅니다")
+        for n in item["notations"]:
+            if n["kind"] not in KINDS:
+                raise ValueError(f"famous_registry: {n['text']} 의 표기 종류를 모릅니다")
         brands.append(Brand(
             name=item["name"],
-            notations=tuple(Notation(
-                text=n["text"], key=n["key"], pieces=tuple(n["pieces"]), script=n["script"],
-                length=n["length"], weak=bool(n["weak"]),
-                judgements=tuple(n.get("judgements") or ())) for n in item["notations"]),
+            notations=tuple(_notation(n) for n in item["notations"]),
             applicants=tuple(item["applicants"]),
             applicant_keys=frozenset(item["applicant_keys"]),
             preset=item["industry"]["preset"], preset_label=item["industry"].get("label"),
@@ -469,25 +706,29 @@ def _per_length(value: float | None = None) -> dict[str, float | None]:
 
 @dataclass(frozen=True)
 class Thresholds:
-    """기준값. None 은 그 경로를 쓰지 않는다는 뜻. 약한 기준은 표기의 길이 구간별."""
+    """기준값. None 은 그 경로를 쓰지 않는다는 뜻. 강한 철자·약한 소리·약한 철자는 표기의 길이
+    구간별, spelling_sound(S)는 약한 철자 일치가 인정되려면 같은 대상의 소리가 넘어야 하는 값."""
 
     strong_sound: float | None = STRONG_SOUND
-    strong_spelling: float | None = None
+    strong_spelling: Mapping[str, float | None] = field(default_factory=_per_length)
     weak_sound: Mapping[str, float | None] = field(default_factory=_per_length)
     weak_spelling: Mapping[str, float | None] = field(default_factory=_per_length)
+    spelling_sound: float | None = None
     contain_other: bool = True  # 품음-기타를 약한 일치로 둘지(결정 대기 — 따로 센다)
 
     def to_dict(self) -> dict:
-        return {"strong_sound": self.strong_sound, "strong_spelling": self.strong_spelling,
+        return {"strong_sound": self.strong_sound,
+                "strong_spelling": dict(self.strong_spelling),
                 "weak_sound": dict(self.weak_sound), "weak_spelling": dict(self.weak_spelling),
-                "contain_other": self.contain_other}
+                "spelling_sound": self.spelling_sound, "contain_other": self.contain_other}
 
     @classmethod
     def from_dict(cls, data: Mapping) -> "Thresholds":
         return cls(strong_sound=data.get("strong_sound", STRONG_SOUND),
-                   strong_spelling=data.get("strong_spelling"),
+                   strong_spelling={**_per_length(), **(data.get("strong_spelling") or {})},
                    weak_sound={**_per_length(), **(data.get("weak_sound") or {})},
                    weak_spelling={**_per_length(), **(data.get("weak_spelling") or {})},
+                   spelling_sound=data.get("spelling_sound"),
                    contain_other=bool(data.get("contain_other", True)))
 
 
@@ -502,40 +743,26 @@ def default_goods_floor() -> float:
 
 @dataclass(frozen=True)
 class PreparedQuery:
-    text: str  # 정리한 이름(접미어 분리 뒤)
-    words: tuple[str, ...]  # 낱말의 붙여 쓴 꼴
-    word_pieces: tuple[tuple[str, ...], ...]  # 낱말마다 조각
+    text: str  # 정리한 이름
+    words: tuple[str, ...]  # 낱말의 붙여 쓴 꼴(공백·기호로만 나눔)
     goods: frozenset[str]
 
-    @property
-    def pieces(self) -> tuple[str, ...]:
-        return tuple(piece for pieces in self.word_pieces for piece in pieces)
 
-
-def prepare_query(name: object, goods_codes: Iterable[str] | str | None,
-                  dist: Distinctiveness) -> PreparedQuery:
-    """이름 정리 — clean_input_name·소문자 → 엔진의 상품 접미어 분리(split_goods_suffix:
-    "스타벅스커피" → "스타벅스 커피") → 공백·기호로 낱말. 식별력 필터는 거치지 않는다."""
-    text = dist.split_goods_suffix(normalize_text(name))
-    words: list[str] = []
-    word_pieces: list[tuple[str, ...]] = []
-    for raw in _clean_chars(text).split():
-        pieces = tuple(_tokenize(raw))
-        if pieces:
-            words.append("".join(pieces))
-            word_pieces.append(pieces)
-    return PreparedQuery(text=text, words=tuple(words), word_pieces=tuple(word_pieces),
+def prepare_query(name: object, goods_codes: Iterable[str] | str | None) -> PreparedQuery:
+    """이름 정리 — clean_input_name·소문자 → 공백·기호로 낱말. 상품 접미어 분리도, 식별력 필터도
+    거치지 않는다."""
+    return PreparedQuery(text=normalize_text(name), words=split_words(name),
                          goods=normalize_codes(goods_codes))
 
 
-def _bundles(words: tuple[str, ...]) -> list[str]:
-    out: list[str] = []
+def _spans(words: tuple[str, ...]) -> list[tuple[int, int, str]]:
+    """낱말 묶음 — (시작, 끝, 붙여 쓴 꼴): 이어진 낱말 1개부터 MAX_BUNDLE_WORDS 개까지."""
+    out: list[tuple[int, int, str]] = []
     for start in range(len(words)):
         key = ""
-        for word in words[start:start + MAX_BUNDLE_WORDS]:
-            key += word
-            if key not in out:
-                out.append(key)
+        for stop in range(start + 1, min(len(words), start + MAX_BUNDLE_WORDS) + 1):
+            key += words[stop - 1]
+            out.append((start, stop, key))
     return out
 
 
@@ -548,22 +775,30 @@ class Evidence:
     notation: str
     key: str
     length: str
-    weak_notation: bool
+    kind: str
     exact: bool = False
     contain: str | None = None  # "설명" | "기타"
     contain_word: str | None = None
     contain_rest: str | None = None
-    sound: float = 0.0
-    sound_unit: str | None = None
-    spelling: float = 0.0
-    spelling_unit: str | None = None
+    units: tuple[tuple[str, float, float], ...] = ()  # 보통 표기: (대상, 소리, 철자)
     weak_use: str | None = None  # 약한 표기: WEAK_USE_ALONE | WEAK_USE_WITH_OTHERS
+    foreign_weak: bool | None = None  # 약한 표기: 질의 업종에서도 식별력 없는 말(업종 없으면 None)
     descriptive: bool = False  # 질의 업종에서 이 표기가 식별력 없는 말
 
+    def best(self, index: int) -> tuple[float, str | None]:
+        """대상 가운데 소리(index 1)·철자(index 2)가 가장 높은 것 — (점수, 대상)."""
+        if not self.units:
+            return 0.0, None
+        unit = max(self.units, key=lambda item: item[index])
+        return unit[index], unit[0]
+
     @property
-    def any_signal(self) -> bool:
-        return bool(self.exact or self.contain or self.weak_use or self.sound > 0.0
-                    or self.spelling > 0.0)
+    def sound(self) -> float:
+        return self.best(1)[0]
+
+    @property
+    def spelling(self) -> float:
+        return self.best(2)[0]
 
 
 @dataclass(frozen=True)
@@ -579,189 +814,153 @@ def _overlap(goods: frozenset[str], brand: Brand, goods_floor: float
              ) -> tuple[bool | None, float | None]:
     if not goods:
         return None, None
-    value = max((goods_similarity(goods, codes) for codes in brand.goods_sets), default=0.0)
+    value = max((goods_similarity(goods, codes) for codes in brand.name_goods_sets),
+                default=0.0)
     return value >= goods_floor, round(value, 4)
 
 
-def _plain_checker(dist: Distinctiveness, query_goods: frozenset[str],
-                   brand_codes: frozenset[str]) -> Callable[[str], bool]:
-    """식별력 없는 말 — 붙여 쓴 글자열의 조각이 모두 약한가(모듈 설명의 맥락 규칙)."""
-    memo: dict[str, bool] = {}
-
-    def piece_plain(piece: str) -> bool:
-        if query_goods:
-            return _weak(dist, piece, query_goods) or _weak(dist, piece, brand_codes)
-        return _weak(dist, piece, brand_codes) or piece in dist.goods_names
-
-    def plain(text: str) -> bool:
-        if text not in memo:
-            pieces = _tokenize(text)
-            memo[text] = bool(pieces) and all(piece_plain(piece) for piece in pieces)
-        return memo[text]
-
-    return plain
-
-
-def _goods_word_checker(dist: Distinctiveness, query_goods: frozenset[str],
-                        brand_codes: frozenset[str]) -> Callable[[str], bool]:
-    """상품·업종을 나타내는 말 — 보통명칭(1호)·성질표시(3호)로 약하다고 판정되는 말이거나 상품
-    접미어 사전에 있는 말."""
-    contexts = [codes for codes in (query_goods, brand_codes) if codes]
-
-    def goods_word(piece: str) -> bool:
-        if piece in dist.goods_names:
-            return True
-        for codes in contexts:
-            judged = _judge(dist, piece, codes)
-            if judged.score < dist.theta and any(
-                    reason.startswith(GOODS_WORD_REASONS) for reason in judged.reasons):
-                return True
-        return False
-
-    return goods_word
-
-
-def _occurrences(pieces: tuple[str, ...], key: str) -> list[tuple[int, int]]:
-    """조각 열에서 이어 붙이면 key 와 같은 구간 [start, stop) 들."""
-    found: list[tuple[int, int]] = []
-    for start in range(len(pieces)):
-        joined = ""
-        for stop in range(start, len(pieces)):
-            joined += pieces[stop]
-            if len(joined) >= len(key):
-                break
+def _attached(words: tuple[str, ...], spans: list[tuple[int, int, str]], key: str,
+              descriptive: Callable[[str], bool]) -> list[tuple[int, int, str, str | None]]:
+    """표기가 놓인 낱말 묶음 — (시작, 끝, 종류, 나머지): 종류 "같음"(묶음 = 표기), "설명"·"기타"
+    (묶음 = 표기 + 나머지 또는 나머지 + 표기 — 나머지는 묶음의 끝 낱말의 뒷부분이거나 첫 낱말의
+    앞부분이고, 설명 낱말이면 "설명")."""
+    out: list[tuple[int, int, str, str | None]] = []
+    for start, stop, joined in spans:
         if joined == key:
-            found.append((start, stop + 1))
-    return found
-
-
-def _weak_use(query: PreparedQuery, notation: Notation,
-              goods_word: Callable[[str], bool]) -> str | None:
-    """약한 표기의 쓰임 — 질의 조각 가운데 표기와 같은 구간을 찾아, 나머지가 모두 상품·업종을
-    나타내는 말이면 "단독", 다른 말이 있으면 "다른 말과 함께". 표기가 없으면 None."""
-    pieces = query.pieces
-    best: str | None = None
-    for start, stop in _occurrences(pieces, notation.key):
-        rest = pieces[:start] + pieces[stop:]
-        if all(goods_word(piece) for piece in rest):
-            return WEAK_USE_ALONE
-        best = WEAK_USE_WITH_OTHERS
-    return best
-
-
-def _masked(query: PreparedQuery, notations: Iterable[Notation]) -> PreparedQuery:
-    """질의에서 그 브랜드의 약한 표기 조각을 가린 것 — 가린 조각은 그 브랜드의 다른 표기와
-    견주지 않는다(약한 표기의 쓰임은 _weak_use 가 정한다). 가릴 것이 없으면 질의 그대로."""
-    pieces = query.pieces
-    hidden: set[int] = set()
-    for notation in notations:
-        if notation.weak and notation.key:
-            for start, stop in _occurrences(pieces, notation.key):
-                hidden.update(range(start, stop))
-    if not hidden:
-        return query
-    words: list[str] = []
-    word_pieces: list[tuple[str, ...]] = []
-    index = 0
-    for group in query.word_pieces:
-        kept = tuple(piece for offset, piece in enumerate(group) if index + offset not in hidden)
-        index += len(group)
-        if kept:
-            words.append("".join(kept))
-            word_pieces.append(kept)
-    return PreparedQuery(text=query.text, words=tuple(words), word_pieces=tuple(word_pieces),
-                         goods=query.goods)
-
-
-def _segments(query: PreparedQuery, plain: Callable[[str], bool]) -> list[str]:
-    """한 낱말의 앞·뒤 구간으로서 나머지가 식별력 없는 말인 것."""
-    out: list[str] = []
-    for word in query.words:
-        for cut in range(1, len(word)):
-            head, tail = word[:cut], word[cut:]
-            if plain(tail) and head not in out:
-                out.append(head)
-            if plain(head) and tail not in out:
-                out.append(tail)
+            out.append((start, stop, "같음", None))
+            continue
+        if len(joined) <= len(key):
+            continue
+        if joined.startswith(key):
+            rest = joined[len(key):]
+            if len(rest) < len(words[stop - 1]):
+                out.append((start, stop, "설명" if descriptive(rest) else "기타", rest))
+        if joined.endswith(key):
+            rest = joined[:-len(key)]
+            if len(rest) < len(words[start]):
+                out.append((start, stop, "설명" if descriptive(rest) else "기타", rest))
     return out
 
 
-def _notation_evidence(query: PreparedQuery, notation: Notation, bundles: list[str],
-                       segments: list[str], plain: Callable[[str], bool],
-                       goods_word: Callable[[str], bool], dist: Distinctiveness, *,
-                       similarity: bool, hidden: frozenset[str] = frozenset()) -> Evidence:
-    """표기 하나의 근거. hidden = 그 브랜드의 약한 표기(붙여 쓴 꼴) — 이것과 같은 단위는 견주지
-    않는다(낱말의 앞·뒤 구간이 약한 표기와 같은 경우: "bbqs" 의 bbq)."""
-    base = dict(notation=notation.text, key=notation.key, length=notation.length,
-                weak_notation=notation.weak)
-    if not notation.key:
-        return Evidence(**base)
-    if notation.weak:  # 약한 표기는 (가)만 — 쓰임을 따로 본다
-        return Evidence(**base, weak_use=_weak_use(query, notation, goods_word))
-    key = notation.key
-    exact = key in bundles
-    contain = word_hit = rest_hit = None
-    for word in query.words:
-        if word == key:
+def _weak_evidence(query: PreparedQuery, notation: Notation, base: dict,
+                   placements: list[tuple[int, int, str, str | None]],
+                   descriptive: Callable[[str], bool], dist: Distinctiveness
+                   ) -> tuple[Evidence, set[int]]:
+    """약한 표기의 근거와, 질의에서 그 표기가 놓인 낱말 번호(가림용). 표기 = 낱말 묶음이거나
+    묶음 = 표기 + 설명 낱말인 자리를 찾아, 그 밖의 낱말이 모두 설명 낱말이면 "단독"."""
+    use: str | None = None
+    covered: set[int] = set()
+    for start, stop, kind, _ in placements:
+        if kind == "기타":
             continue
-        rests = []
-        if word.startswith(key):
-            rests.append(word[len(key):])
-        if word.endswith(key):
-            rests.append(word[:-len(key)])
-        for rest in rests:
-            kind = "설명" if plain(rest) else "기타"
-            if kind == "기타" and notation.length == LENGTH_SHORT:
-                continue  # 짧은 표기는 품음-설명만 인정
-            if contain is None or (kind == "설명" and contain == "기타"):
-                contain, word_hit, rest_hit = kind, word, rest
-    sound = spelling = 0.0
-    sound_unit = spelling_unit = None
-    if similarity:
-        units = list(bundles)
-        if notation.length != LENGTH_SHORT:
-            units += [segment for segment in segments if segment not in units]
-        for unit in units:
-            if unit in hidden:
-                continue
-            score = phonetic_similarity(unit, key)
-            if score > sound:
-                sound, sound_unit = score, unit
-            if script_label(unit) == notation.script:
-                score = orthographic_similarity(unit, key)
-                if score > spelling:
-                    spelling, spelling_unit = score, unit
-    descriptive = bool(query.goods) and bool(notation.pieces) and all(
-        _weak(dist, piece, query.goods) for piece in notation.pieces)
-    return Evidence(**base, exact=exact, contain=contain, contain_word=word_hit,
-                    contain_rest=rest_hit, sound=round(sound, 4), sound_unit=sound_unit,
-                    spelling=round(spelling, 4), spelling_unit=spelling_unit,
-                    descriptive=descriptive)
+        covered.update(range(start, stop))
+        others = query.words[:start] + query.words[stop:]
+        if all(descriptive(word) for word in others):
+            use = WEAK_USE_ALONE
+        elif use is None:
+            use = WEAK_USE_WITH_OTHERS
+    foreign = None
+    if use and query.goods:  # 다른 업종에서의 식별력은 종류를 따르는 표기의 것도 본다
+        foreign = any(_plain_in(dist, text, query.goods)
+                      for text in dict.fromkeys((notation.text, *notation.inherits)))
+    return Evidence(**base, weak_use=use, foreign_weak=foreign), covered
+
+
+def _trimmed(words: tuple[str, ...], descriptive: Callable[[str], bool]
+             ) -> tuple[list[list[str]], list[list[str]]]:
+    """낱말마다 설명 낱말인 뒷부분들·앞부분들(낱말 전체는 빼고)."""
+    tails = [[word[cut:] for cut in range(1, len(word)) if descriptive(word[cut:])]
+             for word in words]
+    heads = [[word[:cut] for cut in range(1, len(word)) if descriptive(word[:cut])]
+             for word in words]
+    return tails, heads
+
+
+def _units(spans: list[tuple[int, int, str]], tails: list[list[str]], heads: list[list[str]],
+           masked: set[int], hidden: frozenset[str]) -> list[str]:
+    """소리·철자를 견줄 대상 — 낱말 묶음과, 묶음의 앞·뒤 구간으로서 나머지가 설명 낱말인 것.
+    가린 낱말이 든 묶음과 약한 표기 그 자체는 뺀다."""
+    out: dict[str, None] = {}
+    for start, stop, joined in spans:
+        if masked and not masked.isdisjoint(range(start, stop)):
+            continue
+        out.setdefault(joined)
+        for rest in tails[stop - 1]:
+            out.setdefault(joined[:-len(rest)])
+        for rest in heads[start]:
+            out.setdefault(joined[len(rest):])
+    return [unit for unit in out if unit and unit not in hidden]
+
+
+def _brand_evidence(query: PreparedQuery, brand: Brand, dist: Distinctiveness,
+                    goods_floor: float, words: frozenset[str], similarity: bool
+                    ) -> BrandEvidence:
+    descriptive = _descriptive_checker(dist, query.goods, brand.name_goods_codes, words)
+    spans = _spans(query.words)
+    overlap, value = _overlap(query.goods, brand, goods_floor)
+    items: dict[str, Evidence] = {}
+    masked: set[int] = set()
+    for notation in brand.notations:  # 약한 표기 먼저 — 그 자리는 다른 표기에서 가린다
+        if notation.kind != KIND_WEAK or not notation.key:
+            continue
+        base = dict(notation=notation.text, key=notation.key, length=notation.length,
+                    kind=notation.kind)
+        placements = _attached(query.words, spans, notation.key, descriptive)
+        items[notation.text], covered = _weak_evidence(
+            query, notation, base, placements, descriptive, dist)
+        masked |= covered
+    hidden = frozenset(n.key for n in brand.notations if n.kind == KIND_WEAK and n.key)
+    open_spans = [span for span in spans if masked.isdisjoint(range(span[0], span[1]))]
+    units: list[str] | None = None
+    for notation in brand.notations:
+        if notation.kind == KIND_WEAK:
+            continue
+        base = dict(notation=notation.text, key=notation.key, length=notation.length,
+                    kind=notation.kind)
+        if not notation.key:
+            items[notation.text] = Evidence(**base)
+            continue
+        exact, contain, word_hit, rest_hit = False, None, None, None
+        for start, stop, kind, rest in _attached(query.words, open_spans, notation.key,
+                                                 descriptive):
+            if kind == "같음":
+                exact = True
+            elif kind == "기타" and (notation.kind != KIND_NORMAL
+                                    or notation.length == LENGTH_SHORT):
+                continue  # 품음-기타는 보통 표기만, 짧은 표기는 인정하지 않는다
+            elif contain is None or (kind == "설명" and contain == "기타"):
+                contain, rest_hit = kind, rest
+                word_hit = "".join(query.words[start:stop])
+        scored: list[tuple[str, float, float]] = []
+        if similarity and notation.kind == KIND_NORMAL:
+            if units is None:
+                tails, heads = _trimmed(query.words, descriptive)
+                units = _units(spans, tails, heads, masked, hidden)
+            for unit in units:
+                sound = whole_sound(unit, notation.key)
+                spelling = (whole_spelling(unit, notation.key)
+                            if script_label(unit) == notation.script else 0.0)
+                if sound >= UNIT_MIN_SOUND or spelling >= UNIT_MIN_SPELLING:
+                    scored.append((unit, round(sound, 4), round(spelling, 4)))
+        plain = bool(query.goods) and bool(notation.pieces) and all(
+            _weak(dist, piece, query.goods) for piece in notation.pieces)
+        items[notation.text] = Evidence(
+            **base, exact=exact, contain=contain, contain_word=word_hit,
+            contain_rest=rest_hit, units=tuple(scored), descriptive=plain)
+    return BrandEvidence(brand=brand.name, protection=brand.protection, overlap=overlap,
+                         overlap_value=value,
+                         items=tuple(items[n.text] for n in brand.notations))
 
 
 def collect_evidence(query: PreparedQuery, registry: Registry, dist: Distinctiveness,
-                     goods_floor: float, *, similarity: bool = True) -> list[BrandEvidence]:
+                     goods_floor: float, *, similarity: bool = True,
+                     words: frozenset[str] | None = None) -> list[BrandEvidence]:
     """질의와 등록부의 모든 브랜드 표기 사이의 근거. similarity=False 면 (가)(나)만(이미지 속 글자).
-    근거가 하나도 없는 브랜드도 돌려준다(기준값 적용은 decide)."""
-    all_bundles = _bundles(query.words)
-    out: list[BrandEvidence] = []
-    for brand in registry.brands:
-        plain = _plain_checker(dist, query.goods, brand.goods_codes)
-        goods_word = _goods_word_checker(dist, query.goods, brand.goods_codes)
-        rest = _masked(query, brand.notations)  # 약한 표기 조각을 가린 질의(다른 표기용)
-        bundles = all_bundles if rest is query else _bundles(rest.words)
-        needs_segments = similarity and any(
-            not n.weak and n.length != LENGTH_SHORT for n in brand.notations)
-        segments = _segments(rest, plain) if needs_segments else []
-        overlap, value = _overlap(query.goods, brand, goods_floor)
-        hidden = frozenset(n.key for n in brand.notations if n.weak and n.key)
-        items = tuple(
-            _notation_evidence(query if notation.weak else rest, notation, bundles, segments,
-                               plain, goods_word, dist, similarity=similarity, hidden=hidden)
-            for notation in brand.notations)
-        out.append(BrandEvidence(brand=brand.name, protection=brand.protection,
-                                 overlap=overlap, overlap_value=value, items=items))
-    return out
+    words 는 업종 낱말 사전(기본: 저장소의 업종 세트에서 만든 것). 근거가 하나도 없는 브랜드도
+    돌려준다(기준값 적용은 decide)."""
+    words = industry_words() if words is None else words
+    return [_brand_evidence(query, brand, dist, goods_floor, words, similarity)
+            for brand in registry.brands]
 
 
 # ---- 판정 --------------------------------------------------------------------------------------
@@ -779,6 +978,7 @@ class BrandMatch:
     pending: bool = False  # 품음-기타(결정 대기)
     note: str = ""
     basis: str = BASIS_NAME
+    kind: str = KIND_NORMAL  # 일치한 표기의 종류
 
     @property
     def order(self) -> tuple[int, int, float]:
@@ -805,11 +1005,14 @@ def _floor(level: str, protection: str, overlap: bool | None) -> str | None:
 def _candidates(item: Evidence, overlap: bool | None, thresholds: Thresholds
                 ) -> list[tuple[str, str, float, bool, str]]:
     """표기 하나에서 나오는 (수준, 경로, 점수, 결정 대기, 메모) 후보."""
-    if item.weak_notation:
+    if item.kind == KIND_WEAK:
         if item.weak_use == WEAK_USE_ALONE:
-            level = LEVEL_NOTICE if overlap is False else LEVEL_STRONG
-            note = "약한 표기 — 업종이 다름" if overlap is False else "약한 표기 — 그 표기 하나뿐"
-            return [(level, PATH_EXACT, 1.0, False, note)]
+            if overlap is False and item.foreign_weak:
+                return [(LEVEL_NOTICE, PATH_EXACT, 1.0, False,
+                         "약한 표기 — 업종이 다르고 그 업종에서도 식별력 없는 말")]
+            note = ("약한 표기 — 업종이 다르지만 그 업종에서는 식별력 있음"
+                    if overlap is False else "약한 표기 — 그 표기 하나뿐")
+            return [(LEVEL_STRONG, PATH_EXACT, 1.0, False, note)]
         if item.weak_use == WEAK_USE_WITH_OTHERS:
             return [(LEVEL_NOTICE, PATH_EXACT, 1.0, False, "약한 표기 — 다른 말과 함께")]
         return []
@@ -819,19 +1022,28 @@ def _candidates(item: Evidence, overlap: bool | None, thresholds: Thresholds
     if item.contain == "설명":
         out.append((LEVEL_STRONG, PATH_CONTAIN_DESC, 1.0, False,
                     f"{item.contain_word} = 표기 + {item.contain_rest}"))
-    if thresholds.strong_sound is not None and item.sound >= thresholds.strong_sound:
-        out.append((LEVEL_STRONG, PATH_SOUND, item.sound, False, item.sound_unit or ""))
-    if thresholds.strong_spelling is not None and item.spelling >= thresholds.strong_spelling:
-        out.append((LEVEL_STRONG, PATH_SPELLING, item.spelling, False, item.spelling_unit or ""))
-    weak_sound = thresholds.weak_sound.get(item.length)
-    if weak_sound is not None and item.sound >= weak_sound:
-        out.append((LEVEL_WEAK, PATH_SOUND, item.sound, False, item.sound_unit or ""))
-    weak_spelling = thresholds.weak_spelling.get(item.length)
-    if weak_spelling is not None and item.spelling >= weak_spelling:
-        out.append((LEVEL_WEAK, PATH_SPELLING, item.spelling, False, item.spelling_unit or ""))
-    if item.contain == "기타" and thresholds.contain_other:
-        out.append((LEVEL_WEAK, PATH_CONTAIN_OTHER, 1.0, True,
-                    f"{item.contain_word} = 표기 + {item.contain_rest}"))
+    if item.kind == KIND_NORMAL:  # 머리글자 표기는 같음·품음-설명만
+        sound, sound_unit = item.best(1)
+        spelling, spelling_unit = item.best(2)
+        if thresholds.strong_sound is not None and sound >= thresholds.strong_sound:
+            out.append((LEVEL_STRONG, PATH_SOUND, sound, False, sound_unit or ""))
+        strong_spelling = thresholds.strong_spelling.get(item.length)
+        if strong_spelling is not None and spelling >= strong_spelling:
+            out.append((LEVEL_STRONG, PATH_SPELLING, spelling, False, spelling_unit or ""))
+        weak_sound = thresholds.weak_sound.get(item.length)
+        if weak_sound is not None and sound >= weak_sound:
+            out.append((LEVEL_WEAK, PATH_SOUND, sound, False, sound_unit or ""))
+        weak_spelling = thresholds.weak_spelling.get(item.length)
+        if weak_spelling is not None:
+            floor = thresholds.spelling_sound  # 약한 철자는 같은 대상의 소리가 S 이상일 때만
+            usable = [unit for unit in item.units
+                      if unit[2] >= weak_spelling and (floor is None or unit[1] >= floor)]
+            if usable:
+                unit = max(usable, key=lambda entry: entry[2])
+                out.append((LEVEL_WEAK, PATH_SPELLING, unit[2], False, unit[0]))
+        if item.contain == "기타" and thresholds.contain_other:
+            out.append((LEVEL_WEAK, PATH_CONTAIN_OTHER, 1.0, True,
+                        f"{item.contain_word} = 표기 + {item.contain_rest}"))
     if item.descriptive and overlap is False:  # 그 밖의 설명적 사용
         out = [(LEVEL_NOTICE, path, score, pending, "질의 업종에서 식별력 없는 말 — 업종이 다름")
                for _, path, score, pending, _ in out]
@@ -852,7 +1064,7 @@ def decide(evidence: Iterable[BrandEvidence], thresholds: Thresholds, *,
                     score=round(float(score), 4),
                     floor=_floor(level, brand.protection, brand.overlap),
                     protection=brand.protection, overlap=brand.overlap, pending=pending,
-                    note=note, basis=basis)
+                    note=note, basis=basis, kind=item.kind)
                 if best is None or match.order > best.order:
                     best = match
         if best is not None:
@@ -868,6 +1080,7 @@ def check_famous(
     name: object, goods_codes: Iterable[str] | str | None, registry: Registry,
     thresholds: Thresholds, *, dist: Distinctiveness | None = None,
     goods_floor: float | None = None, ocr_text: object = None,
+    words: frozenset[str] | None = None,
 ) -> FamousResult:
     """유명 상표 일치 판정. 질의 이름이 없고 이미지에서 읽은 글자(ocr_text — OCR 제안 상표명)가
     있으면 그 글자로 (가)(나)만 판정해 "이미지 속 글자 기준"으로 표시한다. 이름도 글자도 없으면
@@ -875,10 +1088,10 @@ def check_famous(
     dist = dist or load_distinctiveness()
     floor = default_goods_floor() if goods_floor is None else float(goods_floor)
     if normalize_text(name):
-        query = prepare_query(name, goods_codes, dist)
-        return decide(collect_evidence(query, registry, dist, floor), thresholds)
+        query = prepare_query(name, goods_codes)
+        return decide(collect_evidence(query, registry, dist, floor, words=words), thresholds)
     if normalize_text(ocr_text):
-        query = prepare_query(ocr_text, goods_codes, dist)
-        return decide(collect_evidence(query, registry, dist, floor, similarity=False),
-                      thresholds, basis=BASIS_OCR)
+        query = prepare_query(ocr_text, goods_codes)
+        evidence = collect_evidence(query, registry, dist, floor, similarity=False, words=words)
+        return decide(evidence, thresholds, basis=BASIS_OCR)
     return FamousResult(matches=(), strongest=None, floor=None, basis=BASIS_NAME)

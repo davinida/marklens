@@ -1,5 +1,5 @@
 {
- "version": "famous_registry_v1",
+ "version": "famous_registry_v2",
  "sources": {
   "brands_file": "shared/famous_brands.txt",
   "brands_sha256": "3457adb5966f9e53b569f2c60b46dc00bc8b5e62ef6a3ad22663ec7756d9f267",
@@ -11,7 +11,7 @@
   "overrides": "shared/famous_registry_overrides.json",
   "overrides_sha256": "3d9239cbdb458ef2aa555609098c027709b9cab5095cacfddf0b258e04296390",
   "aliases_sha256": "34a069278ec3f4ff460e589757968bb98f8a946488ba9e119dcc19dd1a50f53e",
-  "note": "표장 역할은 자동(이름·도형·다른 이름) 뒤 overrides 로 덮는다. 약한 표기는 유명 예외를 뺀 식별력 판정으로 브랜드 자신의 업종에서 조각이 모두 약한 표기."
+  "note": "표장 역할은 자동(이름·도형·다른 이름) 뒤 overrides 로 덮는다. 표기 종류: 약한 표기 = 유명 예외를 뺀 식별력 판정으로 브랜드 자신의 업종에서 조각이 모두 약한 표기(base_weak)와 그 표기와 소리가 0.98 이상인 표기, 머리글자 표기 = 약한 표기가 아닌 영문 3자 이하 표기와 그 표기와 소리가 0.98 이상인 표기, 나머지는 보통 표기."
  },
  "brands": [
   {
@@ -25,7 +25,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "컴포즈",
@@ -52,7 +55,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "컴포즈",
@@ -71,7 +77,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "compose",
@@ -334,7 +343,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "이디야",
@@ -361,7 +373,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "이디야",
@@ -380,7 +395,10 @@
      ],
      "script": "영문",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "ediya",
@@ -695,7 +713,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "빽다방",
@@ -715,7 +736,10 @@
      ],
      "script": "영문",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "paik",
@@ -993,7 +1017,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "스타벅스",
@@ -1012,7 +1039,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "starbucks",
@@ -1453,7 +1483,12 @@
      ],
      "script": "영문",
      "length": "짧음",
-     "weak": true,
+     "kind": "약한 표기",
+     "base_weak": true,
+     "inherits": [
+      "BBQ"
+     ],
+     "kind_reason": "자기 업종에서 식별력 없음(bbq: 3호 기술적 표장:용도(류 35,43))",
      "judgements": [
       {
        "token": "bbq",
@@ -1472,7 +1507,12 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "약한 표기",
+     "base_weak": false,
+     "inherits": [
+      "BBQ"
+     ],
+     "kind_reason": "약한 표기와 소리가 같음(BBQ 1.00)",
      "judgements": [
       {
        "token": "비비큐",
@@ -2190,7 +2230,12 @@
      ],
      "script": "영문",
      "length": "짧음",
-     "weak": false,
+     "kind": "머리글자 표기",
+     "base_weak": false,
+     "inherits": [
+      "bhc"
+     ],
+     "kind_reason": "영문 3자",
      "judgements": [
       {
        "token": "bhc",
@@ -2209,7 +2254,12 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "머리글자 표기",
+     "base_weak": false,
+     "inherits": [
+      "bhc"
+     ],
+     "kind_reason": "머리글자 표기와 소리가 같음(bhc 1.00)",
      "judgements": [
       {
        "token": "비에이치씨",
@@ -2626,7 +2676,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "교촌치킨",
@@ -2645,7 +2698,10 @@
      ],
      "script": "한글",
      "length": "짧음",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "교촌",
@@ -2664,7 +2720,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "kyochon",
@@ -2940,7 +2999,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "동대문엽기",
@@ -2967,7 +3029,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "엽기",
@@ -2994,7 +3059,10 @@
      ],
      "script": "한글",
      "length": "짧음",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "엽떡",
@@ -3013,7 +3081,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "yupdduk",
@@ -3366,7 +3437,12 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": true,
+     "kind": "약한 표기",
+     "base_weak": true,
+     "inherits": [
+      "김가네"
+     ],
+     "kind_reason": "자기 업종에서 식별력 없음(김가네: 5호 흔한 성)",
      "judgements": [
       {
        "token": "김가네",
@@ -3385,7 +3461,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "gimgane",
@@ -4001,7 +4080,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "뚜레쥬르",
@@ -4022,7 +4104,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "tous",
@@ -4352,7 +4437,10 @@
      ],
      "script": "한글",
      "length": "짧음",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "던킨",
@@ -4371,7 +4459,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "dunkin",
@@ -4645,7 +4736,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "파리바게뜨",
@@ -4665,7 +4759,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "paris",
@@ -5038,7 +5135,12 @@
      ],
      "script": "영문",
      "length": "짧음",
-     "weak": true,
+     "kind": "약한 표기",
+     "base_weak": true,
+     "inherits": [
+      "CU"
+     ],
+     "kind_reason": "자기 업종에서 식별력 없음(cu: 6호 간단 표장)",
      "judgements": [
       {
        "token": "cu",
@@ -5057,7 +5159,12 @@
      ],
      "script": "한글",
      "length": "짧음",
-     "weak": false,
+     "kind": "약한 표기",
+     "base_weak": false,
+     "inherits": [
+      "CU"
+     ],
+     "kind_reason": "약한 표기와 소리가 같음(CU 1.00)",
      "judgements": [
       {
        "token": "씨유",
@@ -5926,7 +6033,12 @@
      ],
      "script": "영문+숫자",
      "length": "중간",
-     "weak": true,
+     "kind": "약한 표기",
+     "base_weak": true,
+     "inherits": [
+      "GS25"
+     ],
+     "kind_reason": "자기 업종에서 식별력 없음(gs: 6호 간단 표장; 25: 6호 간단 표장)",
      "judgements": [
       {
        "token": "gs",
@@ -5953,7 +6065,12 @@
      ],
      "script": "한글+숫자",
      "length": "김",
-     "weak": false,
+     "kind": "약한 표기",
+     "base_weak": false,
+     "inherits": [
+      "GS25"
+     ],
+     "kind_reason": "약한 표기와 소리가 같음(GS25 1.00)",
      "judgements": [
       {
        "token": "지에스",
@@ -6874,7 +6991,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "크린토피아",
@@ -6893,7 +7013,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "cleantopia",
@@ -7164,7 +7287,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "본죽",
@@ -7190,7 +7316,10 @@
      ],
      "script": "한글",
      "length": "짧음",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "본죽",
@@ -7209,7 +7338,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "bonjuk",
@@ -7499,7 +7631,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "마이크로소프트",
@@ -7518,7 +7653,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "microsoft",
@@ -7925,7 +8063,10 @@
      ],
      "script": "한글",
      "length": "짧음",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "구글",
@@ -7944,7 +8085,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "google",
@@ -8235,7 +8379,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "네이버",
@@ -8254,7 +8401,10 @@
      ],
      "script": "영문",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "naver",
@@ -10092,7 +10242,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "인스타그램",
@@ -10111,7 +10264,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "instagram",
@@ -10543,7 +10699,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "넷플릭스",
@@ -10562,7 +10721,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "netflix",
@@ -10964,7 +11126,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "에르메스",
@@ -10983,7 +11148,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "hermes",
@@ -11346,7 +11514,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "루이비통",
@@ -11366,7 +11537,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "louis",
@@ -12374,7 +12548,10 @@
      ],
      "script": "한글",
      "length": "짧음",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "샤넬",
@@ -12393,7 +12570,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "chanel",
@@ -12995,7 +13175,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "로레알",
@@ -13021,7 +13204,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "로레알",
@@ -13041,7 +13227,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "l",
@@ -13322,7 +13511,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "올리브영",
@@ -13342,7 +13534,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "olive",
@@ -13794,7 +13989,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "세포라",
@@ -13813,7 +14011,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "sephora",
@@ -13986,7 +14187,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "이케아",
@@ -14005,7 +14209,10 @@
      ],
      "script": "영문",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "ikea",
@@ -14273,7 +14480,10 @@
      ],
      "script": "한글",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "에어비앤비",
@@ -14292,7 +14502,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "airbnb",
@@ -14366,7 +14579,10 @@
      ],
      "script": "한글",
      "length": "중간",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "야놀자",
@@ -14385,7 +14601,10 @@
      ],
      "script": "영문",
      "length": "김",
-     "weak": false,
+     "kind": "보통 표기",
+     "base_weak": false,
+     "inherits": [],
+     "kind_reason": "",
      "judgements": [
       {
        "token": "yanolja",
