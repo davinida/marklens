@@ -94,6 +94,7 @@ __all__ = [
     "DEFAULT_BRANDS_PATH", "PROTECT_ANY", "PROTECT_NEAR", "PROTECT_ANY_BRANDS", "ROLE_NAME",
     "ROLE_FIGURE", "ROLE_OTHER", "ROLE_LOGO_NOW", "ROLE_LOGO_OLD", "ROLE_BRAND_OTHER",
     "ROLE_UNRELATED", "MARK_ROLES", "LOGO_ROLES", "DEFAULT_ROLE", "EVIDENCE_NONE",
+    "DB_SOURCE_LOGOS", "SOURCE_RECEIVED",
     "LENGTHS", "KIND_WEAK", "KIND_INITIAL",
     "KIND_NORMAL", "LEVEL_STRONG", "LEVEL_WEAK", "LEVEL_NOTICE", "PATH_EXACT",
     "PATH_CONTAIN_DESC", "PATH_CONTAIN_OTHER", "PATH_SOUND", "PATH_SPELLING", "BASIS_NAME",
@@ -138,6 +139,13 @@ DEFAULT_ROLE = {ROLE_NAME: ROLE_BRAND_OTHER, ROLE_FIGURE: ROLE_UNRELATED,
                 ROLE_OTHER: ROLE_UNRELATED}
 SOURCE_FAMOUS, SOURCE_EXISTING = "유명 브랜드 수집", "기존 수집(같은 출원인)"
 SOURCE_PICKED = "사람이 고른 표장"
+SOURCE_RECEIVED = "대표 표장으로 받음"  # 사람이 고른 표장 가운데 그 목적으로 KIPRIS 에서 받은 것
+# DB 메타데이터의 수집 출처(수집_출처) — 고른 표장을 받아 넣을 때 붙이는 값(기존 283건은
+# "유명 브랜드")
+DB_SOURCE_LOGOS = "유명 브랜드(대표 표장)"
+DB_SOURCE_FAMOUS = "유명 브랜드"
+DB_SOURCE_FIELD = "수집_출처"
+_DB_SOURCE_LABELS = {DB_SOURCE_FAMOUS: SOURCE_FAMOUS, DB_SOURCE_LOGOS: SOURCE_RECEIVED}
 EVIDENCE_NONE = "근거 없음"
 FETCH_CANDIDATE, FETCH_DIRECT = "후보", "직접"
 FETCH_SOURCES = (FETCH_CANDIDATE, FETCH_DIRECT)
@@ -451,7 +459,7 @@ class Mark:
     kind: str | None  # 상표구분(도형복합·도형상표 …)
     role: str  # 대표 로고(현재) | 과거 로고 | 브랜드 이름이 든 그 밖의 표장 | 관련 없음
     auto_role: str  # 상표명으로 정한 자동 역할(이름 | 도형 | 다른 이름) — 고르기 전 기본값의 근거
-    source: str  # 유명 브랜드 수집 | 기존 수집(같은 출원인) | 사람이 고른 표장
+    source: str  # 유명 브랜드 수집 | 기존 수집(같은 출원인) | 사람이 고른 표장 | 대표 표장으로 받음
     image: str | None
     image_exists: bool
     codes: frozenset[str]
@@ -482,6 +490,7 @@ class Brand:
     fetch: tuple[Mapping, ...] = ()  # 받을 표장(아직 DB 에 없음) — {appno, role, source, …}
     memo: str = ""
     removed_notations: tuple[str, ...] = ()  # 사람이 지운 표의 표기
+    added_applicants: tuple[str, ...] = ()  # 받은 대표 표장의 출원인이라 출원인 목록에 더한 것
 
     @property
     def logo_marks(self) -> tuple[Mark, ...]:
@@ -795,7 +804,11 @@ def build_registry(
     브랜드의 DB 표장 = 계획 기록의 그 브랜드 표장 + 같은 출원인(별칭 표 적용)의 그 밖의 DB 표장
     (기존 수집) + 사람이 출원번호로 고른 표장 가운데 DB 에 있는 것. 한 출원인이 여러 브랜드에
     걸쳐 있으면 상표명에 그 브랜드 표기가 든 표장은 그 브랜드에, 어느 브랜드 표기도 없는 표장은
-    그 출원인의 모든 브랜드에 보인다. 역할은 자동 역할(auto_role)의 기본값 뒤 사람이 고른 값."""
+    그 출원인의 모든 브랜드에 보인다. 역할은 자동 역할(auto_role)의 기본값 뒤 사람이 고른 값.
+
+    받은 대표 표장(사람이 고른 출원번호 가운데 DB 수집 출처가 DB_SOURCE_LOGOS 인 것)의 출원인은 그
+    브랜드의 출원인 목록에 더한다(지주사·해외 본사 명의 — added_applicants). 그 출원인의 다른 DB
+    표장도 그 브랜드에 보이게 된다(기본 역할로)."""
     overrides = overrides or {"brands": {}}
     specs = _brand_specs(rows, overrides)
     by_appno = {str(record["출원번호"]): record for record in db_records}
@@ -806,8 +819,20 @@ def build_registry(
     for spec in specs:
         if spec["preset"] is not None and spec["preset"] not in preset_codes:
             raise ValueError(f"업종 세트가 없습니다: {spec['preset']} ({spec['name']})")
-        spec["keys"] = frozenset(key for text in spec["applicants"]
-                                 for key in applicant_keys(text))
+        known = {key for text in spec["applicants"] for key in applicant_keys(text)}
+        added: list[str] = []
+        for entry in spec["fetch"]:  # 받은 대표 표장의 출원인을 더한다
+            record = by_appno.get(entry["appno"])
+            if record is None or record.get(DB_SOURCE_FIELD) != DB_SOURCE_LOGOS:
+                continue
+            for name in str(record.get("출원인") or "").split("|"):
+                keys = applicant_keys(name.strip())
+                if name.strip() and keys and not keys <= known:
+                    added.append(name.strip())
+                    known |= keys
+        spec["added_applicants"] = added
+        spec["applicants"] = list(spec["applicants"]) + added
+        spec["keys"] = frozenset(known)
         for key in spec["keys"]:
             owners_of.setdefault(key, []).append(spec["table_name"])
     by_table = {spec["table_name"]: spec for spec in specs}
@@ -828,11 +853,18 @@ def build_registry(
     brands: list[Brand] = []
     for spec in specs:
         table_name = spec["table_name"]
-        listed = [(appno, SOURCE_FAMOUS) for appno in planned.get(table_name, [])]
-        listed += [(appno, SOURCE_EXISTING) for appno in sorted(extra.get(table_name, []))]
-        have = {appno for appno, _ in listed}
         fetch_role = {entry["appno"]: entry["role"] for entry in spec["fetch"]}
-        listed += [(entry["appno"], SOURCE_PICKED) for entry in spec["fetch"]
+        listed = [(appno, SOURCE_FAMOUS) for appno in planned.get(table_name, [])]
+        # 같은 출원인의 그 밖의 DB 표장 — 출처는 그 표장이 DB 에 들어온 길 그대로
+        listed += [(appno, _DB_SOURCE_LABELS.get(by_appno[appno].get(DB_SOURCE_FIELD),
+                                                 SOURCE_EXISTING))
+                   for appno in sorted(extra.get(table_name, []))
+                   if appno not in fetch_role]  # 사람이 고른 것은 아래에서 그 출처로
+        have = {appno for appno, _ in listed}
+        listed += [(entry["appno"],
+                    SOURCE_RECEIVED if by_appno[entry["appno"]].get(DB_SOURCE_FIELD)
+                    == DB_SOURCE_LOGOS else SOURCE_PICKED)
+                   for entry in spec["fetch"]
                    if entry["appno"] in by_appno and entry["appno"] not in have]
         unknown = sorted(set(spec["roles"]) - {appno for appno, _ in listed})
         if unknown:
@@ -884,7 +916,8 @@ def build_registry(
             exceptions=tuple(spec["exceptions"]),
             fetch=tuple(dict(entry) for entry in spec["fetch"]
                         if entry["appno"] not in by_appno),
-            memo=spec["memo"], removed_notations=tuple(spec["removed"])))
+            memo=spec["memo"], removed_notations=tuple(spec["removed"]),
+            added_applicants=tuple(spec["added_applicants"])))
     return Registry(version=REGISTRY_VERSION, brands=tuple(brands), sources=dict(sources or {}))
 
 
@@ -905,6 +938,7 @@ def registry_to_json(registry: Registry) -> dict:
             "removed_notations": list(brand.removed_notations),
             "exceptions": list(brand.exceptions),
             "applicants": list(brand.applicants),
+            "applicants_added": list(brand.added_applicants),
             "applicant_keys": sorted(brand.applicant_keys),
             "industry": {"preset": brand.preset, "label": brand.preset_label,
                          "codes": sorted(brand.preset_codes)},
@@ -959,7 +993,8 @@ def load_registry(path: Path = DEFAULT_REGISTRY_PATH) -> Registry:
             exceptions=tuple(item.get("exceptions") or ()),
             fetch=tuple(dict(entry) for entry in item.get("fetch") or ()),
             memo=item.get("memo") or "",
-            removed_notations=tuple(item.get("removed_notations") or ())))
+            removed_notations=tuple(item.get("removed_notations") or ()),
+            added_applicants=tuple(item.get("applicants_added") or ())))
     return Registry(version=data["version"], brands=tuple(brands),
                     sources=dict(data.get("sources") or {}))
 

@@ -89,6 +89,15 @@ def test_tool_data_separates_automatic_values_from_decisions():
                {"출원번호": "4020200000002", "출원인": "스타벅스 코포레이션",
                 "이미지파일": "4020200000002.png"},
                {"출원번호": "4020200000007", "출원인": "다", "이미지파일": "4020200000007.png"}]
+    picked = {"brands": {"스타벅스": {"fetch": [
+        {"appno": "4020200000002", "role": fc.ROLE_LOGO_NOW, "source": "후보"}]}}}
+    via = curate.tool_data(
+        registry=registry, table_rows=table, overrides=picked, proposed=proposed,
+        candidates=None, records=records, presets={"cafe": "카페"},
+        thumb_of=lambda appno, image: None, cand_thumb_of=lambda name: None)
+    # 출원번호로 골라 이어 둔 표장(받아서 DB 에 들어온 것)은 내보낼 때 fetch 로 남는다
+    assert [mark["via_fetch"] for mark in via["brands"][0]["marks"]] == [None, "후보"]
+    assert via["initial_overrides"] == picked and via["db_count"] == 3
     data = curate.tool_data(
         registry=registry, table_rows=table, overrides={"brands": {}}, proposed=proposed,
         candidates=candidates, records=records, presets={"cafe": "카페"},
@@ -151,3 +160,43 @@ def test_template_sends_nothing_outside():
     for role in ("대표 로고(현재)", "과거 로고", "관련 없음"):
         assert role in template  # 역할 이름은 자료의 roles 순서와 같은 말로 보인다
     assert "innerHTML" not in template  # 자료는 글로만 넣는다
+
+
+def test_industry_table_flags_missing_presets_and_off_core_received_marks():
+    from scripts import famous_registry as builder
+
+    logo = _mark("4020200000001", "STARBUCKS", fc.ROLE_NAME)
+    star = _brand("스타벅스", [_notation("스타벅스")], [
+        fc.Mark(**{**logo.__dict__, "role": fc.ROLE_LOGO_NOW, "picked": True}),
+        fc.Mark(**{**_mark("4020200000002", None, fc.ROLE_FIGURE).__dict__,
+                   "role": fc.ROLE_LOGO_OLD, "picked": True, "classes": (25, 43),
+                   "source": fc.SOURCE_RECEIVED})])
+    gs = fc.Brand(**{**_brand("GS25", [_notation("GS25")], [
+        fc.Mark(**{**_mark("4020200000003", "GS25", fc.ROLE_NAME).__dict__,
+                   "role": fc.ROLE_LOGO_NOW, "picked": True, "classes": (36, 41),
+                   "source": fc.SOURCE_RECEIVED})]).__dict__, "preset": "convenience"})
+    kia = fc.Brand(**{**_brand("기아", [_notation("기아")], is_new=True).__dict__,
+                      "preset": None, "preset_label": None})
+    goods = {"4020200000001": [(43, "카페업"), (30, "커피")],
+             "4020200000002": [(25, "의류"), (43, "카페업")]}
+    rows = builder.industry_table(
+        fc.Registry(fc.REGISTRY_VERSION, (star, gs, kia)),
+        classes_of={"cafe": [30, 43], "convenience": [35]},
+        goods_of=lambda appno: goods.get(appno, []))
+    first, second, third = rows
+    assert (first["대표_로고_현재"], first["대표_로고_과거"]) == (1, 1)
+    assert first["대표_표장의_류"] == [25, 30, 43] and first["업종_세트의_류"] == [30, 43]
+    assert first["대표_지정상품"] == ["카페업", "커피", "의류"]  # 핵심 업종의 것·많이 나온 것 먼저
+    # 받은 표장이 하나라도 핵심 업종의 류에 있으면 표시하지 않는다
+    assert first["받은_표장"] == 1 and first["표시"] == []
+    first_only = builder.industry_table(
+        fc.Registry(fc.REGISTRY_VERSION, (star,)), classes_of={"cafe": [30]},
+        goods_of=lambda appno: [])[0]
+    assert first_only["표시"] == ["받은 표장이 핵심 업종 밖의 류뿐"]
+    assert second["표시"] == ["받은 표장이 핵심 업종 밖의 류뿐"] and second["받은_표장의_류"] == [
+        36, 41]
+    assert third["표시"] == ["업종 세트 없음"] and third["대표_표장의_류"] == []
+    text = builder.review_text({**builder.review(
+        fc.Registry(fc.REGISTRY_VERSION, (star, gs, kia))), "업종_표": rows})
+    assert "GS25 | convenience(35)" in text and "업종 세트 없음" in text
+

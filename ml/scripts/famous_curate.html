@@ -125,7 +125,8 @@ justify-content:center;gap:10px;padding:20px}
 const DATA = JSON.parse(document.getElementById("data").textContent);
 const [R_NOW, R_OLD, R_OTHER, R_NONE] = DATA.roles;
 const ROLE_SHORT = {[R_NOW]: "대표 로고(현재)", [R_OLD]: "과거 로고", [R_OTHER]: "그 밖의 표장", [R_NONE]: "관련 없음"};
-const STORE_KEY = "marklens-famous-curate-v1";
+// 저장 키는 DB 세대별 — DB 가 바뀌어 다시 만든 도구는 적용된 overrides 에서 시작한다
+const STORE_KEY = "marklens-famous-curate-v1" + (DATA.db_generation ? ":" + DATA.db_generation : "");
 const $ = (id) => document.getElementById(id);
 
 // ---- 작은 도구 ----
@@ -185,8 +186,10 @@ function applyOverride(st, ov, b) {
   st.exceptions = [...(ov.exceptions || [])];
   st.marks = Object.assign({}, ov.marks || {});
   const candidates = new Set(b.candidates.map((c) => c.appno));
+  const inBrand = new Set(b.marks.map((m) => m.appno));
   for (const f of ov.fetch || []) {
-    if (candidates.has(f.appno)) st.cand[f.appno] = {fetch: true, role: f.role};
+    if (inBrand.has(f.appno)) st.marks[f.appno] = f.role;  // 받아서 DB 에 들어온 표장 — 역할만
+    else if (candidates.has(f.appno)) st.cand[f.appno] = {fetch: true, role: f.role};
     else st.direct.push({appno: f.appno, role: f.role});
   }
   st.memo = ov.memo || "";
@@ -237,6 +240,14 @@ function changed() { save(); renderNav(); }
 function defaultRole(b, appno) { const m = b.marks.find((x) => x.appno === appno); return m ? m.default_role : null; }
 function fetchList(b, st) {
   const out = [], seen = new Set();
+  for (const m of b.marks) {  // 출원번호로 골라 이어 둔 표장 — fetch 에 남아야 계속 이어진다
+    if (!m.via_fetch) continue;
+    seen.add(m.appno);
+    const row = {appno: m.appno, role: st.marks[m.appno] || m.default_role, source: m.via_fetch};
+    if (m.title) row.title = m.title;
+    if (m.applicant) row.applicant = m.applicant.split("|")[0].trim();
+    out.push(row);
+  }
   for (const c of b.candidates) {
     const pick = st.cand[c.appno];
     if (!pick || !pick.fetch || c.in_brand || seen.has(c.appno)) continue;
@@ -276,7 +287,10 @@ function brandOverride(b, st) {
   if (Object.keys(edit).length) o.notations = edit;
   if (st.exceptions.length) o.exceptions = [...st.exceptions];
   const marks = {};
-  for (const [appno, role] of Object.entries(st.marks)) if (role && role !== defaultRole(b, appno)) marks[appno] = role;
+  const viaFetch = new Set(b.marks.filter((m) => m.via_fetch).map((m) => m.appno));
+  // 사람이 고른 역할은 기본값과 같아도 남긴다(표기를 고쳐 기본값이 바뀌어도 고른 것이 유지되게).
+  // 기본값을 다시 누르면 고른 것이 지워진다(markCard).
+  for (const [appno, role] of Object.entries(st.marks)) if (role && !viaFetch.has(appno) && defaultRole(b, appno) !== null) marks[appno] = role;
   if (Object.keys(marks).length) o.marks = marks;
   const fetch = fetchList(b, st);
   if (fetch.length) o.fetch = fetch;
@@ -329,7 +343,8 @@ function brandStats(key) {
   const b = META.get(key), st = state.brands[key];
   let now = 0, old = 0;
   for (const m of b.marks) { const role = st.marks[m.appno] || m.default_role; if (role === R_NOW) now++; else if (role === R_OLD) old++; }
-  const fetch = fetchList(b, st);
+  const attached = new Set(b.marks.map((m) => m.appno));
+  const fetch = fetchList(b, st).filter((f) => !attached.has(f.appno));  // 아직 DB 에 없는 것만
   const fetchNow = fetch.filter((f) => f.role === R_NOW).length;
   return {now, old, fetch: fetch.length, fetchNow, off: b.base.is_new && !st.include, isNew: b.base.is_new};
 }
@@ -567,7 +582,8 @@ $("btn-reset").addEventListener("click", () => {
 const [restored, fromStore] = restore();
 state = restored;
 renderAll();
-setStatus(fromStore ? "이 브라우저에 저장된 작업을 이어 엽니다" : `만든 때 ${DATA.generated} · 아직 고친 것이 없습니다`);
+setStatus(fromStore ? "이 브라우저에 저장된 작업을 이어 엽니다"
+  : `만든 때 ${DATA.generated} · DB ${DATA.db_count}건 · 적용된 overrides 에서 시작합니다`);
 window.__curate = {toOverrides, problems, state: () => state};  // 점검용
 </script>
 </body>

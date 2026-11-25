@@ -385,3 +385,37 @@ def test_matcher_finds_a_renamed_brand_by_its_table_name():
     assert matcher.kind({"브랜드": "본죽&비빔밥", "표기": "본죽"}) == fc.KIND_NORMAL
     assert matcher.names == {"본죽&비빔밥": "본죽"}
     assert fc.Registry(fc.REGISTRY_VERSION, (renamed,)).brand("본죽&비빔밥") is renamed
+
+
+def test_recheck_diff_reports_only_what_changed():
+    def result(n1_weak, rows, n1_names, p1=(865, 870), dropped=()):
+        match = {"브랜드": "자라", "수준": "약함", "경로": "철자"}
+        return {
+            "목표": {"N1 기준용 약함 2건 이하": {"값": n1_weak, "통과": n1_weak <= 2},
+                   "N3 기준용 0건": {"값": 0, "통과": True}},
+            "기대표": {"행": [{"기대": "없음", "입력": name, "업종": "없음", "결과": value}
+                          for name, value in rows]},
+            "N1": {"목록": [{"이름": name, "일치": match} for name in n1_names]},
+            "N2": {"목록": []}, "N3": {"목록": []},
+            "P1": {"강함": p1[0], "n": p1[1]},
+            "P2": {fc.KIND_NORMAL: {"전체": {"n": 50, "강함": 26}}},
+            "P3": {fc.KIND_NORMAL: {"전체": {"n": 228, "강함": 110}}},
+            "뺀_표본": {"등록부_출원인이_된_N1": list(dropped)}}
+
+    before = result(4, [("삼성", "설명적 사용 안내"), ("구굴", "약함")], ["PARA PARA", "ZARI"])
+    same = fm.recheck_diff(before, before)
+    assert same["같음"] and fm.recheck_diff_text(same) == "직전 결과와 달라진 것: 없음"
+    after = result(3, [("삼성", "강함"), ("구굴", "약함")], ["ZARI", "ZARO"], p1=(866, 870),
+                   dropped=["Q7F — 삼성전자"])
+    diff = fm.recheck_diff(before, after)
+    assert not diff["같음"]
+    assert diff["목표"] == {"N1 기준용 약함 2건 이하": {"직전": 4, "지금": 3, "통과": False}}
+    assert diff["기대표"] == [{"기대": "없음", "입력": "삼성", "업종": "없음",
+                            "직전": "설명적 사용 안내", "지금": "강함"}]
+    assert diff["일치_목록"]["N1"] == {"새로_생김": ["ZARO → 자라 약함(철자)"],
+                                   "없어짐": ["PARA PARA → 자라 약함(철자)"]}
+    assert diff["재현율"] == {"P1": {"직전": [865, 870], "지금": [866, 870]}}
+    assert diff["뺀_표본"]["등록부_출원인이_된_N1"]["새로_빠짐"] == ["Q7F — 삼성전자"]
+    text = fm.recheck_diff_text(diff)
+    assert "기대표 [없음] 삼성 + 없음: 설명적 사용 안내 → 강함" in text and "ZARO" in text
+

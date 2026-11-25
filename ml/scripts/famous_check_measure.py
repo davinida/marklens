@@ -9,6 +9,8 @@
     ml/venv/bin/python ml/scripts/famous_check_measure.py run      # 측정(고정본과 다르면 4)
     ml/venv/bin/python ml/scripts/famous_check_measure.py run --smoke --out-dir <폴더>
     ml/venv/bin/python ml/scripts/famous_check_measure.py sheet    # 확인용 시트만 다시(측정 없음)
+    ml/venv/bin/python ml/scripts/famous_check_measure.py logos    # 대표 로고 점검(§7-14-11, 실제
+                                                                   #   엔진 약 3분)
     ml/venv/bin/python ml/scripts/famous_check_measure.py recheck  # 등록부를 고친 뒤(§7-14-10) —
                                                                    #   2-1 에서 고른 기준 그대로
                                                                    #   기준용 목표·기대표 유지 확인
@@ -563,7 +565,8 @@ def build_samples(registry: fc.Registry, dist, *, preset_list: list[dict], codes
     owners = registry.applicant_keys
     by_name: dict[str, list[dict]] = {}
     for record in db_records:
-        if record.get("수집_출처") == "유명 브랜드":
+        # 유명 브랜드로 모은 것(283건)과 대표 표장으로 받은 것은 어떤 표본에도 넣지 않는다
+        if str(record.get("수집_출처") or "").startswith("유명 브랜드"):
             continue
         if applicant_keys(str(record.get("출원인") or "")) & owners:
             continue
@@ -1201,6 +1204,123 @@ def image_measure(context: dict, registry: fc.Registry, matcher: Matcher,
     return out
 
 
+def logo_review(context: dict, registry: fc.Registry, samples: dict, control: dict,
+                applicant_keys) -> dict:
+    """대표 로고(대표 로고(현재)·과거 로고) 점검 — 새 기준 없이 엔진의 '이미지만' 판단이 위험이면
+    강함. ① 대표 로고마다 글자 위주·결합·도형 위주(엔진이 이름 없는 이미지 질의에 쓰는 OCR 자동
+    유형) ② 서로 다른 브랜드의 대표 로고끼리 강함인 쌍 ③ 덜 닮은 이미지 대조군·표본 A 질의
+    이미지·N1 기준용 이미지가 어느 브랜드의 대표 로고와든 강함인 수와 목록. 확인용은 건드리지
+    않는다."""
+    logo = Logo(context, registry)
+    rows = []
+    for brand, mark, _ in logo.marks:
+        image = logo.direct((IMAGES_DIR / mark.image).read_bytes())
+        seen = read_text(image) if image is not None else {"글자": None, "유형": "유형 모름"}
+        rows.append({"브랜드": brand, "출원번호": mark.appno, "상표명": mark.title,
+                     "역할": mark.role, "상표구분": mark.kind, "출처": mark.source,
+                     "구분": seen["유형"], "읽은_글자": seen["글자"],
+                     "사진_판정": bool(logo.photo(logo.matrix[len(rows)]))})
+    per_brand: dict[str, dict] = {}
+    for row in rows:
+        entry = per_brand.setdefault(row["브랜드"], {"대표 로고": 0})
+        entry["대표 로고"] += 1
+        entry[row["구분"]] = entry.get(row["구분"], 0) + 1
+    pairs = []
+    if len(logo.marks) > 1:
+        scores = logo.matrix @ logo.matrix.T
+        for i, (brand_a, mark_a, _) in enumerate(logo.marks):
+            for j in range(i + 1, len(logo.marks)):
+                brand_b, mark_b, _ = logo.marks[j]
+                value = round(min(1.0, max(0.0, float(scores[i, j]))), 4)
+                if brand_a != brand_b and logo._grade(value) == fc.GRADE_RISK:  # noqa: SLF001
+                    pairs.append({"유사도": value, "가": f"{brand_a} {mark_a.appno} "
+                                  f"{mark_a.title or '(상표명 없음)'}",
+                                  "나": f"{brand_b} {mark_b.appno} "
+                                  f"{mark_b.title or '(상표명 없음)'}",
+                                  "구분": [rows[i]["구분"], rows[j]["구분"]]})
+    pairs.sort(key=lambda pair: -pair["유사도"])
+    own_logos = {mark.appno for _, mark, _ in logo.marks}
+    owners = registry.applicant_keys
+
+    def negatives(entries: list[dict]) -> dict:
+        measured = photos = 0
+        hits = []
+        for entry in entries:
+            image = logo.direct(entry["경로"].read_bytes())
+            if image is None:
+                continue
+            embedding = logo.embed(image)
+            if logo.photo(embedding):
+                photos += 1
+                continue
+            measured += 1
+            for brand, hit in logo.strong(embedding, exclude=entry.get("출원번호")).items():
+                hits.append({"질의": entry["표시"], "브랜드": brand, **hit,
+                             "등록부_출원인의_표장": bool(entry.get("등록부_출원인"))})
+        return {"이미지": len(entries), "사진으로_판정": photos, "잰_이미지": measured,
+                "강함인_이미지": len({hit["질의"] for hit in hits}),
+                "그중_등록부_출원인의_표장": len({hit["질의"] for hit in hits
+                                          if hit["등록부_출원인의_표장"]}),
+                "목록": sorted(hits, key=lambda hit: -hit["유사도"])}
+
+    queries = {query.key: query for query in context["A"]}
+    control_keys = control["대조군"]["이미지"][BASE] + control["대조군"]["이미지"][HOLDOUT]
+    n1 = [item for item in logo_n1_marks(samples) if item["출원번호"] not in own_logos]
+    return {
+        "대표_로고": len(rows),
+        "역할": dict(Counter(row["역할"] for row in rows)),
+        "구분": dict(Counter(row["구분"] for row in rows)),
+        "사진_판정": [f"{row['브랜드']} {row['출원번호']}" for row in rows if row["사진_판정"]],
+        "브랜드별": per_brand, "행": rows,
+        "다른_브랜드의_대표_로고끼리_강함": {"쌍": len(pairs), "목록": pairs},
+        "대조군_덜_닮은_이미지": negatives(
+            [{"표시": key, "경로": queries[key].path} for key in control_keys]),
+        "표본A_질의_이미지": negatives(
+            [{"표시": f"{query.key} {query.name}", "경로": query.path}
+             for query in context["A"]]),
+        "N1_기준용_상표_이미지": negatives(
+            [{"표시": f"{item['출원번호']} {item['이름']} ({item.get('출원인')})",
+              "경로": IMAGES_DIR / item["이미지"], "출원번호": item["출원번호"],
+              "등록부_출원인": bool(applicant_keys(str(item.get("출원인") or "")) & owners)}
+             for item in n1]),
+    }
+
+
+def logo_review_text(results: dict) -> str:
+    lines = [f"대표 로고 {results['대표_로고']}건 — 역할 {results['역할']} · 구분 {results['구분']}"
+             f" · 사진으로 판정 {len(results['사진_판정'])}"]
+    pairs = results["다른_브랜드의_대표_로고끼리_강함"]
+    lines.append(f"서로 다른 브랜드의 대표 로고끼리 강함: {pairs['쌍']}쌍")
+    lines.extend(f"  · {pair['유사도']} {pair['가']} ↔ {pair['나']} ({'/'.join(pair['구분'])})"
+                 for pair in pairs["목록"])
+    for key in ("대조군_덜_닮은_이미지", "표본A_질의_이미지", "N1_기준용_상표_이미지"):
+        group = results[key]
+        lines.append(f"{key.replace('_', ' ')}: {group['잰_이미지']}장(사진 판정 "
+                     f"{group['사진으로_판정']} 제외) 중 강함 {group['강함인_이미지']}장"
+                     f"(등록부 출원인의 표장 {group['그중_등록부_출원인의_표장']})")
+        lines.extend(f"  · {hit['유사도']} {hit['질의']} ↔ {hit['브랜드']} {hit['표장']} "
+                     f"{hit['표장_이름'] or '(상표명 없음)'}"
+                     + (" [같은 출원인]" if hit["등록부_출원인의_표장"] else "")
+                     for hit in group["목록"])
+    return "\n".join(lines)
+
+
+def command_logos(args) -> int:
+    """대표 로고 점검(실제 엔진, 약 3분) — 등록부에서 대표 로고를 고른 뒤."""
+    from scripts import famous_registry as builder
+
+    context = load_context()
+    control = json.loads(CONTROL.read_text(encoding="utf-8"))
+    results = logo_review(context, fc.load_registry(), frozen_samples(), control,
+                          builder.applicant_key_function())
+    results["때"] = _now()
+    out = (args.out_dir if args.out_dir != TRIALS else TRIALS) / "famous_check_logos.json"
+    out.write_text(json.dumps(results, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(logo_review_text(results))
+    print(f"→ {out}")
+    return 0
+
+
 def grade_max(*grades: str | None) -> str | None:
     usable = [grade for grade in grades if grade]
     return max(usable, key=fc.GRADES.index) if usable else None
@@ -1786,6 +1906,75 @@ def recheck_text(results: dict) -> str:
     return "\n".join(lines)
 
 
+def recheck_diff(previous: dict, results: dict) -> dict:
+    """직전 recheck 결과와 달라진 것만 — 목표 값, 기대표 행, N1·N2·N3 일치 목록, 재현율 표, 뺀
+    표본."""
+    def names(source: dict, key: str) -> set[str]:
+        return {f"{row['이름']} → {row['일치']['브랜드']} {row['일치']['수준']}"
+                f"({row['일치']['경로']})" for row in source[key]["목록"]}
+
+    def rows(source: dict) -> dict:
+        return {(row["기대"], row["입력"], row["업종"]): row["결과"]
+                for row in source["기대표"]["행"]}
+
+    before, after = rows(previous), rows(results)
+    out: dict = {
+        "목표": {name: {"직전": previous["목표"][name]["값"], "지금": row["값"],
+                      "통과": row["통과"]}
+               for name, row in results["목표"].items()
+               if previous["목표"].get(name, {}).get("값") != row["값"]},
+        "기대표": [{"기대": key[0], "입력": key[1], "업종": key[2], "직전": before.get(key),
+                  "지금": value} for key, value in after.items() if before.get(key) != value],
+        "일치_목록": {}, "재현율": {}, "뺀_표본": {},
+    }
+    for key in ("N1", "N2", "N3"):
+        new, gone = names(results, key) - names(previous, key), names(previous, key) - names(
+            results, key)
+        if new or gone:
+            out["일치_목록"][key] = {"새로_생김": sorted(new), "없어짐": sorted(gone)}
+    for key in ("P2", "P3"):
+        for kind, table in results[key].items():
+            old = previous[key].get(kind, {}).get("전체")
+            if old != table["전체"]:
+                out["재현율"][f"{key} {kind}"] = {"직전": old, "지금": table["전체"]}
+    if previous["P1"]["강함"] != results["P1"]["강함"] or previous["P1"]["n"] != results["P1"]["n"]:
+        out["재현율"]["P1"] = {"직전": [previous["P1"]["강함"], previous["P1"]["n"]],
+                             "지금": [results["P1"]["강함"], results["P1"]["n"]]}
+    for reason, items in results["뺀_표본"].items():
+        old = previous["뺀_표본"].get(reason, [])
+        if old != items:
+            out["뺀_표본"][reason] = {"직전": len(old), "지금": len(items),
+                                    "새로_빠짐": sorted(set(items) - set(old)),
+                                    "다시_들어옴": sorted(set(old) - set(items))}
+    out["같음"] = not (out["목표"] or out["기대표"] or out["일치_목록"] or out["재현율"]
+                     or out["뺀_표본"])
+    return out
+
+
+def recheck_diff_text(diff: dict) -> str:
+    if diff["같음"]:
+        return "직전 결과와 달라진 것: 없음"
+    lines = ["직전 결과와 달라진 것:"]
+    for name, row in diff["목표"].items():
+        lines.append(f"  · 목표 {name}: {row['직전']} → {row['지금']}"
+                     f"({'통과' if row['통과'] else '미달'})")
+    for row in diff["기대표"]:
+        lines.append(f"  · 기대표 [{row['기대']}] {row['입력']} + {row['업종']}: {row['직전']} → "
+                     f"{row['지금']}")
+    for key, change in diff["일치_목록"].items():
+        for label, rows in change.items():
+            if rows:
+                lines.append(f"  · {key} {label.replace('_', ' ')} {len(rows)}: "
+                             + " / ".join(rows))
+    for key, change in diff["재현율"].items():
+        lines.append(f"  · {key}: {change['직전']} → {change['지금']}")
+    for reason, change in diff["뺀_표본"].items():
+        lines.append(f"  · 뺀 표본 {reason.replace('_', ' ')}: {change['직전']} → {change['지금']}"
+                     + (f" — 새로 빠짐: {' · '.join(change['새로_빠짐'][:12])}"
+                        if change["새로_빠짐"] else ""))
+    return "\n".join(lines)
+
+
 def command_recheck(args) -> int:
     """등록부를 고친 뒤(apply·build) 2-1 기준용 목표와 기대표가 유지되는지 본다."""
     from scripts import famous_registry as builder
@@ -1798,8 +1987,13 @@ def command_recheck(args) -> int:
     results = recheck(fc.load_registry(), dx.load_distinctiveness(), presets, control,
                       frozen_samples(), baseline, builder.applicant_key_function())
     out = (args.out_dir if args.out_dir != TRIALS else TRIALS) / "famous_check_recheck.json"
+    if args.previous:  # 읽고 나서 쓴다(같은 파일을 가리켜도 되게)
+        previous = json.loads(Path(args.previous).read_text(encoding="utf-8"))
+        results["직전_결과와_견줌"] = recheck_diff(previous, results)
     out.write_text(json.dumps(results, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     print(recheck_text(results))
+    if args.previous:
+        print(recheck_diff_text(results["직전_결과와_견줌"]))
     print(f"→ {out}")
     compare = results["2-1 과_견줌"]
     return 0 if compare["목표가_모두_통과"] and compare["기대표_요약이_같음"] else 3
@@ -1815,14 +2009,16 @@ def command_sheet(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=("freeze", "run", "sheet", "recheck"))
+    parser.add_argument("command", choices=("freeze", "run", "sheet", "recheck", "logos"))
+    parser.add_argument("--previous", type=Path,
+                        help="recheck: 직전 recheck 결과(JSON) — 달라진 것만 따로 낸다")
     parser.add_argument("--out-dir", type=Path, default=TRIALS)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--smoke", action="store_true",
                         help="구현 확인 — 일부 표본만(다른 --out-dir 에)")
     args = parser.parse_args(argv)
     return {"freeze": command_freeze, "run": command_run, "sheet": command_sheet,
-            "recheck": command_recheck}[args.command](args)
+            "recheck": command_recheck, "logos": command_logos}[args.command](args)
 
 
 if __name__ == "__main__":

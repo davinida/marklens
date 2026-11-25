@@ -134,10 +134,15 @@ def tool_data(*, registry: fc.Registry, table_rows: list[dict], overrides: dict,
                     "protection_default": fc.PROTECT_NEAR,
                     "notations": list((guess.get("notations") or {}).get("add", []))}
         in_brand = {mark.appno for mark in brand.marks}
+        # 사람이 출원번호로 고른 표장(받아서 DB 에 들어온 것 포함) — 내보낼 때 fetch 로 남아야
+        # 그 브랜드에 계속 이어진다
+        fetched = {entry["appno"]: entry.get("source") or fc.FETCH_DIRECT
+                   for entry in (overrides["brands"].get(key) or {}).get("fetch") or ()}
         marks = []
         for mark in brand.marks:
             record = by_appno.get(mark.appno, {})
             marks.append({
+                "via_fetch": fetched.get(mark.appno) if mark.appno in fetched else None,
                 "appno": mark.appno, "title": mark.title, "kind": mark.kind,
                 "auto_role": mark.auto_role, "default_role": fc.DEFAULT_ROLE[mark.auto_role],
                 "source": mark.source, "app_date": mark.app_date, "reg_date": mark.reg_date,
@@ -172,6 +177,7 @@ def tool_data(*, registry: fc.Registry, table_rows: list[dict], overrides: dict,
     return {
         "generated": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),
         "registry_version": registry.version, "overrides_version": fc.OVERRIDES_VERSION,
+        "db_generation": builder.db_generation() or "", "db_count": len(by_appno),
         "overrides_purpose": builder.OVERRIDES_PURPOSE,
         "roles": list(fc.MARK_ROLES), "protections": list(fc.PROTECTIONS),
         "kinds": list(fc.KINDS),
@@ -225,11 +231,18 @@ def command_build(args) -> int:
                      proposed=proposed, candidates=candidates, records=records,
                      presets=preset_labels, thumb_of=thumb_of, cand_thumb_of=cand_thumb_of)
     out.parent.mkdir(parents=True, exist_ok=True)
+    if args.keep and out.exists():  # 앞서 만든 도구를 남긴다(브라우저에 남은 작업을 볼 수 있게)
+        kept = out.with_name(f"{out.stem}_{args.keep}{out.suffix}")
+        if not kept.exists():
+            kept.write_bytes(out.read_bytes())
     out.write_text(render(data, TEMPLATE.read_text(encoding="utf-8")), encoding="utf-8")
     cands = [c for brand in data["brands"] for c in brand["candidates"]]
     print(json.dumps({
         "경로": str(out), "크기_KB": round(out.stat().st_size / 1024),
+        "DB_세대": data["db_generation"], "DB_건수": data["db_count"],
         "브랜드": len(data["brands"]),
+        "출원번호로_고른_표장(DB에_있음)": sum(1 for brand in data["brands"]
+                                      for mark in brand["marks"] if mark["via_fetch"]),
         "새_브랜드(제안)": sum(1 for brand in data["brands"] if brand["proposed"]),
         "DB_표장": sum(len(brand["marks"]) for brand in data["brands"]),
         "DB_썸네일": made, "후보": len(cands),
@@ -245,6 +258,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=("build",))
     parser.add_argument("--out", type=Path, default=DEFAULT_OUT)
     parser.add_argument("--candidates", type=Path, default=DEFAULT_CANDIDATES)
+    parser.add_argument("--keep", metavar="이름",
+                        help="이미 있는 curate.html 을 curate_<이름>.html 로 남기고 새로 쓴다")
     parser.add_argument("--no-proposed", action="store_true",
                         help="후보 찾기의 새 브랜드를 제안으로 싣지 않는다")
     args = parser.parse_args(argv)

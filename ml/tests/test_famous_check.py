@@ -336,6 +336,37 @@ def test_fetch_list_attaches_marks_once_they_are_in_the_database(dist):
     assert [m.appno for m in chanel.logo_marks] == ["4020200000009"]
 
 
+def test_received_marks_add_their_applicants_to_the_brand(dist):
+    received = [
+        {"출원번호": "4020200000009", "상표한글명": None, "상표구분": "도형상표",
+         "유사군": ["S1282"], "류": [37], "이미지파일": "c.png",
+         "출원인": "샤넬 홀딩|CHANEL HOLDING", "수집_출처": fc.DB_SOURCE_LOGOS},
+        {"출원번호": "4020200000010", "상표한글명": "COCO", "상표구분": "도형복합",
+         "유사군": ["G4502"], "류": [25], "이미지파일": "d.png", "출원인": "샤넬 홀딩",
+         "수집_출처": "기존 수집"},
+        {"출원번호": "4020200000011", "상표한글명": "남의 것", "상표구분": "도형복합",
+         "유사군": ["G0301"], "류": [30], "이미지파일": "e.png", "출원인": "지주회사",
+         "수집_출처": "기존 수집"}]
+    overrides = {"샤넬": {"fetch": [
+        {"appno": "4020200000009", "role": fc.ROLE_LOGO_NOW, "source": "후보"},
+        {"appno": "4020200000011", "role": fc.ROLE_LOGO_OLD, "source": "직접"}]}}
+    chanel = _build(dist, overrides, db=DB + received).brand("샤넬")
+    # 받은 대표 표장(수집 출처가 대표 표장)의 출원인만 더한다 — 이미 DB 에 있던 표장은 역할만
+    assert chanel.added_applicants == ("샤넬 홀딩", "CHANEL HOLDING")
+    assert chanel.applicants == ("샤넬", "샤넬 홀딩", "CHANEL HOLDING")
+    assert chanel.applicant_keys == {"샤넬", "샤넬홀딩", "CHANELHOLDING"}
+    assert [(m.appno, m.source, m.role) for m in chanel.marks] == [
+        ("5", fc.SOURCE_FAMOUS, fc.ROLE_BRAND_OTHER),
+        ("4020200000010", fc.SOURCE_EXISTING, fc.ROLE_UNRELATED),  # 더한 출원인의 다른 표장
+        ("4020200000009", fc.SOURCE_RECEIVED, fc.ROLE_LOGO_NOW),
+        ("4020200000011", fc.SOURCE_PICKED, fc.ROLE_LOGO_OLD)]
+    assert chanel.fetch == () and [m.appno for m in chanel.logo_marks] == [
+        "4020200000009", "4020200000011"]
+    data = fc.registry_to_json(_build(dist, overrides, db=DB + received))
+    assert next(b for b in data["brands"] if b["name"] == "샤넬")["applicants_added"] == [
+        "샤넬 홀딩", "CHANEL HOLDING"]
+
+
 def test_brands_sharing_an_applicant_split_marks_by_title(dist):
     db = DB + [
         {"출원번호": "6", "상표한글명": "백스비어", "상표구분": "도형복합", "유사군": ["G0301"],
@@ -357,8 +388,8 @@ def test_brands_sharing_an_applicant_split_marks_by_title(dist):
 def test_overrides_are_validated(tmp_path):
     assert fc.load_overrides(tmp_path / "none.json") == {
         "version": fc.OVERRIDES_VERSION, "brands": {}}
-    shipped = fc.load_overrides()
-    assert shipped["brands"] == {}  # 저장소의 것은 빈 틀(기본 상태)
+    shipped = fc.load_overrides()  # 저장소의 것(사람이 고르기 도구에서 정한 값)은 형식에 맞다
+    assert shipped["version"] == fc.OVERRIDES_VERSION and isinstance(shipped["brands"], dict)
     parsed = fc.parse_overrides({"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {
         "notations": {"add": [" 샤넬르 ", "샤넬르", ""]}, "exceptions": ["채널", "채널"],
         "marks": {" 4020200000001 ": fc.ROLE_LOGO_NOW}, "preset": "",
@@ -592,36 +623,58 @@ def test_brand_table_matches_the_collection_parser():
         assert fc.title_has_notation(title, names) == cp.title_has_brand(title, names)
 
 
-def test_shipped_registry_follows_the_brand_table():
+def test_shipped_registry_follows_the_brand_table_and_overrides():
     registry = fc.load_registry()
     rows = fc.read_brand_table()
-    assert [b.name for b in registry.brands] == [row["notations"][0] for row in rows]
+    overrides = fc.load_overrides()["brands"]
+    table_names = [row["notations"][0] for row in rows]
+    # [브랜드] 표의 브랜드가 표의 순서로 먼저, 사람이 더한 새 브랜드가 그 뒤
+    assert [b.table_name for b in registry.brands if not b.is_new] == table_names
+    assert [b.table_name for b in registry.brands][:len(rows)] == table_names
+    assert {b.table_name for b in registry.brands if b.is_new} == {
+        name for name, item in overrides.items() if item.get("new")}
     for brand, row in zip(registry.brands, rows):
-        assert [n.text for n in brand.notations] == row["notations"]  # 표기는 표에 있는 그대로
-        assert list(brand.applicants) == row["applicants"] and brand.preset == row["preset"]
-        assert brand.protection in fc.PROTECTIONS and brand.goods_codes
+        edits = (overrides.get(brand.table_name) or {}).get("notations") or {}
+        kept = [text for text in row["notations"] if text not in edits.get("remove", ())]
+        # 표기 = 표의 표기에서 사람이 지운 것을 빼고 더한 것을 붙인 것(새 표기를 지어내지 않는다)
+        assert [n.text for n in brand.notations] == kept + [
+            text for text in edits.get("add", ()) if text not in kept]
+        assert list(brand.removed_notations) == [
+            text for text in row["notations"] if text in edits.get("remove", ())]
+        if "applicants" not in (overrides.get(brand.table_name) or {}):
+            assert list(brand.applicants) == row["applicants"] + list(brand.added_applicants)
+        if "preset" not in (overrides.get(brand.table_name) or {}):
+            assert brand.preset == row["preset"]
+    for brand in registry.brands:
+        assert brand.protection in fc.PROTECTIONS and brand.notations
+        if "protection" not in (overrides.get(brand.table_name) or {}):
+            assert brand.protection == (
+                fc.PROTECT_ANY if brand.table_name in fc.PROTECT_ANY_BRANDS
+                else fc.PROTECT_NEAR)
         texts = {n.text for n in brand.notations}
         for notation in brand.notations:
             assert notation.key == fc.text_key(notation.text)
             assert notation.length == fc.length_class(notation.key)
             assert notation.script == fc.script_label(notation.key)
             assert notation.kind in fc.KINDS and set(notation.inherits) <= texts
-            assert not notation.base_weak or notation.kind == fc.KIND_WEAK
+            assert not (notation.base_weak or notation.common) or notation.kind == fc.KIND_WEAK
         for mark in brand.marks:
             assert mark.role in fc.MARK_ROLES and mark.auto_role in fc.AUTO_ROLES
             if not mark.picked:  # 고르지 않은 표장은 자동 역할의 기본값
                 assert mark.role == fc.DEFAULT_ROLE[mark.auto_role]
-        assert brand.protection == (fc.PROTECT_ANY if brand.table_name in fc.PROTECT_ANY_BRANDS
-                                    else fc.PROTECT_NEAR) or brand.name in fc.load_overrides()[
-                                        "brands"]
-    assert len({m.appno for b in registry.brands for m in b.marks}) == sum(
-        len(b.marks) for b in registry.brands)  # 한 표장은 한 브랜드에만
-    by_kind = {kind: sorted(n.text for b in registry.brands for n in b.notations
-                            if n.kind == kind) for kind in fc.KINDS}
-    assert by_kind[fc.KIND_WEAK] == sorted(
-        ["BBQ", "비비큐", "CU", "씨유", "GS25", "지에스25", "김가네"])
-    assert by_kind[fc.KIND_INITIAL] == ["bhc", "비에이치씨"]
-    assert len(by_kind[fc.KIND_NORMAL]) == 58
+    # 한 표장이 여러 브랜드에 보이는 것은 출원인을 함께 쓰는 브랜드 사이에서만
+    owners: dict[str, list[fc.Brand]] = {}
+    for brand in registry.brands:
+        for mark in brand.marks:
+            owners.setdefault(mark.appno, []).append(brand)
+    for brands in owners.values():
+        for other in brands[1:]:
+            assert brands[0].applicant_keys & other.applicant_keys
+    kinds = {(b.table_name, n.text): n.kind for b in registry.brands for n in b.notations}
+    for key in (("BBQ", "BBQ"), ("BBQ", "비비큐"), ("CU", "CU"), ("CU", "씨유"), ("GS25", "GS25"),
+                ("GS25", "지에스25"), ("김가네", "김가네")):
+        assert kinds[key] == fc.KIND_WEAK
+    assert kinds[("bhc", "bhc")] == kinds[("bhc", "비에이치씨")] == fc.KIND_INITIAL
 
 
 def test_shipped_registry_matches_plan_database_and_rebuild():
@@ -639,14 +692,20 @@ def test_shipped_registry_matches_plan_database_and_rebuild():
     plan = json.loads(PLAN.read_text(encoding="utf-8"))
     records = {str(r["출원번호"]): r for r in json.loads(
         METADATA.read_text(encoding="utf-8"))["trademarks"]}
-    marks = {m.appno: (b, m) for b in registry.brands for m in b.marks}
     for record in plan["records"]:  # 수집 계획의 표장은 그 브랜드에, 이름 여부도 수집 때와 같게
-        brand, mark = marks[str(record["출원번호"])]
-        assert brand.name == record["브랜드"] and mark.source == fc.SOURCE_FAMOUS
-        assert (mark.auto_role == fc.ROLE_NAME) == bool(record["브랜드명_포함"])
-    for appno, (brand, mark) in marks.items():
-        record = records[appno]
-        assert mark.codes == fc.normalize_codes(record.get("유사군") or ())
-        assert mark.image == record.get("이미지파일")
-        if mark.source == fc.SOURCE_EXISTING:  # 같은 출원인의 기존 수집 표장
-            assert record.get("수집_출처") != "유명 브랜드"
+        brand = registry.brand(record["브랜드"])
+        mark = next(m for m in brand.marks if m.appno == str(record["출원번호"]))
+        assert mark.source == fc.SOURCE_FAMOUS
+        if not brand.removed_notations:  # 표기를 지운 브랜드는 자동 역할이 수집 때와 다를 수 있다
+            assert bool(record["브랜드명_포함"]) <= (mark.auto_role == fc.ROLE_NAME)
+    sources = {fc.SOURCE_FAMOUS: "유명 브랜드", fc.SOURCE_RECEIVED: fc.DB_SOURCE_LOGOS,
+               fc.SOURCE_EXISTING: "기존 수집"}
+    for brand in registry.brands:
+        for mark in brand.marks:
+            record = records[mark.appno]
+            assert mark.codes == fc.normalize_codes(record.get("유사군") or ())
+            assert mark.image == record.get("이미지파일")
+            if mark.source in sources:  # 출처는 그 표장이 DB 에 들어온 길 그대로
+                assert record.get("수집_출처") == sources[mark.source]
+        for entry in brand.fetch:  # 받을 표장으로 남은 것은 아직 DB 에 없는 것뿐
+            assert entry["appno"] not in records

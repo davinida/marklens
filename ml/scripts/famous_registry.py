@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -43,7 +44,11 @@ from src.axes import goods_map as gm  # noqa: E402
 DEFAULT_PLAN = ML_ROOT / "data" / "staging" / "famous_brands.plan.json"
 DEFAULT_METADATA = ML_ROOT / "data" / "kipris_metadata.json"
 DEFAULT_IMAGES = ML_ROOT / "data" / "images"
+DEFAULT_MANIFEST = ML_ROOT / "data" / "index" / "kipris_manifest.json"
 DEFAULT_ALIASES = REPO_ROOT / "shared" / "applicant_aliases.json"
+DEFAULT_RAW_BIBLIO = ML_ROOT / "data" / "raw_kipris" / "collect" / "xml"  # 서지 응답 원본
+GOODS_SHOWN = 4  # 업종 표에 보이는 대표 지정상품 수
+_ENGLISH_NOTE = re.compile(r"\s*\([^()]*[A-Za-z][^()]*\)")  # 상품명에 병기한 영문 괄호
 OVERRIDES_PURPOSE = (
     "유명 상표 등록부(shared/famous_registry.json)에서 사람이 정하는 값. 고르기 도구(curate.html — "
     "ml/scripts/famous_curate.py 가 만든다)의 \"내보내기\"가 이 형식으로 쓴다. 손으로 고치지 말고 "
@@ -62,6 +67,14 @@ def applicant_key_function(aliases_path: Path = DEFAULT_ALIASES):
 
     aliases = nst.load_aliases(aliases_path)
     return lambda text: nst.split_applicants(text, aliases)
+
+
+def db_generation(manifest_path: Path = DEFAULT_MANIFEST) -> str | None:
+    """DB 세대(색인 manifest 의 generation_id) — 없으면 None."""
+    try:
+        return json.loads(Path(manifest_path).read_text(encoding="utf-8")).get("generation_id")
+    except (OSError, ValueError):
+        return None
 
 
 def preset_tables() -> tuple[dict, dict]:
@@ -92,7 +105,8 @@ def build(*, brands_path: Path = fc.DEFAULT_BRANDS_PATH, plan_path: Path = DEFAU
         "brands_file": "shared/famous_brands.txt", "brands_sha256": _sha256(brands_path),
         "plan": "ml/data/staging/famous_brands.plan.json", "plan_sha256": _sha256(plan_path),
         "metadata": "ml/data/kipris_metadata.json",
-        "metadata_generation": info.get("generation_id") or info.get("generation"),
+        "metadata_generation": (info.get("generation_id") or info.get("generation")
+                                or db_generation()),
         "metadata_count": len(records),
         "overrides": "shared/famous_registry_overrides.json",
         "overrides_sha256": (_sha256(overrides_path) if Path(overrides_path).exists() else None),
@@ -189,9 +203,79 @@ def summary(registry: fc.Registry) -> dict:
     }
 
 
-def review(registry: fc.Registry) -> dict:
+def preset_classes() -> dict[str, list[int]]:
+    """업종 세트 → 그 세트의 지정상품이 속한 류(브랜드의 핵심 업종을 류로 본 것)."""
+    presets = gm.load_business_presets(gm.load_goods_map()).presets
+    return {preset.id: sorted({good.nice_class for good in preset.goods if good.nice_class})
+            for preset in presets}
+
+
+def raw_goods(appno: str, raw_dir: Path = DEFAULT_RAW_BIBLIO) -> list[tuple[int, str]]:
+    """표장의 지정상품 (류, 상품명) — 받아 둔 서지 응답 원본에서(호출 0). 원본이 없으면 빈 목록."""
+    from backend.src.core import kipris_client as kc
+
+    found = sorted(Path(raw_dir).glob(f"biblio_{appno}_*.xml")) if Path(raw_dir).is_dir() else []
+    if not found:
+        return []
+    try:
+        goods = kc.parse_bibliography_detail(found[-1].read_text(encoding="utf-8"))["goods"]
+    except (kc.KiprisError, OSError, ValueError):
+        return []
+    out = []
+    for item in goods:
+        name = str(item.get("productName") or "")
+        for _ in range(3):  # 겹친 괄호까지
+            name = _ENGLISH_NOTE.sub("", name)
+        name = " ".join(name.replace(";", " ").split())
+        if str(item.get("mainCode") or "").isdigit() and name:
+            out.append((int(item["mainCode"]), name))
+    return out
+
+
+def industry_table(registry: fc.Registry, *, classes_of: dict[str, list[int]] | None = None,
+                   goods_of=None) -> list[dict]:
+    """브랜드별 업종 표 — 업종 세트(와 그 류), 보호 범위, 대표 표장(대표 로고(현재)·과거 로고)이
+    등록된 류와 대표 지정상품. 표시: 업종 세트가 비어 있음 / 받은 표장이 그 브랜드의 핵심 업종
+    (업종 세트의 류)이 아닌 류뿐임."""
+    classes_of = preset_classes() if classes_of is None else classes_of
+    goods_of = raw_goods if goods_of is None else goods_of
+    rows = []
+    for brand in registry.brands:
+        logos = brand.logo_marks
+        core = set(classes_of.get(brand.preset or "", ()))
+        logo_classes = sorted({nice for mark in logos for nice in mark.classes})
+        counts: dict[str, list] = {}
+        for mark in logos:
+            for nice, name in goods_of(mark.appno):
+                entry = counts.setdefault(name, [nice in core, 0, len(counts)])
+                entry[1] += 1
+        ranked = sorted(counts.items(), key=lambda kv: (not kv[1][0], -kv[1][1], kv[1][2]))
+        received = [mark for mark in brand.marks if mark.source == fc.SOURCE_RECEIVED]
+        received_classes = sorted({nice for mark in received for nice in mark.classes})
+        flags = []
+        if not brand.preset:
+            flags.append("업종 세트 없음")
+        elif received and not core & set(received_classes):
+            flags.append("받은 표장이 핵심 업종 밖의 류뿐")
+        rows.append({
+            "브랜드": brand.name, "새_브랜드": brand.is_new, "업종_세트": brand.preset,
+            "업종_세트_이름": brand.preset_label, "업종_세트의_류": sorted(core),
+            "보호": brand.protection,
+            "대표_로고_현재": sum(1 for mark in logos if mark.role == fc.ROLE_LOGO_NOW),
+            "대표_로고_과거": sum(1 for mark in logos if mark.role == fc.ROLE_LOGO_OLD),
+            "대표_표장의_류": logo_classes,
+            "대표_표장의_류_이름": [f"{nice}류 {gm.NICE_CLASS_TITLES.get(nice, '')}".strip()
+                              for nice in logo_classes],
+            "대표_지정상품": [name for name, _ in ranked[:GOODS_SHOWN]],
+            "받은_표장": len(received), "받은_표장의_류": received_classes,
+            "표시": flags})
+    return rows
+
+
+def review(registry: fc.Registry, *, with_industry: bool = False) -> dict:
     """점검 보고 — 대표 로고가 없는 브랜드, 지워지거나 더해진 표기와 그 종류(흔한 말 포함),
-    예외 낱말, 받을 표장 목록, 새 브랜드, 보호 범위."""
+    예외 낱말, 받을 표장 목록, 새 브랜드, 보호 범위. with_industry 면 브랜드별 대표 로고 수와
+    업종 표(업종 세트·대표 표장의 류·대표 지정상품)도."""
     no_logo, removed, added, common, exceptions, fetch, new, picked = [], [], [], [], [], [], [], []
     for brand in registry.brands:
         logos = brand.logo_marks
@@ -225,8 +309,12 @@ def review(registry: fc.Registry) -> dict:
             if mark.picked:
                 picked.append({"출원번호": mark.appno, "브랜드": brand.name, "역할": mark.role,
                                "자동_역할": mark.auto_role, "상표명": mark.title})
+    table = industry_table(registry) if with_industry else []
     return {
         "브랜드": len(registry.brands),
+        "업종_표": table,
+        "더한_출원인": [{"브랜드": b.name, "출원인": list(b.added_applicants)}
+                    for b in registry.brands if b.added_applicants],
         "대표_로고(현재)가_없는_브랜드": no_logo,
         "지운_표기": removed, "더한_표기": added, "흔한_말_표기": common,
         "예외_낱말": exceptions, "받을_표장": fetch, "새_브랜드": new,
@@ -237,8 +325,12 @@ def review(registry: fc.Registry) -> dict:
         "근거_없음": [b.name for b in registry.brands if b.evidence_label],
         "표기_종류별": {kind: [f"{b.name}: {n.text}" for b in registry.brands
                               for n in b.notations if n.kind == kind]
-                     for kind in (fc.KIND_WEAK, fc.KIND_INITIAL)},
+                     for kind in fc.KINDS},
     }
+
+
+def _short(text: str, limit: int = 22) -> str:
+    return text if len(text) <= limit else text[:limit - 1] + "…"
 
 
 def review_text(data: dict) -> str:
@@ -278,8 +370,21 @@ def review_text(data: dict) -> str:
             lambda r: (f"{r['출원번호']} {r['브랜드']} → {r['역할']} [{r['출처']}]"
                        + (f" {r['상표명']}" if r["상표명"] else "")
                        + (f" · {r['출원인']}" if r["출원인"] else "")))
+    section("받은 대표 표장의 출원인이라 더한 출원인", data.get("더한_출원인") or [],
+            lambda r: f"{r['브랜드']}: {' / '.join(r['출원인'])}")
     for kind, rows in data["표기_종류별"].items():
         lines.append(f"\n■ {kind} — {len(rows)}건: " + (" · ".join(rows) if rows else "없음"))
+    if data.get("업종_표"):
+        lines.append("\n■ 브랜드별 업종 표 — 브랜드 | 업종 세트(류) | 보호 범위 | 대표 로고 "
+                     "현재·과거 | 대표 표장의 류 | 대표 지정상품 | 표시")
+        for row in data["업종_표"]:
+            preset = (f"{row['업종_세트']}({','.join(map(str, row['업종_세트의_류']))})"
+                      if row["업종_세트"] else "없음")
+            lines.append(
+                f"  · {row['브랜드']} | {preset} | {row['보호']} | {row['대표_로고_현재']}·"
+                f"{row['대표_로고_과거']} | {','.join(map(str, row['대표_표장의_류'])) or '-'} | "
+                f"{', '.join(_short(name) for name in row['대표_지정상품']) or '-'} | "
+                f"{' · '.join(row['표시']) or '-'}")
     for protection, names in data["보호_범위"].items():
         lines.append(f"\n■ 보호 범위 {protection} — {len(names)}개: " + " · ".join(names))
     if data["근거_없음"]:
@@ -303,7 +408,7 @@ def command_apply(args) -> int:
     args.out.write_text(to_text(registry), encoding="utf-8")
     print(f"썼다: {fc.DEFAULT_OVERRIDES_PATH.name} · {args.out.name} (브랜드 "
           f"{len(registry.brands)}, 표장 {sum(len(b.marks) for b in registry.brands)})\n")
-    print(review_text(review(registry)))
+    print(review_text(review(registry, with_industry=True)))
     print("\n다음: ml/venv/bin/python ml/scripts/famous_check_measure.py recheck   "
           "# 2-1 기준용 목표·기대표가 유지되는지")
     return 0
@@ -314,6 +419,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=("build", "check", "report", "review", "apply"))
     parser.add_argument("file", nargs="?", type=Path, help="apply: 고르기 도구가 내보낸 JSON")
     parser.add_argument("--out", type=Path, default=fc.DEFAULT_REGISTRY_PATH)
+    parser.add_argument("--json", action="store_true", help="review 를 JSON 으로")
     args = parser.parse_args(argv)
     if args.command == "apply":
         return command_apply(args)
@@ -329,7 +435,9 @@ def main(argv: list[str] | None = None) -> int:
         print("같음" if same else "다름 — build 로 다시 만든다")
         return 0 if same else 1
     if args.command == "review":
-        print(review_text(review(registry)))
+        data = review(registry, with_industry=True)
+        print(json.dumps(data, ensure_ascii=False, indent=1) if args.json
+              else review_text(data))
         return 0
     print(json.dumps(summary(registry), ensure_ascii=False, indent=1))
     return 0
