@@ -346,3 +346,42 @@ def test_expectation_table_compares_levels():
     summary = table["요약"]
     assert summary[fm.E_NOTICE]["n"] == 4 and summary[fm.E_NOTICE]["맞음"] == 1
     assert summary[fm.E_NONE]["맞음"] >= 19
+
+
+def test_recheck_drops_samples_the_registry_can_no_longer_judge():
+    star = _brand("스타벅스", [_notation("스타벅스")])  # STARBUCKS 표기를 지운 등록부
+    samsung = fc.Brand(**{**_brand("삼성", [_notation("삼성")]).__dict__,
+                          "applicant_keys": frozenset({"삼성전자"}), "is_new": True})
+    registry = fc.Registry(fc.REGISTRY_VERSION, (star, samsung))
+    matcher = fm.Matcher(registry, None, 0.0)
+    samples = {
+        "P1": [{"이름": "스타벅스", "브랜드": "스타벅스", "표기": "스타벅스", "반": None},
+               {"이름": "STARBUCKS", "브랜드": "스타벅스", "표기": "STARBUCKS", "반": None}],
+        "P3": [{"이름": "STARBUCKZ", "브랜드": "스타벅스", "표기": "STARBUCKS",
+                "반": fm.BASE}],
+        "P2": [{"이름": "스타벅수", "브랜드": "스타벅스", "표기": "스타벅스", "반": fm.BASE,
+                "변형": fm.P2_VARIANT},
+               {"이름": "STARBUCKSS", "브랜드": "스타벅스", "표기": "STARBUCKS", "반": fm.BASE,
+                "변형": fm.P2_VARIANT},
+               {"이름": "스타벅슈", "브랜드": "스타벅스", "표기": "스타벅스", "반": fm.HOLDOUT,
+                "변형": fm.P2_VARIANT}],
+        "N1": [{"이름": "Galaxy", "출원인": "삼성전자", "반": fm.BASE},
+               {"이름": "IDEA", "출원인": "다른 회사", "반": fm.BASE},
+               {"이름": "확인용", "출원인": "다른 회사", "반": fm.HOLDOUT}],
+        "N2": [{"이름": "ON PACKS", "반": None}], "N3": [], "N4": []}
+    items, dropped = fm.usable_samples(samples, registry, matcher,
+                                       lambda text: frozenset({text}))
+    assert [item["이름"] for item in items["P1"]] == ["스타벅스"]
+    assert items["P3"] == [] and [item["이름"] for item in items["P2"]] == ["스타벅수"]
+    assert [item["이름"] for item in items["N1"]] == ["IDEA"]  # 확인용은 애초에 빠진다
+    assert len(dropped["지운_표기의_표본"]) == 3  # STARBUCKS 를 겨냥한 P1·P3·P2
+    assert dropped["등록부_출원인이_된_N1"] == ["Galaxy — 삼성전자"]
+
+
+def test_matcher_finds_a_renamed_brand_by_its_table_name():
+    renamed = fc.Brand(**{**_brand("본죽", [_notation("본죽")]).__dict__,
+                          "table_name": "본죽&비빔밥"})
+    matcher = fm.Matcher(fc.Registry(fc.REGISTRY_VERSION, (renamed,)), None, 0.0)
+    assert matcher.kind({"브랜드": "본죽&비빔밥", "표기": "본죽"}) == fc.KIND_NORMAL
+    assert matcher.names == {"본죽&비빔밥": "본죽"}
+    assert fc.Registry(fc.REGISTRY_VERSION, (renamed,)).brand("본죽&비빔밥") is renamed

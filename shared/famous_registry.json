@@ -1,5 +1,5 @@
 {
- "version": "famous_registry_v2",
+ "version": "famous_registry_v3",
  "sources": {
   "brands_file": "shared/famous_brands.txt",
   "brands_sha256": "3457adb5966f9e53b569f2c60b46dc00bc8b5e62ef6a3ad22663ec7756d9f267",
@@ -9,13 +9,15 @@
   "metadata_generation": null,
   "metadata_count": 1383,
   "overrides": "shared/famous_registry_overrides.json",
-  "overrides_sha256": "3d9239cbdb458ef2aa555609098c027709b9cab5095cacfddf0b258e04296390",
+  "overrides_sha256": "441d2896cab2ef6bd3f70f39fc8fe9ac664e82d0a905256971bbfa7f611a6798",
   "aliases_sha256": "34a069278ec3f4ff460e589757968bb98f8a946488ba9e119dcc19dd1a50f53e",
-  "note": "표장 역할은 자동(이름·도형·다른 이름) 뒤 overrides 로 덮는다. 표기 종류: 약한 표기 = 유명 예외를 뺀 식별력 판정으로 브랜드 자신의 업종에서 조각이 모두 약한 표기(base_weak)와 그 표기와 소리가 0.98 이상인 표기, 머리글자 표기 = 약한 표기가 아닌 영문 3자 이하 표기와 그 표기와 소리가 0.98 이상인 표기, 나머지는 보통 표기."
+  "note": "표장 역할은 사람이 고른다(대표 로고(현재)·과거 로고·브랜드 이름이 든 그 밖의 표장·관련 없음) — 고르기 전 기본값은 자동 역할(상표명으로 정한 이름·도형·다른 이름)에서 이름 → 브랜드 이름이 든 그 밖의 표장, 도형·다른 이름 → 관련 없음. 표기 종류: 약한 표기 = 유명 예외를 뺀 식별력 판정으로 브랜드 자신의 업종에서 조각이 모두 약한 표기(base_weak)·사람이 흔한 말로 표시한 표기(common)와 그 표기와 소리가 0.98 이상인 표기, 머리글자 표기 = 약한 표기가 아닌 영문 3자 이하 표기와 그 표기와 소리가 0.98 이상인 표기, 나머지는 보통 표기."
  },
  "brands": [
   {
    "name": "컴포즈커피",
+   "table_name": "컴포즈커피",
+   "new": false,
    "notations": [
     {
      "text": "컴포즈커피",
@@ -27,6 +29,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -57,6 +61,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -79,6 +85,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -92,6 +100,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 컴포즈커피"
    ],
@@ -112,9 +122,10 @@
     "text": "커피 가맹점 수 2위 2,649개(공정위 가맹사업 현황 통계 인용) https://brunch.co.kr/@mobiinside/7515",
     "urls": [
      "https://brunch.co.kr/@mobiinside/7515"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -132,18 +143,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020250007320",
      "title": "TOPPING COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250007320.png",
      "image_exists": true,
+     "app_date": "2025-01-14",
+     "reg_date": "2026-07-31",
      "codes": [
       "G0206",
       "G0301",
@@ -160,11 +174,14 @@
      "appno": "4020250007321",
      "title": "TOPPING COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250007321.png",
      "image_exists": true,
+     "app_date": "2025-01-14",
+     "reg_date": "2026-07-31",
      "codes": [
       "S0101",
       "S123101",
@@ -179,11 +196,14 @@
      "appno": "4020250007322",
      "title": "TOPPING COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250007322.png",
      "image_exists": true,
+     "app_date": "2025-01-14",
+     "reg_date": "2026-07-31",
      "codes": [
       "G0301",
       "G0502",
@@ -197,11 +217,14 @@
      "appno": "4020250008755",
      "title": "COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250008755.png",
      "image_exists": true,
+     "app_date": "2025-01-16",
+     "reg_date": "2026-07-31",
      "codes": [
       "G0206",
       "G0301",
@@ -218,11 +241,14 @@
      "appno": "4020250008756",
      "title": "COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250008756.png",
      "image_exists": true,
+     "app_date": "2025-01-16",
+     "reg_date": "2026-07-31",
      "codes": [
       "S0101",
       "S123101",
@@ -237,11 +263,14 @@
      "appno": "4020250008757",
      "title": "COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250008757.png",
      "image_exists": true,
+     "app_date": "2025-01-16",
+     "reg_date": "2026-07-31",
      "codes": [
       "G0301",
       "G0502",
@@ -255,11 +284,14 @@
      "appno": "4020250008759",
      "title": "No.1 Take-out Coffee COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250008759.png",
      "image_exists": true,
+     "app_date": "2025-01-16",
+     "reg_date": "2026-07-20",
      "codes": [
       "G0206",
       "G0301",
@@ -276,11 +308,14 @@
      "appno": "4020250008760",
      "title": "No.1 Take-out Coffee COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250008760.png",
      "image_exists": true,
+     "app_date": "2025-01-16",
+     "reg_date": "2026-07-20",
      "codes": [
       "S0101",
       "S123101",
@@ -295,11 +330,14 @@
      "appno": "4020250008761",
      "title": "No.1 Take-out Coffee COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250008761.png",
      "image_exists": true,
+     "app_date": "2025-01-16",
+     "reg_date": "2026-07-20",
      "codes": [
       "G0301",
       "G0502",
@@ -313,11 +351,14 @@
      "appno": "4020250008763",
      "title": "COMPOSE COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250008763.png",
      "image_exists": true,
+     "app_date": "2025-01-16",
+     "reg_date": "2026-07-20",
      "codes": [
       "G0206",
       "G0301",
@@ -330,10 +371,14 @@
       30
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "이디야커피",
+   "table_name": "이디야커피",
+   "new": false,
    "notations": [
     {
      "text": "이디야커피",
@@ -345,6 +390,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -375,6 +422,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -397,6 +446,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -410,6 +461,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 이디야"
    ],
@@ -430,9 +483,10 @@
     "text": "커피 가맹점 수 3위 2,562개(같은 출처) https://brunch.co.kr/@mobiinside/7515",
     "urls": [
      "https://brunch.co.kr/@mobiinside/7515"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -455,18 +509,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020230132345",
      "title": "EDIYA TRIPLE Blending",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230132345.png",
      "image_exists": true,
+     "app_date": "2023-07-24",
+     "reg_date": "2025-02-04",
      "codes": [
       "G0501",
       "G0502",
@@ -480,11 +537,14 @@
      "appno": "4020230027404",
      "title": "EDIYA TRIPLE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230027404.png",
      "image_exists": true,
+     "app_date": "2023-02-15",
+     "reg_date": "2024-08-21",
      "codes": [
       "G0501",
       "G0502",
@@ -498,11 +558,14 @@
      "appno": "4020230027406",
      "title": "EDIYA TRIPLE Brew",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230027406.png",
      "image_exists": true,
+     "app_date": "2023-02-15",
+     "reg_date": "2024-08-21",
      "codes": [
       "G0501",
       "G0502",
@@ -516,11 +579,14 @@
      "appno": "7020210000736",
      "title": "LAB EDIYA COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020210000736.png",
      "image_exists": true,
+     "app_date": "2021-05-10",
+     "reg_date": "2022-12-12",
      "codes": [
       "G0301",
       "G0501",
@@ -550,11 +616,14 @@
      "appno": "7020210000737",
      "title": "LAB EDIYA COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020210000737.png",
      "image_exists": true,
+     "app_date": "2021-05-10",
+     "reg_date": "2022-12-12",
      "codes": [
       "G0301",
       "G0501",
@@ -584,11 +653,14 @@
      "appno": "7020210000738",
      "title": "EDIYA COFFEE LAB",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020210000738.png",
      "image_exists": true,
+     "app_date": "2021-05-10",
+     "reg_date": "2022-12-12",
      "codes": [
       "G0301",
       "G0501",
@@ -618,11 +690,14 @@
      "appno": "7020210000739",
      "title": "EDIYA COFFEE LAB",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020210000739.png",
      "image_exists": true,
+     "app_date": "2021-05-10",
+     "reg_date": "2022-12-12",
      "codes": [
       "G0301",
       "G0501",
@@ -652,11 +727,14 @@
      "appno": "4020190098804",
      "title": "EDIYA KOMBUCHA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190098804.png",
      "image_exists": true,
+     "app_date": "2019-06-26",
+     "reg_date": "2020-06-12",
      "codes": [
       "G0501",
       "G0503"
@@ -669,11 +747,14 @@
      "appno": "4020180117361",
      "title": "SO~TASTY EDIYA SNACK",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180117361.png",
      "image_exists": true,
+     "app_date": "2018-08-23",
+     "reg_date": "2019-05-08",
      "codes": [
       "G0206",
       "G0301"
@@ -686,11 +767,14 @@
      "appno": "4020170029207",
      "title": "EDIYA BLENDING TEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170029207.png",
      "image_exists": true,
+     "app_date": "2017-03-07",
+     "reg_date": "2017-09-28",
      "codes": [
       "G0501",
       "G0502",
@@ -700,10 +784,14 @@
       30
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "빽다방",
+   "table_name": "빽다방",
+   "new": false,
    "notations": [
     {
      "text": "빽다방",
@@ -715,6 +803,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -738,6 +828,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -758,6 +850,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "(주)더본코리아"
    ],
@@ -778,9 +872,10 @@
     "text": "커피 가맹점 수 4위 1,712개(같은 출처) https://brunch.co.kr/@mobiinside/7515",
     "urls": [
      "https://brunch.co.kr/@mobiinside/7515"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -807,18 +902,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020240068866",
      "title": "PAIK'S COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240068866.png",
      "image_exists": true,
+     "app_date": "2024-04-15",
+     "reg_date": "2025-08-20",
      "codes": [
       "S0101",
       "S123101",
@@ -841,11 +939,14 @@
      "appno": "4020220211885",
      "title": "엉클백 스테이크 PAIK UNCLE PAIK'S 스테이크",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220211885.png",
      "image_exists": true,
+     "app_date": "2022-11-18",
+     "reg_date": "2024-05-22",
      "codes": [
       "G0301",
       "G0502",
@@ -861,11 +962,14 @@
      "appno": "4020210142665",
      "title": "빽빵 빽다방 빵연구소 PAIK'S BAKERY",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210142665.png",
      "image_exists": true,
+     "app_date": "2021-07-12",
+     "reg_date": "2023-05-18",
      "codes": [
       "G0301",
       "G0502",
@@ -879,11 +983,14 @@
      "appno": "4020210064984",
      "title": "빽다방",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210064984.png",
      "image_exists": true,
+     "app_date": "2021-03-30",
+     "reg_date": "2022-08-18",
      "codes": [
       "G0301",
       "G0502",
@@ -897,11 +1004,14 @@
      "appno": "4020210064985",
      "title": "PAIK'S COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210064985.png",
      "image_exists": true,
+     "app_date": "2021-03-30",
+     "reg_date": "2022-08-18",
      "codes": [
       "G0301",
       "G0502",
@@ -915,11 +1025,14 @@
      "appno": "4020210032406",
      "title": "PAIK'S BEER",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210032406.png",
      "image_exists": true,
+     "app_date": "2021-02-17",
+     "reg_date": "2022-06-15",
      "codes": [
       "S120602",
       "S120603"
@@ -932,11 +1045,14 @@
      "appno": "4020190159863",
      "title": "빽다방 Bakery",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190159863.png",
      "image_exists": true,
+     "app_date": "2019-10-21",
+     "reg_date": "2021-02-03",
      "codes": [
       "G0301",
       "G0502",
@@ -950,11 +1066,14 @@
      "appno": "4020170164249",
      "title": "빽다방",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170164249.png",
      "image_exists": true,
+     "app_date": "2017-12-21",
+     "reg_date": "2018-08-27",
      "codes": [
       "G0206",
       "G0301",
@@ -970,11 +1089,14 @@
      "appno": "4020170164250",
      "title": "빽다방",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170164250.png",
      "image_exists": true,
+     "app_date": "2017-12-21",
+     "reg_date": "2018-08-27",
      "codes": [
       "G0301",
       "G0502",
@@ -988,11 +1110,14 @@
      "appno": "4020170164252",
      "title": "PAIK'S COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170164252.png",
      "image_exists": true,
+     "app_date": "2017-12-21",
+     "reg_date": "2018-08-27",
      "codes": [
       "G0206",
       "G0301",
@@ -1004,10 +1129,14 @@
       30
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "스타벅스",
+   "table_name": "스타벅스",
+   "new": false,
    "notations": [
     {
      "text": "스타벅스",
@@ -1019,6 +1148,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -1041,6 +1172,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -1054,6 +1187,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "스타벅스 코포레이션"
    ],
@@ -1074,7 +1209,8 @@
     "text": "카페 예외(국내 직영이라 가맹점 수 순위 밖): Brand Finance 브랜드 가치 순위 레스토랑 부문 2위, USD 38.8bn(2025-03) https://brandfinance.com/press-releases/mcdonalds-is-the-worlds-most-valuable-restaurant-brand-starbucks-drops-to-second-place",
     "urls": [
      "https://brandfinance.com/press-releases/mcdonalds-is-the-worlds-most-valuable-restaurant-brand-starbucks-drops-to-second-place"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -1156,18 +1292,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020230148641",
      "title": "STARBUCKS COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230148641.png",
      "image_exists": true,
+     "app_date": "2023-08-17",
+     "reg_date": "2025-03-17",
      "codes": [
       "G0206",
       "G0301",
@@ -1206,11 +1345,14 @@
      "appno": "4020200011726",
      "title": "STARBUCKS COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200011726.png",
      "image_exists": true,
+     "app_date": "2020-01-22",
+     "reg_date": "2021-05-11",
      "codes": [
       "G0301",
       "G0502",
@@ -1230,11 +1372,14 @@
      "appno": "4520160000776",
      "title": "STARBUCKS REWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520160000776.png",
      "image_exists": true,
+     "app_date": "2016-01-27",
+     "reg_date": "2017-01-20",
      "codes": [
       "G390802",
       "G520101",
@@ -1264,11 +1409,14 @@
      "appno": "4020120059966",
      "title": "STARBUCKS COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020120059966.png",
      "image_exists": true,
+     "app_date": "2012-09-21",
+     "reg_date": "2014-02-06",
      "codes": [
       "G020102",
       "G0202",
@@ -1300,11 +1448,14 @@
      "appno": "4520120004853",
      "title": "STARBUCKS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520120004853.png",
      "image_exists": true,
+     "app_date": "2012-09-21",
+     "reg_date": "2013-09-09",
      "codes": [
       "G020102",
       "G0206",
@@ -1327,11 +1478,14 @@
      "appno": "4520100001281",
      "title": "STARBUCKS COFFEE AND TEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520100001281.png",
      "image_exists": true,
+     "app_date": "2010-03-30",
+     "reg_date": "2011-09-21",
      "codes": [
       "G0206",
       "G0290",
@@ -1351,11 +1505,14 @@
      "appno": "5620070020012",
      "title": "STARBUCKS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5620070020012.png",
      "image_exists": true,
+     "app_date": "2007-11-08",
+     "reg_date": "2008-06-16",
      "codes": [
       "G0301",
       "G0502",
@@ -1396,11 +1553,14 @@
      "appno": "5620070023151",
      "title": "STARBUCKS COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5620070023151.png",
      "image_exists": true,
+     "app_date": "2007-12-18",
+     "reg_date": "2008-05-01",
      "codes": [
       "G0301",
       "G0502",
@@ -1423,11 +1583,14 @@
      "appno": "5620070020013",
      "title": "STARBUCKS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5620070020013.png",
      "image_exists": true,
+     "app_date": "2007-11-08",
+     "reg_date": "2008-03-18",
      "codes": [
       "G0206",
       "G0701",
@@ -1447,11 +1610,14 @@
      "appno": "5120070002832",
      "title": "STARBUCKS COFFEE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5120070002832.png",
      "image_exists": true,
+     "app_date": "2007-12-18",
+     "reg_date": "2008-02-11",
      "codes": [
       "G0301",
       "G0502",
@@ -1470,10 +1636,14 @@
       43
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "BBQ",
+   "table_name": "BBQ",
+   "new": false,
    "notations": [
     {
      "text": "BBQ",
@@ -1485,6 +1655,8 @@
      "length": "짧음",
      "kind": "약한 표기",
      "base_weak": true,
+     "common": false,
+     "added": false,
      "inherits": [
       "BBQ"
      ],
@@ -1509,6 +1681,8 @@
      "length": "중간",
      "kind": "약한 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [
       "BBQ"
      ],
@@ -1524,6 +1698,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 제너시스비비큐"
    ],
@@ -1542,9 +1718,10 @@
     "text": "치킨 가맹점 수 1위 2,316개(2024년 말, 공정위 2026-04 발표 인용) https://www.mt.co.kr/article/2026041513573592080",
     "urls": [
      "https://www.mt.co.kr/article/2026041513573592080"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -1664,20 +1841,22 @@
     ]
    },
    "role_counts": {
-    "이름": 10,
-    "다른 이름": 3,
-    "도형": 2
+    "브랜드 이름이 든 그 밖의 표장": 10,
+    "관련 없음": 5
    },
    "marks": [
     {
      "appno": "4020220034725",
      "title": "로제치킨 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034725.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0701",
@@ -1691,11 +1870,14 @@
      "appno": "4020220034726",
      "title": "로제치킨 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034726.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0502",
@@ -1711,11 +1893,14 @@
      "appno": "4020220034727",
      "title": "크런치 버터치킨 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034727.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0701",
@@ -1729,11 +1914,14 @@
      "appno": "4020220034728",
      "title": "크런치 버터치킨 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034728.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0502",
@@ -1749,11 +1937,14 @@
      "appno": "4020220034729",
      "title": "황금올리브 콤보치킨 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034729.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0701",
@@ -1767,11 +1958,14 @@
      "appno": "4020220034730",
      "title": "황금올리브 콤보치킨 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034730.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0502",
@@ -1787,11 +1981,14 @@
      "appno": "4020220034731",
      "title": "씨솔트볼 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034731.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0704"
      ],
@@ -1803,11 +2000,14 @@
      "appno": "4020220034732",
      "title": "씨솔트볼 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034732.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0502",
@@ -1823,11 +2023,14 @@
      "appno": "4020220034733",
      "title": "리얼초코볼 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034733.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0704"
      ],
@@ -1839,11 +2042,14 @@
      "appno": "4020220034734",
      "title": "리얼초코볼 bbq",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220034734.png",
      "image_exists": true,
+     "app_date": "2022-02-23",
+     "reg_date": "2023-11-02",
      "codes": [
       "G0301",
       "G0502",
@@ -1859,11 +2065,14 @@
      "appno": "4020200003746",
      "title": "치킨대학 People Performance Profit",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200003746.png",
      "image_exists": true,
+     "app_date": "2020-01-09",
+     "reg_date": "2021-08-11",
      "codes": [
       "G0301",
       "G0502",
@@ -1886,11 +2095,14 @@
      "appno": "4020200003750",
      "title": "치킨대학 People Performance Profit",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200003750.png",
      "image_exists": true,
+     "app_date": "2020-01-09",
+     "reg_date": "2021-08-11",
      "codes": [
       "G0301",
       "G0502",
@@ -1913,11 +2125,14 @@
      "appno": "4020250015861",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020250015861.png",
      "image_exists": true,
+     "app_date": "2025-02-03",
+     "reg_date": "2026-04-15",
      "codes": [
       "G020102",
       "G0202",
@@ -2059,11 +2274,14 @@
      "appno": "4020250015862",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020250015862.png",
      "image_exists": true,
+     "app_date": "2025-02-03",
+     "reg_date": "2026-07-22",
      "codes": [
       "G020102",
       "G0202",
@@ -2205,11 +2423,14 @@
      "appno": "4120050024446",
      "title": "행복한 맛 BHC",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4120050024446.png",
      "image_exists": true,
+     "app_date": "2005-10-28",
+     "reg_date": "2006-08-16",
      "codes": [
       "S120602"
      ],
@@ -2217,10 +2438,14 @@
       43
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "bhc",
+   "table_name": "bhc",
+   "new": false,
    "notations": [
     {
      "text": "bhc",
@@ -2232,6 +2457,8 @@
      "length": "짧음",
      "kind": "머리글자 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [
       "bhc"
      ],
@@ -2256,6 +2483,8 @@
      "length": "김",
      "kind": "머리글자 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [
       "bhc"
      ],
@@ -2271,6 +2500,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "다이닝브랜즈그룹 주식회사"
    ],
@@ -2290,9 +2521,10 @@
     "urls": [
      "https://www.smarttoday.co.kr/ko-kr/articles/58093)",
      "https://www.mt.co.kr/article/2026041513573592080"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -2332,18 +2564,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020250027276",
      "title": "bhc pop TASTY, CRISPY, JUICY!",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250027276.png",
      "image_exists": true,
+     "app_date": "2025-02-20",
+     "reg_date": "2026-06-18",
      "codes": [
       "G0202",
       "G0204",
@@ -2370,11 +2605,14 @@
      "appno": "4020250027281",
      "title": "bhc pop TASTY, CRISPY, JUICY!",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250027281.png",
      "image_exists": true,
+     "app_date": "2025-02-20",
+     "reg_date": "2026-06-18",
      "codes": [
       "G0202",
       "G0204",
@@ -2401,11 +2639,14 @@
      "appno": "4020250027280",
      "title": "bhc pop TASTY, CRISPY, JUICY!",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250027280.png",
      "image_exists": true,
+     "app_date": "2025-02-20",
+     "reg_date": "2026-04-16",
      "codes": [
       "G0301",
       "G0502",
@@ -2420,11 +2661,14 @@
      "appno": "4020250027285",
      "title": "bhc pop TASTY, CRISPY, JUICY!",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250027285.png",
      "image_exists": true,
+     "app_date": "2025-02-20",
+     "reg_date": "2026-04-16",
      "codes": [
       "G0301",
       "G0502",
@@ -2439,11 +2683,14 @@
      "appno": "4020210266531",
      "title": "구운 bhc",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210266531.png",
      "image_exists": true,
+     "app_date": "2021-12-30",
+     "reg_date": "2023-10-06",
      "codes": [
       "G0301",
       "G0502",
@@ -2457,11 +2704,14 @@
      "appno": "7020210001342",
      "title": "bhc",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020210001342.png",
      "image_exists": true,
+     "app_date": "2021-08-23",
+     "reg_date": "2023-02-08",
      "codes": [
       "G020101",
       "G020102",
@@ -2502,11 +2752,14 @@
      "appno": "7020210001343",
      "title": "bhc DELIVERY CHICKEN",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020210001343.png",
      "image_exists": true,
+     "app_date": "2021-08-23",
+     "reg_date": "2023-02-08",
      "codes": [
       "G020101",
       "G020102",
@@ -2550,11 +2803,14 @@
      "appno": "4020190067501",
      "title": "족발상회 bhc",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190067501.png",
      "image_exists": true,
+     "app_date": "2019-04-30",
+     "reg_date": "2020-03-06",
      "codes": [
       "G0202",
       "G0204",
@@ -2585,11 +2841,14 @@
      "appno": "4020190028771",
      "title": "bhc DELIVERY CHICKEN",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190028771.png",
      "image_exists": true,
+     "app_date": "2019-02-25",
+     "reg_date": "2019-10-11",
      "codes": [
       "G020101",
       "G020102",
@@ -2633,11 +2892,14 @@
      "appno": "4020180057858",
      "title": "bhc 소이바베큐 bhc Soy Barbecue",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180057858.png",
      "image_exists": true,
+     "app_date": "2018-04-27",
+     "reg_date": "2019-02-15",
      "codes": [
       "G0202",
       "G0204",
@@ -2663,10 +2925,14 @@
       43
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "교촌치킨",
+   "table_name": "교촌치킨",
+   "new": false,
    "notations": [
     {
      "text": "교촌치킨",
@@ -2678,6 +2944,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -2700,6 +2968,8 @@
      "length": "짧음",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -2722,6 +2992,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -2735,6 +3007,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "교촌 에프 앤 비(주)"
    ],
@@ -2753,9 +3027,10 @@
     "text": "치킨 가맹점 수 3위 1,361개(같은 출처) https://www.mt.co.kr/article/2026041513573592080",
     "urls": [
      "https://www.mt.co.kr/article/2026041513573592080"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -2778,18 +3053,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020230062315",
      "title": "교촌필방 KYO CHON PIL BANG",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230062315.png",
      "image_exists": true,
+     "app_date": "2023-04-07",
+     "reg_date": "2024-12-12",
      "codes": [
       "G0204",
       "G0701",
@@ -2804,11 +3082,14 @@
      "appno": "4020230062327",
      "title": "교촌필방 KYO CHON PIL BANG",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230062327.png",
      "image_exists": true,
+     "app_date": "2023-04-07",
+     "reg_date": "2024-12-12",
      "codes": [
       "G0301",
       "G0502",
@@ -2824,11 +3105,14 @@
      "appno": "4020230159819",
      "title": "KYOCHON 1991",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230159819.png",
      "image_exists": true,
+     "app_date": "2023-09-04",
+     "reg_date": "2024-01-23",
      "codes": [
       "G0301",
       "G0502",
@@ -2843,11 +3127,14 @@
      "appno": "4020210161573",
      "title": "KYOCHON To go",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210161573.png",
      "image_exists": true,
+     "app_date": "2021-08-05",
+     "reg_date": "2023-04-25",
      "codes": [
       "G0301",
       "G0502",
@@ -2861,11 +3148,14 @@
      "appno": "4020210048619",
      "title": "교촌 신화 신화",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210048619.png",
      "image_exists": true,
+     "app_date": "2021-03-10",
+     "reg_date": "2022-10-12",
      "codes": [
       "G0301",
       "G0502",
@@ -2880,11 +3170,14 @@
      "appno": "4020210012057",
      "title": "KYOCHON F&B",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210012057.png",
      "image_exists": true,
+     "app_date": "2021-01-19",
+     "reg_date": "2022-04-26",
      "codes": [
       "G0204",
       "G0205",
@@ -2906,11 +3199,14 @@
      "appno": "4020210012058",
      "title": "KYOCHON F&B",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210012058.png",
      "image_exists": true,
+     "app_date": "2021-01-19",
+     "reg_date": "2022-04-25",
      "codes": [
       "G0301",
       "G0502",
@@ -2925,11 +3221,14 @@
      "appno": "4020200131337",
      "title": "KYOCHON",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200131337.png",
      "image_exists": true,
+     "app_date": "2020-07-28",
+     "reg_date": "2021-08-31",
      "codes": [
       "G0204",
       "G0205",
@@ -2951,11 +3250,14 @@
      "appno": "4020200131358",
      "title": "KYOCHON",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200131358.png",
      "image_exists": true,
+     "app_date": "2020-07-28",
+     "reg_date": "2021-08-31",
      "codes": [
       "G0301",
       "G0502",
@@ -2970,11 +3272,14 @@
      "appno": "4020170131229",
      "title": "담김쌈 DAM GIM SSAM by KYOCHON",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170131229.png",
      "image_exists": true,
+     "app_date": "2017-10-18",
+     "reg_date": "2018-06-11",
      "codes": [
       "G0301",
       "G0502",
@@ -2986,10 +3291,14 @@
       43
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "동대문엽기떡볶이",
+   "table_name": "동대문엽기떡볶이",
+   "new": false,
    "notations": [
     {
      "text": "동대문엽기떡볶이",
@@ -3001,6 +3310,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -3031,6 +3342,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -3061,6 +3374,8 @@
      "length": "짧음",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -3083,6 +3398,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -3096,6 +3413,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 핫시즈너"
    ],
@@ -3114,9 +3433,10 @@
     "text": "떡볶이 가맹점 수 2위 659개(2025-10 말 정보공개서) https://v.daum.net/v/F68011GhtJ",
     "urls": [
      "https://v.daum.net/v/F68011GhtJ"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -3145,18 +3465,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "7020240001751",
      "title": "불닭발 동대문 엽기 떡볶이 땡초 DONGDAEMUN YUPDDUK",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020240001751.png",
      "image_exists": true,
+     "app_date": "2024-11-08",
+     "reg_date": "2026-10-19",
      "codes": [
       "G020101",
       "G020102",
@@ -3183,11 +3506,14 @@
      "appno": "7020240001752",
      "title": "불닭발 동대문 엽기떡볶이 땡초",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020240001752.png",
      "image_exists": true,
+     "app_date": "2024-11-08",
+     "reg_date": "2026-10-19",
      "codes": [
       "G020101",
       "G020102",
@@ -3214,11 +3540,14 @@
      "appno": "4020220099659",
      "title": "불닭발 동대문 엽기떡볶이 땡초",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220099659.png",
      "image_exists": true,
+     "app_date": "2022-05-27",
+     "reg_date": "2023-12-20",
      "codes": [
       "G020101",
       "G020102",
@@ -3245,11 +3574,14 @@
      "appno": "4020220099664",
      "title": "불닭발 동대문 엽기떡볶이 땡초",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220099664.png",
      "image_exists": true,
+     "app_date": "2022-05-27",
+     "reg_date": "2023-12-20",
      "codes": [
       "G0301",
       "G0502",
@@ -3268,11 +3600,14 @@
      "appno": "4020200014632",
      "title": "땡초 동대문 엽기떡볶이",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200014632.png",
      "image_exists": true,
+     "app_date": "2020-01-29",
+     "reg_date": "2021-11-01",
      "codes": [
       "G020101",
       "G020102",
@@ -3297,11 +3632,14 @@
      "appno": "4020200014635",
      "title": "땡초 동대문 엽기떡볶이",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200014635.png",
      "image_exists": true,
+     "app_date": "2020-01-29",
+     "reg_date": "2021-11-01",
      "codes": [
       "G0301",
       "G0502",
@@ -3320,11 +3658,14 @@
      "appno": "4020180159457",
      "title": "불닭발 땡초 동대문 엽기떡볶이 TTANG CHO HOT FOOD",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180159457.png",
      "image_exists": true,
+     "app_date": "2018-11-16",
+     "reg_date": "2019-09-03",
      "codes": [
       "G0301",
       "G0502",
@@ -3343,11 +3684,14 @@
      "appno": "4020180041684",
      "title": "엽떡 DONGDAEMUN YUPDDUK",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180041684.png",
      "image_exists": true,
+     "app_date": "2018-03-29",
+     "reg_date": "2019-01-23",
      "codes": [
       "G020101",
       "G020102",
@@ -3374,11 +3718,14 @@
      "appno": "4020180041688",
      "title": "엽떡 DONGDAEMUN YUPDDUK",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180041688.png",
      "image_exists": true,
+     "app_date": "2018-03-29",
+     "reg_date": "2019-01-23",
      "codes": [
       "G0301",
       "G0502",
@@ -3397,11 +3744,14 @@
      "appno": "4020180041694",
      "title": "동대문 엽기 떡볶이 HOT FOOD",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180041694.png",
      "image_exists": true,
+     "app_date": "2018-03-29",
+     "reg_date": "2019-01-23",
      "codes": [
       "G020101",
       "G020102",
@@ -3424,10 +3774,14 @@
       30
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "김가네",
+   "table_name": "김가네",
+   "new": false,
    "notations": [
     {
      "text": "김가네",
@@ -3439,6 +3793,8 @@
      "length": "중간",
      "kind": "약한 표기",
      "base_weak": true,
+     "common": false,
+     "added": false,
      "inherits": [
       "김가네"
      ],
@@ -3463,6 +3819,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -3476,6 +3834,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 김가네"
    ],
@@ -3494,9 +3854,10 @@
     "text": "김밥 브랜드 가맹점 2위(2026년 335개) https://www.segye.com/newsView/20260830503261",
     "urls": [
      "https://www.segye.com/newsView/20260830503261"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -3566,18 +3927,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020180180329",
      "title": "김가네",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180180329.png",
      "image_exists": true,
+     "app_date": "2018-12-21",
+     "reg_date": "2019-11-15",
      "codes": [
       "G0301",
       "G0502",
@@ -3592,11 +3956,14 @@
      "appno": "4120140025332",
      "title": "김가네",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120140025332.png",
      "image_exists": true,
+     "app_date": "2014-06-24",
+     "reg_date": "2015-04-16",
      "codes": [
       "S120602"
      ],
@@ -3608,11 +3975,14 @@
      "appno": "4120120004033",
      "title": "대학로 김가네김밥 GimGaNe",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120120004033.png",
      "image_exists": true,
+     "app_date": "2012-02-08",
+     "reg_date": "2012-07-25",
      "codes": [
       "S120602"
      ],
@@ -3624,11 +3994,14 @@
      "appno": "7020090000270",
      "title": "대학로 김가네",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020090000270.png",
      "image_exists": true,
+     "app_date": "2009-04-29",
+     "reg_date": "2010-10-06",
      "codes": [
       "G020101",
       "G020102",
@@ -3694,11 +4067,14 @@
      "appno": "7020090000271",
      "title": "대학로 김가네 김밥",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020090000271.png",
      "image_exists": true,
+     "app_date": "2009-04-29",
+     "reg_date": "2010-09-02",
      "codes": [
       "G020101",
       "G020102",
@@ -3764,11 +4140,14 @@
      "appno": "5620090004016",
      "title": "대학로 김가네 김밥",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5620090004016.png",
      "image_exists": true,
+     "app_date": "2009-04-22",
+     "reg_date": "2010-01-04",
      "codes": [
       "G020101",
       "G020102",
@@ -3834,11 +4213,14 @@
      "appno": "5620090004019",
      "title": "대학로 김가네",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5620090004019.png",
      "image_exists": true,
+     "app_date": "2009-04-22",
+     "reg_date": "2010-01-04",
      "codes": [
       "G020101",
       "G020102",
@@ -3904,11 +4286,14 @@
      "appno": "5020090006996",
      "title": "대학로 김가네 김밥",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020090006996.png",
      "image_exists": true,
+     "app_date": "2009-04-22",
+     "reg_date": "2009-09-14",
      "codes": [
       "G020101",
       "G020102",
@@ -3974,11 +4359,14 @@
      "appno": "5020090007011",
      "title": "대학로 김가네",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020090007011.png",
      "image_exists": true,
+     "app_date": "2009-04-22",
+     "reg_date": "2009-09-14",
      "codes": [
       "G020101",
       "G020102",
@@ -4044,11 +4432,14 @@
      "appno": "4120080017515",
      "title": "(주)김가네",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120080017515.png",
      "image_exists": true,
+     "app_date": "2008-06-26",
+     "reg_date": "2009-05-07",
      "codes": [
       "G0301",
       "G0502",
@@ -4067,10 +4458,14 @@
       43
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "뚜레쥬르",
+   "table_name": "뚜레쥬르",
+   "new": false,
    "notations": [
     {
      "text": "뚜레쥬르",
@@ -4082,6 +4477,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -4106,6 +4503,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -4134,6 +4533,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "씨제이푸드빌 주식회사"
    ],
@@ -4155,9 +4556,10 @@
     "urls": [
      "https://fchamall.com/franchise-info/%EB%9A%9C%EB%A0%88%EC%A5%AC%EB%A5%B4",
      "https://www.newsis.com/view/NISX20251010_0003358438"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -4204,19 +4606,22 @@
     ]
    },
    "role_counts": {
-    "이름": 8,
-    "도형": 2
+    "브랜드 이름이 든 그 밖의 표장": 8,
+    "관련 없음": 2
    },
    "marks": [
     {
      "appno": "4020230151875",
      "title": "GRAIN DE CAFE COLD BREW TouS leS JourS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230151875.png",
      "image_exists": true,
+     "app_date": "2023-08-22",
+     "reg_date": "2026-02-23",
      "codes": [
       "S120603",
       "S1207",
@@ -4231,11 +4636,14 @@
      "appno": "4020230151870",
      "title": "GRAIN DE CAFE COLD BREW Decaf TouS leS JourS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230151870.png",
      "image_exists": true,
+     "app_date": "2023-08-22",
+     "reg_date": "2025-09-12",
      "codes": [
       "G0206",
       "G0303",
@@ -4253,11 +4661,14 @@
      "appno": "4020230151871",
      "title": "GRAIN DE CAFE COLD BREW Decaf TouS leS JourS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230151871.png",
      "image_exists": true,
+     "app_date": "2023-08-22",
+     "reg_date": "2025-09-12",
      "codes": [
       "S0101",
       "S123101",
@@ -4273,11 +4684,14 @@
      "appno": "4020230196217",
      "title": "TOUS les JOURS SINCE 1997",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230196217.png",
      "image_exists": true,
+     "app_date": "2023-10-31",
+     "reg_date": "2025-08-27",
      "codes": [
       "G0206",
       "G0302",
@@ -4297,11 +4711,14 @@
      "appno": "4020230196220",
      "title": "TOUS les JOURS SINCE 1997",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230196220.png",
      "image_exists": true,
+     "app_date": "2023-10-31",
+     "reg_date": "2025-08-27",
      "codes": [
       "S120603",
       "S1207",
@@ -4316,11 +4733,14 @@
      "appno": "4020230151874",
      "title": "GRAIN DE CAFE COLD BREW TouS leS JourS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230151874.png",
      "image_exists": true,
+     "app_date": "2023-08-22",
+     "reg_date": "2025-06-19",
      "codes": [
       "S0101",
       "S123101",
@@ -4336,11 +4756,14 @@
      "appno": "4020230151873",
      "title": "GRAIN DE CAFE COLD BREW TouS leS JourS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230151873.png",
      "image_exists": true,
+     "app_date": "2023-08-22",
+     "reg_date": "2025-05-07",
      "codes": [
       "G0206",
       "G0303",
@@ -4358,11 +4781,14 @@
      "appno": "4020190027392",
      "title": "TOUS les JOURS SINCE 1997",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190027392.png",
      "image_exists": true,
+     "app_date": "2019-02-21",
+     "reg_date": "2019-11-11",
      "codes": [
       "G3402",
       "G3403",
@@ -4390,11 +4816,14 @@
      "appno": "4020260047124",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020260047124.png",
      "image_exists": true,
+     "app_date": "2026-03-11",
+     "reg_date": "2026-07-15",
      "codes": [
       "S0101",
       "S2003",
@@ -4410,11 +4839,14 @@
      "appno": "4020260047125",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020260047125.png",
      "image_exists": true,
+     "app_date": "2026-03-11",
+     "reg_date": "2026-07-15",
      "codes": [
       "G0301",
       "G0502",
@@ -4424,10 +4856,14 @@
       43
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "던킨",
+   "table_name": "던킨",
+   "new": false,
    "notations": [
     {
      "text": "던킨",
@@ -4439,6 +4875,8 @@
      "length": "짧음",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -4461,6 +4899,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -4474,6 +4914,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "비알코리아주식회사"
    ],
@@ -4495,9 +4937,10 @@
     "urls": [
      "https://fchamall.com/franchise-info/%EB%8D%98%ED%82%A8-%EB%8D%98%ED%82%A8%EB%8F%84%EB%84%88%EC%B8%A0",
      "https://www.newsis.com/view/NISX20251010_0003358438"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "업종 세트",
     "codes": [
@@ -4508,18 +4951,21 @@
     ]
    },
    "role_counts": {
-    "다른 이름": 10
+    "관련 없음": 10
    },
    "marks": [
     {
      "appno": "4020220032747",
      "title": "flow",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220032747.png",
      "image_exists": true,
+     "app_date": "2022-02-21",
+     "reg_date": "2026-02-03",
      "codes": [
       "S123101",
       "S2002",
@@ -4536,11 +4982,14 @@
      "appno": "4020240058152",
      "title": "핫볼 Hot Ball",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240058152.png",
      "image_exists": true,
+     "app_date": "2024-03-29",
+     "reg_date": "2025-10-14",
      "codes": [
       "G0206",
       "G0301",
@@ -4554,11 +5003,14 @@
      "appno": "4020230190090",
      "title": "스윗드롭치즈케이크 Sweet Drop Cheese Cake",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190090.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-09-23",
      "codes": [
       "G0206",
       "G0301",
@@ -4575,11 +5027,14 @@
      "appno": "4020230190060",
      "title": "커피에디터 Coffee editor",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190060.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-04-30",
      "codes": [
       "G0206",
       "G0301",
@@ -4596,11 +5051,14 @@
      "appno": "4020230190065",
      "title": "버블스 라이스 케이크 Bubbles Rice Cake",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190065.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-04-30",
      "codes": [
       "G0206",
       "G0301",
@@ -4617,11 +5075,14 @@
      "appno": "4020230190070",
      "title": "아이스 쫀떡 Ice Zzon Tteok",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190070.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-04-30",
      "codes": [
       "G0206",
       "G0301",
@@ -4638,11 +5099,14 @@
      "appno": "4020230190075",
      "title": "꿀꿀허니 Honey Honey ICE",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190075.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-04-30",
      "codes": [
       "G0206",
       "G0301",
@@ -4661,11 +5125,14 @@
      "appno": "4020230190076",
      "title": "베리스윗바이올렛 Berry Sweet Violet",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190076.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-04-30",
      "codes": [
       "G0206",
       "G0301",
@@ -4683,11 +5150,14 @@
      "appno": "4020230190078",
      "title": "시크릿누가크런치 Secret Nougat Crunch",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190078.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-04-30",
      "codes": [
       "G0206",
       "G0301",
@@ -4705,11 +5175,14 @@
      "appno": "4020230190081",
      "title": "밤이옥수로맛있구마 Marron, Corn and Sweet potato",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230190081.png",
      "image_exists": true,
+     "app_date": "2023-10-23",
+     "reg_date": "2025-04-30",
      "codes": [
       "G0206",
       "G0301",
@@ -4723,10 +5196,14 @@
       30
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "파리바게뜨",
+   "table_name": "파리바게뜨",
+   "new": false,
    "notations": [
     {
      "text": "파리바게뜨",
@@ -4738,6 +5215,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -4761,6 +5240,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -4781,6 +5262,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 파리크라상"
    ],
@@ -4802,9 +5285,10 @@
     "urls": [
      "https://fchamall.com/franchise-info/%ED%8C%8C%EB%A6%AC%EB%B0%94%EA%B2%8C%EB%9C%A8",
      "https://www.newsis.com/view/NISX20251010_0003358438"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -4880,18 +5364,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020250039363",
      "title": "table8 PARIS BAGUETTE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250039363.png",
      "image_exists": true,
+     "app_date": "2025-03-12",
+     "reg_date": "2026-11-12",
      "codes": [
       "G0206",
       "G0301",
@@ -4907,11 +5394,14 @@
      "appno": "4020250018107",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250018107.png",
      "image_exists": true,
+     "app_date": "2025-02-06",
+     "reg_date": "2026-10-29",
      "codes": [
       "G020101",
       "G020102",
@@ -4935,11 +5425,14 @@
      "appno": "4020250013404",
      "title": "BOULANGERIE PATISSERIE PARIS BAGUETTE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250013404.png",
      "image_exists": true,
+     "app_date": "2025-01-24",
+     "reg_date": "2026-09-04",
      "codes": [
       "G0206",
       "G0301",
@@ -4955,11 +5448,14 @@
      "appno": "4020250015293",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250015293.png",
      "image_exists": true,
+     "app_date": "2025-02-03",
+     "reg_date": "2026-11-12",
      "codes": [
       "G0705",
       "G1001",
@@ -4981,11 +5477,14 @@
      "appno": "4020250015294",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250015294.png",
      "image_exists": true,
+     "app_date": "2025-02-03",
+     "reg_date": "2026-11-12",
      "codes": [
       "G0209",
       "G0213",
@@ -5004,11 +5503,14 @@
      "appno": "4020250015332",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250015332.png",
      "image_exists": true,
+     "app_date": "2025-02-03",
+     "reg_date": "2026-11-12",
      "codes": [
       "G110101",
       "G110102",
@@ -5023,11 +5525,14 @@
      "appno": "4020250015459",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250015459.png",
      "image_exists": true,
+     "app_date": "2025-02-03",
+     "reg_date": "2026-11-12",
      "codes": [
       "G1002",
       "G2401",
@@ -5049,11 +5554,14 @@
      "appno": "4020250018001",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250018001.png",
      "image_exists": true,
+     "app_date": "2025-02-06",
+     "reg_date": "2026-10-29",
      "codes": [
       "G270101",
       "G430301",
@@ -5074,11 +5582,14 @@
      "appno": "4020250018097",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250018097.png",
      "image_exists": true,
+     "app_date": "2025-02-06",
+     "reg_date": "2026-10-29",
      "codes": [
       "G0202",
       "G0204",
@@ -5102,11 +5613,14 @@
      "appno": "4020250018125",
      "title": "PB PARIS BAGUETTE BOULANGERIE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250018125.png",
      "image_exists": true,
+     "app_date": "2025-02-06",
+     "reg_date": "2026-10-29",
      "codes": [
       "G020101",
       "G0202",
@@ -5122,10 +5636,14 @@
       31
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "CU",
+   "table_name": "CU",
+   "new": false,
    "notations": [
     {
      "text": "CU",
@@ -5137,6 +5655,8 @@
      "length": "짧음",
      "kind": "약한 표기",
      "base_weak": true,
+     "common": false,
+     "added": false,
      "inherits": [
       "CU"
      ],
@@ -5161,6 +5681,8 @@
      "length": "짧음",
      "kind": "약한 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [
       "CU"
      ],
@@ -5176,6 +5698,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "(주) 비지에프리테일"
    ],
@@ -5193,9 +5717,10 @@
     "text": "편의점 점포 수 1만8,711개(2025, 편의점 4사 비교 보도) https://www.ceoscoredaily.com/page/view/2026021115265521903",
     "urls": [
      "https://www.ceoscoredaily.com/page/view/2026021115265521903"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -5309,20 +5834,22 @@
     ]
    },
    "role_counts": {
-    "이름": 23,
-    "다른 이름": 5,
-    "도형": 2
+    "브랜드 이름이 든 그 밖의 표장": 23,
+    "관련 없음": 7
    },
    "marks": [
     {
      "appno": "4020210233735",
      "title": "CU Cube",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210233735.png",
      "image_exists": true,
+     "app_date": "2021-11-17",
+     "reg_date": "2023-04-20",
      "codes": [
       "S173503",
       "S2002",
@@ -5345,11 +5872,14 @@
      "appno": "4020220058929",
      "title": "CU FRIENDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220058929.png",
      "image_exists": true,
+     "app_date": "2022-03-30",
+     "reg_date": "2023-11-21",
      "codes": [
       "G270101",
       "G430301",
@@ -5375,11 +5905,14 @@
      "appno": "4020220058930",
      "title": "CU FRIENDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220058930.png",
      "image_exists": true,
+     "app_date": "2022-03-30",
+     "reg_date": "2023-11-21",
      "codes": [
       "G1812",
       "G1817",
@@ -5398,11 +5931,14 @@
      "appno": "4020220058931",
      "title": "CU FRIENDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220058931.png",
      "image_exists": true,
+     "app_date": "2022-03-30",
+     "reg_date": "2023-11-21",
      "codes": [
       "G0202",
       "G0204",
@@ -5428,11 +5964,14 @@
      "appno": "4020220058932",
      "title": "CU FRIENDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220058932.png",
      "image_exists": true,
+     "app_date": "2022-03-30",
+     "reg_date": "2023-11-21",
      "codes": [
       "G020101",
       "G020102",
@@ -5457,11 +5996,14 @@
      "appno": "4020220058933",
      "title": "CU FRIENDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220058933.png",
      "image_exists": true,
+     "app_date": "2022-03-30",
+     "reg_date": "2023-11-21",
      "codes": [
       "G0290",
       "G0503",
@@ -5476,11 +6018,14 @@
      "appno": "4020210233732",
      "title": "CU키핑쿠폰",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210233732.png",
      "image_exists": true,
+     "app_date": "2021-11-17",
+     "reg_date": "2023-04-20",
      "codes": [
       "G520102"
      ],
@@ -5492,11 +6037,14 @@
      "appno": "4020210233734",
      "title": "CU Cube",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210233734.png",
      "image_exists": true,
+     "app_date": "2021-11-17",
+     "reg_date": "2023-04-20",
      "codes": [
       "G3602"
      ],
@@ -5508,11 +6056,14 @@
      "appno": "4020170128796",
      "title": "CU Buy-Self",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170128796.png",
      "image_exists": true,
+     "app_date": "2017-10-12",
+     "reg_date": "2018-09-05",
      "codes": [
       "G390802",
       "G390803",
@@ -5528,11 +6079,14 @@
      "appno": "4020170113020",
      "title": "CU",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170113020.png",
      "image_exists": true,
+     "app_date": "2017-09-06",
+     "reg_date": "2018-07-11",
      "codes": [
       "G120401",
       "G120402",
@@ -5558,11 +6112,14 @@
      "appno": "4020170113032",
      "title": "CU",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020170113032.png",
      "image_exists": true,
+     "app_date": "2017-09-06",
+     "reg_date": "2018-07-11",
      "codes": [
       "G100401",
       "S120501",
@@ -5587,11 +6144,14 @@
      "appno": "4020170113058",
      "title": "Nice to CU",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020170113058.png",
      "image_exists": true,
+     "app_date": "2017-09-06",
+     "reg_date": "2018-07-11",
      "codes": [
       "G100401",
       "S120501",
@@ -5616,11 +6176,14 @@
      "appno": "4020190115146",
      "title": "CU Tomorrow",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020190115146.png",
      "image_exists": true,
+     "app_date": "2019-07-24",
+     "reg_date": "2020-08-14",
      "codes": [
       "G1401",
       "G1801",
@@ -5647,11 +6210,14 @@
      "appno": "4020200238189",
      "title": "GET",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200238189.png",
      "image_exists": true,
+     "app_date": "2020-12-28",
+     "reg_date": "2022-09-14",
      "codes": [
       "G100401",
       "S120501",
@@ -5677,11 +6243,14 @@
      "appno": "4020220008229",
      "title": "픽업 CU",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020220008229.png",
      "image_exists": true,
+     "app_date": "2022-01-13",
+     "reg_date": "2023-11-30",
      "codes": [
       "G390802",
       "G520102",
@@ -5699,11 +6268,14 @@
      "appno": "4020220038282",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020220038282.png",
      "image_exists": true,
+     "app_date": "2022-02-28",
+     "reg_date": "2023-11-06",
      "codes": [
       "S2002",
       "S2003",
@@ -5724,11 +6296,14 @@
      "appno": "4020220058934",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020220058934.png",
      "image_exists": true,
+     "app_date": "2022-03-30",
+     "reg_date": "2023-11-21",
      "codes": [
       "S2002",
       "S2003",
@@ -5749,11 +6324,14 @@
      "appno": "4020240026758",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240026758.png",
      "image_exists": true,
+     "app_date": "2024-02-13",
+     "reg_date": "2025-05-13",
      "codes": [
       "G1002",
       "G1401",
@@ -5773,11 +6351,14 @@
      "appno": "4020240026759",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240026759.png",
      "image_exists": true,
+     "app_date": "2024-02-13",
+     "reg_date": "2025-05-13",
      "codes": [
       "G270101",
       "G430301",
@@ -5800,11 +6381,14 @@
      "appno": "4020240026760",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240026760.png",
      "image_exists": true,
+     "app_date": "2024-02-13",
+     "reg_date": "2025-05-13",
      "codes": [
       "G1817",
       "G4301",
@@ -5821,11 +6405,14 @@
      "appno": "4020240026761",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240026761.png",
      "image_exists": true,
+     "app_date": "2024-02-13",
+     "reg_date": "2025-05-13",
      "codes": [
       "G0202",
       "G0204",
@@ -5846,11 +6433,14 @@
      "appno": "4020240026762",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240026762.png",
      "image_exists": true,
+     "app_date": "2024-02-13",
+     "reg_date": "2025-05-13",
      "codes": [
       "G020102",
       "G0206",
@@ -5872,11 +6462,14 @@
      "appno": "4020240026763",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240026763.png",
      "image_exists": true,
+     "app_date": "2024-02-13",
+     "reg_date": "2025-05-13",
      "codes": [
       "G0290",
       "G0503",
@@ -5891,11 +6484,14 @@
      "appno": "4020240026764",
      "title": "CU FRIENDS",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240026764.png",
      "image_exists": true,
+     "app_date": "2024-02-13",
+     "reg_date": "2025-05-13",
      "codes": [
       "S2002",
       "S2003",
@@ -5913,11 +6509,14 @@
      "appno": "4020240083034",
      "title": "CU",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240083034.png",
      "image_exists": true,
+     "app_date": "2024-05-07",
+     "reg_date": "2025-11-11",
      "codes": [
       "G390802",
       "G520101",
@@ -5931,11 +6530,14 @@
      "appno": "4020240161956",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240161956.png",
      "image_exists": true,
+     "app_date": "2024-08-30",
+     "reg_date": "2025-01-07",
      "codes": [
       "S2002",
       "S2003",
@@ -5951,11 +6553,14 @@
      "appno": "4020250054953",
      "title": "get",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020250054953.png",
      "image_exists": true,
+     "app_date": "2025-04-03",
+     "reg_date": "2025-07-25",
      "codes": [
       "G0502"
      ],
@@ -5967,11 +6572,14 @@
      "appno": "4020250144508",
      "title": "PBICK",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020250144508.png",
      "image_exists": true,
+     "app_date": "2025-08-07",
+     "reg_date": "2025-11-14",
      "codes": [
       "G0204",
       "G0205",
@@ -5988,11 +6596,14 @@
      "appno": "4020250144509",
      "title": "PBICK",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020250144509.png",
      "image_exists": true,
+     "app_date": "2025-08-07",
+     "reg_date": "2025-11-11",
      "codes": [
       "G020102",
       "G0206",
@@ -6007,11 +6618,14 @@
      "appno": "4020250144511",
      "title": "PBICK",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020250144511.png",
      "image_exists": true,
+     "app_date": "2025-08-07",
+     "reg_date": "2025-11-11",
      "codes": [
       "G0503"
      ],
@@ -6019,10 +6633,14 @@
       32
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "GS25",
+   "table_name": "GS25",
+   "new": false,
    "notations": [
     {
      "text": "GS25",
@@ -6035,6 +6653,8 @@
      "length": "중간",
      "kind": "약한 표기",
      "base_weak": true,
+     "common": false,
+     "added": false,
      "inherits": [
       "GS25"
      ],
@@ -6067,6 +6687,8 @@
      "length": "김",
      "kind": "약한 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [
       "GS25"
      ],
@@ -6089,6 +6711,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 지에스리테일"
    ],
@@ -6106,9 +6730,10 @@
     "text": "편의점 점포 수 1만8,112개(2024, 같은 보도) https://www.ceoscoredaily.com/page/view/2026021115265521903",
     "urls": [
      "https://www.ceoscoredaily.com/page/view/2026021115265521903"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -6139,19 +6764,21 @@
     ]
    },
    "role_counts": {
-    "다른 이름": 27,
-    "도형": 3
+    "관련 없음": 30
    },
    "marks": [
     {
      "appno": "4020220154572",
      "title": "FRESH CRISPY, FAST CHICKEN 25 CHICKEN NEVER WRONG",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220154572.png",
      "image_exists": true,
+     "app_date": "2022-08-19",
+     "reg_date": "2024-04-19",
      "codes": [
       "S2002",
       "S2003",
@@ -6167,11 +6794,14 @@
      "appno": "4020220116440",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220116440.png",
      "image_exists": true,
+     "app_date": "2022-06-22",
+     "reg_date": "2024-02-22",
      "codes": [
       "S0101",
       "S123101",
@@ -6186,11 +6816,14 @@
      "appno": "4020220116443",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220116443.png",
      "image_exists": true,
+     "app_date": "2022-06-22",
+     "reg_date": "2024-02-22",
      "codes": [
       "S0101",
       "S123101",
@@ -6205,11 +6838,14 @@
      "appno": "4020210209565",
      "title": "연어로운",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210209565.png",
      "image_exists": true,
+     "app_date": "2021-10-15",
+     "reg_date": "2023-06-30",
      "codes": [
       "S1370",
       "S2002",
@@ -6226,11 +6862,14 @@
      "appno": "4020210086832",
      "title": "픽업25",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210086832.png",
      "image_exists": true,
+     "app_date": "2021-04-27",
+     "reg_date": "2022-12-13",
      "codes": [
       "S0101",
       "S123101",
@@ -6254,11 +6893,14 @@
      "appno": "4020210092335",
      "title": "WINE25+",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210092335.png",
      "image_exists": true,
+     "app_date": "2021-05-04",
+     "reg_date": "2022-10-31",
      "codes": [
       "S0101",
       "S120401",
@@ -6282,11 +6924,14 @@
      "appno": "4020210008397",
      "title": "BREADIQUE Bread&Dessert",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210008397.png",
      "image_exists": true,
+     "app_date": "2021-01-14",
+     "reg_date": "2022-07-19",
      "codes": [
       "S0101",
       "S123101",
@@ -6304,11 +6949,14 @@
      "appno": "4020200100619",
      "title": "우리동네 딜리버리",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200100619.png",
      "image_exists": true,
+     "app_date": "2020-06-15",
+     "reg_date": "2021-08-24",
      "codes": [
       "S0101",
       "S123101",
@@ -6327,11 +6975,14 @@
      "appno": "4020200100738",
      "title": "우딜",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200100738.png",
      "image_exists": true,
+     "app_date": "2020-06-15",
+     "reg_date": "2021-08-24",
      "codes": [
       "S0101",
       "S123101",
@@ -6350,11 +7001,14 @@
      "appno": "4020200059218",
      "title": "M:",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200059218.png",
      "image_exists": true,
+     "app_date": "2020-04-08",
+     "reg_date": "2021-04-26",
      "codes": [
       "G100401",
       "G100402",
@@ -6388,11 +7042,14 @@
      "appno": "4020080054944",
      "title": "자연가치",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020080054944.png",
      "image_exists": true,
+     "app_date": "2008-11-24",
+     "reg_date": "2010-03-12",
      "codes": [
       "G020101",
       "G020102",
@@ -6455,11 +7112,14 @@
      "appno": "4020110019186",
      "title": "함박웃음",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020110019186.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2013-05-16",
      "codes": [
       "G0101",
       "G020102",
@@ -6489,11 +7149,14 @@
      "appno": "4020110019189",
      "title": "함박웃음",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020110019189.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2012-09-28",
      "codes": [
       "G0213",
       "G0302",
@@ -6518,11 +7181,14 @@
      "appno": "4020110019201",
      "title": "함박웃음",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020110019201.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2013-05-16",
      "codes": [
       "G1812",
       "G1817",
@@ -6546,11 +7212,14 @@
      "appno": "4020110019202",
      "title": "함박웃음",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020110019202.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2015-07-21",
      "codes": [
       "G020101",
       "G0202",
@@ -6578,11 +7247,14 @@
      "appno": "4020110019205",
      "title": "SnF",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020110019205.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2012-09-28",
      "codes": [
       "G020102",
       "G1002",
@@ -6607,11 +7279,14 @@
      "appno": "4020110019206",
      "title": "SnF",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020110019206.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2012-09-28",
      "codes": [
       "G0404",
       "G1001",
@@ -6636,11 +7311,14 @@
      "appno": "4020110019207",
      "title": "SnF",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020110019207.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2012-09-28",
      "codes": [
       "G0213",
       "G0302",
@@ -6663,11 +7341,14 @@
      "appno": "4020120003461",
      "title": "함박웃음",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020120003461.png",
      "image_exists": true,
+     "app_date": "2012-01-18",
+     "reg_date": "2013-07-31",
      "codes": [
       "G0404",
       "G1001",
@@ -6693,11 +7374,14 @@
      "appno": "4020150023363",
      "title": "모바일팝 mobile POP",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020150023363.png",
      "image_exists": true,
+     "app_date": "2015-03-30",
+     "reg_date": "2016-05-27",
      "codes": [
       "G520101",
       "G520102",
@@ -6711,11 +7395,14 @@
      "appno": "4020160025085",
      "title": "명인명품",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020160025085.png",
      "image_exists": true,
+     "app_date": "2016-04-05",
+     "reg_date": "2016-12-12",
      "codes": [
       "G0213",
       "G0302",
@@ -6736,11 +7423,14 @@
      "appno": "4020180006983",
      "title": "VRIGHT",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020180006983.png",
      "image_exists": true,
+     "app_date": "2018-01-16",
+     "reg_date": "2018-12-10",
      "codes": [
       "S110101",
       "S121002",
@@ -6756,11 +7446,14 @@
      "appno": "4020190132633",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020190132633.png",
      "image_exists": true,
+     "app_date": "2019-08-26",
+     "reg_date": "2020-08-06",
      "codes": [
       "G100401",
       "G100402",
@@ -6794,11 +7487,14 @@
      "appno": "4020200030333",
      "title": "P",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200030333.png",
      "image_exists": true,
+     "app_date": "2020-02-24",
+     "reg_date": "2020-07-31",
      "codes": [
       "S0201",
       "S0301",
@@ -6813,11 +7509,14 @@
      "appno": "4020200058291",
      "title": "MARKET FOR:",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200058291.png",
      "image_exists": true,
+     "app_date": "2020-04-07",
+     "reg_date": "2021-05-18",
      "codes": [
       "G100401",
       "G100402",
@@ -6851,11 +7550,14 @@
      "appno": "4020200100661",
      "title": "우리동네 딜리버리",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200100661.png",
      "image_exists": true,
+     "app_date": "2020-06-15",
+     "reg_date": "2021-08-24",
      "codes": [
       "S0201"
      ],
@@ -6867,11 +7569,14 @@
      "appno": "4020200100748",
      "title": "우딜",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200100748.png",
      "image_exists": true,
+     "app_date": "2020-06-15",
+     "reg_date": "2021-08-24",
      "codes": [
       "S0201"
      ],
@@ -6883,11 +7588,14 @@
      "appno": "4120110009950",
      "title": "함박웃음",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4120110009950.png",
      "image_exists": true,
+     "app_date": "2011-04-12",
+     "reg_date": "2013-04-26",
      "codes": [
       "S0101",
       "S123101",
@@ -6908,11 +7616,14 @@
      "appno": "4120150021612",
      "title": "담고! 쌓고! 쓰고!",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4120150021612.png",
      "image_exists": true,
+     "app_date": "2015-05-08",
+     "reg_date": "2016-05-27",
      "codes": [
       "S0201",
       "S0301",
@@ -6933,11 +7644,14 @@
      "appno": "4520130000430",
      "title": "POP",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4520130000430.png",
      "image_exists": true,
+     "app_date": "2013-01-24",
+     "reg_date": "2013-12-27",
      "codes": [
       "G210101",
       "G3002",
@@ -6978,10 +7692,14 @@
       42
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "크린토피아",
+   "table_name": "크린토피아",
+   "new": false,
    "notations": [
     {
      "text": "크린토피아",
@@ -6993,6 +7711,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -7015,6 +7735,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -7028,6 +7750,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 크린토피아"
    ],
@@ -7045,9 +7769,10 @@
     "text": "점포 3,300여 개, \"유일한 전국구 세탁 프랜차이즈\"(2025-05 보도) https://news.bizwatch.co.kr/article/consumer/2025/05/29/0047",
     "urls": [
      "https://news.bizwatch.co.kr/article/consumer/2025/05/29/0047"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -7062,18 +7787,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020250102186",
      "title": "크린토피아 Multi",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250102186.png",
      "image_exists": true,
+     "app_date": "2025-06-13",
+     "reg_date": "2026-09-22",
      "codes": [
       "S050123",
       "S050127",
@@ -7091,11 +7819,14 @@
      "appno": "4020250102187",
      "title": "CLEANTOPIA Multi",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250102187.png",
      "image_exists": true,
+     "app_date": "2025-06-13",
+     "reg_date": "2026-09-22",
      "codes": [
       "S050123",
       "S050127",
@@ -7113,11 +7844,14 @@
      "appno": "4020220229152",
      "title": "크린토피아",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220229152.png",
      "image_exists": true,
+     "app_date": "2022-12-14",
+     "reg_date": "2024-08-30",
      "codes": [
       "S050123",
       "S050126",
@@ -7134,11 +7868,14 @@
      "appno": "4020220229156",
      "title": "크린토피아 Plus",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220229156.png",
      "image_exists": true,
+     "app_date": "2022-12-14",
+     "reg_date": "2024-08-30",
      "codes": [
       "S050123",
       "S050126",
@@ -7155,11 +7892,14 @@
      "appno": "4020220229159",
      "title": "크린토피아 코인워시365",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220229159.png",
      "image_exists": true,
+     "app_date": "2022-12-14",
+     "reg_date": "2024-08-30",
      "codes": [
       "S050123",
       "S050126",
@@ -7176,11 +7916,14 @@
      "appno": "4020220229166",
      "title": "크린토피아 BLACK LABEL",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220229166.png",
      "image_exists": true,
+     "app_date": "2022-12-14",
+     "reg_date": "2023-05-16",
      "codes": [
       "S050123",
       "S050126",
@@ -7197,11 +7940,14 @@
      "appno": "4020200005696",
      "title": "WASH & FOLD CLEANTOPIA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200005696.png",
      "image_exists": true,
+     "app_date": "2020-01-13",
+     "reg_date": "2021-03-16",
      "codes": [
       "S050123",
       "S1282"
@@ -7214,11 +7960,14 @@
      "appno": "4020180066845",
      "title": "크린토피아 코인워시 365",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180066845.png",
      "image_exists": true,
+     "app_date": "2018-05-17",
+     "reg_date": "2019-08-19",
      "codes": [
       "S050123",
       "S050126",
@@ -7235,11 +7984,14 @@
      "appno": "4020180066847",
      "title": "크린토피아 코인워시 365",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180066847.png",
      "image_exists": true,
+     "app_date": "2018-05-17",
+     "reg_date": "2019-08-19",
      "codes": [
       "S050123",
       "S050126",
@@ -7256,11 +8008,14 @@
      "appno": "4020180066856",
      "title": "크린토피아+ 코인워시",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180066856.png",
      "image_exists": true,
+     "app_date": "2018-05-17",
+     "reg_date": "2019-08-19",
      "codes": [
       "S050123",
       "S050126",
@@ -7273,10 +8028,14 @@
       37
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "본죽&비빔밥",
+   "table_name": "본죽&비빔밥",
+   "new": false,
    "notations": [
     {
      "text": "본죽&비빔밥",
@@ -7289,6 +8048,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -7318,6 +8079,8 @@
      "length": "짧음",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -7340,6 +8103,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -7353,6 +8118,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "본아이에프 주식회사"
    ],
@@ -7371,9 +8138,10 @@
     "text": "가맹점 1,000호점, \"한식 프랜차이즈 단일 브랜드로는 유일\"(2024-01 보도) https://view.asiae.co.kr/article/2024011509071254175",
     "urls": [
      "https://view.asiae.co.kr/article/2024011509071254175"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -7405,18 +8173,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020220088297",
      "title": "베이비본죽",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220088297.png",
      "image_exists": true,
+     "app_date": "2022-05-12",
+     "reg_date": "2022-10-11",
      "codes": [
       "S120602"
      ],
@@ -7428,11 +8199,14 @@
      "appno": "4020200216466",
      "title": "본죽&비빔밥",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200216466.png",
      "image_exists": true,
+     "app_date": "2020-11-30",
+     "reg_date": "2021-02-16",
      "codes": [
       "S120602",
       "S1207"
@@ -7445,11 +8219,14 @@
      "appno": "4020200216533",
      "title": "본죽 비빔밥",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200216533.png",
      "image_exists": true,
+     "app_date": "2020-11-30",
+     "reg_date": "2021-02-16",
      "codes": [
       "S120602",
       "S1207"
@@ -7462,11 +8239,14 @@
      "appno": "4020180059338",
      "title": "맛있는 건강 본죽",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180059338.png",
      "image_exists": true,
+     "app_date": "2018-05-02",
+     "reg_date": "2019-02-11",
      "codes": [
       "S120602"
      ],
@@ -7478,11 +8258,14 @@
      "appno": "4020180059339",
      "title": "본죽 비빔밥 Cafe",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180059339.png",
      "image_exists": true,
+     "app_date": "2018-05-02",
+     "reg_date": "2019-02-11",
      "codes": [
       "S120602"
      ],
@@ -7494,11 +8277,14 @@
      "appno": "4020230039899",
      "title": "본죽키즈",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230039899.png",
      "image_exists": true,
+     "app_date": "2023-03-07",
+     "reg_date": "2024-08-30",
      "codes": [
       "G020102",
       "G0206",
@@ -7521,11 +8307,14 @@
      "appno": "4020220134761",
      "title": "본죽 Signature",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220134761.png",
      "image_exists": true,
+     "app_date": "2022-07-20",
+     "reg_date": "2024-03-04",
      "codes": [
       "G0204",
       "G0205",
@@ -7548,11 +8337,14 @@
      "appno": "4020220134763",
      "title": "본죽 Healthy",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220134763.png",
      "image_exists": true,
+     "app_date": "2022-07-20",
+     "reg_date": "2024-03-04",
      "codes": [
       "G0204",
       "G0205",
@@ -7575,11 +8367,14 @@
      "appno": "4020220134764",
      "title": "본죽 Healthy",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220134764.png",
      "image_exists": true,
+     "app_date": "2022-07-20",
+     "reg_date": "2024-03-04",
      "codes": [
       "G0206",
       "G0302",
@@ -7595,11 +8390,14 @@
      "appno": "4020220134765",
      "title": "본죽 Fresh",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220134765.png",
      "image_exists": true,
+     "app_date": "2022-07-20",
+     "reg_date": "2024-03-04",
      "codes": [
       "G0204",
       "G0205",
@@ -7618,10 +8416,14 @@
       29
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "마이크로소프트",
+   "table_name": "마이크로소프트",
+   "new": false,
    "notations": [
     {
      "text": "마이크로소프트",
@@ -7633,6 +8435,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -7655,6 +8459,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -7668,6 +8474,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "마이크로소프트 코포레이션"
    ],
@@ -7686,7 +8494,8 @@
     "text": "인터브랜드 Best Global Brands 2026 2위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -7748,20 +8557,22 @@
     ]
    },
    "role_counts": {
-    "이름": 2,
-    "도형": 6,
-    "다른 이름": 2
+    "브랜드 이름이 든 그 밖의 표장": 2,
+    "관련 없음": 8
    },
    "marks": [
     {
      "appno": "4520140004653",
      "title": "Microsoft",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520140004653.png",
      "image_exists": true,
+     "app_date": "2014-06-18",
+     "reg_date": "2015-07-16",
      "codes": [
       "G390802",
       "S0101",
@@ -7781,11 +8592,14 @@
      "appno": "4020050035814",
      "title": "CREATED BY XBOX Microsoft AUTHENTIC PRODUCT.ORIGINAL-PRODUKT.PRODUIT ORIGINAL.PRODOTTO AUTENTICO.PRODUCTO ORIGINAL.",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020050035814.png",
      "image_exists": true,
+     "app_date": "2005-07-29",
+     "reg_date": "2006-10-24",
      "codes": [
       "G390102",
       "G3903",
@@ -7804,11 +8618,14 @@
      "appno": "4020240133216",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240133216.png",
      "image_exists": true,
+     "app_date": "2024-07-19",
+     "reg_date": "2026-05-13",
      "codes": [
       "G390802",
       "G5206",
@@ -7827,11 +8644,14 @@
      "appno": "4020240198922",
      "title": "HALO STUDIOS",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240198922.png",
      "image_exists": true,
+     "app_date": "2024-10-31",
+     "reg_date": "2026-03-23",
      "codes": [
       "G390802",
       "G5206",
@@ -7849,11 +8669,14 @@
      "appno": "4020210130652",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210130652.png",
      "image_exists": true,
+     "app_date": "2021-06-25",
+     "reg_date": "2025-10-17",
      "codes": [
       "G3402",
       "G3404",
@@ -7891,11 +8714,14 @@
      "appno": "4020230221958",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230221958.png",
      "image_exists": true,
+     "app_date": "2023-12-05",
+     "reg_date": "2025-09-24",
      "codes": [
       "G3402",
       "G3404",
@@ -7919,11 +8745,14 @@
      "appno": "4020230221966",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230221966.png",
      "image_exists": true,
+     "app_date": "2023-12-05",
+     "reg_date": "2025-09-24",
      "codes": [
       "G3402",
       "G3404",
@@ -7947,11 +8776,14 @@
      "appno": "4020210130651",
      "title": "Windows",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210130651.png",
      "image_exists": true,
+     "app_date": "2021-06-25",
+     "reg_date": "2025-07-18",
      "codes": [
       "G3402",
       "G3404",
@@ -7989,11 +8821,14 @@
      "appno": "4020210223162",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210223162.png",
      "image_exists": true,
+     "app_date": "2021-11-03",
+     "reg_date": "2023-10-30",
      "codes": [
       "G390802",
       "G390803",
@@ -8010,11 +8845,14 @@
      "appno": "4020210189270",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210189270.png",
      "image_exists": true,
+     "app_date": "2021-09-13",
+     "reg_date": "2023-08-30",
      "codes": [
       "G2602",
       "G390802",
@@ -8050,10 +8888,14 @@
       42
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "구글",
+   "table_name": "구글",
+   "new": false,
    "notations": [
     {
      "text": "구글",
@@ -8065,6 +8907,8 @@
      "length": "짧음",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -8087,6 +8931,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -8100,6 +8946,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "구글 엘엘씨"
    ],
@@ -8118,7 +8966,8 @@
     "text": "인터브랜드 Best Global Brands 2026 3위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -8149,19 +8998,22 @@
     ]
    },
    "role_counts": {
-    "이름": 6,
-    "도형": 4
+    "브랜드 이름이 든 그 밖의 표장": 6,
+    "관련 없음": 4
    },
    "marks": [
     {
      "appno": "4020250027782",
      "title": "Google Developer Groups",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250027782.png",
      "image_exists": true,
+     "app_date": "2025-02-21",
+     "reg_date": "2026-09-28",
      "codes": [
       "G390802",
       "S0101",
@@ -8179,11 +9031,14 @@
      "appno": "4020200235774",
      "title": "Google TV",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200235774.png",
      "image_exists": true,
+     "app_date": "2020-12-23",
+     "reg_date": "2022-08-11",
      "codes": [
       "G390701",
       "G390702",
@@ -8207,11 +9062,14 @@
      "appno": "4020190132806",
      "title": "Google Duo",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190132806.png",
      "image_exists": true,
+     "app_date": "2019-08-27",
+     "reg_date": "2020-10-07",
      "codes": [
       "G390802",
       "S0601",
@@ -8227,11 +9085,14 @@
      "appno": "4020200152925",
      "title": "Google Play",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200152925.png",
      "image_exists": true,
+     "app_date": "2020-08-31",
+     "reg_date": "2021-10-21",
      "codes": [
       "G390802",
       "S2039",
@@ -8247,11 +9108,14 @@
      "appno": "4020150044901",
      "title": "WORKS WITH Google Cardboard",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020150044901.png",
      "image_exists": true,
+     "app_date": "2015-06-17",
+     "reg_date": "2016-06-10",
      "codes": [
       "G390701",
       "G390702",
@@ -8267,11 +9131,14 @@
      "appno": "4520120004145",
      "title": "Google play",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520120004145.png",
      "image_exists": true,
+     "app_date": "2012-08-17",
+     "reg_date": "2013-12-17",
      "codes": [
       "G390802",
       "S2039",
@@ -8287,11 +9154,14 @@
      "appno": "4020250220661",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250220661.png",
      "image_exists": true,
+     "app_date": "2025-11-26",
+     "reg_date": "2026-09-28",
      "codes": [
       "G3402",
       "G3403",
@@ -8317,11 +9187,14 @@
      "appno": "4020240119529",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240119529.png",
      "image_exists": true,
+     "app_date": "2024-07-01",
+     "reg_date": "2026-04-20",
      "codes": [
       "G390802",
       "S123301"
@@ -8334,11 +9207,14 @@
      "appno": "4020240005940",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240005940.png",
      "image_exists": true,
+     "app_date": "2024-01-10",
+     "reg_date": "2026-03-12",
      "codes": [
       "G390802",
       "S123301",
@@ -8352,11 +9228,14 @@
      "appno": "4020240161168",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240161168.png",
      "image_exists": true,
+     "app_date": "2024-08-29",
+     "reg_date": "2026-03-06",
      "codes": [
       "G390802",
       "S123301"
@@ -8366,10 +9245,14 @@
       42
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "네이버",
+   "table_name": "네이버",
+   "new": false,
    "notations": [
     {
      "text": "네이버",
@@ -8381,6 +9264,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -8403,6 +9288,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -8416,6 +9303,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "네이버 주식회사"
    ],
@@ -8434,7 +9323,8 @@
     "text": "인터브랜드 베스트 코리아 브랜드 2026 5위 https://www.newswire.co.kr/newsRead.php?no=1036230",
     "urls": [
      "https://www.newswire.co.kr/newsRead.php?no=1036230"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -8695,20 +9585,22 @@
     ]
    },
    "role_counts": {
-    "이름": 11,
-    "다른 이름": 5,
-    "도형": 10
+    "브랜드 이름이 든 그 밖의 표장": 11,
+    "관련 없음": 15
    },
    "marks": [
     {
      "appno": "4020200187560",
      "title": "NAVER Z",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200187560.png",
      "image_exists": true,
+     "app_date": "2020-10-22",
+     "reg_date": "2022-02-11",
      "codes": [
       "G3402",
       "G3404",
@@ -8772,11 +9664,14 @@
      "appno": "4020170043257",
      "title": "NAVER CLOUD PLATFORM",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170043257.png",
      "image_exists": true,
+     "app_date": "2017-04-04",
+     "reg_date": "2018-04-12",
      "codes": [
       "G3905",
       "G390701",
@@ -8808,11 +9703,14 @@
      "appno": "4520110000173",
      "title": "NAVER me",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520110000173.png",
      "image_exists": true,
+     "app_date": "2011-01-13",
+     "reg_date": "2012-05-30",
      "codes": [
       "G390701",
       "G390702",
@@ -8862,11 +9760,14 @@
      "appno": "4120080024801",
      "title": "POWER blog NAVER",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120080024801.png",
      "image_exists": true,
+     "app_date": "2008-09-18",
+     "reg_date": "2010-05-17",
      "codes": [
       "G390802",
       "S0601",
@@ -8884,11 +9785,14 @@
      "appno": "4120080024802",
      "title": "POWER blog NAVER",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120080024802.png",
      "image_exists": true,
+     "app_date": "2008-09-18",
+     "reg_date": "2010-05-17",
      "codes": [
       "G390802",
       "S0601",
@@ -8906,11 +9810,14 @@
      "appno": "4520060003251",
      "title": "NAVER",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520060003251.png",
      "image_exists": true,
+     "app_date": "2006-09-05",
+     "reg_date": "2007-05-29",
      "codes": [
       "G100401",
       "G110101",
@@ -9023,11 +9930,14 @@
      "appno": "4120030009776",
      "title": "NAVER",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120030009776.png",
      "image_exists": true,
+     "app_date": "2003-05-07",
+     "reg_date": "2004-09-07",
      "codes": [
       "G5206",
       "S0101",
@@ -9110,11 +10020,14 @@
      "appno": "4519990001498",
      "title": "NAVER.COM",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4519990001498.png",
      "image_exists": true,
+     "app_date": "1999-06-28",
+     "reg_date": "2000-07-25",
      "codes": [
       "G390701",
       "G390802",
@@ -9135,11 +10048,14 @@
      "appno": "4020200060776",
      "title": "NAVER+ MEMBERSHIP",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200060776.png",
      "image_exists": true,
+     "app_date": "2020-04-10",
+     "reg_date": "2021-06-30",
      "codes": [
       "S0101",
       "S0201",
@@ -9161,11 +10077,14 @@
      "appno": "4020200060777",
      "title": "NAVER+",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200060777.png",
      "image_exists": true,
+     "app_date": "2020-04-10",
+     "reg_date": "2021-06-30",
      "codes": [
       "S0101",
       "S0201",
@@ -9187,11 +10106,14 @@
      "appno": "4020170034309",
      "title": "whale",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020170034309.png",
      "image_exists": true,
+     "app_date": "2017-03-16",
+     "reg_date": "2018-04-12",
      "codes": [
       "G3601",
       "G3905",
@@ -9225,11 +10147,14 @@
      "appno": "4020170034310",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020170034310.png",
      "image_exists": true,
+     "app_date": "2017-03-16",
+     "reg_date": "2017-11-24",
      "codes": [
       "G3402",
       "G3404",
@@ -9267,11 +10192,14 @@
      "appno": "4020200060778",
      "title": "N+",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020200060778.png",
      "image_exists": true,
+     "app_date": "2020-04-10",
+     "reg_date": "2021-06-30",
      "codes": [
       "S0101",
       "S0201",
@@ -9293,11 +10221,14 @@
      "appno": "4020210115622",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020210115622.png",
      "image_exists": true,
+     "app_date": "2021-06-04",
+     "reg_date": "2023-02-01",
      "codes": [
       "G390802",
       "G5206",
@@ -9341,11 +10272,14 @@
      "appno": "4020210127881",
      "title": "마법 같은 라이브! 매직특가쇼",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020210127881.png",
      "image_exists": true,
+     "app_date": "2021-06-22",
+     "reg_date": "2023-04-18",
      "codes": [
       "G5206",
       "S0101",
@@ -9390,11 +10324,14 @@
      "appno": "4020210192039",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020210192039.png",
      "image_exists": true,
+     "app_date": "2021-09-15",
+     "reg_date": "2022-02-11",
      "codes": [
       "G390701",
       "G390702",
@@ -9425,11 +10362,14 @@
      "appno": "4020210232185",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020210232185.png",
      "image_exists": true,
+     "app_date": "2021-11-16",
+     "reg_date": "2023-12-11",
      "codes": [
       "G0290",
       "G0406",
@@ -9564,11 +10504,14 @@
      "appno": "4020210232187",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020210232187.png",
      "image_exists": true,
+     "app_date": "2021-11-16",
+     "reg_date": "2023-12-11",
      "codes": [
       "G0290",
       "G0406",
@@ -9703,11 +10646,14 @@
      "appno": "4020210232189",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020210232189.png",
      "image_exists": true,
+     "app_date": "2021-11-16",
+     "reg_date": "2023-12-11",
      "codes": [
       "G0290",
       "G0406",
@@ -9842,11 +10788,14 @@
      "appno": "4020210232192",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020210232192.png",
      "image_exists": true,
+     "app_date": "2021-11-16",
+     "reg_date": "2023-12-11",
      "codes": [
       "G0290",
       "G0406",
@@ -9981,11 +10930,14 @@
      "appno": "4020220178876",
      "title": "N 지식iN",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020220178876.png",
      "image_exists": true,
+     "app_date": "2022-09-28",
+     "reg_date": "2024-03-26",
      "codes": [
       "G390802",
       "S0101",
@@ -10008,11 +10960,14 @@
      "appno": "4020230004502",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020230004502.png",
      "image_exists": true,
+     "app_date": "2023-01-09",
+     "reg_date": "2023-05-17",
      "codes": [
       "G3402",
       "G390701",
@@ -10045,11 +11000,14 @@
      "appno": "4020240206385",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4020240206385.png",
      "image_exists": true,
+     "app_date": "2024-11-11",
+     "reg_date": "2026-03-04",
      "codes": [
       "G1808",
       "G210101",
@@ -10087,11 +11045,14 @@
      "appno": "4120070033144",
      "title": "NAVER HOOD",
      "kind": null,
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4120070033144.png",
      "image_exists": true,
+     "app_date": "2007-12-20",
+     "reg_date": "2009-05-08",
      "codes": [
       "S050137",
       "S0601",
@@ -10186,11 +11147,14 @@
      "appno": "4120130035782",
      "title": null,
      "kind": null,
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "4120130035782.png",
      "image_exists": true,
+     "app_date": "2013-09-11",
+     "reg_date": "2014-07-02",
      "codes": [
       "S120602",
       "S120603",
@@ -10210,11 +11174,14 @@
      "appno": "7020210001916",
      "title": "AiTEMS",
      "kind": null,
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "기존 수집(같은 출원인)",
      "image": "7020210001916.png",
      "image_exists": true,
+     "app_date": "2021-12-09",
+     "reg_date": "2023-10-20",
      "codes": [
       "G390802",
       "S0601",
@@ -10229,10 +11196,14 @@
       42
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "인스타그램",
+   "table_name": "인스타그램",
+   "new": false,
    "notations": [
     {
      "text": "인스타그램",
@@ -10244,6 +11215,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -10266,6 +11239,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -10279,6 +11254,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "인스타그램, 엘엘씨"
    ],
@@ -10298,7 +11275,8 @@
     "text": "인터브랜드 Best Global Brands 2026 7위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -10347,18 +11325,21 @@
     ]
    },
    "role_counts": {
-    "도형": 10
+    "관련 없음": 10
    },
    "marks": [
     {
      "appno": "4020230121030",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230121030.png",
      "image_exists": true,
+     "app_date": "2023-07-07",
+     "reg_date": "2025-04-01",
      "codes": [
       "G390802",
       "G390803",
@@ -10386,11 +11367,14 @@
      "appno": "4020200221088",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200221088.png",
      "image_exists": true,
+     "app_date": "2020-12-04",
+     "reg_date": "2022-08-05",
      "codes": [
       "G390802",
       "S0601",
@@ -10411,11 +11395,14 @@
      "appno": "4020180142337",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180142337.png",
      "image_exists": true,
+     "app_date": "2018-10-17",
+     "reg_date": "2019-11-18",
      "codes": [
       "G390802",
       "G390803",
@@ -10457,11 +11444,14 @@
      "appno": "4020180142338",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180142338.png",
      "image_exists": true,
+     "app_date": "2018-10-17",
+     "reg_date": "2019-11-18",
      "codes": [
       "G390802",
       "G390803",
@@ -10503,11 +11493,14 @@
      "appno": "4020180106532",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180106532.png",
      "image_exists": true,
+     "app_date": "2018-08-01",
+     "reg_date": "2019-08-22",
      "codes": [
       "G270101",
       "G390802",
@@ -10556,11 +11549,14 @@
      "appno": "4020160097879",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160097879.png",
      "image_exists": true,
+     "app_date": "2016-11-11",
+     "reg_date": "2017-11-30",
      "codes": [
       "G270101",
       "G390701",
@@ -10599,11 +11595,14 @@
      "appno": "4520160004004",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520160004004.png",
      "image_exists": true,
+     "app_date": "2016-05-16",
+     "reg_date": "2017-04-06",
      "codes": [
       "G270101",
       "G390701",
@@ -10642,11 +11641,14 @@
      "appno": "4020200239126",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200239126.png",
      "image_exists": true,
+     "app_date": "2020-12-29",
+     "reg_date": "2022-04-29",
      "codes": [
       "S0201"
      ],
@@ -10658,11 +11660,14 @@
      "appno": "4020190187762",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190187762.png",
      "image_exists": true,
+     "app_date": "2019-12-04",
+     "reg_date": "2021-02-16",
      "codes": [
       "S0201"
      ],
@@ -10674,11 +11679,14 @@
      "appno": "4020180097220",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180097220.png",
      "image_exists": true,
+     "app_date": "2018-07-16",
+     "reg_date": "2019-05-21",
      "codes": [
       "G390802"
      ],
@@ -10686,10 +11694,14 @@
       9
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "넷플릭스",
+   "table_name": "넷플릭스",
+   "new": false,
    "notations": [
     {
      "text": "넷플릭스",
@@ -10701,6 +11713,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -10723,6 +11737,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -10736,6 +11752,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "넷플릭스, 인크."
    ],
@@ -10755,7 +11773,8 @@
     "text": "인터브랜드 Best Global Brands 2026 23위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -10822,19 +11841,22 @@
     ]
    },
    "role_counts": {
-    "이름": 2,
-    "다른 이름": 6
+    "브랜드 이름이 든 그 밖의 표장": 2,
+    "관련 없음": 6
    },
    "marks": [
     {
      "appno": "4020240195744",
      "title": "NETFLIX",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240195744.png",
      "image_exists": true,
+     "app_date": "2024-10-25",
+     "reg_date": "2026-04-22",
      "codes": [
       "G120401",
       "G1302",
@@ -10897,11 +11919,14 @@
      "appno": "4520110000994",
      "title": "NETFLIX",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520110000994.png",
      "image_exists": true,
+     "app_date": "2011-03-09",
+     "reg_date": "2012-07-26",
      "codes": [
       "G390701",
       "G390702",
@@ -10931,11 +11956,14 @@
      "appno": "4020240195745",
      "title": "N",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240195745.png",
      "image_exists": true,
+     "app_date": "2024-10-25",
+     "reg_date": "2026-07-03",
      "codes": [
       "G5206",
       "S110101",
@@ -10957,11 +11985,14 @@
      "appno": "4020210115772",
      "title": "N STUDIO",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210115772.png",
      "image_exists": true,
+     "app_date": "2021-06-04",
+     "reg_date": "2023-08-17",
      "codes": [
       "G390802",
       "S110101",
@@ -10978,11 +12009,14 @@
      "appno": "4020160099918",
      "title": "N",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160099918.png",
      "image_exists": true,
+     "app_date": "2016-11-16",
+     "reg_date": "2017-07-20",
      "codes": [
       "S0601"
      ],
@@ -10994,11 +12028,14 @@
      "appno": "4020160099919",
      "title": "N",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160099919.png",
      "image_exists": true,
+     "app_date": "2016-11-16",
+     "reg_date": "2017-07-20",
      "codes": [
       "S110101"
      ],
@@ -11010,11 +12047,14 @@
      "appno": "4020210107241",
      "title": "N",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210107241.png",
      "image_exists": true,
+     "app_date": "2021-05-25",
+     "reg_date": "2023-03-24",
      "codes": [
       "G120401",
       "G1302",
@@ -11098,11 +12138,14 @@
      "appno": "4020160099917",
      "title": "N",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160099917.png",
      "image_exists": true,
+     "app_date": "2016-11-16",
+     "reg_date": "2017-07-14",
      "codes": [
       "G3402",
       "G390701",
@@ -11113,10 +12156,14 @@
       9
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "에르메스",
+   "table_name": "에르메스",
+   "new": false,
    "notations": [
     {
      "text": "에르메스",
@@ -11128,6 +12175,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -11150,6 +12199,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -11164,6 +12215,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "에르메스 앵떼르나씨오날"
    ],
@@ -11191,7 +12244,8 @@
     "text": "인터브랜드 Best Global Brands 2026 15위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -11254,18 +12308,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "5020100001742",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020100001742.png",
      "image_exists": true,
+     "app_date": "2010-01-27",
+     "reg_date": "2010-06-15",
      "codes": [
       "G430301",
       "G430305",
@@ -11293,11 +12350,14 @@
      "appno": "5020090009521",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020090009521.png",
      "image_exists": true,
+     "app_date": "2009-06-16",
+     "reg_date": "2009-10-19",
      "codes": [
       "G270101",
       "G4305"
@@ -11312,11 +12372,14 @@
      "appno": "5020090009529",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020090009529.png",
      "image_exists": true,
+     "app_date": "2009-06-16",
+     "reg_date": "2009-10-19",
      "codes": [
       "G270101",
       "G2702",
@@ -11335,11 +12398,14 @@
      "appno": "5020000001534",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020000001534.png",
      "image_exists": true,
+     "app_date": "2000-02-03",
+     "reg_date": "2000-03-27",
      "codes": [
       "G430301",
       "G430305",
@@ -11367,11 +12433,14 @@
      "appno": "5019990002470",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5019990002470.png",
      "image_exists": true,
+     "app_date": "1999-04-07",
+     "reg_date": "1999-07-23",
      "codes": [
       "G270101",
       "G4305"
@@ -11386,11 +12455,14 @@
      "appno": "4020170143383",
      "title": "COLOGNE HERMES Eau de citron noir",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170143383.png",
      "image_exists": true,
+     "app_date": "2017-11-13",
+     "reg_date": "2018-09-11",
      "codes": [
       "G1201",
       "G1202",
@@ -11406,11 +12478,14 @@
      "appno": "4020110059580",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020110059580.png",
      "image_exists": true,
+     "app_date": "2011-10-28",
+     "reg_date": "2013-01-03",
      "codes": [
       "G120401",
       "G1302",
@@ -11449,11 +12524,14 @@
      "appno": "5020100001743",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020100001743.png",
      "image_exists": true,
+     "app_date": "2010-01-27",
+     "reg_date": "2010-12-10",
      "codes": [
       "G210101",
       "G2301",
@@ -11468,11 +12546,14 @@
      "appno": "5020100001744",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020100001744.png",
      "image_exists": true,
+     "app_date": "2010-01-27",
+     "reg_date": "2010-12-10",
      "codes": [
       "G1804",
       "G2501",
@@ -11489,11 +12570,14 @@
      "appno": "5020100001745",
      "title": "HERMES",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020100001745.png",
      "image_exists": true,
+     "app_date": "2010-01-27",
+     "reg_date": "2010-12-10",
      "codes": [
       "G3501"
      ],
@@ -11501,10 +12585,14 @@
       14
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "루이비통",
+   "table_name": "루이비통",
+   "new": false,
    "notations": [
     {
      "text": "루이비통",
@@ -11516,6 +12604,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -11539,6 +12629,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -11560,6 +12652,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "루이비통 말레띠에"
    ],
@@ -11587,7 +12681,8 @@
     "text": "인터브랜드 Best Global Brands 2026 16위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -11825,20 +12920,22 @@
     ]
    },
    "role_counts": {
-    "이름": 3,
-    "다른 이름": 6,
-    "도형": 1
+    "브랜드 이름이 든 그 밖의 표장": 3,
+    "관련 없음": 7
    },
    "marks": [
     {
      "appno": "4020170154086",
      "title": "LOUIS VUITTON",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170154086.png",
      "image_exists": true,
+     "app_date": "2017-12-01",
+     "reg_date": "2018-07-16",
      "codes": [
       "G1002",
       "G1808",
@@ -11862,11 +12959,14 @@
      "appno": "4020160110860",
      "title": "LOUIS VUITTON",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160110860.png",
      "image_exists": true,
+     "app_date": "2016-12-09",
+     "reg_date": "2017-10-20",
      "codes": [
       "G1002",
       "G1808",
@@ -11890,11 +12990,14 @@
      "appno": "4020010005913",
      "title": "LOUIS VUITTON PARIS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020010005913.png",
      "image_exists": true,
+     "app_date": "2001-02-16",
+     "reg_date": "2002-05-20",
      "codes": [
       "G120401",
       "G2501",
@@ -11908,11 +13011,14 @@
      "appno": "4020250013360",
      "title": "LV",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250013360.png",
      "image_exists": true,
+     "app_date": "2025-01-24",
+     "reg_date": "2026-09-22",
      "codes": [
       "G2501",
       "G270101",
@@ -11932,11 +13038,14 @@
      "appno": "4020250013348",
      "title": "LV",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020250013348.png",
      "image_exists": true,
+     "app_date": "2025-01-24",
+     "reg_date": "2026-09-14",
      "codes": [
       "G2501",
       "G270101",
@@ -11959,11 +13068,14 @@
      "appno": "4020220220027",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220220027.png",
      "image_exists": true,
+     "app_date": "2022-11-30",
+     "reg_date": "2025-02-26",
      "codes": [
       "G020101",
       "G0204",
@@ -12224,11 +13336,14 @@
      "appno": "4020220118175",
      "title": "LV",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220118175.png",
      "image_exists": true,
+     "app_date": "2022-06-24",
+     "reg_date": "2024-10-02",
      "codes": [
       "G100401",
       "G3405",
@@ -12315,11 +13430,14 @@
      "appno": "4020220118129",
      "title": "LV",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220118129.png",
      "image_exists": true,
+     "app_date": "2022-06-24",
+     "reg_date": "2024-09-30",
      "codes": [
       "G100401",
       "G3405",
@@ -12406,11 +13524,14 @@
      "appno": "4020220118150",
      "title": "LV",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020220118150.png",
      "image_exists": true,
+     "app_date": "2022-06-24",
+     "reg_date": "2024-09-30",
      "codes": [
       "G100401",
       "G3405",
@@ -12497,11 +13618,14 @@
      "appno": "4020190066947",
      "title": "LVM.",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020190066947.png",
      "image_exists": true,
+     "app_date": "2019-04-29",
+     "reg_date": "2020-08-03",
      "codes": [
       "G120401",
       "G1810",
@@ -12535,10 +13659,14 @@
       25
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "샤넬",
+   "table_name": "샤넬",
+   "new": false,
    "notations": [
     {
      "text": "샤넬",
@@ -12550,6 +13678,8 @@
      "length": "짧음",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -12572,6 +13702,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -12585,6 +13717,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "샤넬"
    ],
@@ -12612,7 +13746,8 @@
     "text": "인터브랜드 Best Global Brands 2026 24위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -12758,20 +13893,22 @@
     ]
    },
    "role_counts": {
-    "이름": 3,
-    "다른 이름": 5,
-    "도형": 2
+    "브랜드 이름이 든 그 밖의 표장": 3,
+    "관련 없음": 7
    },
    "marks": [
     {
      "appno": "4020240102517",
      "title": "CHANEL 공식 판매처 AUTHORIZED RETAILER",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240102517.png",
      "image_exists": true,
+     "app_date": "2024-06-05",
+     "reg_date": "2025-12-29",
      "codes": [
       "S120907",
       "S128302",
@@ -12786,11 +13923,14 @@
      "appno": "4020210115648",
      "title": "CHANEL & moi LES ATELIERS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210115648.png",
      "image_exists": true,
+     "app_date": "2021-06-04",
+     "reg_date": "2023-08-10",
      "codes": [
       "G390802",
       "S050123",
@@ -12827,11 +13967,14 @@
      "appno": "4120010021675",
      "title": "샤넬 CHANEL",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120010021675.png",
      "image_exists": true,
+     "app_date": "2001-11-07",
+     "reg_date": "2003-07-02",
      "codes": [
       "G0301",
       "G0502",
@@ -12853,11 +13996,14 @@
      "appno": "4020200053191",
      "title": "19M",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200053191.png",
      "image_exists": true,
+     "app_date": "2020-03-31",
+     "reg_date": "2021-07-21",
      "codes": [
       "G5206",
       "S0101",
@@ -12890,11 +14036,14 @@
      "appno": "4020180047329",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020180047329.png",
      "image_exists": true,
+     "app_date": "2018-04-09",
+     "reg_date": "2019-06-13",
      "codes": [
       "G0404",
       "G1001",
@@ -12963,11 +14112,14 @@
      "appno": "4020160103941",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160103941.png",
      "image_exists": true,
+     "app_date": "2016-11-24",
+     "reg_date": "2018-01-05",
      "codes": [
       "128303",
       "G1002",
@@ -13045,11 +14197,14 @@
      "appno": "7120090000278",
      "title": "c",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7120090000278.png",
      "image_exists": true,
+     "app_date": "2009-12-10",
+     "reg_date": "2011-08-09",
      "codes": [
       "G0301",
       "G0502",
@@ -13076,11 +14231,14 @@
      "appno": "7020090000665",
      "title": "C",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "7020090000665.png",
      "image_exists": true,
+     "app_date": "2009-12-10",
+     "reg_date": "2011-02-25",
      "codes": [
       "G120402",
       "G2501",
@@ -13117,11 +14275,14 @@
      "appno": "5020080012371",
      "title": "c",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020080012371.png",
      "image_exists": true,
+     "app_date": "2008-06-16",
+     "reg_date": "2008-09-10",
      "codes": [
       "G270101",
       "G2702",
@@ -13137,11 +14298,14 @@
      "appno": "5020080012373",
      "title": "c",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "5020080012373.png",
      "image_exists": true,
+     "app_date": "2008-06-16",
+     "reg_date": "2008-09-10",
      "codes": [
       "G430301",
       "G430305",
@@ -13161,10 +14325,14 @@
       26
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "로레알 파리",
+   "table_name": "로레알 파리",
+   "new": false,
    "notations": [
     {
      "text": "로레알 파리",
@@ -13177,6 +14345,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -13206,6 +14376,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -13229,6 +14401,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -13249,6 +14423,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "로레알"
    ],
@@ -13269,9 +14445,10 @@
     "text": "인터브랜드 Best Global Brands 2026 57위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -13295,18 +14472,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020230106936",
      "title": "L'OREAL seedZ Management Trainee Program",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230106936.png",
      "image_exists": true,
+     "app_date": "2023-06-16",
+     "reg_date": "2025-05-15",
      "codes": [
       "S120102",
       "S120103",
@@ -13329,11 +14509,14 @@
      "appno": "4020210047537",
      "title": "LOREAL PARiS MEN EXPERT",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020210047537.png",
      "image_exists": true,
+     "app_date": "2021-03-09",
+     "reg_date": "2022-10-18",
      "codes": [
       "G1201",
       "G1301",
@@ -13349,11 +14532,14 @@
      "appno": "4020170075629",
      "title": "L'OREAL PARiS COLO RISTA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170075629.png",
      "image_exists": true,
+     "app_date": "2017-06-20",
+     "reg_date": "2018-04-17",
      "codes": [
       "G1201",
       "S120907",
@@ -13367,11 +14553,14 @@
      "appno": "4020170018657",
      "title": "BOTANICALS FRESH CARE LOREAL",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170018657.png",
      "image_exists": true,
+     "app_date": "2017-02-14",
+     "reg_date": "2017-10-12",
      "codes": [
       "G1201",
       "G1301",
@@ -13386,11 +14575,14 @@
      "appno": "4020160081380",
      "title": "R LOREAL",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160081380.png",
      "image_exists": true,
+     "app_date": "2016-10-07",
+     "reg_date": "2017-06-07",
      "codes": [
       "G1201",
       "G1301",
@@ -13405,11 +14597,14 @@
      "appno": "4020160037753",
      "title": "L'OREAL PROFESSIONNEL PROFESSIONAL HAIR IDENTITY SCIENCE",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160037753.png",
      "image_exists": true,
+     "app_date": "2016-05-20",
+     "reg_date": "2017-01-24",
      "codes": [
       "G1201",
       "G1301",
@@ -13424,11 +14619,14 @@
      "appno": "4020160017641",
      "title": "L'OREAL PARIS LUCENT MAGIQUE Cushion PORCELAIN",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020160017641.png",
      "image_exists": true,
+     "app_date": "2016-03-09",
+     "reg_date": "2016-11-29",
      "codes": [
       "G1201",
       "S120907",
@@ -13442,11 +14640,14 @@
      "appno": "4120140005781",
      "title": "SALON emotion L'OREAL",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120140005781.png",
      "image_exists": true,
+     "app_date": "2014-02-17",
+     "reg_date": "2015-01-13",
      "codes": [
       "S0101",
       "S120906",
@@ -13464,11 +14665,14 @@
      "appno": "4020130074252",
      "title": "L'OREAL PROFESSIONNEL PARIS Jelly Perm",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020130074252.png",
      "image_exists": true,
+     "app_date": "2013-11-08",
+     "reg_date": "2014-11-05",
      "codes": [
       "G1201",
       "G1301",
@@ -13483,11 +14687,14 @@
      "appno": "4020130065480",
      "title": "L'OREAL PARIS ELSEVE HUILE Extraordinaire",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020130065480.png",
      "image_exists": true,
+     "app_date": "2013-10-04",
+     "reg_date": "2014-10-30",
      "codes": [
       "G1201",
       "G1301",
@@ -13498,10 +14705,14 @@
       3
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "올리브영",
+   "table_name": "올리브영",
+   "new": false,
    "notations": [
     {
      "text": "올리브영",
@@ -13513,6 +14724,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -13536,6 +14749,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -13557,6 +14772,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "씨제이올리브영 주식회사"
    ],
@@ -13577,9 +14794,10 @@
     "text": "인터브랜드 베스트 코리아 브랜드 2026 27위 https://www.newswire.co.kr/newsRead.php?no=1036230",
     "urls": [
      "https://www.newswire.co.kr/newsRead.php?no=1036230"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -13653,18 +14871,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020240209350",
      "title": "OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240209350.png",
      "image_exists": true,
+     "app_date": "2024-11-14",
+     "reg_date": "2026-03-04",
      "codes": [
       "G100401",
       "G1009",
@@ -13688,11 +14909,14 @@
      "appno": "4020230169294",
      "title": "2O23 OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230169294.png",
      "image_exists": true,
+     "app_date": "2023-09-15",
+     "reg_date": "2025-03-25",
      "codes": [
       "G0404",
       "G1001",
@@ -13718,11 +14942,14 @@
      "appno": "4020230169295",
      "title": "2O23 OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020230169295.png",
      "image_exists": true,
+     "app_date": "2023-09-15",
+     "reg_date": "2025-03-25",
      "codes": [
       "S0101",
       "S123101",
@@ -13737,11 +14964,14 @@
      "appno": "4020200182684",
      "title": "OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200182684.png",
      "image_exists": true,
+     "app_date": "2020-10-15",
+     "reg_date": "2022-02-11",
      "codes": [
       "G0404",
       "G1001",
@@ -13768,11 +14998,14 @@
      "appno": "4020200182685",
      "title": "OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200182685.png",
      "image_exists": true,
+     "app_date": "2020-10-15",
+     "reg_date": "2022-02-11",
      "codes": [
       "G100401",
       "G100402",
@@ -13814,11 +15047,14 @@
      "appno": "4020200144707",
      "title": "CLEAN BEAUTY OLIVE YOUNG",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200144707.png",
      "image_exists": true,
+     "app_date": "2020-08-18",
+     "reg_date": "2021-12-07",
      "codes": [
       "G0404",
       "G1001",
@@ -13842,11 +15078,14 @@
      "appno": "4020200144708",
      "title": "CLEAN BEAUTY OLIVE YOUNG",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200144708.png",
      "image_exists": true,
+     "app_date": "2020-08-18",
+     "reg_date": "2021-11-18",
      "codes": [
       "S0101",
       "S123101",
@@ -13868,11 +15107,14 @@
      "appno": "4020200003334",
      "title": "OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200003334.png",
      "image_exists": true,
+     "app_date": "2020-01-08",
+     "reg_date": "2021-01-21",
      "codes": [
       "G0404",
       "G1001",
@@ -13899,11 +15141,14 @@
      "appno": "4020200003338",
      "title": "OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200003338.png",
      "image_exists": true,
+     "app_date": "2020-01-08",
+     "reg_date": "2021-01-21",
      "codes": [
       "G100401",
       "G100402",
@@ -13945,11 +15190,14 @@
      "appno": "4020200003335",
      "title": "OLIVE YOUNG AWARDS",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020200003335.png",
      "image_exists": true,
+     "app_date": "2020-01-08",
+     "reg_date": "2021-01-21",
      "codes": [
       "G120401",
       "G1803",
@@ -13976,10 +15224,14 @@
       8
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "세포라",
+   "table_name": "세포라",
+   "new": false,
    "notations": [
     {
      "text": "세포라",
@@ -13991,6 +15243,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14013,6 +15267,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14026,6 +15282,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "세포라",
     "세포라 쏘시에떼 아노님"
@@ -14048,9 +15306,10 @@
     "text": "인터브랜드 Best Global Brands 2026 92위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -14076,19 +15335,22 @@
     ]
    },
    "role_counts": {
-    "이름": 1,
-    "도형": 3
+    "브랜드 이름이 든 그 밖의 표장": 1,
+    "관련 없음": 3
    },
    "marks": [
     {
      "appno": "4520120006604",
      "title": "SEPHORA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520120006604.png",
      "image_exists": true,
+     "app_date": "2012-12-21",
+     "reg_date": "2014-06-04",
      "codes": [
       "128303",
       "G0404",
@@ -14118,11 +15380,14 @@
      "appno": "4020000044333",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020000044333.png",
      "image_exists": true,
+     "app_date": "2000-09-21",
+     "reg_date": "2002-08-09",
      "codes": [
       "G1201",
       "G1301",
@@ -14137,11 +15402,14 @@
      "appno": "4019980013939",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4019980013939.png",
      "image_exists": true,
+     "app_date": "1998-05-29",
+     "reg_date": "1999-08-25",
      "codes": [
       "G1201",
       "G1202",
@@ -14157,11 +15425,14 @@
      "appno": "4119980003974",
      "title": null,
      "kind": "도형상표",
-     "role": "도형",
+     "role": "관련 없음",
      "auto_role": "도형",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4119980003974.png",
      "image_exists": true,
+     "app_date": "1998-05-20",
+     "reg_date": "1999-08-03",
      "codes": [
       "S0101",
       "S128302",
@@ -14174,10 +15445,14 @@
       42
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "이케아",
+   "table_name": "이케아",
+   "new": false,
    "notations": [
     {
      "text": "이케아",
@@ -14189,6 +15464,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14211,6 +15488,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14224,6 +15503,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "인터 이케아 시스템 비. 브이.",
     "인터 이케아 시스템스 비. 브이."
@@ -14243,7 +15524,8 @@
     "text": "인터브랜드 Best Global Brands 2026 46위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
    "protection": "업종 불문",
    "goods": {
@@ -14281,18 +15563,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4120070007005",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4120070007005.png",
      "image_exists": true,
+     "app_date": "2007-03-14",
+     "reg_date": "2008-06-16",
      "codes": [
       "S2014",
       "S2018",
@@ -14308,11 +15593,14 @@
      "appno": "4019970051319",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4019970051319.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1999-03-29",
      "codes": [
       "G0801",
       "G0803"
@@ -14326,11 +15614,14 @@
      "appno": "4019970051327",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4019970051327.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-31",
      "codes": [
       "G4301",
       "G4302",
@@ -14345,11 +15636,14 @@
      "appno": "4019970051315",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4019970051315.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-17",
      "codes": [
       "G0301",
       "G0302"
@@ -14362,11 +15656,14 @@
      "appno": "4019970051317",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4019970051317.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-17",
      "codes": [
       "G0501",
       "G0502",
@@ -14383,11 +15680,14 @@
      "appno": "4119970015183",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4119970015183.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-17",
      "codes": [
       "S0201"
      ],
@@ -14399,11 +15699,14 @@
      "appno": "4119970015184",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4119970015184.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-17",
      "codes": [
       "S0301"
      ],
@@ -14415,11 +15718,14 @@
      "appno": "4119970015185",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4119970015185.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-17",
      "codes": [
       "S080101",
       "S173999"
@@ -14432,11 +15738,14 @@
      "appno": "4119970015186",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4119970015186.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-17",
      "codes": [
       "S090101"
      ],
@@ -14448,11 +15757,14 @@
      "appno": "4019970051314",
      "title": "IKEA",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4019970051314.png",
      "image_exists": true,
+     "app_date": "1997-11-04",
+     "reg_date": "1998-12-14",
      "codes": [
       "G020101",
       "G0204",
@@ -14467,10 +15779,14 @@
       31
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "에어비앤비",
+   "table_name": "에어비앤비",
+   "new": false,
    "notations": [
     {
      "text": "에어비앤비",
@@ -14482,6 +15798,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14504,6 +15822,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14517,6 +15837,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "에어비앤비, 인크."
    ],
@@ -14534,9 +15856,10 @@
     "text": "인터브랜드 Best Global Brands 2026 44위 https://interbrand.com/best-global-brands/global/",
     "urls": [
      "https://interbrand.com/best-global-brands/global/"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "업종 세트",
     "codes": [
@@ -14544,18 +15867,21 @@
     ]
    },
    "role_counts": {
-    "다른 이름": 1
+    "관련 없음": 1
    },
    "marks": [
     {
      "appno": "4520140004936",
      "title": "superhost",
      "kind": "도형복합",
-     "role": "다른 이름",
+     "role": "관련 없음",
      "auto_role": "다른 이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4520140004936.png",
      "image_exists": true,
+     "app_date": "2014-06-26",
+     "reg_date": "2015-08-17",
      "codes": [
       "S0101",
       "S123101",
@@ -14566,10 +15892,14 @@
       35
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   },
   {
    "name": "야놀자",
+   "table_name": "야놀자",
+   "new": false,
    "notations": [
     {
      "text": "야놀자",
@@ -14581,6 +15911,8 @@
      "length": "중간",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14603,6 +15935,8 @@
      "length": "김",
      "kind": "보통 표기",
      "base_weak": false,
+     "common": false,
+     "added": false,
      "inherits": [],
      "kind_reason": "",
      "judgements": [
@@ -14616,6 +15950,8 @@
      ]
     }
    ],
+   "removed_notations": [],
+   "exceptions": [],
    "applicants": [
     "주식회사 야놀자"
    ],
@@ -14633,9 +15969,10 @@
     "text": "인터브랜드 베스트 코리아 브랜드 2025 50위 https://www.newswire.co.kr/newsRead.php?no=1013186",
     "urls": [
      "https://www.newswire.co.kr/newsRead.php?no=1013186"
-    ]
+    ],
+    "label": null
    },
-   "protection": "업종 불문",
+   "protection": "같은·가까운 업종 중심",
    "goods": {
     "source": "브랜드 표장",
     "codes": [
@@ -14679,18 +16016,21 @@
     ]
    },
    "role_counts": {
-    "이름": 10
+    "브랜드 이름이 든 그 밖의 표장": 10
    },
    "marks": [
     {
      "appno": "4020240023171",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023171.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "G0301",
       "G0502",
@@ -14709,11 +16049,14 @@
      "appno": "4020170072001",
      "title": "ya-nolja",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170072001.png",
      "image_exists": true,
+     "app_date": "2017-06-13",
+     "reg_date": "2018-02-27",
      "codes": [
       "S1207"
      ],
@@ -14725,11 +16068,14 @@
      "appno": "4020240023164",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023164.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "G390802",
       "G510101",
@@ -14745,11 +16091,14 @@
      "appno": "4020240023165",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023165.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "S0101",
       "S123101",
@@ -14763,11 +16112,14 @@
      "appno": "4020240023166",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023166.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "S0201",
       "S0301"
@@ -14780,11 +16132,14 @@
      "appno": "4020240023167",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023167.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "S0601",
       "S0701"
@@ -14797,11 +16152,14 @@
      "appno": "4020240023168",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023168.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "S080101",
       "S080102",
@@ -14816,11 +16174,14 @@
      "appno": "4020240023169",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023169.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "G5206",
       "S110101",
@@ -14844,11 +16205,14 @@
      "appno": "4020240023170",
      "title": "yanolja class",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020240023170.png",
      "image_exists": true,
+     "app_date": "2024-02-05",
+     "reg_date": "2025-10-17",
      "codes": [
       "G390802",
       "S123301"
@@ -14861,11 +16225,14 @@
      "appno": "4020170072000",
      "title": "ya-nolja",
      "kind": "도형복합",
-     "role": "이름",
+     "role": "브랜드 이름이 든 그 밖의 표장",
      "auto_role": "이름",
+     "picked": false,
      "source": "유명 브랜드 수집",
      "image": "4020170072000.png",
      "image_exists": true,
+     "app_date": "2017-06-13",
+     "reg_date": "2018-02-27",
      "codes": [
       "G390802"
      ],
@@ -14873,7 +16240,9 @@
       9
      ]
     }
-   ]
+   ],
+   "fetch": [],
+   "memo": ""
   }
  ]
 }

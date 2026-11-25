@@ -5,6 +5,17 @@
 가 만든다)의 브랜드 표기와 일치하는지를 **표기 기준**으로 본다. 식별력 필터(요부 추출)는
 거치지 않는다 — 설명 낱말로 빠지는 "bbq" 도 견줘야 한다. 아래는 2-1단계(2026-11-25) 규칙.
 
+등록부(상표 단위 — §7-14-10)
+    표장 역할       사람이 고른다: 대표 로고(현재) · 과거 로고 · 브랜드 이름이 든 그 밖의 표장 ·
+                    관련 없음. 고르기 전 기본값은 자동 역할(상표명에 표기가 있으면 "이름", 상표명이
+                    없으면 "도형", 그 밖은 "다른 이름")에서 이름 → 브랜드 이름이 든 그 밖의 표장,
+                    도형·다른 이름 → 관련 없음 — 고르지 않으면 대표 로고는 0건이다. 로고 확인과
+                    안내에는 대표 로고(현재)·과거 로고만 쓴다.
+    사람이 정한 값  shared/famous_registry_overrides.json(parse_overrides) — 표기 지우기·더하기,
+                    "흔한 말" 표시(약한 표기와 같게 다룬다), 예외 낱말(질의 낱말이 그 낱말과 같으면
+                    그 브랜드와 약한 일치로 보지 않는다 — 강한 일치는 그대로), 보호 범위, 표장
+                    역할, 새 브랜드(근거가 없으면 "근거 없음"), 받을 표장.
+
 용어
     붙여 쓴 꼴(key)  정리(clean_input_name → 상표 기호 제거·NFKC·소문자) 뒤 한글·영문·숫자만
                     이은 것.
@@ -16,8 +27,9 @@
                     판정되는 말(유명 예외를 뺀 판정). 4호·5호·6호로만 식별력이 없는 말(지명·
                     흔한 성·한 글자)은 설명 낱말이 아니다. 나머지는 설명 낱말 하나 또는 둘을
                     이어 쓴 꼴까지 인정한다.
-    브랜드 업종     이름 일치에는 업종 세트와 역할 "이름" 표장의 유사군만 쓴다(표장별 겹침의
-                    최댓값 ≥ 결합 하한 0.0252 면 겹침). 도형·다른 이름 표장의 유사군은 안 쓴다.
+    브랜드 업종     이름 일치에는 업종 세트와 "관련 없음"이 아닌 표장의 유사군을 쓴다(표장별
+                    겹침의 최댓값 ≥ 결합 하한 0.0252 면 겹침). 고르기 전에는 자동 역할이 "이름"인
+                    표장만 해당한다(2-1단계와 같다).
 
 표기 종류
     약한 표기       유명 예외를 뺀 식별력 판정으로 그 브랜드 자신의 업종에서 식별력이 없는 표기
@@ -79,8 +91,10 @@ from src.axes.x4_goods import goods_similarity
 
 __all__ = [
     "REGISTRY_VERSION", "OVERRIDES_VERSION", "DEFAULT_REGISTRY_PATH", "DEFAULT_OVERRIDES_PATH",
-    "DEFAULT_BRANDS_PATH", "PROTECT_ANY", "PROTECT_NEAR", "ROLE_NAME", "ROLE_FIGURE",
-    "ROLE_OTHER", "ROLE_LOGO", "ROLE_EXCLUDED", "LENGTHS", "KIND_WEAK", "KIND_INITIAL",
+    "DEFAULT_BRANDS_PATH", "PROTECT_ANY", "PROTECT_NEAR", "PROTECT_ANY_BRANDS", "ROLE_NAME",
+    "ROLE_FIGURE", "ROLE_OTHER", "ROLE_LOGO_NOW", "ROLE_LOGO_OLD", "ROLE_BRAND_OTHER",
+    "ROLE_UNRELATED", "MARK_ROLES", "LOGO_ROLES", "DEFAULT_ROLE", "EVIDENCE_NONE",
+    "LENGTHS", "KIND_WEAK", "KIND_INITIAL",
     "KIND_NORMAL", "LEVEL_STRONG", "LEVEL_WEAK", "LEVEL_NOTICE", "PATH_EXACT",
     "PATH_CONTAIN_DESC", "PATH_CONTAIN_OTHER", "PATH_SOUND", "PATH_SPELLING", "BASIS_NAME",
     "BASIS_OCR", "Notation", "Mark", "Brand", "Registry", "Thresholds", "PreparedQuery",
@@ -88,7 +102,8 @@ __all__ = [
     "text_key", "script_label", "length_class", "whole_sound", "whole_spelling",
     "industry_words", "analyze_notation", "classify_notations", "read_brand_table",
     "title_has_notation", "auto_role", "build_registry", "registry_to_json", "load_registry",
-    "load_overrides", "prepare_query", "collect_evidence", "decide", "check_famous",
+    "load_overrides", "parse_overrides", "normalize_appno", "prepare_query",
+    "collect_evidence", "decide", "check_famous",
     "default_goods_floor",
 ]
 
@@ -98,19 +113,39 @@ DEFAULT_OVERRIDES_PATH = REPO_ROOT / "shared" / "famous_registry_overrides.json"
 DEFAULT_BRANDS_PATH = REPO_ROOT / "shared" / "famous_brands.txt"
 # 업종 낱말 사전의 원천 — 환경 변수로 바꾼 경로가 아니라 저장소의 업종 세트 파일 그대로
 PRESETS_PATH = REPO_ROOT / "shared" / "goods_map" / "business_presets.json"
-REGISTRY_VERSION = "famous_registry_v2"  # v2: 표기 종류(kind)·종류의 근거(inherits)
-OVERRIDES_VERSION = "famous_registry_overrides_v1"
+# v3: 상표 단위 — 표장 역할 넷, 사람이 고친 표기(흔한 말), 예외 낱말, 새 브랜드, 받을 표장
+REGISTRY_VERSION = "famous_registry_v3"
+OVERRIDES_VERSION = "famous_registry_overrides_v2"
 BRAND_SECTION = "[브랜드]"
 
 PROTECT_ANY = "업종 불문"
 PROTECT_NEAR = "같은·가까운 업종 중심"
 PROTECTIONS = (PROTECT_ANY, PROTECT_NEAR)
+# 보호 범위의 기본값이 "업종 불문"인 브랜드([브랜드] 표의 이름). 나머지와 새 브랜드는 "같은·가까운
+# 업종 중심" — 사람이 overrides 로 바꾼다.
+PROTECT_ANY_BRANDS = ("스타벅스", "샤넬", "루이비통", "에르메스", "구글", "마이크로소프트",
+                      "네이버", "인스타그램", "넷플릭스", "이케아")
+# 자동 역할 — 상표명으로 정한다(고르기 전 기본 역할의 근거)
 ROLE_NAME, ROLE_FIGURE, ROLE_OTHER = "이름", "도형", "다른 이름"
-ROLE_LOGO, ROLE_EXCLUDED = "브랜드 로고", "제외"  # overrides 로만
 AUTO_ROLES = (ROLE_NAME, ROLE_FIGURE, ROLE_OTHER)
-OVERRIDE_ROLES = (ROLE_LOGO, ROLE_EXCLUDED)
-BRAND_MARK_ROLES = (ROLE_NAME, ROLE_FIGURE, ROLE_LOGO)  # 브랜드 자신의 표장으로 보는 역할
+# 표장 역할 — 사람이 고른다(고르기 도구 → overrides)
+ROLE_LOGO_NOW, ROLE_LOGO_OLD = "대표 로고(현재)", "과거 로고"
+ROLE_BRAND_OTHER, ROLE_UNRELATED = "브랜드 이름이 든 그 밖의 표장", "관련 없음"
+MARK_ROLES = (ROLE_LOGO_NOW, ROLE_LOGO_OLD, ROLE_BRAND_OTHER, ROLE_UNRELATED)
+LOGO_ROLES = (ROLE_LOGO_NOW, ROLE_LOGO_OLD)  # 로고 확인·안내에 보여 줄 대표 이미지
+# 고르기 전 기본 역할: 사람이 고르지 않으면 대표 로고는 0건이다
+DEFAULT_ROLE = {ROLE_NAME: ROLE_BRAND_OTHER, ROLE_FIGURE: ROLE_UNRELATED,
+                ROLE_OTHER: ROLE_UNRELATED}
 SOURCE_FAMOUS, SOURCE_EXISTING = "유명 브랜드 수집", "기존 수집(같은 출원인)"
+SOURCE_PICKED = "사람이 고른 표장"
+EVIDENCE_NONE = "근거 없음"
+FETCH_CANDIDATE, FETCH_DIRECT = "후보", "직접"
+FETCH_SOURCES = (FETCH_CANDIDATE, FETCH_DIRECT)
+APPNO_DIGITS = 13
+_OVERRIDE_BRAND_KEYS = frozenset({
+    "new", "name", "applicants", "preset", "evidence_urls", "protection", "notations",
+    "exceptions", "marks", "fetch", "memo"})
+_OVERRIDE_NOTATION_KEYS = frozenset({"remove", "add", "common"})
 
 LENGTH_SHORT, LENGTH_MID, LENGTH_LONG = "짧음", "중간", "김"
 LENGTHS = (LENGTH_SHORT, LENGTH_MID, LENGTH_LONG)
@@ -129,6 +164,7 @@ STRONG_SOUND = 0.98  # 단독 축 기준(standalone x1)과 같다
 MAX_BUNDLE_WORDS = 5  # 낱말 묶음에 넣는 이어진 낱말 수 상한
 MAX_DESCRIPTIVE_WORDS = 2  # 나머지는 설명 낱말 하나 또는 둘을 이어 쓴 꼴까지
 WEAK_USE_ALONE, WEAK_USE_WITH_OTHERS = "단독", "다른 말과 함께"
+COMMON_REASON = "사람 표시: 흔한 말"
 # 가게 형태 낱말(업종 낱말 사전의 일부 — 업종 세트의 이름·별칭에 더한다)
 SHOP_WORDS = ("가게", "전문점", "매장", "샵", "숍", "스토어", "마트", "하우스", "본점", "지점",
               "직영점")
@@ -345,18 +381,23 @@ def analyze_notation(text: str, dist: Distinctiveness, brand_codes: frozenset[st
 def classify_notations(items: list[dict]) -> list[dict]:
     """한 브랜드의 표기들에 종류를 붙인다(kind·inherits·kind_reason).
 
-    약한 표기 = base_weak 인 표기와, 그 표기와 통째 소리가 KIND_SOUND 이상인 표기(inherits = 그
-    약한 표기들 — 다른 업종에서의 식별력은 그 표기의 것을 따른다). 머리글자 표기 = 약한 표기가
-    아닌 영문 INITIAL_MAX_LETTERS 자 이하 표기와, 그 표기와 소리가 KIND_SOUND 이상인 표기. 나머지는
-    보통 표기."""
+    약한 표기 = base_weak 인 표기, 사람이 "흔한 말"로 표시한 표기(common), 그리고 그 표기들과
+    통째 소리가 KIND_SOUND 이상인 표기(inherits = 그 약한 표기들 — 다른 업종에서의 식별력은 그
+    표기의 것을 따른다). 머리글자 표기 = 약한 표기가 아닌 영문 INITIAL_MAX_LETTERS 자 이하 표기와,
+    그 표기와 소리가 KIND_SOUND 이상인 표기. 나머지는 보통 표기."""
     out = [dict(item) for item in items]
-    base = [item for item in out if item["base_weak"]]
+    base = [item for item in out if item["base_weak"] or item.get("common")]
     for item in out:
-        if item["base_weak"]:
-            reasons = "; ".join(f"{j['token']}: {'·'.join(j['reasons'])}"
-                                for j in item["judgements"])
+        if item["base_weak"] or item.get("common"):
+            reasons = []
+            if item["base_weak"]:
+                judged = "; ".join(f"{j['token']}: {'·'.join(j['reasons'])}"
+                                   for j in item["judgements"])
+                reasons.append(f"자기 업종에서 식별력 없음({judged})")
+            if item.get("common"):
+                reasons.append(COMMON_REASON)
             item.update(kind=KIND_WEAK, inherits=[item["text"]],
-                        kind_reason=f"자기 업종에서 식별력 없음({reasons})")
+                        kind_reason=" · ".join(reasons))
             continue
         alike = [(other["text"], whole_sound(item["key"], other["key"])) for other in base]
         alike = [(text, score) for text, score in alike if score >= KIND_SOUND]
@@ -385,7 +426,7 @@ def classify_notations(items: list[dict]) -> list[dict]:
 
 @dataclass(frozen=True)
 class Notation:
-    text: str  # 표에 적힌 표기 그대로
+    text: str  # 표에 적힌 표기 그대로(사람이 더한 표기는 적은 그대로)
     key: str
     pieces: tuple[str, ...]
     script: str
@@ -395,6 +436,8 @@ class Notation:
     inherits: tuple[str, ...] = ()  # 종류를 따르는 같은 브랜드의 표기(자기 자신일 수 있다)
     kind_reason: str = ""
     judgements: tuple[dict, ...] = ()
+    common: bool = False  # 사람 표시 "흔한 말" — 약한 표기와 같게 다룬다
+    added: bool = False  # 사람이 더한 표기([브랜드] 표에 없음)
 
     @property
     def weak(self) -> bool:
@@ -406,13 +449,16 @@ class Mark:
     appno: str
     title: str | None
     kind: str | None  # 상표구분(도형복합·도형상표 …)
-    role: str  # 이름 | 도형 | 다른 이름 | 브랜드 로고 | 제외
-    auto_role: str  # overrides 적용 전 자동 역할
-    source: str  # 유명 브랜드 수집 | 기존 수집(같은 출원인)
+    role: str  # 대표 로고(현재) | 과거 로고 | 브랜드 이름이 든 그 밖의 표장 | 관련 없음
+    auto_role: str  # 상표명으로 정한 자동 역할(이름 | 도형 | 다른 이름) — 고르기 전 기본값의 근거
+    source: str  # 유명 브랜드 수집 | 기존 수집(같은 출원인) | 사람이 고른 표장
     image: str | None
     image_exists: bool
     codes: frozenset[str]
     classes: tuple[int, ...] = ()
+    app_date: str | None = None
+    reg_date: str | None = None
+    picked: bool = False  # 역할을 사람이 골랐는가(overrides)
 
 
 @dataclass(frozen=True)
@@ -421,7 +467,7 @@ class Brand:
     notations: tuple[Notation, ...]
     applicants: tuple[str, ...]
     applicant_keys: frozenset[str]  # 정규화 + 별칭 표 적용
-    preset: str
+    preset: str | None  # 업종 세트 id(새 브랜드는 없을 수 있다)
     preset_label: str | None
     preset_codes: frozenset[str]
     evidence: str
@@ -430,31 +476,54 @@ class Brand:
     goods_codes: frozenset[str]  # 자기 업종의 식별력 맥락 — 브랜드 표장 유사군, 없으면 업종 세트
     goods_source: str
     marks: tuple[Mark, ...]
+    table_name: str = ""  # [브랜드] 표의 이름(첫 표기) — 새 브랜드는 overrides 의 이름
+    is_new: bool = False  # [브랜드] 표에 없고 overrides 로 더한 브랜드
+    exceptions: tuple[str, ...] = ()  # 이 브랜드와 닮았다고 보면 안 되는 일반 낱말
+    fetch: tuple[Mapping, ...] = ()  # 받을 표장(아직 DB 에 없음) — {appno, role, source, …}
+    memo: str = ""
+    removed_notations: tuple[str, ...] = ()  # 사람이 지운 표의 표기
 
     @property
-    def brand_marks(self) -> tuple[Mark, ...]:
-        return tuple(mark for mark in self.marks if mark.role in BRAND_MARK_ROLES)
+    def logo_marks(self) -> tuple[Mark, ...]:
+        """로고 확인과 안내에 보여 줄 대표 이미지 — "대표 로고(현재)"와 "과거 로고"만."""
+        return tuple(mark for mark in self.marks if mark.role in LOGO_ROLES)
+
+    @property
+    def own_marks(self) -> tuple[Mark, ...]:
+        """"관련 없음"이 아닌 표장."""
+        return tuple(mark for mark in self.marks if mark.role != ROLE_UNRELATED)
 
     @property
     def goods_sets(self) -> tuple[frozenset[str], ...]:
-        """1단계의 업종 겹침 집합(브랜드 표장 하나하나와 업종 세트) — 1단계 표본을 그대로 다시
-        만드는 데만 쓴다. 이름 일치의 업종 겹침은 name_goods_sets."""
-        sets = [mark.codes for mark in self.brand_marks if mark.codes]
+        """1단계의 업종 겹침 집합(자동 역할이 이름·도형인 표장 하나하나와 업종 세트) — 1단계
+        표본을 그대로 다시 만드는 데만 쓴다(사람이 고른 역할과 무관). 이름 일치의 업종 겹침은
+        name_goods_sets."""
+        sets = [mark.codes for mark in self.marks
+                if mark.auto_role in (ROLE_NAME, ROLE_FIGURE) and mark.codes]
         if self.preset_codes:
             sets.append(self.preset_codes)
         return tuple(sets)
 
     @property
     def name_goods_sets(self) -> tuple[frozenset[str], ...]:
-        """이름 일치용 브랜드 업종 — 업종 세트와 역할 "이름" 표장 하나하나의 유사군."""
+        """이름 일치용 브랜드 업종 — 업종 세트와 "관련 없음"이 아닌 표장 하나하나의 유사군."""
         sets = [self.preset_codes] if self.preset_codes else []
-        sets += [mark.codes for mark in self.marks if mark.role == ROLE_NAME and mark.codes]
+        sets += [mark.codes for mark in self.own_marks if mark.codes]
         return tuple(sets)
 
     @property
     def name_goods_codes(self) -> frozenset[str]:
         """이름 일치용 브랜드 업종의 유사군 합집합(설명 낱말 판정의 맥락)."""
         return frozenset(code for codes in self.name_goods_sets for code in codes)
+
+    @property
+    def exception_keys(self) -> frozenset[str]:
+        return frozenset(key for key in map(text_key, self.exceptions) if key)
+
+    @property
+    def evidence_label(self) -> str | None:
+        """근거 URL 도 근거 글도 없으면 "근거 없음"."""
+        return None if (self.evidence_urls or self.evidence.strip()) else EVIDENCE_NONE
 
 
 @dataclass(frozen=True)
@@ -464,7 +533,10 @@ class Registry:
     sources: Mapping = field(default_factory=dict)
 
     def brand(self, name: str) -> Brand | None:
-        return next((brand for brand in self.brands if brand.name == name), None)
+        """이름(바꾼 이름이면 표의 이름으로도)으로 찾는다."""
+        found = next((brand for brand in self.brands if brand.name == name), None)
+        return found or next(
+            (brand for brand in self.brands if brand.table_name == name), None)
 
     @property
     def applicant_keys(self) -> frozenset[str]:
@@ -521,30 +593,125 @@ def title_has_notation(title: str | None, notations: Iterable[str]) -> bool:
 
 
 def auto_role(title: str | None, notations: Iterable[str]) -> str:
-    """표장 역할(자동) — 상표명에 브랜드 표기가 있으면 "이름", 상표명이 없으면 "도형", 그 밖은
-    "다른 이름"."""
+    """표장의 자동 역할 — 상표명에 브랜드 표기가 있으면 "이름", 상표명이 없으면 "도형", 그 밖은
+    "다른 이름". 고르기 전 기본 역할은 DEFAULT_ROLE(이름 → 브랜드 이름이 든 그 밖의 표장,
+    도형·다른 이름 → 관련 없음)."""
     if not (title or "").strip():
         return ROLE_FIGURE
     return ROLE_NAME if title_has_notation(title, notations) else ROLE_OTHER
 
 
-def load_overrides(path: Path = DEFAULT_OVERRIDES_PATH) -> dict:
-    """사람이 정한 값 — {"brands": {브랜드: {"protection": …}}, "marks": {출원번호: {"role": …}}}.
-    파일이 없으면 빈 틀. 모르는 값은 ValueError."""
-    if not Path(path).exists():
-        return {"version": OVERRIDES_VERSION, "brands": {}, "marks": {}}
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if data.get("version") != OVERRIDES_VERSION:
+def normalize_appno(value: object) -> str:
+    """출원번호 — 숫자만 13자리(하이픈·공백은 뗀다). 아니면 ValueError."""
+    digits = re.sub(r"\D", "", str(value or ""))
+    if len(digits) != APPNO_DIGITS:
+        raise ValueError(f"출원번호는 숫자 {APPNO_DIGITS}자리여야 합니다: {value!r}")
+    return digits
+
+
+def _text_list(value: object, where: str) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(text, str) for text in value):
+        raise ValueError(f"overrides: {where} 는 글 목록이어야 합니다")
+    out = [text.strip() for text in value if text.strip()]
+    return list(dict.fromkeys(out))
+
+
+def parse_overrides(data: Mapping) -> dict:
+    """사람이 정한 값(고르기 도구가 내보내는 JSON)을 확인해 정리한다 — 모르는 값은 ValueError.
+
+        {"version": "famous_registry_overrides_v2",
+         "brands": {브랜드 이름(표의 첫 표기, 새 브랜드는 그 이름): {
+             "new": true,                       # 표에 없는 새 브랜드(표기는 notations.add 전부)
+             "name": 바꾼 이름, "applicants": [...], "preset": 업종 세트 id | null,
+             "evidence_urls": [...],            # 주면 표의 값을 대신한다
+             "protection": "업종 불문" | "같은·가까운 업종 중심",
+             "notations": {"remove": [...], "add": [...], "common": [...]},  # common = 흔한 말
+             "exceptions": [...],               # 닮았다고 보면 안 되는 일반 낱말
+             "marks": {출원번호: 역할},          # DB 에 있는 표장의 역할(넷 중 하나)
+             "fetch": [{"appno": …, "role": …, "source": "후보" | "직접", …}],  # 받을 표장
+             "memo": "…"}}}
+    """
+    if not isinstance(data, Mapping) or data.get("version") != OVERRIDES_VERSION:
         raise ValueError(f"famous_registry_overrides: version 은 {OVERRIDES_VERSION} 여야 합니다")
+    brands: dict[str, dict] = {}
     for name, item in (data.get("brands") or {}).items():
+        if not isinstance(item, Mapping):
+            raise ValueError(f"overrides: {name} 의 값이 사전이 아닙니다")
+        unknown = sorted(set(item) - _OVERRIDE_BRAND_KEYS)
+        if unknown:
+            raise ValueError(f"overrides: {name} 에 모르는 칸이 있습니다: {unknown}")
+        out: dict = {}
+        if item.get("new"):
+            out["new"] = True
+        if str(item.get("name") or "").strip():
+            out["name"] = str(item["name"]).strip()
+        if "applicants" in item:
+            out["applicants"] = _text_list(item["applicants"], f"{name}.applicants")
+        if "preset" in item:
+            preset = item["preset"]
+            if preset is not None and not isinstance(preset, str):
+                raise ValueError(f"overrides: {name}.preset 은 업종 세트 id 나 null 입니다")
+            out["preset"] = (preset or "").strip() or None
+        if "evidence_urls" in item:
+            out["evidence_urls"] = _text_list(item["evidence_urls"], f"{name}.evidence_urls")
         protection = item.get("protection")
-        if protection is not None and protection not in PROTECTIONS:
-            raise ValueError(f"overrides: {name} 의 보호 범위는 {PROTECTIONS} 중 하나여야 합니다")
-    for appno, item in (data.get("marks") or {}).items():
-        if item.get("role") not in OVERRIDE_ROLES:
-            raise ValueError(f"overrides: {appno} 의 역할은 {OVERRIDE_ROLES} 중 하나여야 합니다")
-    return {"version": data["version"], "brands": dict(data.get("brands") or {}),
-            "marks": dict(data.get("marks") or {})}
+        if protection is not None:
+            if protection not in PROTECTIONS:
+                raise ValueError(f"overrides: {name} 의 보호 범위는 {PROTECTIONS} 중 하나입니다")
+            out["protection"] = protection
+        notations = item.get("notations") or {}
+        if not isinstance(notations, Mapping) or set(notations) - _OVERRIDE_NOTATION_KEYS:
+            raise ValueError(
+                f"overrides: {name}.notations 는 {sorted(_OVERRIDE_NOTATION_KEYS)} 만 가집니다")
+        edits = {key: _text_list(notations.get(key), f"{name}.notations.{key}")
+                 for key in ("remove", "add", "common")}
+        if any(edits.values()):
+            out["notations"] = {key: value for key, value in edits.items() if value}
+        exceptions = _text_list(item.get("exceptions"), f"{name}.exceptions")
+        if exceptions:
+            out["exceptions"] = exceptions
+        marks = item.get("marks") or {}
+        if not isinstance(marks, Mapping):
+            raise ValueError(f"overrides: {name}.marks 는 {{출원번호: 역할}} 입니다")
+        roles = {}
+        for appno, role in marks.items():
+            if role not in MARK_ROLES:
+                raise ValueError(f"overrides: {name} 의 {appno} 역할은 {MARK_ROLES} 중 하나입니다")
+            roles[str(appno).strip()] = role  # DB 에 있는 번호 — 등록부를 만들 때 확인한다
+        if roles:
+            out["marks"] = roles
+        fetch = []
+        for entry in item.get("fetch") or ():
+            if not isinstance(entry, Mapping):
+                raise ValueError(f"overrides: {name}.fetch 의 항목이 사전이 아닙니다")
+            role = entry.get("role") or ROLE_LOGO_NOW
+            source = entry.get("source") or FETCH_DIRECT
+            if role not in MARK_ROLES or source not in FETCH_SOURCES:
+                raise ValueError(f"overrides: {name}.fetch 의 역할·출처를 모릅니다: {dict(entry)}")
+            row = {"appno": normalize_appno(entry.get("appno")), "role": role, "source": source}
+            for key in ("title", "applicant"):
+                if str(entry.get(key) or "").strip():
+                    row[key] = str(entry[key]).strip()
+            fetch.append(row)
+        if len({row["appno"] for row in fetch}) != len(fetch):
+            raise ValueError(f"overrides: {name}.fetch 에 같은 출원번호가 두 번 있습니다")
+        if fetch:
+            out["fetch"] = fetch
+        if str(item.get("memo") or "").strip():
+            out["memo"] = str(item["memo"]).strip()
+        if out.get("new") and not (out.get("notations") or {}).get("add"):
+            raise ValueError(f"overrides: 새 브랜드 {name} 에 표기(notations.add)가 없습니다")
+        brands[str(name)] = out
+    return {"version": OVERRIDES_VERSION, "brands": brands}
+
+
+def load_overrides(path: Path = DEFAULT_OVERRIDES_PATH) -> dict:
+    """사람이 정한 값 파일 — 없으면 빈 틀. 형식은 parse_overrides."""
+    if not Path(path).exists():
+        return {"version": OVERRIDES_VERSION, "brands": {}}
+    return parse_overrides(json.loads(Path(path).read_text(encoding="utf-8")))
 
 
 def _record_title(record: dict) -> str | None:
@@ -553,13 +720,66 @@ def _record_title(record: dict) -> str | None:
     return title or None
 
 
+def _record_date(record: dict, key: str) -> str | None:
+    return str(record.get(key) or "").strip() or None
+
+
 def _notation(item: dict) -> Notation:
     return Notation(
         text=item["text"], key=item["key"], pieces=tuple(item["pieces"]),
         script=item["script"], length=item["length"], kind=item["kind"],
         base_weak=bool(item["base_weak"]), inherits=tuple(item.get("inherits") or ()),
         kind_reason=item.get("kind_reason") or "",
-        judgements=tuple(item.get("judgements") or ()))
+        judgements=tuple(item.get("judgements") or ()),
+        common=bool(item.get("common")), added=bool(item.get("added")))
+
+
+def _brand_specs(rows: list[dict], overrides: dict) -> list[dict]:
+    """[브랜드] 표의 행에 사람이 정한 값을 입힌 브랜드 명세(표의 순서, 새 브랜드는 그 뒤)."""
+    specs: list[dict] = []
+    table_names = [row["notations"][0] for row in rows]
+    for name, item in overrides["brands"].items():
+        if item.get("new") and name in table_names:
+            raise ValueError(f"overrides: 새 브랜드 {name} 은 이미 [브랜드] 표에 있습니다")
+        if not item.get("new") and name not in table_names:
+            raise ValueError(f"overrides 의 브랜드가 [브랜드] 표에 없습니다: {name}")
+    sources = [(row["notations"][0], row, False) for row in rows]
+    sources += [(name, {"notations": [], "applicants": [], "preset": None, "evidence": "",
+                        "urls": []}, True)
+                for name, item in overrides["brands"].items() if item.get("new")]
+    for table_name, row, is_new in sources:
+        item = overrides["brands"].get(table_name) or {}
+        edits = item.get("notations") or {}
+        unknown = [text for text in edits.get("remove", ()) if text not in row["notations"]]
+        if unknown:
+            raise ValueError(f"overrides: {table_name} 에서 지울 표기가 표에 없습니다: {unknown}")
+        kept = [text for text in row["notations"] if text not in edits.get("remove", ())]
+        added = [text for text in edits.get("add", ()) if text not in kept]
+        texts = kept + added
+        if not texts:
+            raise ValueError(f"overrides: {table_name} 에 표기가 하나도 남지 않습니다")
+        unknown = [text for text in edits.get("common", ()) if text not in texts]
+        if unknown:
+            raise ValueError(f"overrides: {table_name} 의 흔한 말 표기가 표기 목록에 없습니다: "
+                             f"{unknown}")
+        urls = item["evidence_urls"] if "evidence_urls" in item else list(row["urls"])
+        specs.append({
+            "table_name": table_name, "name": item.get("name") or table_name, "is_new": is_new,
+            "texts": texts, "added": set(added), "common": set(edits.get("common", ())),
+            "removed": [text for text in row["notations"] if text in edits.get("remove", ())],
+            "applicants": (item["applicants"] if "applicants" in item
+                           else list(row["applicants"])),
+            "preset": item["preset"] if "preset" in item else row["preset"],
+            "evidence": row["evidence"], "urls": urls,
+            "protection": item.get("protection") or (
+                PROTECT_ANY if table_name in PROTECT_ANY_BRANDS else PROTECT_NEAR),
+            "exceptions": item.get("exceptions", []), "roles": item.get("marks", {}),
+            "fetch": item.get("fetch", []), "memo": item.get("memo", "")})
+    names = [spec["name"] for spec in specs]
+    duplicated = sorted({name for name in names if names.count(name) > 1})
+    if duplicated:
+        raise ValueError(f"브랜드 이름이 겹칩니다: {duplicated}")
+    return specs
 
 
 def build_registry(
@@ -569,72 +789,102 @@ def build_registry(
     overrides: dict | None = None, image_exists: Callable[[str], bool] | None = None,
     sources: Mapping | None = None,
 ) -> Registry:
-    """[브랜드] 표(rows)·수집 계획 기록(plan_records: 출원번호 → 브랜드)·DB 메타데이터로 등록부를
-    만든다. 브랜드의 DB 표장 = 계획 기록의 그 브랜드 표장 + 같은 출원인(별칭 표 적용)의 그 밖의
-    DB 표장(기존 수집). 역할은 자동(auto_role) 뒤 overrides("브랜드 로고" 확정·"제외")로 덮는다."""
-    overrides = overrides or {"brands": {}, "marks": {}}
+    """[브랜드] 표(rows)·수집 계획 기록(plan_records: 출원번호 → 브랜드)·DB 메타데이터에 사람이
+    정한 값(overrides — parse_overrides 형식)을 입혀 등록부를 만든다.
+
+    브랜드의 DB 표장 = 계획 기록의 그 브랜드 표장 + 같은 출원인(별칭 표 적용)의 그 밖의 DB 표장
+    (기존 수집) + 사람이 출원번호로 고른 표장 가운데 DB 에 있는 것. 한 출원인이 여러 브랜드에
+    걸쳐 있으면 상표명에 그 브랜드 표기가 든 표장은 그 브랜드에, 어느 브랜드 표기도 없는 표장은
+    그 출원인의 모든 브랜드에 보인다. 역할은 자동 역할(auto_role)의 기본값 뒤 사람이 고른 값."""
+    overrides = overrides or {"brands": {}}
+    specs = _brand_specs(rows, overrides)
     by_appno = {str(record["출원번호"]): record for record in db_records}
     planned: dict[str, list[str]] = {}
     for record in plan_records:
         planned.setdefault(record["브랜드"], []).append(str(record["출원번호"]))
-    planned_all = {appno for items in planned.values() for appno in items}
-    owner_of: dict[str, str] = {}
-    brand_rows = []
-    for row in rows:
-        name = row["notations"][0]
-        keys = frozenset(key for text in row["applicants"] for key in applicant_keys(text))
-        for key in keys:
-            if owner_of.setdefault(key, name) != name:
-                raise ValueError(f"출원인 {key} 이 두 브랜드({owner_of[key]}, {name})에 있습니다")
-        brand_rows.append((name, row, keys))
+    owners_of: dict[str, list[str]] = {}
+    for spec in specs:
+        if spec["preset"] is not None and spec["preset"] not in preset_codes:
+            raise ValueError(f"업종 세트가 없습니다: {spec['preset']} ({spec['name']})")
+        spec["keys"] = frozenset(key for text in spec["applicants"]
+                                 for key in applicant_keys(text))
+        for key in spec["keys"]:
+            owners_of.setdefault(key, []).append(spec["table_name"])
+    by_table = {spec["table_name"]: spec for spec in specs}
     extra: dict[str, list[str]] = {}
     for record in db_records:
         appno = str(record["출원번호"])
-        if appno in planned_all:
-            continue
-        for key in applicant_keys(str(record.get("출원인") or "")):
-            if key in owner_of:
-                extra.setdefault(owner_of[key], []).append(appno)
-                break
+        owners = list(dict.fromkeys(
+            owner for key in applicant_keys(str(record.get("출원인") or ""))
+            for owner in owners_of.get(key, ())))
+        if len(owners) > 1:  # 출원인이 여러 브랜드에 걸침 — 상표명에 표기가 든 브랜드가 먼저
+            title = _record_title(record)
+            named = [owner for owner in owners
+                     if title_has_notation(title, by_table[owner]["texts"])]
+            owners = named or owners
+        for owner in owners:
+            if appno not in planned.get(owner, ()):
+                extra.setdefault(owner, []).append(appno)
     brands: list[Brand] = []
-    for name, row, keys in brand_rows:
+    for spec in specs:
+        table_name = spec["table_name"]
+        listed = [(appno, SOURCE_FAMOUS) for appno in planned.get(table_name, [])]
+        listed += [(appno, SOURCE_EXISTING) for appno in sorted(extra.get(table_name, []))]
+        have = {appno for appno, _ in listed}
+        fetch_role = {entry["appno"]: entry["role"] for entry in spec["fetch"]}
+        listed += [(entry["appno"], SOURCE_PICKED) for entry in spec["fetch"]
+                   if entry["appno"] in by_appno and entry["appno"] not in have]
+        unknown = sorted(set(spec["roles"]) - {appno for appno, _ in listed})
+        if unknown:
+            raise ValueError(f"overrides: {spec['name']} 의 표장이 등록부에 없습니다: {unknown}")
         marks: list[Mark] = []
-        listed = [(appno, SOURCE_FAMOUS) for appno in planned.get(name, [])]
-        listed += [(appno, SOURCE_EXISTING) for appno in sorted(extra.get(name, []))]
         for appno, source in listed:
             record = by_appno.get(appno)
             if record is None:
                 raise ValueError(f"계획 기록의 출원번호가 DB 에 없습니다: {appno}")
             title = _record_title(record)
-            automatic = auto_role(title, row["notations"])
-            role = (overrides["marks"].get(appno) or {}).get("role") or automatic
+            automatic = auto_role(title, spec["texts"])
+            chosen = spec["roles"].get(appno) or fetch_role.get(appno)
             image = record.get("이미지파일")
             marks.append(Mark(
-                appno=appno, title=title, kind=record.get("상표구분"), role=role,
-                auto_role=automatic, source=source, image=image,
+                appno=appno, title=title, kind=record.get("상표구분"),
+                role=chosen or DEFAULT_ROLE[automatic], auto_role=automatic, source=source,
+                image=image,
                 image_exists=bool(image) and (image_exists(image) if image_exists else True),
                 codes=normalize_codes(record.get("유사군") or ()),
-                classes=tuple(sorted(int(c) for c in record.get("류") or ()))))
-        own = frozenset(code for mark in marks if mark.role in BRAND_MARK_ROLES
-                        for code in mark.codes)
-        preset = frozenset(normalize_codes(preset_codes.get(row["preset"]) or ()))
+                classes=tuple(sorted(int(c) for c in record.get("류") or ())),
+                app_date=_record_date(record, "출원일자"),
+                reg_date=_record_date(record, "등록일자"), picked=bool(chosen)))
+        # 자기 업종의 식별력 맥락(약한 표기의 1단계 정의): 자동 역할이 이름·도형이거나 사람이
+        # "관련 없음"이 아니라고 고른 표장의 유사군, 없으면 업종 세트
+        own = frozenset(
+            code for mark in marks for code in mark.codes
+            if (mark.role != ROLE_UNRELATED if mark.picked
+                else mark.auto_role in (ROLE_NAME, ROLE_FIGURE)))
+        preset = frozenset(normalize_codes(preset_codes.get(spec["preset"]) or ()))
         goods_codes, goods_source = (own, "브랜드 표장") if own else (preset, "업종 세트")
-        notations = tuple(_notation(item) for item in classify_notations(
-            [analyze_notation(text, dist, goods_codes) for text in row["notations"]]))
-        protection = (overrides["brands"].get(name) or {}).get("protection") or PROTECT_ANY
+        analyzed = []
+        for text in spec["texts"]:
+            item = analyze_notation(text, dist, goods_codes)
+            item.update(common=text in spec["common"], added=text in spec["added"])
+            analyzed.append(item)
+        keys = [item["key"] for item in analyzed]
+        if "" in keys or len(set(keys)) != len(keys):
+            raise ValueError(f"{spec['name']}: 표기가 비었거나 붙여 쓴 꼴이 같은 표기가 있습니다: "
+                             f"{spec['texts']}")
+        notations = tuple(_notation(item) for item in classify_notations(analyzed))
         brands.append(Brand(
-            name=name, notations=notations, applicants=tuple(row["applicants"]),
-            applicant_keys=keys, preset=row["preset"],
-            preset_label=preset_labels.get(row["preset"]), preset_codes=preset,
-            evidence=row["evidence"], evidence_urls=tuple(row["urls"]), protection=protection,
-            goods_codes=goods_codes, goods_source=goods_source, marks=tuple(marks)))
-    unknown = sorted(set(overrides["brands"]) - {brand.name for brand in brands})
-    if unknown:
-        raise ValueError(f"overrides 의 브랜드가 등록부에 없습니다: {unknown}")
-    known = {mark.appno for brand in brands for mark in brand.marks}
-    unknown = sorted(set(overrides["marks"]) - known)
-    if unknown:
-        raise ValueError(f"overrides 의 출원번호가 등록부에 없습니다: {unknown}")
+            name=spec["name"], notations=notations, applicants=tuple(spec["applicants"]),
+            applicant_keys=spec["keys"], preset=spec["preset"],
+            preset_label=preset_labels.get(spec["preset"]) if spec["preset"] else None,
+            preset_codes=preset, evidence=spec["evidence"],
+            evidence_urls=tuple(spec["urls"]), protection=spec["protection"],
+            goods_codes=goods_codes, goods_source=goods_source, marks=tuple(marks),
+            table_name=table_name, is_new=spec["is_new"],
+            exceptions=tuple(spec["exceptions"]),
+            fetch=tuple(dict(entry) for entry in spec["fetch"]
+                        if entry["appno"] not in by_appno),
+            memo=spec["memo"], removed_notations=tuple(spec["removed"])))
     return Registry(version=REGISTRY_VERSION, brands=tuple(brands), sources=dict(sources or {}))
 
 
@@ -646,24 +896,30 @@ def registry_to_json(registry: Registry) -> dict:
         for mark in brand.marks:
             counts[mark.role] = counts.get(mark.role, 0) + 1
         brands.append({
-            "name": brand.name,
+            "name": brand.name, "table_name": brand.table_name, "new": brand.is_new,
             "notations": [{"text": n.text, "key": n.key, "pieces": list(n.pieces),
                            "script": n.script, "length": n.length, "kind": n.kind,
-                           "base_weak": n.base_weak, "inherits": list(n.inherits),
-                           "kind_reason": n.kind_reason,
+                           "base_weak": n.base_weak, "common": n.common, "added": n.added,
+                           "inherits": list(n.inherits), "kind_reason": n.kind_reason,
                            "judgements": list(n.judgements)} for n in brand.notations],
+            "removed_notations": list(brand.removed_notations),
+            "exceptions": list(brand.exceptions),
             "applicants": list(brand.applicants),
             "applicant_keys": sorted(brand.applicant_keys),
             "industry": {"preset": brand.preset, "label": brand.preset_label,
                          "codes": sorted(brand.preset_codes)},
-            "evidence": {"text": brand.evidence, "urls": list(brand.evidence_urls)},
+            "evidence": {"text": brand.evidence, "urls": list(brand.evidence_urls),
+                         "label": brand.evidence_label},
             "protection": brand.protection,
             "goods": {"source": brand.goods_source, "codes": sorted(brand.goods_codes)},
             "role_counts": counts,
             "marks": [{"appno": m.appno, "title": m.title, "kind": m.kind, "role": m.role,
-                       "auto_role": m.auto_role, "source": m.source, "image": m.image,
-                       "image_exists": m.image_exists, "codes": sorted(m.codes),
-                       "classes": list(m.classes)} for m in brand.marks]})
+                       "auto_role": m.auto_role, "picked": m.picked, "source": m.source,
+                       "image": m.image, "image_exists": m.image_exists,
+                       "app_date": m.app_date, "reg_date": m.reg_date,
+                       "codes": sorted(m.codes), "classes": list(m.classes)}
+                      for m in brand.marks],
+            "fetch": [dict(entry) for entry in brand.fetch], "memo": brand.memo})
     return {"version": registry.version, "sources": dict(registry.sources), "brands": brands}
 
 
@@ -678,6 +934,9 @@ def load_registry(path: Path = DEFAULT_REGISTRY_PATH) -> Registry:
         for n in item["notations"]:
             if n["kind"] not in KINDS:
                 raise ValueError(f"famous_registry: {n['text']} 의 표기 종류를 모릅니다")
+        for m in item["marks"]:
+            if m["role"] not in MARK_ROLES or m["auto_role"] not in AUTO_ROLES:
+                raise ValueError(f"famous_registry: {m['appno']} 의 역할을 모릅니다")
         brands.append(Brand(
             name=item["name"],
             notations=tuple(_notation(n) for n in item["notations"]),
@@ -690,10 +949,17 @@ def load_registry(path: Path = DEFAULT_REGISTRY_PATH) -> Registry:
             goods_source=item["goods"]["source"],
             marks=tuple(Mark(
                 appno=m["appno"], title=m.get("title"), kind=m.get("kind"), role=m["role"],
-                auto_role=m.get("auto_role", m["role"]), source=m.get("source", SOURCE_FAMOUS),
+                auto_role=m["auto_role"], source=m.get("source", SOURCE_FAMOUS),
                 image=m.get("image"), image_exists=bool(m.get("image_exists")),
                 codes=frozenset(m.get("codes") or ()),
-                classes=tuple(m.get("classes") or ())) for m in item["marks"])))
+                classes=tuple(m.get("classes") or ()), app_date=m.get("app_date"),
+                reg_date=m.get("reg_date"), picked=bool(m.get("picked")))
+                for m in item["marks"]),
+            table_name=item.get("table_name") or item["name"], is_new=bool(item.get("new")),
+            exceptions=tuple(item.get("exceptions") or ()),
+            fetch=tuple(dict(entry) for entry in item.get("fetch") or ()),
+            memo=item.get("memo") or "",
+            removed_notations=tuple(item.get("removed_notations") or ())))
     return Registry(version=data["version"], brands=tuple(brands),
                     sources=dict(data.get("sources") or {}))
 
@@ -784,6 +1050,7 @@ class Evidence:
     weak_use: str | None = None  # 약한 표기: WEAK_USE_ALONE | WEAK_USE_WITH_OTHERS
     foreign_weak: bool | None = None  # 약한 표기: 질의 업종에서도 식별력 없는 말(업종 없으면 None)
     descriptive: bool = False  # 질의 업종에서 이 표기가 식별력 없는 말
+    exempt: frozenset[str] = frozenset()  # 브랜드의 예외 낱말(붙여 쓴 꼴) — 약한 일치에 안 쓴다
 
     def best(self, index: int) -> tuple[float, str | None]:
         """대상 가운데 소리(index 1)·철자(index 2)가 가장 높은 것 — (점수, 대상)."""
@@ -946,7 +1213,8 @@ def _brand_evidence(query: PreparedQuery, brand: Brand, dist: Distinctiveness,
             _weak(dist, piece, query.goods) for piece in notation.pieces)
         items[notation.text] = Evidence(
             **base, exact=exact, contain=contain, contain_word=word_hit,
-            contain_rest=rest_hit, units=tuple(scored), descriptive=plain)
+            contain_rest=rest_hit, units=tuple(scored), descriptive=plain,
+            exempt=brand.exception_keys)
     return BrandEvidence(brand=brand.name, protection=brand.protection, overlap=overlap,
                          overlap_value=value,
                          items=tuple(items[n.text] for n in brand.notations))
@@ -1030,18 +1298,23 @@ def _candidates(item: Evidence, overlap: bool | None, thresholds: Thresholds
         strong_spelling = thresholds.strong_spelling.get(item.length)
         if strong_spelling is not None and spelling >= strong_spelling:
             out.append((LEVEL_STRONG, PATH_SPELLING, spelling, False, spelling_unit or ""))
+        # 약한 일치 — 질의 낱말(대상)이 브랜드의 예외 낱말과 같으면 쓰지 않는다(강한 일치는 그대로)
+        units = [unit for unit in item.units if unit[0] not in item.exempt]
         weak_sound = thresholds.weak_sound.get(item.length)
-        if weak_sound is not None and sound >= weak_sound:
-            out.append((LEVEL_WEAK, PATH_SOUND, sound, False, sound_unit or ""))
+        if weak_sound is not None and units:
+            unit = max(units, key=lambda entry: entry[1])
+            if unit[1] >= weak_sound:
+                out.append((LEVEL_WEAK, PATH_SOUND, unit[1], False, unit[0]))
         weak_spelling = thresholds.weak_spelling.get(item.length)
         if weak_spelling is not None:
             floor = thresholds.spelling_sound  # 약한 철자는 같은 대상의 소리가 S 이상일 때만
-            usable = [unit for unit in item.units
+            usable = [unit for unit in units
                       if unit[2] >= weak_spelling and (floor is None or unit[1] >= floor)]
             if usable:
                 unit = max(usable, key=lambda entry: entry[2])
                 out.append((LEVEL_WEAK, PATH_SPELLING, unit[2], False, unit[0]))
-        if item.contain == "기타" and thresholds.contain_other:
+        if (item.contain == "기타" and thresholds.contain_other
+                and item.contain_word not in item.exempt):
             out.append((LEVEL_WEAK, PATH_CONTAIN_OTHER, 1.0, True,
                         f"{item.contain_word} = 표기 + {item.contain_rest}"))
     if item.descriptive and overlap is False:  # 그 밖의 설명적 사용

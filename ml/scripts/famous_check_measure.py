@@ -9,11 +9,20 @@
     ml/venv/bin/python ml/scripts/famous_check_measure.py run      # 측정(고정본과 다르면 4)
     ml/venv/bin/python ml/scripts/famous_check_measure.py run --smoke --out-dir <폴더>
     ml/venv/bin/python ml/scripts/famous_check_measure.py sheet    # 확인용 시트만 다시(측정 없음)
+    ml/venv/bin/python ml/scripts/famous_check_measure.py recheck  # 등록부를 고친 뒤(§7-14-10) —
+                                                                   #   2-1 에서 고른 기준 그대로
+                                                                   #   기준용 목표·기대표 유지 확인
 
 표본은 1단계에 고정한 것 그대로다(다시 만든 표본의 sha256 이 1단계 값과 같아야 한다). 확인용 표본
 (P2 둘째·P3 뒤 둘·N1·N3 확인용)은 이번에도 계산하지 않는다 — 규칙을 다 고친 뒤 다음 단계에서 한
 번만 본다. KIPRIS 호출 0. run 은 실제 CLIP·OCR·X3 엔진(이미지 속 글자·로고·미리 보기).
 1단계 측정은 커밋 ea1d0ef 의 이 파일과 `ml/data/trials/famous_check_{rule,samples,results}.json`.
+
+recheck 는 고정한 표본 파일(famous_check_samples.json)을 그대로 읽고(다시 만들지 않는다) 엔진을
+띄우지 않는다 — 사람이 표기를 지우거나 더하고 흔한 말·예외 낱말·새 브랜드를 정한 뒤(overrides)
+목표와 기대표가 2-1 결과와 같은지, 무엇이 달라졌는지 낸다(다르면 종료 코드 3). 지운 표기를 겨냥한
+표본과 등록부 출원인이 된 상표의 N1 항목은 빼고 그 수를 적는다. 등록부·판정 모듈이 바뀌었으므로
+freeze·run(전체 측정)은 `freeze --force` 뒤에만 돈다.
 """
 
 from __future__ import annotations
@@ -57,6 +66,8 @@ EXIT_REFUSED = 4
 SEED = 0
 BASE, HOLDOUT = "기준용", "확인용"
 REVIEW_DIR = Path.home() / "marklens-archive" / "famous-check-20261124"
+SAMPLES_FILE = TRIALS / "famous_check_samples.json"  # 1단계에 고정한 표본(recheck 가 그대로 읽는다)
+STAGE21_RESULTS = TRIALS / "famous_check_2_1_results.json"  # recheck 가 견주는 2-1 결과
 METADATA = ML_ROOT / "data" / "kipris_metadata.json"
 FEATURES = TRIALS / "pairs_features.csv"
 IMAGE_PARTS = TRIALS / "image_parts.csv"
@@ -635,8 +646,10 @@ def base_items(items: list[dict], limit: int | None = None) -> list[dict]:
 class Matcher:
     def __init__(self, registry: fc.Registry, dist, goods_floor: float):
         self.registry, self.dist, self.floor = registry, dist, goods_floor
-        self.kinds = {(brand.name, notation.text): notation.kind
-                      for brand in registry.brands for notation in brand.notations}
+        self.kinds = {(name, notation.text): notation.kind
+                      for brand in registry.brands for notation in brand.notations
+                      for name in {brand.name, brand.table_name or brand.name}}
+        self.names = {brand.table_name or brand.name: brand.name for brand in registry.brands}
         self._cache: dict[tuple, list[fc.BrandEvidence]] = {}
 
     def evidence(self, item: dict) -> list[fc.BrandEvidence]:
@@ -662,7 +675,8 @@ class Matcher:
     def own(self, item: dict, thresholds: fc.Thresholds) -> fc.BrandMatch | None:
         """대상 브랜드와의 일치."""
         result = self.decide(item, thresholds)
-        return next((match for match in result.matches if match.brand == item["브랜드"]), None)
+        target = self.names.get(item["브랜드"], item["브랜드"])
+        return next((match for match in result.matches if match.brand == target), None)
 
 
 P2_VARIANT = "실제 모방 꼴"  # build_samples 가 P2 항목에 적는 변형 이름
@@ -1003,8 +1017,9 @@ def image_types() -> dict[str, str]:
 
 
 class Logo:
-    """로고 — 질의 이미지와 브랜드 표장(역할 이름·도형) 사이의 엔진 '이미지만' 판단 등급이 위험이면
-    강함. 약함(검토 권장)은 쓰지 않는다."""
+    """로고 — 질의 이미지와 브랜드의 대표 이미지(역할 "대표 로고(현재)"·"과거 로고") 사이의 엔진
+    '이미지만' 판단 등급이 위험이면 강함. 약함(검토 권장)은 쓰지 않는다. 사람이 대표 로고를 고르기
+    전에는 견줄 표장이 없다(2-1 측정은 그때의 역할 — 이름·도형 — 로 쟀다)."""
 
     def __init__(self, context: dict, registry: fc.Registry):
         import numpy as np
@@ -1016,7 +1031,7 @@ class Logo:
         self.marks: list[tuple[str, fc.Mark, int]] = []
         for brand in registry.brands:
             for mark in brand.marks:
-                if mark.role not in (fc.ROLE_NAME, fc.ROLE_FIGURE):
+                if mark.role not in fc.LOGO_ROLES:
                     continue
                 record = self.ms.state.by_appno.get(mark.appno)
                 if record is None or record.pos is None or not mark.image_exists:
@@ -1092,7 +1107,7 @@ def image_measure(context: dict, registry: fc.Registry, matcher: Matcher,
 
     # 1) 역할 "이름" 표장 이미지 전부 — 제안 상표명이 나오는가, 그 글자로 자기 브랜드와 강함인가
     name_marks = [(brand.name, mark) for brand in registry.brands for mark in brand.marks
-                  if mark.role == fc.ROLE_NAME and mark.image_exists]
+                  if mark.auto_role == fc.ROLE_NAME and mark.image_exists]
     if cut:
         name_marks = name_marks[:cut["이름_표장"]]
     rows = []
@@ -1258,7 +1273,7 @@ def preview_images(context: dict, registry: fc.Registry, matcher: Matcher,
     starbucks = (REPO_ROOT / second.SCENARIO_IMAGES["starbucks"]).read_bytes()
     instagram = next(mark for mark in sorted(registry.brand("인스타그램").marks,
                                              key=lambda m: m.appno)
-                     if mark.role == fc.ROLE_FIGURE and mark.image_exists)
+                     if mark.auto_role == fc.ROLE_FIGURE and mark.image_exists)
     queries = {query.key: query for query in context["A"]}
     control_key = control["대조군"]["이미지"][BASE][0]
     entries = [
@@ -1315,8 +1330,9 @@ def _thumb(path: Path, size: int = 120) -> str | None:
 
 
 def review_html(registry: fc.Registry, out_path: Path, limit: int | None = None) -> dict:
-    """사람이 볼 시트 — 브랜드마다 표기(종류)·출원인·업종·보호 범위·근거, 표장 썸네일을 역할별로."""
-    order = [fc.ROLE_NAME, fc.ROLE_LOGO, fc.ROLE_FIGURE, fc.ROLE_OTHER, fc.ROLE_EXCLUDED]
+    """사람이 볼 시트 — 브랜드마다 표기(종류)·출원인·업종·보호 범위·근거, 표장 썸네일을 역할별로.
+    고르는 일은 고르기 도구(curate.html — famous_curate.py)에서 한다."""
+    order = list(fc.MARK_ROLES)
     parts = ["""<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>유명 상표 등록부 확인</title><style>
@@ -1337,14 +1353,15 @@ figure img{display:block;width:120px;height:120px;object-fit:contain;background:
 border:1px solid var(--line)}figure.look img{outline:3px solid var(--warn)}
 a{color:inherit}</style></head><body>
 <h1>유명 상표 등록부 확인</h1>
-<p class="sub">shared/famous_registry.json 초안. <span class="warn">주황 테두리</span>는 사람이 볼
-"도형"·"다른 이름" 표장입니다. 정한 값은 shared/famous_registry_overrides.json 에 적습니다.
+<p class="sub">shared/famous_registry.json 의 지금 상태. <span class="warn">주황 테두리</span>는
+아직 고르지 않아 기본값 "관련 없음"인 표장(상표명이 없거나 브랜드 표기가 없는 것)입니다. 역할은
+고르기 도구(curate.html)에서 고릅니다.
 표기 종류: <span class=flag>약한 표기</span>는 그 표기 하나뿐일 때만 일치,
 <span class=flag>머리글자 표기</span>는 같음·품음-설명만 인정합니다.</p>"""]
     brands = registry.brands[:limit] if limit else registry.brands
     index = []
     for number, brand in enumerate(brands):
-        roles = Counter(mark.role for mark in brand.marks)
+        roles = Counter(mark.auto_role for mark in brand.marks)
         special = ", ".join(f"{n.text}({n.kind})" for n in brand.notations
                             if n.kind != fc.KIND_NORMAL)
         index.append(
@@ -1377,10 +1394,9 @@ a{color:inherit}</style></head><body>
             marks = [mark for mark in brand.marks if mark.role == role]
             if not marks:
                 continue
-            look = role in (fc.ROLE_FIGURE, fc.ROLE_OTHER)
-            parts.append(f"<h3>{role} {len(marks)}건{' — 확인해 주세요' if look else ''}</h3>"
-                         "<div class=marks>")
+            parts.append(f"<h3>{role} {len(marks)}건</h3><div class=marks>")
             for mark in marks:
+                look = role == fc.ROLE_UNRELATED and not mark.picked
                 data = _thumb(IMAGES_DIR / mark.image) if mark.image else None
                 img = (f'<img alt="" src="data:image/png;base64,{data}">' if data
                        else "<div>(이미지 없음)</div>")
@@ -1626,6 +1642,169 @@ def report_text(results: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def frozen_samples() -> dict:
+    """1단계에 고정한 표본 파일을 그대로 읽는다(다시 만들지 않는다 — 등록부의 표기가 바뀌면 다시
+    만든 표본은 달라진다)."""
+    samples = json.loads(SAMPLES_FILE.read_text(encoding="utf-8"))
+    if canonical_sha256(samples) != STAGE1_SAMPLES_SHA256:
+        raise SystemExit(f"거절: {SAMPLES_FILE.name} 이 1단계에 고정한 표본이 아닙니다")
+    return samples
+
+
+def usable_samples(samples: dict, registry: fc.Registry, matcher: Matcher,
+                   applicant_keys) -> tuple[dict, dict]:
+    """지금 등록부로 볼 수 있는 기준용 표본과, 뺀 것의 까닭 — 지운 표기를 겨냥한 P1·P3·P2 항목,
+    등록부 출원인이 된 상표의 N1 항목(새 브랜드를 넣으면 그 회사의 상표는 음성이 아니다)."""
+    dropped: dict[str, list] = {"지운_표기의_표본": [], "등록부_출원인이_된_N1": []}
+    out: dict[str, list] = {}
+    for name in ("P1", "P3"):
+        out[name] = []
+        for item in base_items(samples[name]):
+            if (item["브랜드"], item["표기"]) in matcher.kinds:
+                out[name].append(item)
+            else:
+                dropped["지운_표기의_표본"].append(f"{name}: {item['이름']}({item['표기']})")
+    out["P2"] = []
+    for item in base_items(samples["P2"]):
+        brand = registry.brand(item["브랜드"])
+        script = fc.script_label(fc.text_key(item["이름"]))
+        if brand is not None and (any(n.script == script for n in brand.notations)
+                                  or any(n.text == item["표기"] for n in brand.notations)):
+            out["P2"].append(item)
+        else:
+            dropped["지운_표기의_표본"].append(f"P2: {item['이름']}({item['표기']})")
+    keys = registry.applicant_keys
+    out["N1"] = []
+    for item in base_items(samples["N1"]):
+        if applicant_keys(str(item.get("출원인") or "")) & keys:
+            dropped["등록부_출원인이_된_N1"].append(f"{item['이름']} — {item.get('출원인')}")
+        else:
+            out["N1"].append(item)
+    for name in ("N2", "N3", "N4"):
+        out[name] = base_items(samples[name])
+    return out, dropped
+
+
+def recheck(registry: fc.Registry, dist, presets, control: dict, samples: dict,
+            baseline: dict, applicant_keys) -> dict:
+    """등록부(표기·흔한 말·예외 낱말·새 브랜드)가 바뀐 뒤의 2-1 기준용 재측정 — 2-1 에서 고른
+    기준 그대로 목표와 기대표를 다시 내고 2-1 결과와 견준다. 엔진을 쓰지 않는다(이미지 속 글자·
+    로고·미리 보기 없음). 확인용 표본은 계산하지 않는다."""
+    floor = fc.default_goods_floor()
+    matcher = Matcher(registry, dist, floor)
+    thresholds = fc.Thresholds.from_dict(baseline["기준_선택"]["고른_기준"])
+    items, dropped = usable_samples(samples, registry, matcher, applicant_keys)
+    normal = fc.KIND_NORMAL
+    p2_normal = [item for item in items["P2"] if matcher.kind(item) == normal]
+    p3_normal = [item for item in items["P3"] if matcher.kind(item) == normal]
+    results: dict = {
+        "때": _now(), "2-1_설정_sha256": baseline["설정_sha256"], "결합_하한": floor,
+        "등록부_sha256": file_sha256(fc.DEFAULT_REGISTRY_PATH),
+        "overrides_sha256": file_sha256(fc.DEFAULT_OVERRIDES_PATH),
+        "기준(2-1 에서 고른 값)": thresholds.to_dict(),
+        "표기_종류": kind_summary(registry), "뺀_표본": dropped,
+        "계산한_질의": {name: len(rows) for name, rows in items.items()} | {
+            "P2_보통_표기": len(p2_normal), "P3_보통_표기": len(p3_normal)},
+        "P1": p1_table(matcher, items["P1"], thresholds),
+        "P2": recall_by_kind(matcher, items["P2"], thresholds),
+        "P3": recall_by_kind(matcher, items["P3"], thresholds),
+        "N1": match_list(matcher, items["N1"], thresholds),
+        "N2": match_list(matcher, items["N2"], thresholds),
+        "N3": match_list(matcher, items["N3"], thresholds),
+    }
+    results["목표"] = targets(results)
+    results["기대표"] = expectation(matcher, thresholds, goods_resolver(presets), control, samples)
+    selection = select_thresholds(matcher, items["N1"], items["N3"], p2_normal, p3_normal)
+    results["기준을_다시_고르면"] = {
+        "고른_기준": selection["고른_기준"], "S": selection["S"]["고른_값"],
+        "2-1 과_같음": selection["고른_기준"] == baseline["기준_선택"]["고른_기준"]}
+    # 2-1 결과와 견주기
+    before = {(row["기대"], row["입력"], row["업종"]): row["결과"]
+              for row in baseline["기대표"]["행"]}
+    changed = [{"기대": row["기대"], "입력": row["입력"], "업종": row["업종"],
+                "2-1": before.get((row["기대"], row["입력"], row["업종"])), "지금": row["결과"],
+                "일치": row.get("일치")}
+               for row in results["기대표"]["행"]
+               if before.get((row["기대"], row["입력"], row["업종"])) != row["결과"]]
+    target_changes = {name: {"2-1": baseline["목표"][name], "지금": row}
+                      for name, row in results["목표"].items()
+                      if baseline["목표"][name]["통과"] != row["통과"]
+                      or baseline["목표"][name]["값"] != row["값"]}
+
+    def names(key: str, source: dict) -> list[str]:
+        return sorted(f"{row['이름']} → {row['일치']['브랜드']} {row['일치']['수준']}"
+                      f"({row['일치']['경로']})" for row in source[key]["목록"])
+
+    lists = {}
+    for key in ("N1", "N2", "N3"):
+        now, then = names(key, results), names(key, baseline)
+        lists[key] = {"새로_생긴_일치": sorted(set(now) - set(then)),
+                      "없어진_일치": sorted(set(then) - set(now))}
+    results["2-1 과_견줌"] = {
+        "목표가_모두_통과": all(row["통과"] for row in results["목표"].values()),
+        "목표에서_달라진_것": target_changes,
+        "기대표_요약이_같음": results["기대표"]["요약"] == baseline["기대표"]["요약"],
+        "기대표에서_달라진_행": changed, "일치_목록에서_달라진_것": lists}
+    return results
+
+
+def recheck_text(results: dict) -> str:
+    compare = results["2-1 과_견줌"]
+    lines = ["유명 상표 확인 — 2-1 기준용 재측정(확인용은 계산하지 않음)", ""]
+    lines.append("표기 종류: " + " · ".join(
+        f"{kind} {len(value) if isinstance(value, list) else value}"
+        for kind, value in results["표기_종류"].items()))
+    for reason, rows in results["뺀_표본"].items():
+        if rows:
+            lines.append(f"뺀 표본 — {reason} {len(rows)}건: " + " · ".join(rows[:12])
+                         + (" …" if len(rows) > 12 else ""))
+    lines.append("")
+    lines.append("목표(2-1 에서 고른 기준 그대로):")
+    for name, row in results["목표"].items():
+        lines.append(f"  {'통과' if row['통과'] else '미달'}  {name} — 값 {row['값']}"
+                     + (f" (n {row['n']})" if "n" in row else ""))
+    lines.append("")
+    lines.append("기대표:")
+    for label, row in results["기대표"]["요약"].items():
+        lines.append(f"  {label}: {row['맞음']}/{row['n']}"
+                     + (f" — 다름: {' / '.join(row['다름'])}" if row["다름"] else ""))
+    lines.append("")
+    lines.append("2-1 결과와 견줌: 목표가 모두 통과 "
+                 f"{'예' if compare['목표가_모두_통과'] else '아니오'} · 기대표 요약이 같음 "
+                 f"{'예' if compare['기대표_요약이_같음'] else '아니오'} · 달라진 기대표 행 "
+                 f"{len(compare['기대표에서_달라진_행'])}")
+    for row in compare["기대표에서_달라진_행"]:
+        lines.append(f"  · [{row['기대']}] {row['입력']} + {row['업종']}: {row['2-1']} → "
+                     f"{row['지금']}")
+    for key, change in compare["일치_목록에서_달라진_것"].items():
+        for label, rows in change.items():
+            if rows:
+                lines.append(f"  · {key} {label.replace('_', ' ')} {len(rows)}: "
+                             + " / ".join(rows[:10]) + (" …" if len(rows) > 10 else ""))
+    again = results["기준을_다시_고르면"]
+    lines.append(f"기준을 다시 고르면 2-1 과 같은 값: {'예' if again['2-1 과_같음'] else '아니오'}")
+    return "\n".join(lines)
+
+
+def command_recheck(args) -> int:
+    """등록부를 고친 뒤(apply·build) 2-1 기준용 목표와 기대표가 유지되는지 본다."""
+    from scripts import famous_registry as builder
+
+    if not STAGE21_RESULTS.exists():
+        raise SystemExit(f"거절: 2-1 결과가 없습니다({STAGE21_RESULTS.name})")
+    baseline = json.loads(STAGE21_RESULTS.read_text(encoding="utf-8"))
+    presets = gm.load_business_presets(gm.load_goods_map())
+    control = json.loads(CONTROL.read_text(encoding="utf-8"))
+    results = recheck(fc.load_registry(), dx.load_distinctiveness(), presets, control,
+                      frozen_samples(), baseline, builder.applicant_key_function())
+    out = (args.out_dir if args.out_dir != TRIALS else TRIALS) / "famous_check_recheck.json"
+    out.write_text(json.dumps(results, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    print(recheck_text(results))
+    print(f"→ {out}")
+    compare = results["2-1 과_견줌"]
+    return 0 if compare["목표가_모두_통과"] and compare["기대표_요약이_같음"] else 3
+
+
 def command_sheet(args) -> int:
     """확인용 시트만 다시 만든다(측정 없음 — 등록부·overrides 를 고친 뒤)."""
     target = (args.out_dir / "review.html") if args.out_dir != TRIALS else (
@@ -1636,14 +1815,14 @@ def command_sheet(args) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("command", choices=("freeze", "run", "sheet"))
+    parser.add_argument("command", choices=("freeze", "run", "sheet", "recheck"))
     parser.add_argument("--out-dir", type=Path, default=TRIALS)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--smoke", action="store_true",
                         help="구현 확인 — 일부 표본만(다른 --out-dir 에)")
     args = parser.parse_args(argv)
-    return {"freeze": command_freeze, "run": command_run,
-            "sheet": command_sheet}[args.command](args)
+    return {"freeze": command_freeze, "run": command_run, "sheet": command_sheet,
+            "recheck": command_recheck}[args.command](args)
 
 
 if __name__ == "__main__":

@@ -157,62 +157,235 @@ def test_classify_notations(dist):
         "BBQ": (fc.KIND_INITIAL, ["BBQ"]), "비비큐": (fc.KIND_INITIAL, ["BBQ"])}
 
 
-def test_registry_roles_goods_and_kinds(registry):
+def _build(dist, overrides=None, table=None, db=None, plan=None):
+    return fc.build_registry(
+        TABLE if table is None else table,
+        plan_records=PLAN_RECORDS if plan is None else plan, db_records=DB if db is None else db,
+        preset_codes=PRESETS, preset_labels={"cafe": "카페"}, dist=dist, applicant_keys=_keys,
+        overrides=fc.parse_overrides({"version": fc.OVERRIDES_VERSION,
+                                      "brands": overrides or {}}))
+
+
+def test_registry_default_roles_goods_and_kinds(registry):
     star, bbq = registry.brand("스타벅스"), registry.brand("BBQ")
-    assert [(m.appno, m.role, m.image_exists) for m in star.marks] == [
-        ("1", "이름", True), ("2", "도형", False)]
-    assert [(m.appno, m.role, m.source) for m in bbq.marks] == [
-        ("3", "이름", fc.SOURCE_FAMOUS), ("4", "다른 이름", fc.SOURCE_EXISTING)]
+    # 고르기 전 기본 역할: 자동 "이름" → 브랜드 이름이 든 그 밖의 표장, 나머지 → 관련 없음
+    assert [(m.appno, m.auto_role, m.role, m.picked, m.image_exists) for m in star.marks] == [
+        ("1", "이름", fc.ROLE_BRAND_OTHER, False, True),
+        ("2", "도형", fc.ROLE_UNRELATED, False, False)]
+    assert [(m.appno, m.auto_role, m.role, m.source) for m in bbq.marks] == [
+        ("3", "이름", fc.ROLE_BRAND_OTHER, fc.SOURCE_FAMOUS),
+        ("4", "다른 이름", fc.ROLE_UNRELATED, fc.SOURCE_EXISTING)]
+    assert all(b.logo_marks == () for b in registry.brands)  # 고르지 않으면 대표 로고는 0건
     assert bbq.goods_codes == {"G0703"} and bbq.goods_source == "브랜드 표장"
     assert {n.text: (n.kind, n.base_weak) for n in bbq.notations} == {
         "BBQ": (fc.KIND_WEAK, True), "비비큐": (fc.KIND_WEAK, False)}
     assert all(n.kind == fc.KIND_NORMAL for n in star.notations)  # 유명 예외를 빼도 조어
-    # 이름 일치용 업종 = 업종 세트 + 역할 "이름" 표장(도형·다른 이름 표장의 유사군은 안 쓴다)
+    # 이름 일치용 업종 = 업종 세트 + "관련 없음"이 아닌 표장(고르기 전에는 자동 "이름" 표장만)
     assert star.name_goods_sets == (frozenset({"G0301"}), frozenset({"G0301"}))
+    # 1단계 표본 재현용 업종(자동 역할 이름·도형 + 업종 세트)과 식별력 맥락은 자동 역할 그대로
     assert star.goods_sets == (frozenset({"G0301"}), frozenset({"G4502"}), frozenset({"G0301"}))
+    assert star.goods_codes == {"G0301", "G4502"}
     assert bbq.name_goods_codes == {"G0703"}
     naver = registry.brand("네이버")
     assert naver.marks == () and naver.goods_source == "업종 세트"
     assert naver.name_goods_sets == (frozenset({"G0301"}),)
     assert registry.applicant_keys >= {"스타벅스코포레이션", "제너시스비비큐", "샤넬"}
-    assert star.evidence_urls == ("https://example.org/a",) and star.protection == fc.PROTECT_ANY
+    assert star.evidence_urls == ("https://example.org/a",) and star.evidence_label is None
+    # 보호 범위 기본값: 정해 둔 브랜드만 업종 불문, 나머지는 같은·가까운 업종 중심
+    assert {b.name: b.protection for b in registry.brands} == {
+        "스타벅스": fc.PROTECT_ANY, "샤넬": fc.PROTECT_ANY, "네이버": fc.PROTECT_ANY,
+        "BBQ": fc.PROTECT_NEAR, "bhc": fc.PROTECT_NEAR, "CU": fc.PROTECT_NEAR,
+        "김가네": fc.PROTECT_NEAR, "PAIK'S": fc.PROTECT_NEAR}
 
 
-def test_registry_json_round_trip_and_overrides(registry, dist, tmp_path):
-    data = fc.registry_to_json(registry)
-    path = tmp_path / "registry.json"
-    path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-    assert fc.load_registry(path) == registry
-    stale = tmp_path / "v1.json"
-    stale.write_text(json.dumps({**data, "version": "famous_registry_v1"}), encoding="utf-8")
+def test_registry_json_round_trip(registry, dist, tmp_path):
+    changed = _build(dist, {
+        "샤넬": {"protection": fc.PROTECT_NEAR, "exceptions": ["채널", "CHANNEL"],
+                 "notations": {"add": ["샤넬르"], "common": ["샤넬르"]},
+                 "fetch": [{"appno": "40-2020-0000001", "role": fc.ROLE_LOGO_NOW}], "memo": "확인"},
+        "토스": {"new": True, "notations": {"add": ["토스", "toss"]}}})
+    for source in (registry, changed):
+        data = fc.registry_to_json(source)
+        path = tmp_path / "registry.json"
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        assert fc.load_registry(path) == source
+    stale = tmp_path / "v2.json"
+    stale.write_text(json.dumps({**fc.registry_to_json(registry),
+                                 "version": "famous_registry_v2"}), encoding="utf-8")
     with pytest.raises(ValueError):
         fc.load_registry(stale)
-    overrides = {"brands": {"샤넬": {"protection": fc.PROTECT_NEAR}},
-                 "marks": {"2": {"role": fc.ROLE_EXCLUDED}, "4": {"role": fc.ROLE_LOGO}}}
-    changed = fc.build_registry(
-        TABLE, plan_records=PLAN_RECORDS, db_records=DB, preset_codes=PRESETS,
-        preset_labels={}, dist=dist, applicant_keys=_keys, overrides=overrides)
-    assert changed.brand("샤넬").protection == fc.PROTECT_NEAR
-    assert [m.role for m in changed.brand("스타벅스").marks] == ["이름", "제외"]
-    assert [(m.role, m.auto_role) for m in changed.brand("BBQ").marks] == [
-        ("이름", "이름"), ("브랜드 로고", "다른 이름")]
-    assert len(changed.brand("BBQ").brand_marks) == 2
-    assert changed.brand("BBQ").name_goods_sets == (frozenset({"G0703"}), frozenset({"G0703"}))
-    with pytest.raises(ValueError):
-        fc.build_registry(TABLE, plan_records=PLAN_RECORDS, db_records=DB, preset_codes=PRESETS,
-                          preset_labels={}, dist=dist, applicant_keys=_keys,
-                          overrides={"brands": {}, "marks": {"404": {"role": fc.ROLE_LOGO}}})
 
 
-def test_overrides_file_is_validated(tmp_path):
-    assert fc.load_overrides(tmp_path / "none.json")["marks"] == {}
-    bad = tmp_path / "bad.json"
-    bad.write_text(json.dumps({"version": fc.OVERRIDES_VERSION, "brands": {},
-                               "marks": {"1": {"role": "이름"}}}), encoding="utf-8")
-    with pytest.raises(ValueError):
-        fc.load_overrides(bad)
+def test_picked_roles_change_logos_and_brand_industry(dist):
+    changed = _build(dist, {
+        "스타벅스": {"marks": {"2": fc.ROLE_LOGO_NOW, "1": fc.ROLE_LOGO_OLD}},
+        "BBQ": {"marks": {"3": fc.ROLE_UNRELATED, "4": fc.ROLE_BRAND_OTHER}}})
+    star, bbq = changed.brand("스타벅스"), changed.brand("BBQ")
+    assert [(m.appno, m.role, m.picked) for m in star.marks] == [
+        ("1", fc.ROLE_LOGO_OLD, True), ("2", fc.ROLE_LOGO_NOW, True)]
+    assert [m.appno for m in star.logo_marks] == ["1", "2"]  # 대표 로고(현재)·과거 로고만
+    # 사람이 고른 표장은 "관련 없음"이 아니면 이름 일치용 업종에 든다(도형 표장이어도)
+    assert star.name_goods_sets == (frozenset({"G0301"}), frozenset({"G0301"}),
+                                    frozenset({"G4502"}))
+    assert [m.appno for m in bbq.own_marks] == ["4"]
+    assert bbq.name_goods_sets == (frozenset({"G0703"}), frozenset({"S1282"}))
+    assert bbq.goods_codes == {"S1282"}  # 식별력 맥락도 사람이 고른 것을 따른다
+    assert star.goods_sets == (frozenset({"G0301"}), frozenset({"G4502"}), frozenset({"G0301"}))
+    evidence = fc.collect_evidence(fc.prepare_query("스타벅스", CLOTHES), changed, dist, FLOOR,
+                                   words=WORDS)
+    assert next(e for e in evidence if e.brand == "스타벅스").overlap is True
+    with pytest.raises(ValueError):  # 그 브랜드의 표장이 아닌 출원번호
+        _build(dist, {"샤넬": {"marks": {"1": fc.ROLE_LOGO_NOW}}})
+
+
+def test_notation_edits_common_words_and_new_brands(dist):
+    changed = _build(dist, {
+        "스타벅스": {"notations": {"remove": ["STARBUCKS"], "add": ["스벅", "별다방"],
+                               "common": ["별다방"]}},
+        "토스": {"new": True, "notations": {"add": ["토스", "toss"], "common": ["토스"]},
+                 "applicants": ["다른 회사"], "preset": "cafe"},
+        "애플": {"new": True, "name": "애플(Apple)", "notations": {"add": ["애플"]},
+                 "evidence_urls": ["https://example.org/apple"],
+                 "protection": fc.PROTECT_ANY}})
+    star = changed.brand("스타벅스")
+    assert [(n.text, n.added, n.common, n.kind) for n in star.notations] == [
+        ("스타벅스", False, False, fc.KIND_NORMAL), ("스벅", True, False, fc.KIND_NORMAL),
+        ("별다방", True, True, fc.KIND_WEAK)]
+    assert star.removed_notations == ("STARBUCKS",)
+    assert star.notations[2].kind_reason == fc.COMMON_REASON
+    # 지운 표기는 표기 목록에 없다 — 남은 표기와 소리가 같으면 그 경로로는 여전히 일치한다
+    assert _level("STARBUCKS", CAFE, changed, dist) == ("강함", "소리")
+    assert _level("스벅", CAFE, changed, dist) == ("강함", "같음")
+    # 흔한 말로 표시한 표기는 약한 표기처럼 이름이 그 표기뿐일 때만 일치
+    assert _level("별다방", CAFE, changed, dist) == ("강함", "같음")
+    assert _level("별다방 카페", CAFE, changed, dist) == ("강함", "같음")
+    assert _level("우리동네 별다방", CAFE, changed, dist) == ("설명적 사용 안내", "같음")
+    assert _check("별다방이", CAFE, changed, dist).strongest is None
+    toss, apple = changed.brand("토스"), changed.brand("애플")
+    assert [brand.name for brand in changed.brands][-2:] == ["토스", "애플(Apple)"]
+    assert (toss.is_new, toss.preset, toss.protection, toss.evidence_label) == (
+        True, "cafe", fc.PROTECT_NEAR, fc.EVIDENCE_NONE)  # 근거 URL 이 없으면 "근거 없음"
+    # 소리가 같은 표기도 흔한 말을 따른다(toss = 토스)
+    assert [(n.text, n.kind, n.inherits) for n in toss.notations] == [
+        ("토스", fc.KIND_WEAK, ("토스",)), ("toss", fc.KIND_WEAK, ("토스",))]
+    assert [m.appno for m in toss.marks] == ["9"]  # 같은 출원인의 DB 표장
+    assert (apple.table_name, apple.preset, apple.evidence_label, apple.protection) == (
+        "애플", None, None, fc.PROTECT_ANY)
+    assert changed.brand("애플") is apple and changed.brand("애플(Apple)") is apple
+    assert apple.goods_codes == frozenset() and apple.name_goods_sets == ()
+    assert _level("애플", CAFE, changed, dist) == ("강함", "같음")
+    for bad in (
+        {"스타벅스": {"notations": {"remove": ["없는 표기"]}}},
+        {"스타벅스": {"notations": {"remove": ["스타벅스", "STARBUCKS"]}}},
+        {"스타벅스": {"notations": {"common": ["없는 표기"]}}},
+        {"스타벅스": {"notations": {"add": ["STAR BUCKS"]}}},  # 붙여 쓴 꼴이 같은 표기
+        {"없는 브랜드": {"protection": fc.PROTECT_ANY}},
+        {"샤넬": {"new": True, "notations": {"add": ["샤넬"]}}},
+        {"스타벅스": {"preset": "없는 세트"}},
+        {"새것": {"new": True, "name": "샤넬", "notations": {"add": ["새것"]}}},
+    ):
+        with pytest.raises(ValueError):
+            _build(dist, bad)
+
+
+def test_exception_words_block_only_weak_matches(dist):
+    weak = fc.Thresholds(weak_spelling={"김": 0.75, "짧음": 0.75}, weak_sound={"짧음": 0.90})
+    plain = _build(dist)
+    excepted = _build(dist, {"샤넬": {"exceptions": ["채널", "CHANNEL"]},
+                             "스타벅스": {"exceptions": ["스타벅스리"]}})
+
+    def level(name, source, goods=None):
+        return _level(name, goods, source, dist, thresholds=weak)
+
+    assert level("CHANNEL", plain) == ("약함", "철자")
+    assert level("CHANNEL", excepted) is None  # 질의 낱말이 예외 낱말과 같으면 약한 일치가 아니다
+    assert level("channel 카페", excepted, CAFE) is None
+    assert level("CHANNEL카페", excepted, CAFE) is None  # 설명 낱말을 뗀 구간도 같은 낱말
+    assert level("CHANNELS", excepted) == ("약함", "철자")  # 다른 낱말은 그대로
+    assert level("스타벅스리", plain) == ("약함", "철자")
+    assert level("스타벅스리", excepted) is None
+    # 품음-기타도 약한 일치라 같은 낱말이면 빠진다
+    assert _level("스타벅스리", None, plain, dist) == ("약함", "품음-기타")
+    assert _level("스타벅스리", None, excepted, dist) is None
+    # 강한 일치에는 영향이 없다
+    assert level("샤넬", excepted) == ("강함", "같음")
+    assert level("CHANNEL 샤넬", excepted) == ("강함", "같음")
+    strong = _build(dist, {"샤넬": {"exceptions": ["샤넬카페"]}})
+    assert level("샤넬카페", strong, CAFE) == ("강함", "품음-설명")
+    assert excepted.brand("샤넬").exception_keys == {"채널", "channel"}
+
+
+def test_fetch_list_attaches_marks_once_they_are_in_the_database(dist):
+    changed = _build(dist, {"샤넬": {"fetch": [
+        {"appno": "4020200000009", "role": fc.ROLE_LOGO_NOW, "source": "후보",
+         "title": "CC", "applicant": "샤넬"},
+        {"appno": "40-2019-0000001", "role": fc.ROLE_LOGO_OLD}]}})
+    chanel = changed.brand("샤넬")
+    assert [(e["appno"], e["role"], e["source"]) for e in chanel.fetch] == [
+        ("4020200000009", fc.ROLE_LOGO_NOW, "후보"), ("4020190000001", fc.ROLE_LOGO_OLD, "직접")]
+    assert [m.appno for m in chanel.marks] == ["5"]  # 아직 DB 에 없는 것은 표장이 아니다
+    db = DB + [{"출원번호": "4020200000009", "상표한글명": None, "상표구분": "도형상표",
+                "유사군": ["S1282"], "류": [37], "이미지파일": "c.png", "출원인": "지주회사"}]
+    later = _build(dist, {"샤넬": {"fetch": [
+        {"appno": "4020200000009", "role": fc.ROLE_LOGO_NOW, "source": "후보"}]}}, db=db)
+    chanel = later.brand("샤넬")
+    assert chanel.fetch == ()  # 받은 뒤에는 받을 목록에서 빠지고 고른 역할의 표장이 된다
+    assert [(m.appno, m.role, m.source, m.picked) for m in chanel.marks] == [
+        ("5", fc.ROLE_BRAND_OTHER, fc.SOURCE_FAMOUS, False),
+        ("4020200000009", fc.ROLE_LOGO_NOW, fc.SOURCE_PICKED, True)]
+    assert [m.appno for m in chanel.logo_marks] == ["4020200000009"]
+
+
+def test_brands_sharing_an_applicant_split_marks_by_title(dist):
+    db = DB + [
+        {"출원번호": "6", "상표한글명": "백스비어", "상표구분": "도형복합", "유사군": ["G0301"],
+         "류": [30], "이미지파일": "6.png", "출원인": "더본코리아"},
+        {"출원번호": "7", "상표한글명": "PAIK'S COFFEE", "상표구분": "도형복합",
+         "유사군": ["G0301"], "류": [30], "이미지파일": "7.png", "출원인": "더본코리아"},
+        {"출원번호": "8", "상표한글명": None, "상표구분": "도형상표", "유사군": ["G0301"],
+         "류": [30], "이미지파일": "8.png", "출원인": "더본코리아"}]
+    alone = _build(dist, db=db).brand("PAIK'S")
+    assert [m.appno for m in alone.marks] == ["6", "7", "8"]
+    shared = _build(dist, {"백스비어": {"new": True, "notations": {"add": ["백스비어"]},
+                                     "applicants": ["더본코리아"]}}, db=db)
+    # 상표명에 그 브랜드 표기가 든 표장은 그 브랜드에, 어느 표기도 없는 표장은 둘 다에 보인다
+    assert [m.appno for m in shared.brand("PAIK'S").marks] == ["7", "8"]
+    assert [(m.appno, m.auto_role) for m in shared.brand("백스비어").marks] == [
+        ("6", "이름"), ("8", "도형")]
+
+
+def test_overrides_are_validated(tmp_path):
+    assert fc.load_overrides(tmp_path / "none.json") == {
+        "version": fc.OVERRIDES_VERSION, "brands": {}}
     shipped = fc.load_overrides()
-    assert shipped["brands"] == {} and shipped["marks"] == {}  # 처음엔 빈 틀
+    assert shipped["brands"] == {}  # 저장소의 것은 빈 틀(기본 상태)
+    parsed = fc.parse_overrides({"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {
+        "notations": {"add": [" 샤넬르 ", "샤넬르", ""]}, "exceptions": ["채널", "채널"],
+        "marks": {" 4020200000001 ": fc.ROLE_LOGO_NOW}, "preset": "",
+        "fetch": [{"appno": "4020200000002"}]}}})
+    assert parsed["brands"]["샤넬"] == {
+        "preset": None, "notations": {"add": ["샤넬르"]}, "exceptions": ["채널"],
+        "marks": {"4020200000001": fc.ROLE_LOGO_NOW},
+        "fetch": [{"appno": "4020200000002", "role": fc.ROLE_LOGO_NOW, "source": "직접"}]}
+    assert fc.normalize_appno("40-2020-0011726") == "4020200011726"
+    for bad in (
+        {"version": "famous_registry_overrides_v1", "brands": {}},
+        {"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {"모르는 칸": 1}}},
+        {"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {"protection": "넓게"}}},
+        {"version": fc.OVERRIDES_VERSION,
+         "brands": {"샤넬": {"marks": {"4020200000001": "이름"}}}},
+        {"version": fc.OVERRIDES_VERSION,
+         "brands": {"샤넬": {"fetch": [{"appno": "12", "role": fc.ROLE_LOGO_NOW}]}}},
+        {"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {"notations": {"rename": []}}}},
+        {"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {"notations": {"add": "샤넬르"}}}},
+        {"version": fc.OVERRIDES_VERSION, "brands": {"새것": {"new": True}}},
+        {"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {"fetch": [
+            {"appno": "4020200000002"}, {"appno": "40-2020-0000002"}]}}},
+        {"version": fc.OVERRIDES_VERSION, "brands": {"샤넬": {"fetch": [
+            {"appno": "4020200000002", "source": "어딘가"}]}}},
+    ):
+        with pytest.raises(ValueError):
+            fc.parse_overrides(bad)
 
 
 def test_exact_and_contain_paths(registry, dist):
@@ -297,7 +470,7 @@ def test_weak_notation_only_matches_alone(registry, dist):
     # 업종이 다를 때: 그 업종에서도 식별력 없는 말이면 안내만, 식별력이 있으면 같음처럼 강함
     assert _level("BBQ", CLOTHES, registry, dist) == ("설명적 사용 안내", "같음")  # 3호(류 25)
     assert _level("BBQ", LAUNDRY, registry, dist) == ("강함", "같음")
-    assert _check("BBQ", LAUNDRY, registry, dist).floor == "위험"
+    assert _check("BBQ", LAUNDRY, registry, dist).floor == "검토 권장"  # 같은·가까운 업종 중심
     # 소리가 같아 약한 표기가 된 표기는 그 약한 표기의 식별력을 따른다
     assert _level("비비큐", CLOTHES, registry, dist) == ("설명적 사용 안내", "같음")
     assert _level("비비큐", LAUNDRY, registry, dist) == ("강함", "같음")
@@ -349,8 +522,9 @@ def test_descriptive_use_of_a_normal_notation():
     assert same.strongest.level == "강함" and same.floor == "위험"
 
 
-def test_brand_industry_for_names_ignores_figure_marks(registry, dist):
-    # 스타벅스의 도형 표장(2번)은 의류에 등록돼 있지만 이름 일치의 업종 겹침에는 쓰지 않는다
+def test_brand_industry_for_names_ignores_unrelated_marks(registry, dist):
+    # 스타벅스의 도형 표장(2번 — 고르기 전 "관련 없음")은 의류에 등록돼 있지만 이름 일치의 업종
+    # 겹침에는 쓰지 않는다
     evidence = fc.collect_evidence(fc.prepare_query("스타벅스", CLOTHES), registry, dist, FLOOR,
                                    words=WORDS)
     star = next(e for e in evidence if e.brand == "스타벅스")
@@ -434,7 +608,12 @@ def test_shipped_registry_follows_the_brand_table():
             assert notation.kind in fc.KINDS and set(notation.inherits) <= texts
             assert not notation.base_weak or notation.kind == fc.KIND_WEAK
         for mark in brand.marks:
-            assert mark.role in (*fc.AUTO_ROLES, *fc.OVERRIDE_ROLES)
+            assert mark.role in fc.MARK_ROLES and mark.auto_role in fc.AUTO_ROLES
+            if not mark.picked:  # 고르지 않은 표장은 자동 역할의 기본값
+                assert mark.role == fc.DEFAULT_ROLE[mark.auto_role]
+        assert brand.protection == (fc.PROTECT_ANY if brand.table_name in fc.PROTECT_ANY_BRANDS
+                                    else fc.PROTECT_NEAR) or brand.name in fc.load_overrides()[
+                                        "brands"]
     assert len({m.appno for b in registry.brands for m in b.marks}) == sum(
         len(b.marks) for b in registry.brands)  # 한 표장은 한 브랜드에만
     by_kind = {kind: sorted(n.text for b in registry.brands for n in b.notations
