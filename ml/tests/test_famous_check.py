@@ -68,6 +68,7 @@ DB = [
 PLAN_RECORDS = [{"출원번호": "1", "브랜드": "스타벅스"}, {"출원번호": "2", "브랜드": "스타벅스"},
                 {"출원번호": "3", "브랜드": "BBQ"}, {"출원번호": "5", "브랜드": "샤넬"}]
 PRESETS = {"cafe": ["G0301"], "chicken": ["G0703"], "clothing": ["G4502"], "store": ["S2090"]}
+PRESET_CLASSES = {"cafe": [30], "chicken": [29], "clothing": [25], "store": [35]}
 
 
 def _keys(text: str) -> frozenset[str]:
@@ -91,7 +92,7 @@ def registry(dist) -> fc.Registry:
     return fc.build_registry(
         TABLE, plan_records=PLAN_RECORDS, db_records=DB, preset_codes=PRESETS,
         preset_labels={"cafe": "카페"}, dist=dist, applicant_keys=_keys,
-        image_exists=lambda name: name != "2.png")
+        image_exists=lambda name: name != "2.png", preset_classes=PRESET_CLASSES)
 
 
 def _check(name, goods, registry, dist, **kwargs):
@@ -163,7 +164,8 @@ def _build(dist, overrides=None, table=None, db=None, plan=None):
         plan_records=PLAN_RECORDS if plan is None else plan, db_records=DB if db is None else db,
         preset_codes=PRESETS, preset_labels={"cafe": "카페"}, dist=dist, applicant_keys=_keys,
         overrides=fc.parse_overrides({"version": fc.OVERRIDES_VERSION,
-                                      "brands": overrides or {}}))
+                                      "brands": overrides or {}}),
+        preset_classes=PRESET_CLASSES)
 
 
 def test_registry_default_roles_goods_and_kinds(registry):
@@ -383,6 +385,22 @@ def test_brands_sharing_an_applicant_split_marks_by_title(dist):
     assert [m.appno for m in shared.brand("PAIK'S").marks] == ["7", "8"]
     assert [(m.appno, m.auto_role) for m in shared.brand("백스비어").marks] == [
         ("6", "이름"), ("8", "도형")]
+    # 정할 수 없는 표장은 양쪽에 보이되 함께 걸린 브랜드를 적고, 어느 쪽의 대표 로고로도 안 쓴다
+    assert [m.shared for m in shared.brand("PAIK'S").marks] == [(), ("백스비어",)]
+    assert [m.shared for m in shared.brand("백스비어").marks] == [(), ("PAIK'S",)]
+    both = {"백스비어": {"new": True, "notations": {"add": ["백스비어"]},
+                      "applicants": ["더본코리아"], "marks": {"8": fc.ROLE_LOGO_NOW}},
+            "PAIK'S": {"marks": {"8": fc.ROLE_LOGO_NOW}}}
+    picked_twice = _build(dist, both, db=db)
+    assert picked_twice.brand("PAIK'S").logo_marks == ()
+    assert picked_twice.brand("백스비어").logo_marks == ()
+    # 사람이 한 브랜드에서만 고르면 그 브랜드에만 잇는다
+    one = _build(dist, {"백스비어": both["백스비어"]}, db=db)
+    assert [m.appno for m in one.brand("PAIK'S").marks] == ["7"]
+    assert [m.appno for m in one.brand("백스비어").logo_marks] == ["8"]
+    data = fc.registry_to_json(shared)
+    assert next(b for b in data["brands"] if b["name"] == "백스비어")["marks"][1]["shared"] == [
+        "PAIK'S"]
 
 
 def test_overrides_are_validated(tmp_path):
@@ -590,6 +608,12 @@ def test_ocr_text_uses_exact_and_contain_only(registry, dist):
     assert _level(None, None, registry, dist, ocr_text="스타벅스커피") == ("강함", "품음-설명")
     missed = _check(None, None, registry, dist, ocr_text="스타벅수", thresholds=weak)
     assert missed.strongest is None  # 이미지 속 글자는 소리·철자로 견주지 않는다
+    # 같음·품음-설명(강함)만 — 품음-기타와 약한 표기의 안내는 내지 않는다
+    assert _level("스타벅스리", None, registry, dist) == ("약함", "품음-기타")
+    assert _check(None, None, registry, dist, ocr_text="스타벅스리").strongest is None
+    assert _level("텍사스 BBQ", CHICKEN, registry, dist) == ("설명적 사용 안내", "같음")
+    assert _check(None, CHICKEN, registry, dist, ocr_text="텍사스 BBQ").strongest is None
+    assert _level(None, CHICKEN, registry, dist, ocr_text="BBQ치킨") == ("강함", "같음")
     assert _check("", None, registry, dist).matches == ()
     named = _check("스타벅수", None, registry, dist, ocr_text="STARBUCKS", thresholds=weak)
     assert named.basis == fc.BASIS_NAME and named.strongest.path == "소리"  # 이름이 있으면 이름으로
@@ -605,6 +629,143 @@ def test_thresholds_round_trip():
     assert again.weak_sound == {"짧음": None, "중간": None, "김": 0.9}
     assert again.weak_spelling["중간"] == 0.85 and again.contain_other is False
     assert fc.Thresholds.from_dict({}).spelling_sound is None
+    assert again.weak_mode == "W0" and again.weak_pair_sound == fc.WEAK_PAIR_SOUND
+    assert fc.Thresholds.from_dict({"weak_mode": "W2"}).weak_mode == "W2"
+    with pytest.raises(ValueError):
+        fc.Thresholds(weak_mode="W9")
+
+
+def _decide_units(mode, units, *, length="김", script="한글"):
+    """보통 표기 하나의 대상(이름, 소리, 철자)들에 약한 일치 조건을 적용한 결과(수준, 경로)."""
+    thresholds = fc.Thresholds(
+        weak_sound={"짧음": 0.90, "중간": 0.92, "김": 0.90},
+        weak_spelling={"짧음": 0.75, "중간": 0.75, "김": 0.75}, weak_mode=mode)
+    item = fc.Evidence(notation="표기", key="표기", length=length, kind=fc.KIND_NORMAL,
+                       units=tuple(units), script=script, exempt=frozenset({"예외"}))
+    result = fc.decide([fc.BrandEvidence("브랜드", fc.PROTECT_ANY, None, None, (item,))],
+                       thresholds)
+    return None if result.strongest is None else (result.strongest.level, result.strongest.path)
+
+
+def test_weak_match_conditions():
+    spelling_only = [("가나다라", 0.70, 0.80)]  # 철자만 닮음
+    sound_only = [("가나다라", 0.91, 0.60)]  # 소리만 닮음
+    both = [("가나다라", 0.86, 0.78)]  # 소리 0.85·철자 0.75 를 둘 다 넘지만 약한 소리에는 못 미침
+    other_script = [("abcd", 0.91, 0.0)]  # 문자가 다르면 소리만
+    assert [_decide_units("W0", u) for u in (spelling_only, sound_only, both, other_script)] == [
+        ("약함", "철자"), ("약함", "소리"), ("약함", "철자"), ("약함", "소리")]
+    assert [_decide_units("W1", u) for u in (spelling_only, sound_only, both, other_script)] == [
+        None, ("약함", "소리"), None, ("약함", "소리")]
+    assert [_decide_units("W2", u) for u in (spelling_only, sound_only, both, other_script)] == [
+        None, None, ("약함", "소리"), ("약함", "소리")]
+    # W3: 짧은·중간 표기는 소리만, 긴 표기는 소리 또는 철자
+    assert _decide_units("W3", spelling_only, length="김") == ("약함", "철자")
+    assert _decide_units("W3", spelling_only, length="중간") is None
+    assert _decide_units("W3", [("가나다", 0.93, 0.5)], length="중간") == ("약함", "소리")
+    assert _decide_units("W3", [("가나", 0.90, 0.5)], length="짧음") == ("약함", "소리")
+    # 예외 낱말은 어느 조건에서나 약한 일치에 쓰지 않는다
+    for mode in fc.WEAK_MODES:
+        assert _decide_units(mode, [("예외", 0.95, 0.95)]) is None
+
+
+def test_retail_class_is_left_out(dist):
+    """35류(판매업)는 약한 표기의 다른 업종 판정과 이름 일치용 업종 겹침에서 뺀다 — 질의 업종과
+    브랜드 업종 세트가 둘 다 35류뿐일 때만 그대로."""
+    names, classes = dx.goods_index(GOODS)
+    retail = dx.Distinctiveness({}, goods_names=names, code_classes=classes,
+                                descriptive=dx.validate_descriptive_terms({"terms": {
+                                    "bbq": {"kind": "용도", "absolute": False,
+                                            "classes": [29, 35]}}}))
+    registry = _build(retail)
+    clothes_shop = CLOTHES | STORE  # 의류 + 그 판매업
+    full = retail.judge("bbq", clothes_shop, famous_exception=False)
+    assert full.score == 0.0  # 그대로 보면 35류 때문에 의류에서도 성질표시
+    assert fc.retail_free(retail).judge("bbq", clothes_shop, famous_exception=False).score > 0.5
+    assert fc.retail_free(retail) is fc.retail_free(retail) and retail.code_classes["S2090"]
+    assert _level("BBQ", clothes_shop, registry, retail) == ("강함", "같음")
+    assert _level("BBQ", CHICKEN, registry, retail) == ("강함", "같음")
+    # 겹침: 판매업 코드만 같은 것은 겹침이 아니다 — 편의점(35류뿐)끼리는 그대로 잰다
+    evidence = {e.brand: e for e in fc.collect_evidence(
+        fc.prepare_query("CU", CAFE | STORE), registry, retail, FLOOR, words=WORDS)}
+    assert evidence["CU"].overlap is False and evidence["스타벅스"].overlap is True
+    store = {e.brand: e for e in fc.collect_evidence(
+        fc.prepare_query("CU", STORE), registry, retail, FLOOR, words=WORDS)}
+    assert (store["CU"].overlap, store["CU"].overlap_by) == (True, "유사군")
+    assert store["스타벅스"].overlap is False  # 질의는 35류뿐이지만 브랜드 업종 세트는 아니다
+    assert fc.goods_classes(CAFE | STORE, retail) == {30, 35}
+
+
+def test_core_classes_join_overlap_and_descriptive_words(dist):
+    goods = GoodsMap(list(GOODS.entries) + [GoodsEntry("운동화", 28, ("G4301",))])
+    names, classes = dx.goods_index(goods)
+    sports = dx.Distinctiveness({}, goods_names=names, code_classes=classes)
+    overrides = {"나이키": {"new": True, "notations": {"add": ["나이키"]}, "core_classes": [28]}}
+    registry = _build(sports, overrides)
+    nike = registry.brand("나이키")
+    assert nike.core_classes == (28,) and nike.preset is None and nike.preset_classes == ()
+
+    def overlap(codes, classes=None):
+        found = fc.collect_evidence(fc.prepare_query("나이키", codes, classes), registry, sports,
+                                    FLOOR, words=WORDS)
+        hit = next(e for e in found if e.brand == "나이키")
+        return hit.overlap, hit.overlap_by
+
+    assert overlap({"G4301"}) == (True, "핵심 류")  # 류는 유사군 코드에서 얻는다
+    assert overlap(CAFE) == (False, None) and overlap(None) == (None, None)
+    assert overlap(CAFE, [28]) == (True, "핵심 류")  # 받은 류가 먼저
+    assert overlap({"G4301"}, [30]) == (False, None)
+    # 핵심 류의 보통명칭은 설명 낱말 — 표장의 지정상품 전체로는 넓히지 않는다
+    assert _level("나이키운동화", None, registry, sports) == ("강함", "품음-설명")
+    assert _level("나이키세탁업", None, registry, sports) == ("약함", "품음-기타")
+    data = fc.registry_to_json(registry)
+    industry = next(b for b in data["brands"] if b["name"] == "나이키")["industry"]
+    assert industry["core_classes"] == [28] and industry["classes"] == []
+    for bad in ([0], [46], ["9"], 9, [True]):
+        with pytest.raises(ValueError):
+            fc.parse_overrides({"version": fc.OVERRIDES_VERSION,
+                                "brands": {"스타벅스": {"core_classes": bad}}})
+
+
+def test_common_notation_is_only_a_notice_in_another_industry(dist):
+    overrides = {"애플": {"new": True, "preset": "cafe",
+                         "notations": {"add": ["애플", "APPLE"], "common": ["애플"]}}}
+    registry = _build(dist, overrides)
+    assert [n.kind for n in registry.brand("애플").notations] == [fc.KIND_WEAK, fc.KIND_WEAK]
+    assert _level("애플", CAFE, registry, dist) == ("강함", "같음")
+    assert _level("애플", None, registry, dist) == ("강함", "같음")
+    for name in ("애플", "APPLE"):  # 흔한 말과 그 표기를 소리로 따르는 표기 — 업종이 다르면 안내만
+        other = _check(name, LAUNDRY, registry, dist)
+        assert (other.strongest.level, other.strongest.note) == (
+            "설명적 사용 안내", fc.COMMON_NOTE) and other.floor is None
+
+
+def test_masking_does_not_hide_an_exact_match_with_a_longer_notation(dist):
+    """가림의 예외 — 약한 표기가 같은 브랜드의 더 긴 표기의 앞 낱말일 때, 띄어 쓴 꼴도 같음이다."""
+    overrides = {"당근": {"new": True, "preset": "cafe",
+                         "notations": {"add": ["당근", "당근마켓"], "common": ["당근"]}}}
+    registry = _build(dist, overrides)
+    assert [n.kind for n in registry.brand("당근").notations] == [fc.KIND_WEAK, fc.KIND_NORMAL]
+    for name in ("당근마켓", "당근 마켓"):
+        hit = _check(name, None, registry, dist).strongest
+        assert (hit.level, hit.path, hit.notation) == ("강함", "같음", "당근마켓"), name
+    assert _check("당근 마켓", LAUNDRY, registry, dist).strongest.notation == "당근마켓"
+    # 같음이 아닌 것은 그대로 가린다 — 약한 표기가 다른 말과 함께 쓰인 것으로 본다
+    weak = fc.Thresholds(weak_sound={"짧음": 0.5, "중간": 0.5, "김": 0.5})
+    other = _check("당근 마캣", None, registry, dist, thresholds=weak).strongest
+    assert (other.level, other.notation, other.note) == (
+        "설명적 사용 안내", "당근", "약한 표기 — 다른 말과 함께")
+    assert _level("당근 카페", None, registry, dist) == ("강함", "같음")  # 설명 낱말과는 단독
+
+
+def test_logo_match_rule():
+    risk, review = "위험", "검토 권장"
+    assert fc.logo_match(0.95, risk) and not fc.logo_match(0.95, review)
+    text = fc.LOGO_KIND_TEXT
+    assert not fc.logo_match(0.95, risk, logo_kind=text, query_kind=text)  # 글자끼리는 0.98 부터
+    assert fc.logo_match(0.98, risk, logo_kind=text, query_kind=text)
+    assert fc.logo_match(0.95, risk, logo_kind=text, query_kind="결합")
+    assert not fc.logo_match(0.99, risk, logo_photo=True)
+    assert not fc.logo_match(0.99, risk, query_photo=True)
 
 
 def test_brand_table_matches_the_collection_parser():

@@ -1041,6 +1041,40 @@ class Logo:
                     continue
                 self.marks.append((brand.name, mark, record.pos))
         self.matrix = self.ms.state.embeddings[[pos for _, _, pos in self.marks]]
+        # 확정 단계의 로고 규칙(fc.logo_match)에 쓰는 것 — prepare() 가 채운다
+        self.kinds: list[str] | None = None
+        self.photos: list[bool] = []
+        self.texts: list[str | None] = []
+        self._risk_min: float | None = None
+
+    def prepare(self) -> None:
+        """대표 로고마다 글자 위주·결합·도형 위주(엔진의 OCR 자동 유형)와 사진 판정을 구해 둔다 —
+        strong() 이 로고 규칙(둘 다 글자 위주면 유사도 0.98 이상, 사진은 보지 않음)을 쓰게."""
+        kinds, photos, texts = [], [], []
+        for index, (_, mark, _) in enumerate(self.marks):
+            image = self.direct((IMAGES_DIR / mark.image).read_bytes())
+            seen = read_text(image) if image is not None else {"글자": None, "유형": "유형 모름"}
+            kinds.append(seen["유형"])
+            texts.append(seen["글자"])
+            photos.append(bool(self.photo(self.matrix[index])))
+        self.kinds, self.photos, self.texts = kinds, photos, texts
+
+    def is_risk(self, value: float) -> bool:
+        """이미지만 판단이 위험인 유사도인가 — 넷째 자리까지의 값에서 등급이 바뀌는 곳을 한 번
+        찾아 둔다."""
+        if self._risk_min is None:
+            low, high = 0, 10000  # high 는 위험이라고 본다(1.0)
+            if self._grade(1.0) != fc.GRADE_RISK:
+                self._risk_min = 2.0
+            else:
+                while low < high:
+                    middle = (low + high) // 2
+                    if self._grade(middle / 10000) == fc.GRADE_RISK:
+                        high = middle
+                    else:
+                        low = middle + 1
+                self._risk_min = low / 10000
+        return value >= self._risk_min - 1e-9
 
     def _grade(self, x2: float) -> str:
         ms = self.ms
@@ -1051,19 +1085,29 @@ class Logo:
         return self.np.asarray(self.engine.encode_image(image),
                                dtype=self.np.float32).reshape(-1)
 
-    def strong(self, embedding, *, exclude: str | None = None) -> dict[str, dict]:
-        """강함인 브랜드 — 브랜드마다 가장 닮은 표장의 유사도가 이미지만 판단 위험일 때."""
+    def strong(self, embedding, *, exclude: str | None = None, query_kind: str | None = None,
+               rule: bool = True) -> dict[str, dict]:
+        """강함인 브랜드 — 브랜드마다 일치하는 표장 가운데 가장 닮은 것. 일치 = 유사도가 이미지만
+        판단 위험. prepare() 를 한 뒤(rule=True)에는 로고 규칙(fc.logo_match)까지: 대표 로고와
+        질의가 둘 다 글자 위주면 0.98 이상, 사진으로 판정된 대표 로고는 보지 않는다."""
         scores = self.matrix @ embedding
+        use_rule = rule and self.kinds is not None
         best: dict[str, tuple[float, fc.Mark]] = {}
-        for (brand, mark, _), score in zip(self.marks, scores):
+        for index, ((brand, mark, _), score) in enumerate(zip(self.marks, scores)):
             if mark.appno == exclude:
                 continue
             value = round(min(1.0, max(0.0, float(score))), 4)
+            if not self.is_risk(value):
+                continue
+            if use_rule and not fc.logo_match(
+                    value, fc.GRADE_RISK, logo_kind=self.kinds[index], query_kind=query_kind,
+                    logo_photo=self.photos[index]):
+                continue
             if brand not in best or value > best[brand][0]:
                 best[brand] = (value, mark)
         return {brand: {"유사도": value, "표장": mark.appno, "표장_이름": mark.title,
                         "역할": mark.role, "표장_이미지": mark.image}
-                for brand, (value, mark) in best.items() if self._grade(value) == fc.GRADE_RISK}
+                for brand, (value, mark) in best.items()}
 
     def photo(self, embedding) -> bool:
         return bool(self.ms.is_photo_query(embedding))

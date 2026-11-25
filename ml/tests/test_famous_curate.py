@@ -98,6 +98,7 @@ def test_tool_data_separates_automatic_values_from_decisions():
     # 출원번호로 골라 이어 둔 표장(받아서 DB 에 들어온 것)은 내보낼 때 fetch 로 남는다
     assert [mark["via_fetch"] for mark in via["brands"][0]["marks"]] == [None, "후보"]
     assert via["initial_overrides"] == picked and via["db_count"] == 3
+    assert len(via["overrides_key"]) == 12  # 적용된 값이 바뀌면 저장 키도 바뀐다
     data = curate.tool_data(
         registry=registry, table_rows=table, overrides={"brands": {}}, proposed=proposed,
         candidates=candidates, records=records, presets={"cafe": "카페"},
@@ -106,6 +107,7 @@ def test_tool_data_separates_automatic_values_from_decisions():
     assert data["roles"] == list(fc.MARK_ROLES) and data["kinds"] == list(fc.KINDS)
     assert data["overrides_version"] == fc.OVERRIDES_VERSION
     assert data["initial_overrides"] == {"brands": {}}
+    assert data["overrides_key"] != via["overrides_key"]
     first, second = data["brands"]
     # 자동 값(base)은 [브랜드] 표 그대로 — 사람이 정한 값은 initial_overrides 로 따로
     assert first["base"] == {

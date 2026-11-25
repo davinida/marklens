@@ -233,6 +233,9 @@
    }
   },
   "네이버": {
+   "exceptions": [
+    "네이처"
+   ],
    "marks": {
     "4020200187560": "관련 없음",
     "4120130035782": "브랜드 이름이 든 그 밖의 표장",
@@ -242,6 +245,9 @@
   "인스타그램": {
    "notations": {
     "add": [
+     "인스타"
+    ],
+    "common": [
      "인스타"
     ]
    },
@@ -337,6 +343,11 @@
    "applicants": [
     "삼성전자주식회사"
    ],
+   "preset": null,
+   "core_classes": [
+    9,
+    11
+   ],
    "notations": {
     "add": [
      "삼성",
@@ -364,6 +375,11 @@
    "applicants": [
     "주식회사 엘지"
    ],
+   "preset": null,
+   "core_classes": [
+    9,
+    11
+   ],
    "notations": {
     "add": [
      "엘지",
@@ -385,6 +401,10 @@
    "new": true,
    "applicants": [
     "현대자동차주식회사"
+   ],
+   "preset": null,
+   "core_classes": [
+    12
    ],
    "notations": {
     "add": [
@@ -426,6 +446,10 @@
    "applicants": [
     "기아 주식회사"
    ],
+   "preset": null,
+   "core_classes": [
+    12
+   ],
    "notations": {
     "add": [
      "기아",
@@ -444,6 +468,10 @@
    "new": true,
    "applicants": [
     "애플 인크."
+   ],
+   "preset": "software",
+   "core_classes": [
+    9
    ],
    "notations": {
     "add": [
@@ -500,12 +528,20 @@
    "applicants": [
     "나이키 이노베이트 씨.브이."
    ],
+   "preset": "clothing",
+   "core_classes": [
+    28
+   ],
    "notations": {
     "add": [
      "나이키",
      "NIKE"
     ]
    },
+   "exceptions": [
+    "like",
+    "nice"
+   ],
    "fetch": [
     {
      "appno": "4020240068462",
@@ -545,6 +581,10 @@
    "applicants": [
     "아디다스 악티엔게젤샤프트"
    ],
+   "preset": "clothing",
+   "core_classes": [
+    28
+   ],
    "notations": {
     "add": [
      "아디다스",
@@ -577,6 +617,11 @@
    "new": true,
    "applicants": [
     "구치오구치쏘시에떼퍼아찌오니"
+   ],
+   "preset": "clothing",
+   "core_classes": [
+    14,
+    18
    ],
    "notations": {
     "add": [
@@ -623,6 +668,7 @@
    "applicants": [
     "가부시키가이샤 파스토 리테이링구"
    ],
+   "preset": "clothing",
    "notations": {
     "add": [
      "유니클로",
@@ -644,12 +690,20 @@
    "applicants": [
     "인두스트리아 데 디세노 텍스틸 에스.에이"
    ],
+   "preset": "clothing",
    "notations": {
     "add": [
      "자라",
      "ZARA"
+    ],
+    "common": [
+     "자라",
+     "ZARA"
     ]
    },
+   "exceptions": [
+    "자리"
+   ],
    "fetch": [
     {
      "appno": "4020190017935",
@@ -664,6 +718,11 @@
    "new": true,
    "applicants": [
     "맥도날즈 인터내셔널 프로퍼티 컴퍼니, 엘티디."
+   ],
+   "preset": "chicken",
+   "core_classes": [
+    29,
+    30
    ],
    "notations": {
     "add": [
@@ -690,6 +749,11 @@
    "new": true,
    "applicants": [
     "롯데지알에스 주식회사"
+   ],
+   "preset": "chicken",
+   "core_classes": [
+    29,
+    30
    ],
    "notations": {
     "add": [
@@ -725,6 +789,10 @@
    "applicants": [
     "더 코카콜라 컴파니"
    ],
+   "preset": null,
+   "core_classes": [
+    32
+   ],
    "notations": {
     "add": [
      "코카콜라",
@@ -759,6 +827,11 @@
    "applicants": [
     "주식회사 카카오"
    ],
+   "preset": "software",
+   "core_classes": [
+    9,
+    38
+   ],
    "notations": {
     "add": [
      "카카오",
@@ -785,6 +858,10 @@
    "new": true,
    "applicants": [
     "쿠팡 주식회사"
+   ],
+   "preset": "software",
+   "core_classes": [
+    39
    ],
    "notations": {
     "add": [
@@ -829,6 +906,10 @@
    "applicants": [
     "주식회사 우아한형제들"
    ],
+   "preset": "software",
+   "core_classes": [
+    39
+   ],
    "notations": {
     "add": [
      "배달의민족",
@@ -858,6 +939,10 @@
    "new": true,
    "applicants": [
     "(주)비바리퍼블리카"
+   ],
+   "preset": "software",
+   "core_classes": [
+    36
    ],
    "notations": {
     "add": [
@@ -896,6 +981,7 @@
    "applicants": [
     "당근 주식회사"
    ],
+   "preset": "software",
    "notations": {
     "add": [
      "당근",
@@ -932,6 +1018,10 @@
    "applicants": [
     "주식회사 아성다이소"
    ],
+   "preset": null,
+   "core_classes": [
+    21
+   ],
    "notations": {
     "add": [
      "다이소",
@@ -966,6 +1056,7 @@
    "applicants": [
     "코리아세븐 주식회사"
    ],
+   "preset": "convenience",
    "notations": {
     "add": [
      "세븐일레븐",
@@ -999,6 +1090,11 @@
    "new": true,
    "applicants": [
     "주식회사 해마로푸드서비스"
+   ],
+   "preset": "chicken",
+   "core_classes": [
+    29,
+    30
    ],
    "notations": {
     "add": [
@@ -1042,6 +1138,7 @@
    "applicants": [
     "주식회사 투썸플레이스"
    ],
+   "preset": "cafe",
    "notations": {
     "add": [
      "투썸플레이스",
@@ -1077,6 +1174,7 @@
    "applicants": [
     "주식회사 앤하우스"
    ],
+   "preset": "cafe",
    "notations": {
     "add": [
      "메가MGC커피",
@@ -1089,6 +1187,7 @@
    "applicants": [
     "주식회사 할리스에프앤비"
    ],
+   "preset": "cafe",
    "notations": {
     "add": [
      "할리스",
@@ -1122,6 +1221,7 @@
    "applicants": [
     "주식회사 무신사"
    ],
+   "preset": "clothing",
    "notations": {
     "add": [
      "무신사",
@@ -1140,6 +1240,7 @@
    "applicants": [
     "아마존 테크놀로지스, 인크."
    ],
+   "preset": "software",
    "notations": {
     "add": [
      "아마존",
@@ -1177,6 +1278,10 @@
    "applicants": [
     "바이에리셰 모토렌 베르케 악티엔게젤샤프트"
    ],
+   "preset": null,
+   "core_classes": [
+    12
+   ],
    "notations": {
     "add": [
      "비엠더블유",
@@ -1210,6 +1315,10 @@
    "new": true,
    "applicants": [
     "도요타지도샤가부시키가이샤"
+   ],
+   "preset": null,
+   "core_classes": [
+    12
    ],
    "notations": {
     "add": [

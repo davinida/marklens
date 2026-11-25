@@ -18,6 +18,7 @@ shared/famous_brands.txt 의 [브랜드] 표(자동 값), 후보 목록 ml/data/
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -178,6 +179,10 @@ def tool_data(*, registry: fc.Registry, table_rows: list[dict], overrides: dict,
         "generated": datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M"),
         "registry_version": registry.version, "overrides_version": fc.OVERRIDES_VERSION,
         "db_generation": builder.db_generation() or "", "db_count": len(by_appno),
+        # 적용된 값이 바뀌면(핵심 업종을 더한 때처럼) 브라우저의 옛 작업 대신 이 값에서 시작한다
+        "overrides_key": hashlib.sha256(json.dumps(
+            overrides["brands"], ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()[:12],
         "overrides_purpose": builder.OVERRIDES_PURPOSE,
         "roles": list(fc.MARK_ROLES), "protections": list(fc.PROTECTIONS),
         "kinds": list(fc.KINDS),

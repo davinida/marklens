@@ -419,3 +419,47 @@ def test_recheck_diff_reports_only_what_changed():
     text = fm.recheck_diff_text(diff)
     assert "기대표 [없음] 삼성 + 없음: 설명적 사용 안내 → 강함" in text and "ZARO" in text
 
+
+def test_logo_strong_applies_the_text_and_photo_rule():
+    """확정 단계의 로고 규칙 — 강함(이미지만 판단이 위험)만, 대표 로고와 질의가 둘 다 글자 위주면
+    유사도 0.98 이상, 사진으로 판정된 대표 로고는 보지 않는다(prepare 뒤에만)."""
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    def mark(appno: str) -> fc.Mark:
+        return fc.Mark(appno=appno, title="x", kind="도형복합", role=fc.ROLE_LOGO_NOW,
+                       auto_role=fc.ROLE_NAME, source="s", image=f"{appno}.png",
+                       image_exists=True, codes=frozenset())
+
+    def brand(name: str, *appnos: str) -> fc.Brand:
+        made = _brand(name, [_notation(name)])
+        return fc.Brand(**{**made.__dict__, "marks": tuple(mark(a) for a in appnos)})
+
+    registry = fc.Registry(fc.REGISTRY_VERSION, (brand("가", "1", "2"), brand("나", "3")))
+    ms = SimpleNamespace(
+        state=SimpleNamespace(
+            model=None, by_appno={str(i + 1): SimpleNamespace(pos=i) for i in range(3)},
+            embeddings=np.array([[0.95, 0.0], [0.985, 0.0], [0.91, 0.0]], dtype=np.float32)),
+        _image_only_features=lambda value, kind: value,
+        _judge=lambda value, model, kind: SimpleNamespace(result=SimpleNamespace(
+            grade=fc.GRADE_RISK if value >= 0.9 else fc.GRADE_REVIEW)),
+        is_photo_query=lambda embedding: False)
+    logo = fm.Logo({"ms": ms, "engine": None, "direct": None}, registry)
+    query = np.array([1.0, 0.0], dtype=np.float32)
+    assert logo.is_risk(0.9) and not logo.is_risk(0.8999)
+    assert {name: hit["표장"] for name, hit in logo.strong(query).items()} == {"가": "2", "나": "3"}
+    text, figure = fc.LOGO_KIND_TEXT, "도형 위주"
+    logo.kinds, logo.photos = [figure, text, text], [False, False, False]
+    # 글자 위주끼리는 0.98 이상만 — "나"의 글자 로고(0.91)는 빠지고, "가"는 0.985 로 남는다
+    by_text = logo.strong(query, query_kind=text)
+    assert {name: hit["표장"] for name, hit in by_text.items()} == {"가": "2"}
+    assert set(logo.strong(query, query_kind=figure)) == {"가", "나"}  # 질의가 글자가 아니면 그대로
+    assert set(logo.strong(query, query_kind=text, rule=False)) == {"가", "나"}
+    logo.photos = [False, True, False]  # 사진으로 판정된 대표 로고는 보지 않는다
+    assert {name: hit["표장"] for name, hit in logo.strong(query, query_kind=figure).items()} == {
+        "가": "1", "나": "3"}
+    # 뺄 표장(그 상표 자신)과 사진 로고를 빼면 도형 위주 로고 하나만 남는다
+    assert {name: hit["표장"] for name, hit in logo.strong(
+        query, exclude="3", query_kind=text).items()} == {"가": "1"}
+

@@ -125,8 +125,8 @@ justify-content:center;gap:10px;padding:20px}
 const DATA = JSON.parse(document.getElementById("data").textContent);
 const [R_NOW, R_OLD, R_OTHER, R_NONE] = DATA.roles;
 const ROLE_SHORT = {[R_NOW]: "대표 로고(현재)", [R_OLD]: "과거 로고", [R_OTHER]: "그 밖의 표장", [R_NONE]: "관련 없음"};
-// 저장 키는 DB 세대별 — DB 가 바뀌어 다시 만든 도구는 적용된 overrides 에서 시작한다
-const STORE_KEY = "marklens-famous-curate-v1" + (DATA.db_generation ? ":" + DATA.db_generation : "");
+// 저장 키는 DB 세대와 적용된 overrides 별 — 둘 중 하나가 바뀌어 다시 만든 도구는 적용된 overrides 에서 시작한다
+const STORE_KEY = "marklens-famous-curate-v1" + (DATA.db_generation ? ":" + DATA.db_generation : "") + (DATA.overrides_key ? ":" + DATA.overrides_key : "");
 const $ = (id) => document.getElementById(id);
 
 // ---- 작은 도구 ----
@@ -171,12 +171,16 @@ function defaultBrand(b) {
   return {include: true, name: b.base.name, applicants: [...b.base.applicants], preset: b.base.preset,
           urls: [...b.base.urls], protection: b.base.protection_default,
           notations: b.base.notations.map((text) => ({text, base: true, removed: false, common: false})),
-          exceptions: [], marks: {}, cand: {}, direct: [], memo: ""};
+          exceptions: [], marks: {}, cand: {}, direct: [], memo: "", core: []};
+}
+function parseClasses(text) {
+  return uniq((text.match(/\d+/g) || []).map(Number).filter((n) => n >= 1 && n <= 45)).sort((a, b) => a - b);
 }
 function applyOverride(st, ov, b) {
   if (ov.name) st.name = ov.name;
   if ("applicants" in ov) st.applicants = [...ov.applicants];
   if ("preset" in ov) st.preset = ov.preset || null;
+  if ("core_classes" in ov) st.core = [...ov.core_classes];
   if ("evidence_urls" in ov) st.urls = [...ov.evidence_urls];
   if (ov.protection) st.protection = ov.protection;
   const edit = ov.notations || {};
@@ -273,6 +277,7 @@ function brandOverride(b, st) {
   const applicants = uniq(st.applicants.map((s) => s.trim()).filter(Boolean));
   if (isNew || !sameList(applicants, b.base.applicants)) o.applicants = applicants;
   if (isNew ? st.preset : st.preset !== b.base.preset) o.preset = st.preset || null;
+  if ((st.core || []).length) o.core_classes = [...st.core];
   const urls = uniq(st.urls.map((s) => s.trim()).filter(Boolean));
   if (isNew ? urls.length : !sameList(urls, b.base.urls)) o.evidence_urls = urls;
   if (st.protection !== b.base.protection_default) o.protection = st.protection;
@@ -456,6 +461,7 @@ function renderBrand() {
   const basics = h("div", {class: "grid2"},
     h("label", {class: "f"}, h("span", null, "이름"), h("input", {type: "text", value: st.name, oninput: (e) => { st.name = e.target.value; changed(); }})),
     h("label", {class: "f"}, h("span", null, "업종 세트"), presetSel),
+    h("label", {class: "f"}, h("span", null, "핵심 류(숫자를 쉼표로 — 예: 9, 11)"), h("input", {type: "text", value: (st.core || []).join(", "), onchange: (e) => { st.core = parseClasses(e.target.value); changed(); }})),
     h("label", {class: "f"}, h("span", null, "출원인(한 줄에 하나)"), h("textarea", {oninput: (e) => { st.applicants = lines(e.target.value); changed(); }}, st.applicants.join("\n"))),
     h("label", {class: "f"}, h("span", null, "근거 URL(한 줄에 하나)"), h("textarea", {oninput: (e) => { st.urls = lines(e.target.value); changed(); }}, st.urls.join("\n"))));
   const evidence = b.base.evidence_text ? h("p", {class: "sub", style: "max-width:900px"}, "표의 근거: " + b.base.evidence_text) : null;

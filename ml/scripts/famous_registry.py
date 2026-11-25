@@ -117,14 +117,19 @@ def build(*, brands_path: Path = fc.DEFAULT_BRANDS_PATH, plan_path: Path = DEFAU
                  "표기 종류: 약한 표기 = 유명 예외를 뺀 식별력 판정으로 브랜드 자신의 업종에서 "
                  "조각이 모두 약한 표기(base_weak)·사람이 흔한 말로 표시한 표기(common)와 그 "
                  "표기와 소리가 0.98 이상인 표기, 머리글자 표기 = 약한 표기가 아닌 영문 3자 이하 "
-                 "표기와 그 표기와 소리가 0.98 이상인 표기, 나머지는 보통 표기."),
+                 "표기와 그 표기와 소리가 0.98 이상인 표기, 나머지는 보통 표기. 핵심 업종 = "
+                 "업종 세트(industry.codes·classes)와 핵심 류(industry.core_classes — 사람이 "
+                 "정함). 두 브랜드의 목록에 함께 든 표장은 상표명이 가리키는 브랜드 하나에만 잇고, "
+                 "정할 수 없으면 marks[].shared 에 다른 브랜드를 적어 어느 쪽의 대표 로고로도 쓰지 "
+                 "않는다."),
     }
     return fc.build_registry(
         rows, plan_records=plan["records"], db_records=records, preset_codes=preset_codes,
         preset_labels=preset_labels, dist=dx.load_distinctiveness(),
         applicant_keys=applicant_key_function(aliases_path),
         overrides=overrides if overrides is not None else fc.load_overrides(overrides_path),
-        image_exists=lambda name: (Path(images_dir) / name).is_file(), sources=sources)
+        image_exists=lambda name: (Path(images_dir) / name).is_file(), sources=sources,
+        preset_classes=preset_classes())
 
 
 def to_text(registry: fc.Registry) -> str:
@@ -254,13 +259,13 @@ def industry_table(registry: fc.Registry, *, classes_of: dict[str, list[int]] | 
         received_classes = sorted({nice for mark in received for nice in mark.classes})
         flags = []
         if not brand.preset:
-            flags.append("업종 세트 없음")
+            flags.append("업종 세트 없음" + ("(핵심 류만)" if brand.core_classes else ""))
         elif received and not core & set(received_classes):
             flags.append("받은 표장이 핵심 업종 밖의 류뿐")
         rows.append({
             "브랜드": brand.name, "새_브랜드": brand.is_new, "업종_세트": brand.preset,
             "업종_세트_이름": brand.preset_label, "업종_세트의_류": sorted(core),
-            "보호": brand.protection,
+            "핵심_류": list(brand.core_classes), "보호": brand.protection,
             "대표_로고_현재": sum(1 for mark in logos if mark.role == fc.ROLE_LOGO_NOW),
             "대표_로고_과거": sum(1 for mark in logos if mark.role == fc.ROLE_LOGO_OLD),
             "대표_표장의_류": logo_classes,
@@ -277,6 +282,7 @@ def review(registry: fc.Registry, *, with_industry: bool = False) -> dict:
     예외 낱말, 받을 표장 목록, 새 브랜드, 보호 범위. with_industry 면 브랜드별 대표 로고 수와
     업종 표(업종 세트·대표 표장의 류·대표 지정상품)도."""
     no_logo, removed, added, common, exceptions, fetch, new, picked = [], [], [], [], [], [], [], []
+    shared = []
     for brand in registry.brands:
         logos = brand.logo_marks
         if not any(mark.role == fc.ROLE_LOGO_NOW for mark in logos):
@@ -303,12 +309,17 @@ def review(registry: fc.Registry, *, with_industry: bool = False) -> dict:
             new.append({"브랜드": brand.name,
                         "표기": [f"{n.text}({n.kind})" for n in brand.notations],
                         "출원인": list(brand.applicants), "업종": brand.preset,
+                        "핵심_류": list(brand.core_classes),
                         "보호": brand.protection, "근거": brand.evidence_label or "있음",
                         "DB_표장": len(brand.marks)})
         for mark in brand.marks:
             if mark.picked:
                 picked.append({"출원번호": mark.appno, "브랜드": brand.name, "역할": mark.role,
                                "자동_역할": mark.auto_role, "상표명": mark.title})
+            if mark.shared:
+                shared.append({"출원번호": mark.appno, "브랜드": brand.name,
+                               "함께_걸린_브랜드": list(mark.shared), "역할": mark.role,
+                               "상표명": mark.title, "류": list(mark.classes)})
     table = industry_table(registry) if with_industry else []
     return {
         "브랜드": len(registry.brands),
@@ -319,6 +330,7 @@ def review(registry: fc.Registry, *, with_industry: bool = False) -> dict:
         "지운_표기": removed, "더한_표기": added, "흔한_말_표기": common,
         "예외_낱말": exceptions, "받을_표장": fetch, "새_브랜드": new,
         "역할을_고른_표장": picked,
+        "함께_걸린_표장": shared,
         "보호_범위": {protection: [b.name for b in registry.brands
                                  if b.protection == protection]
                     for protection in fc.PROTECTIONS},
@@ -348,8 +360,10 @@ def review_text(data: dict) -> str:
         return row["브랜드"] + (f" ({', '.join(notes)})" if notes else "")
 
     def new_brand(row: dict) -> str:
-        return (f"{row['브랜드']} — 표기 {' / '.join(row['표기'])} · 업종 {row['업종'] or '없음'} "
-                f"· {row['보호']} · 근거 {row['근거']} · DB 표장 {row['DB_표장']}")
+        core = ("·".join(map(str, row["핵심_류"])) + "류") if row.get("핵심_류") else "없음"
+        return (f"{row['브랜드']} — 표기 {' / '.join(row['표기'])} · 업종 세트 "
+                f"{row['업종'] or '없음'} · 핵심 류 {core} · {row['보호']} · 근거 {row['근거']} "
+                f"· DB 표장 {row['DB_표장']}")
 
     def picked(row: dict) -> str:
         return (f"{row['출원번호']} {row['브랜드']} → {row['역할']} "
@@ -372,16 +386,23 @@ def review_text(data: dict) -> str:
                        + (f" · {r['출원인']}" if r["출원인"] else "")))
     section("받은 대표 표장의 출원인이라 더한 출원인", data.get("더한_출원인") or [],
             lambda r: f"{r['브랜드']}: {' / '.join(r['출원인'])}")
+    section("두 브랜드에 함께 걸린 표장(정할 수 없어 어느 쪽의 대표 로고로도 쓰지 않음)",
+            data.get("함께_걸린_표장") or [],
+            lambda r: (f"{r['출원번호']} {r['브랜드']} ↔ {' · '.join(r['함께_걸린_브랜드'])} "
+                       f"({r['상표명'] or '상표명 없음'}, {r['역할']}, 류 "
+                       f"{','.join(map(str, r['류'])) or '-'})"))
     for kind, rows in data["표기_종류별"].items():
         lines.append(f"\n■ {kind} — {len(rows)}건: " + (" · ".join(rows) if rows else "없음"))
     if data.get("업종_표"):
-        lines.append("\n■ 브랜드별 업종 표 — 브랜드 | 업종 세트(류) | 보호 범위 | 대표 로고 "
-                     "현재·과거 | 대표 표장의 류 | 대표 지정상품 | 표시")
+        lines.append("\n■ 브랜드별 업종 표 — 브랜드 | 업종 세트(류) | 핵심 류 | 보호 범위 | 대표 "
+                     "로고 현재·과거 | 대표 표장의 류 | 대표 지정상품 | 표시")
         for row in data["업종_표"]:
             preset = (f"{row['업종_세트']}({','.join(map(str, row['업종_세트의_류']))})"
                       if row["업종_세트"] else "없음")
             lines.append(
-                f"  · {row['브랜드']} | {preset} | {row['보호']} | {row['대표_로고_현재']}·"
+                f"  · {row['브랜드']} | {preset} | "
+                f"{','.join(map(str, row.get('핵심_류') or ())) or '-'} | {row['보호']} | "
+                f"{row['대표_로고_현재']}·"
                 f"{row['대표_로고_과거']} | {','.join(map(str, row['대표_표장의_류'])) or '-'} | "
                 f"{', '.join(_short(name) for name in row['대표_지정상품']) or '-'} | "
                 f"{' · '.join(row['표시']) or '-'}")
@@ -409,8 +430,8 @@ def command_apply(args) -> int:
     print(f"썼다: {fc.DEFAULT_OVERRIDES_PATH.name} · {args.out.name} (브랜드 "
           f"{len(registry.brands)}, 표장 {sum(len(b.marks) for b in registry.brands)})\n")
     print(review_text(review(registry, with_industry=True)))
-    print("\n다음: ml/venv/bin/python ml/scripts/famous_check_measure.py recheck   "
-          "# 2-1 기준용 목표·기대표가 유지되는지")
+    print("\n다음: 등록부가 바뀌었으므로 확정 측정(ml/scripts/famous_check_confirm.py — "
+          "freeze → base → holdout)의 확정 파일은 더 이상 이 등록부의 것이 아니다.")
     return 0
 
 
