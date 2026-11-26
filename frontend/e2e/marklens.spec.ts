@@ -609,3 +609,163 @@ test("a famous mark name with clothing goods shows the famous banner and the flo
   expect(searchBody).toContain("G4503");
   await expectNoHorizontalOverflow(page);
 });
+
+// 설명적 이름 안내(계약 v2 §2-7·§4-7) — 기존 모의 응답에 선택 필드 name_words 를 더한다.
+function buildDescriptiveSearchV2Result() {
+  const result = buildSearchV2Result({ x4: 0.75, nice_classes: [43] });
+  return {
+    ...result,
+    overall: { ...result.overall, grade: "주의", prob: 0.41 },
+    name_words: {
+      generic: "all",
+      words: [
+        { word: "맛있는", distinctive: false, category: "성질·품질", reason: "3호 기술적 표장:품질(류 29,30,43)" },
+        { word: "커피", distinctive: false, category: "상품 이름", reason: "3호 기술적 표장:원재료(류 30,35,43)·1호 보통명칭" },
+        { word: "전문점", distinctive: false, category: "성질·품질", reason: "3호 기술적 표장:용도(류 35,43)" },
+      ],
+      more: 0,
+      more_generic: 0,
+    },
+  };
+}
+
+test("a name made only of descriptive words shows the notice and lets the user try another name", async ({
+  page,
+}) => {
+  await page.route("**/api/goods/search?*", async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        url.searchParams.get("q") === "카페"
+          ? CAFE_PRESET_RESULT
+          : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
+      ),
+    });
+  });
+  let searchBody = "";
+  await page.route("**/api/search/v2*", async (route) => {
+    searchBody = route.request().postData() ?? "";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(buildDescriptiveSearchV2Result()),
+    });
+  });
+
+  const nameField = page.getByRole("textbox", { name: "상표 이름" });
+  await nameField.fill("맛있는 커피 전문점");
+  await page.getByRole("combobox", { name: "지정상품 검색" }).fill("카페");
+  await page
+    .getByRole("region", { name: "카페 업종 세트" })
+    .getByRole("button", { name: "3개 모두 추가" })
+    .click();
+  await expect(page.getByText("선택 3개")).toBeVisible();
+  await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
+
+  const title = "이 이름은 상표로 등록받기 어려울 수 있어요";
+  const notice = page.getByRole("region", { name: title });
+  const heading = notice.getByRole("heading", { level: 2, name: title });
+  await expect(heading).toBeVisible();
+  await expect(heading).toBeFocused(); // 결과가 뜨면 맨 위 안내의 제목이 읽힌다
+  await expect(
+    notice.getByText("'맛있는 커피 전문점'은 모두 상품을 설명하거나 누구나 쓰는 말이에요."),
+  ).toBeVisible();
+  await expect(notice.getByTestId("descriptive-words").getByRole("listitem")).toHaveText([
+    "맛있는 — 맛·품질·재료·쓰임새 같은 성질을 설명하는 말이에요",
+    "커피 — 파는 상품이나 서비스의 이름 그 자체예요",
+    "전문점 — 맛·품질·재료·쓰임새 같은 성질을 설명하는 말이에요",
+  ]);
+  await expect(notice.getByText("예: '○○ 커피'처럼요.")).toBeVisible();
+  await expect(
+    notice.getByText(
+      "최종 판단은 특허청 심사에서 정해져요. 오래 써서 많은 사람이 알아보는 이름은 예외가 될 수 있어요.",
+    ),
+  ).toBeVisible();
+  // 안내는 전체 등급 위에 있고, 등급은 그대로다
+  await expect(page.getByTestId("overall-grade")).toHaveText("주의");
+  await expect(page.getByTestId("descriptive-whole-name")).toHaveText(
+    "설명하는 말로만 된 이름이라, 아래는 이름 전체를 견준 결과예요.",
+  );
+  expect(searchBody).toContain("맛있는 커피 전문점");
+  expect(searchBody).toContain("S120602");
+  await expectNoHorizontalOverflow(page);
+
+  // "다른 이름으로 다시 확인하기" — 입력은 그대로 둔 채 입력 화면으로 돌아가 이름 칸을 고른다
+  await notice.getByRole("button", { name: "다른 이름으로 다시 확인하기" }).click();
+  await expect(nameField).toBeFocused();
+  await expect(nameField).toHaveValue("맛있는 커피 전문점");
+  await expect(page.getByText("선택 3개")).toBeVisible();
+  await nameField.pressSequentially("몬테로사");
+  await expect(nameField).toHaveValue("몬테로사"); // 전체 선택돼 있어 바로 새 이름으로 바뀐다
+});
+
+// 유명 상표 배너가 이름 쪽의 강한 일치로 뜨면 설명적 이름 안내를 그리지 않는다(계약 v2 §4-7). 파리바게트는
+// 엔진이 파리(지역 이름)·바게트(상품 이름)로 나눠 모든 낱말이 식별력 없는 말이지만, 배너만 보인다.
+function buildFamousDescriptiveSearchV2Result() {
+  const result = buildSearchV2Result({ x4: null, nice_classes: [30] });
+  return {
+    ...result,
+    overall: { ...result.overall, grade: "위험", famous_floor: true },
+    famous: {
+      status: "checked",
+      brand_count: 58,
+      matches: [
+        {
+          brand: "파리바게뜨",
+          level: "강함",
+          basis: "이름",
+          notation: "파리바게뜨",
+          matched_text: "파리바게트",
+          protection: "같은·가까운 업종 중심",
+          goods_overlap: null,
+          floor: "위험",
+          logos: [],
+        },
+      ],
+    },
+    name_words: {
+      generic: "all",
+      words: [
+        { word: "파리", distinctive: false, category: "지역 이름", reason: "4호 지명" },
+        { word: "바게트", distinctive: false, category: "상품 이름", reason: "1호 보통명칭" },
+      ],
+      more: 0,
+      more_generic: 0,
+    },
+  };
+}
+
+test("a strong famous-name match shows only the famous banner, not the descriptive-name notice", async ({
+  page,
+}) => {
+  let searchBody = "";
+  await page.route("**/api/search/v2*", async (route) => {
+    searchBody = route.request().postData() ?? "";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(buildFamousDescriptiveSearchV2Result()),
+    });
+  });
+
+  await page.getByRole("textbox", { name: "상표 이름" }).fill("파리바게트");
+  await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
+
+  const title = "널리 알려진 상표 '파리바게뜨'와 이름이 같거나 거의 같아요";
+  const banner = page.getByRole("region", { name: title });
+  const heading = banner.getByRole("heading", { level: 2, name: title });
+  await expect(heading).toBeVisible();
+  await expect(heading).toBeFocused(); // 결과가 뜨면 배너의 제목이 읽힌다
+  await expect(page.getByTestId("overall-grade")).toHaveText("위험");
+  await expect(page.getByTestId("famous-floor-reason")).toHaveText(
+    "널리 알려진 상표와 같거나 거의 같아서 이 등급으로 봤어요.",
+  );
+  // 큰 안내도 작은 안내도, 전체 등급 옆의 "이름 전체를 견준 결과" 한 줄도 없다
+  await expect(page.getByTestId("descriptive-notice")).toHaveCount(0);
+  await expect(page.getByTestId("descriptive-whole-name")).toHaveCount(0);
+  await expect(page.getByText("누구나 쓰는 말")).toHaveCount(0);
+  expect(searchBody).toContain("파리바게트");
+  await expectNoHorizontalOverflow(page);
+});

@@ -10,7 +10,14 @@ import {
 } from "lucide-react";
 import { imageUrl } from "@/lib/api";
 import type { SearchV2Candidate, SearchV2Grade, SearchV2Response } from "@/lib/contracts";
-import FamousBanner, { famousFloorReason } from "@/components/FamousBanner";
+import DescriptiveNotice from "@/components/DescriptiveNotice";
+import FamousBanner, {
+  FAMOUS_LEVEL_DESCRIPTIVE,
+  famousBannerLevel,
+  famousBannerState,
+  famousFloorReason,
+} from "@/components/FamousBanner";
+import { NOTICE_TEXT, showsWholeNameLine } from "@/lib/descriptiveNotice";
 // v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
 import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/visualStatusView";
 
@@ -541,7 +548,9 @@ export default function ResultViewV2({
   result,
   queryPreview,
   queryHasName,
+  queryName,
   onReset,
+  onRename,
   onRetypeTo,
   onUseSuggestedName,
 }: {
@@ -549,7 +558,11 @@ export default function ResultViewV2({
   queryPreview: string | null;
   /** 요청에 상표명(name)을 넣었는지 — salient 문장의 "전체로 비교" 폴백 판단에 쓴다. */
   queryHasName: boolean;
+  /** 요청에 넣은 상표명 그대로 — 설명적 이름 안내가 "'{이름}'은(는) …"에 쓴다(§4-7). */
+  queryName?: string | null;
   onReset: () => void;
+  /** "다른 이름으로 다시 확인하기" — 입력을 그대로 둔 채 입력 화면으로 돌아가 이름 칸에 포커스. */
+  onRename?: () => void;
   /** "유형 고치기" — type_override 를 채워 입력 화면으로 돌아간다(새 Turnstile 토큰으로 재요청). */
   onRetypeTo?: (type: "문자" | "도형" | "결합") => void;
   /** "상표명으로 넣기" — OCR 이 읽은 글자를 이름 칸에 채워 입력 화면으로 돌아간다. */
@@ -563,12 +576,26 @@ export default function ResultViewV2({
   // 그리지 않고 까닭 한 줄만 보인다.
   const famousFloor = overall.famous_floor === true;
   const showPrecision = overall.grade === "위험" && !overallNameless && !famousFloor;
+  // 맨 위 안내의 순서(§4-7): ① 유명 상표 배너(강함·약함) ② 설명적 이름 안내 ③ 유명 상표의 "설명적 사용".
+  // 배너가 이름 쪽의 강한 일치로 떴으면 설명적 이름 안내와 전체 등급 옆 한 줄은 그리지 않는다.
+  const famousLevel = famousBannerLevel(result.famous);
+  const famousAfterNotice = famousLevel === FAMOUS_LEVEL_DESCRIPTIVE;
+  const famousState = famousBannerState(result.famous);
+  const famousBanner = <FamousBanner famous={result.famous} />;
   // "결합-문자요부"·"결합-도형요부" 는 사용자에게는 "결합"으로 보여 주고, 고치기 버튼도 그 기준으로 제외한다.
   const displayType = overall.query_type.type.startsWith("결합") ? "결합" : overall.query_type.type;
 
   return (
     <div className="flex flex-col gap-4">
-      <FamousBanner famous={result.famous} />
+      {!famousAfterNotice && famousBanner}
+      <DescriptiveNotice
+        nameWords={result.name_words}
+        candidates={candidates}
+        queryName={queryName}
+        famousBanner={famousState}
+        onRename={onRename}
+      />
+      {famousAfterNotice && famousBanner}
       <section className={`rounded-lg border p-5 ${view ? `${view.border} ${view.bg}` : "border-line bg-card"}`}>
         <div className="flex items-start gap-4">
           {queryPreview && (
@@ -614,6 +641,11 @@ export default function ResultViewV2({
                   </p>
                 ) : (
                   <p className={`mt-2 text-[13px] font-semibold ${view!.text}`}>{view!.description}</p>
+                )}
+                {showsWholeNameLine(result.name_words, candidates, famousState) && (
+                  <p data-testid="descriptive-whole-name" className="mt-1 text-[11.5px] text-sub">
+                    {NOTICE_TEXT.wholeName}
+                  </p>
                 )}
                 {!queryHasName && (
                   <p data-testid="nameless-guidance" className="mt-1 text-[11.5px] text-sub">

@@ -50,6 +50,15 @@ famous(확인 상태·등록부 브랜드 수·일치 최대 2개 브랜드)와 
 예외가 나면 검색은 그대로 내고 famous.status 만 "unavailable". 표시가 없는 JSON(≤ v1.4.6)은 예전과
 똑같이 동작한다. MARKLENS_FAKE_ML 에서는 로고 경로를 쓰지 않는다(가짜 임베딩은 유사도가 고정).
 
+질의 이름의 낱말별 식별력(2026-11-26 — 계약 v2 §2-7, 식별력 설계 §9): 이름이 있는 질의는 응답에
+선택 필드 name_words(낱말마다 식별력 여부·화면용 사유 분류, 모든 낱말이 그런지·일부만 그런지)를
+싣는다 — 설명적 이름 안내용. 새로 판정하지 않는다: 후보마다 요부를 정할 때 쓰는 것과 같은 함수
+(Distinctiveness.judge_name — 상품 접미어 분리 뒤의 낱말)를 질의의 이름과 질의의 업종만으로 부른
+결과다(src.name_words). 후보와 견줄 때는 후보의 업종까지 합쳐 판정하므로 쌍별 결과
+(candidates[].salient)는 후보에 따라 더 뺄 수 있다. 반대로 그 판정이 식별력 없다고 한 낱말을
+어느 후보와 견줄 때 요부 후보로 썼으면(업종 없는 질의의 "전역" 보통명칭) 식별력 있음으로 싣는다
+(_name_words). 후보 목록·등급·위험도·정렬은 건드리지 않는다.
+
 규약: 동기 함수(CPU 작업은 API 가 기존 스레드 풀로 돌린다, asyncio 없음), 로그에 검색어·이미지
 미기록(풀
 크기·소요·유형 출처만), KIPRIS 호출 0. MARKLENS_FAKE_ML 에서는 가짜 임베더(CLIP·X3)·가짜 OCR 로 돌고
@@ -75,6 +84,7 @@ if str(paths.ML_ROOT) not in sys.path:
 
 from src import famous_runtime as fr  # noqa: E402
 from src import mark_type as mt  # noqa: E402
+from src import name_words as nw  # noqa: E402
 from src import photo_mark  # noqa: E402
 from src.axes import goods_map as gm  # noqa: E402
 from src.axes import x3_semantic as x3  # noqa: E402
@@ -304,6 +314,8 @@ class SearchV2Result:
     famous_floor: bool | None = None
     famous_outcome: object | None = None  # fr.Outcome
     famous_ms: float = 0.0  # 유명 상표 확인에 든 시간
+    # 질의 이름의 낱말별 식별력(선택 필드 — 이름이 있는 질의만, 계약 v2 §2-7) — 응답 그대로
+    name_words: dict | None = None
 
     def to_dict(self) -> dict:
         overall = {
@@ -319,6 +331,8 @@ class SearchV2Result:
         if self.famous is not None:  # 꺼져 있으면 키를 싣지 않는다(v1.4.6 응답과 같게)
             overall["famous_floor"] = bool(self.famous_floor)
             head["famous"] = self.famous
+        if self.name_words is not None:  # 이름이 없는 질의는 키를 싣지 않는다
+            head["name_words"] = self.name_words
         return {
             **head,
             "candidates": [candidate.to_dict() for candidate in self.candidates],
@@ -767,6 +781,8 @@ class PoolResult:
     model: dict
     embedding: np.ndarray | None = None  # 질의 이미지 임베딩(분석 스크립트가 같은 질의를 다시 채점)
     timings: dict = field(default_factory=dict)  # 단계별 ms(STAGES — 응답에 넣지 않음, 분석용)
+    # 질의 이름의 낱말별 식별력(이름이 없으면 None) — 질의의 이름·업종만으로 부른 judge_name
+    name_words: nw.NameWords | None = None
 
 
 @dataclass(frozen=True)
@@ -1131,7 +1147,41 @@ def search_pool(
         query_name=query_name, split_name=split_name, goods=goods, x3_on=x3_on,
         has_image=image is not None, index_size=index_size, model=model,
         embedding=query_embedding, timings={k: round(v, 1) for k, v in timings.items()},
+        name_words=_name_words(distinct, split_name, goods, candidates),
     )
+
+
+def _name_words(distinct: Distinctiveness, split_name: str | None, goods: frozenset[str] | None,
+                candidates: list[CandidateResult]) -> nw.NameWords | None:
+    """질의 이름의 낱말별 식별력(계약 v2 §2-7). 새 판정이 아니다 — score_record 가 후보마다 요부를
+    정할 때(compute_pair_axes)와 같은 이름(상품 접미어 분리 뒤)·같은 함수(judge_name)를, 업종만
+    질의의 것으로(후보의 업종을 합치지 않고) 부른다.
+
+    그 판정이 식별력 없다고 한 낱말을 엔진이 어느 후보와 견줄 때 요부 후보로 썼으면(후보의
+    query_tokens) 그 쌍의 판정으로 바꿔 식별력 있음으로 싣는다 — 응답이 "식별력 없는 말"이라고 한
+    낱말을 엔진이 요부로 쓴 일이 없게. 업종을 고른 질의에서는 일어나지 않는다(쌍의 업종은 질의의
+    업종을 품어 약한 낱말이 약한 채로 남는다). 업종이 없는 질의에서 "어느 업종의 상품 이름"
+    (1호 보통명칭(전역))일 뿐인 낱말이 여기에 걸린다 — 엔진은 쌍마다 후보의 업종으로 판정해 그
+    업종과 무관한 후보에는 그 낱말을 요부로 쓴다. 후보는 정렬된 풀 전체(앞에서부터).
+
+    실패해도 검색은 그대로 낸다(응답에 싣지 않음 — 로그에는 예외 종류만, 질의 이름은 남기지
+    않는다)."""
+    if not split_name:
+        return None
+    try:
+        judged = distinct.judge_name(split_name, goods)
+        weak = {judgement.token for judgement in judged if judgement.is_weak}
+        used: dict[str, object] = {}  # 요부 후보로 쓰인 약한 낱말 → 그 쌍의 판정
+        for candidate in candidates:
+            for token in candidate.query_tokens:
+                if token in weak and token not in used:
+                    record = state.by_appno.get(candidate.id)
+                    pair = (goods or frozenset()) | (record.goods if record else frozenset())
+                    used[token] = distinct.judge(token, pair or None)
+        return nw.describe([used.get(judgement.token, judgement) for judgement in judged])
+    except Exception as exc:
+        logger.error("낱말별 식별력 정리 실패(%s) — 검색 결과는 그대로 낸다", type(exc).__name__)
+        return None
 
 
 def _overall(top: tuple[CandidateResult, ...]) -> tuple[str | None, float | None, str | None]:
@@ -1285,4 +1335,5 @@ def multi_search(
         famous_floor=famous_floor,
         famous_outcome=outcome,
         famous_ms=famous_ms,
+        name_words=None if pooled.name_words is None else pooled.name_words.to_dict(),
     )

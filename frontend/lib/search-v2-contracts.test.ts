@@ -6,17 +6,18 @@ import { SearchV2ResponseSchema } from "@/lib/contracts";
 import textFixture from "@/test/fixtures/search-v2-text.json";
 import imageFixture from "@/test/fixtures/search-v2-image.json";
 import famousFixture from "@/test/fixtures/search-v2-famous.json";
+import descriptiveFixture from "@/test/fixtures/search-v2-descriptive.json";
 
 describe("SearchV2ResponseSchema", () => {
-  it.each([textFixture, imageFixture, famousFixture])("accepts and preserves the complete contract fixture", (fixture) => {
+  it.each([textFixture, imageFixture, famousFixture, descriptiveFixture])("accepts and preserves the complete contract fixture", (fixture) => {
     expect(SearchV2ResponseSchema.parse(fixture)).toEqual(fixture);
   });
 
-  it("uses the three verbatim JSON blocks from contract §3", () => {
+  it("uses the four verbatim JSON blocks from contract §3", () => {
     const contract = readFileSync(new URL("../../docs/MarkLens_API계약_v2.md", import.meta.url), "utf8");
     const blocks = [...contract.matchAll(/```json\r?\n([\s\S]*?)\r?\n```/g)];
-    expect(blocks).toHaveLength(3);
-    for (const [index, file] of ["text", "image", "famous"].entries()) {
+    expect(blocks).toHaveLength(4);
+    for (const [index, file] of ["text", "image", "famous", "descriptive"].entries()) {
       const fixture = readFileSync(new URL(`../test/fixtures/search-v2-${file}.json`, import.meta.url), "utf8");
       expect(fixture.trimEnd()).toBe(blocks[index][1]);
     }
@@ -259,3 +260,74 @@ describe("contract §3-3 fixture — a famous mark match (v1.4.7)", () => {
   });
 });
 
+describe("SearchV2ResponseSchema — name_words (설명적 이름 안내, 선택 필드)", () => {
+  it("keeps the word judgements of the three named fixtures and none for the image-only one", () => {
+    expect(SearchV2ResponseSchema.parse(descriptiveFixture).name_words).toEqual({
+      generic: "all",
+      words: [
+        { word: "맛있는", distinctive: false, category: "성질·품질", reason: "3호 기술적 표장:품질(류 29,30,43)" },
+        { word: "커피", distinctive: false, category: "상품 이름", reason: "3호 기술적 표장:원재료(류 30,35,43)·1호 보통명칭" },
+        { word: "전문점", distinctive: false, category: "성질·품질", reason: "3호 기술적 표장:용도(류 35,43)" },
+      ],
+      more: 0,
+      more_generic: 0,
+    });
+    const text = SearchV2ResponseSchema.parse(textFixture).name_words;
+    expect(text?.generic).toBe("some");
+    expect(text?.words.map((word) => [word.word, word.distinctive, word.category])).toEqual([
+      ["블루", true, null],
+      ["커피", false, "상품 이름"],
+    ]);
+    const famous = SearchV2ResponseSchema.parse(famousFixture).name_words;
+    expect(famous?.generic).toBe("none");
+    expect(famous?.words[0]).toMatchObject({ word: "스타벅스", distinctive: true, category: null });
+    // 이름이 없는 질의에는 싣지 않는다
+    expect("name_words" in SearchV2ResponseSchema.parse(imageFixture)).toBe(false);
+  });
+
+  it("accepts a response without the field and does not invent it (older server)", () => {
+    const older = structuredClone(descriptiveFixture) as Record<string, unknown>;
+    delete older.name_words;
+    const parsed = SearchV2ResponseSchema.parse(older);
+    expect("name_words" in parsed).toBe(false);
+    expect(parsed.candidates).toHaveLength(descriptiveFixture.candidates.length);
+  });
+
+  it("keeps unknown generic/category strings and additive keys (the screen draws only known values)", () => {
+    const fixture = structuredClone(descriptiveFixture) as typeof descriptiveFixture & {
+      name_words: Record<string, unknown> & { words: Record<string, unknown>[] };
+    };
+    fixture.name_words.generic = "most";
+    fixture.name_words.words[0].category = "새 분류";
+    fixture.name_words.words[0].future = 1;
+    fixture.name_words.future = true;
+    const parsed = SearchV2ResponseSchema.parse(fixture);
+    expect(parsed.name_words).toMatchObject({ generic: "most", future: true });
+    expect(parsed.name_words?.words[0]).toMatchObject({ category: "새 분류", future: 1 });
+  });
+
+  it("accepts a word without the raw reason", () => {
+    const fixture = structuredClone(descriptiveFixture) as unknown as {
+      name_words: { words: Record<string, unknown>[] };
+    };
+    for (const word of fixture.name_words.words) delete word.reason;
+    expect(SearchV2ResponseSchema.parse(fixture).name_words?.words).toHaveLength(3);
+  });
+
+  it("drops a malformed name_words field instead of rejecting the whole response", () => {
+    for (const broken of [
+      { generic: "all", words: "커피", more: 0, more_generic: 0 },
+      { generic: "all", words: [{ word: "커피", distinctive: "no", category: null }], more: 0, more_generic: 0 },
+      { generic: "all", words: [], more: -1, more_generic: 0 },
+      "all",
+      null,
+    ]) {
+      const fixture = Object.assign(structuredClone(descriptiveFixture), { name_words: broken });
+      const parsed = SearchV2ResponseSchema.safeParse(fixture);
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.name_words).toBeUndefined();
+      expect(parsed.data?.overall.grade).toBe(descriptiveFixture.overall.grade);
+      expect(parsed.data?.candidates).toHaveLength(descriptiveFixture.candidates.length);
+    }
+  });
+});

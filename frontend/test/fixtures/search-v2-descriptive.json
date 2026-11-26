@@ -1,0 +1,282 @@
+{
+  "api_version": "2026-10-24",
+  "research_beta": true,
+  "legal_conclusion": false,
+  "overall": {
+    "grade": "주의",
+    "prob": 0.409,
+    "pattern": "x4",
+    "caveats": [
+      "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"
+    ],
+    "query_type": {
+      "type": "문자",
+      "source": "fallback",
+      "detail": null,
+      "suggested_name": null
+    },
+    "visual_status": null,
+    "famous_floor": false
+  },
+  "famous": {
+    "status": "checked",
+    "brand_count": 58,
+    "matches": []
+  },
+  "name_words": {
+    "generic": "all",
+    "words": [
+      {
+        "word": "맛있는",
+        "distinctive": false,
+        "category": "성질·품질",
+        "reason": "3호 기술적 표장:품질(류 29,30,43)"
+      },
+      {
+        "word": "커피",
+        "distinctive": false,
+        "category": "상품 이름",
+        "reason": "3호 기술적 표장:원재료(류 30,35,43)·1호 보통명칭"
+      },
+      {
+        "word": "전문점",
+        "distinctive": false,
+        "category": "성질·품질",
+        "reason": "3호 기술적 표장:용도(류 35,43)"
+      }
+    ],
+    "more": 0,
+    "more_generic": 0
+  },
+  "candidates": [
+    {
+      "id": "4020240197305",
+      "title": "잇츠크레페 It's crepe CREPE CAFE",
+      "image_url": "/api/images/4020240197305.png",
+      "type": "결합",
+      "applicant": "김민주",
+      "nice_classes": [
+        43
+      ],
+      "axes": {
+        "x1": 0.4667,
+        "x2_text": 0.1818,
+        "x2_img": null,
+        "x3": 0.0,
+        "x4": 0.75
+      },
+      "risk": {
+        "prob": 0.409,
+        "grade": "주의",
+        "contributions": {
+          "X1": 1.001,
+          "X2": 0.155,
+          "X3": 0.0,
+          "X4": 0.719,
+          "요부": 1.21
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [],
+        "candidate_tokens": [
+          "잇츠크레페",
+          "crepe"
+        ],
+        "removed": [
+          {
+            "token": "it",
+            "reason": "6호 간단 표장",
+            "side": "candidate"
+          },
+          {
+            "token": "s",
+            "reason": "6호 간단 표장",
+            "side": "candidate"
+          },
+          {
+            "token": "cafe",
+            "reason": "3호 기술적 표장:용도(류 35,43)",
+            "side": "candidate"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "G0301",
+          "G0502",
+          "S120602"
+        ],
+        "jaccard": 0.75
+      }
+    },
+    {
+      "id": "4020180059338",
+      "title": "맛있는 건강 본죽",
+      "image_url": "/api/images/4020180059338.png",
+      "type": "결합",
+      "applicant": "본아이에프 주식회사",
+      "nice_classes": [
+        43
+      ],
+      "axes": {
+        "x1": 0.6207,
+        "x2_text": 0.3333,
+        "x2_img": null,
+        "x3": 0.0717,
+        "x4": 0.25
+      },
+      "risk": {
+        "prob": 0.404,
+        "grade": "주의",
+        "contributions": {
+          "X1": 1.332,
+          "X2": 0.285,
+          "X3": 0.0,
+          "X4": 0.24,
+          "요부": 1.21
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [],
+        "candidate_tokens": [
+          "건강",
+          "본죽"
+        ],
+        "removed": [
+          {
+            "token": "맛있는",
+            "reason": "3호 기술적 표장:품질(류 29,30,43)",
+            "side": "both"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "S120602"
+        ],
+        "jaccard": 0.25
+      },
+      "famous_brand": "본죽&비빔밥"
+    },
+    {
+      "id": "4020230007146",
+      "title": "SAPA KITCHEN FOOD&BEER",
+      "image_url": "/api/images/4020230007146.png",
+      "type": "결합",
+      "applicant": "이경호",
+      "nice_classes": [
+        43
+      ],
+      "axes": {
+        "x1": 0.4667,
+        "x2_text": 0.0,
+        "x2_img": null,
+        "x3": 0.0,
+        "x4": 0.75
+      },
+      "risk": {
+        "prob": 0.372,
+        "grade": "주의",
+        "contributions": {
+          "X1": 1.001,
+          "X2": 0.0,
+          "X3": 0.0,
+          "X4": 0.719,
+          "요부": 1.21
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [],
+        "candidate_tokens": [
+          "sapa"
+        ],
+        "removed": [
+          {
+            "token": "kitchen",
+            "reason": "3호 기술적 표장:용도(류 35,43)",
+            "side": "candidate"
+          },
+          {
+            "token": "food",
+            "reason": "3호 기술적 표장:용도(류 29,30,31,35,43)",
+            "side": "candidate"
+          },
+          {
+            "token": "beer",
+            "reason": "3호 기술적 표장:용도(류 35,43)",
+            "side": "candidate"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "G0301",
+          "G0502",
+          "S120602"
+        ],
+        "jaccard": 0.75
+      }
+    }
+  ],
+  "meta": {
+    "model_version": "risk_model_v1.4.7",
+    "grade_precision": 0.7039,
+    "thresholds": {
+      "grade": {
+        "주의": 0.0902,
+        "검토 권장": 0.5059,
+        "위험": 0.5902
+      },
+      "nameless": {
+        "noname:x2_whole": {
+          "주의": 0.3677,
+          "검토 권장": 0.491,
+          "위험": 0.5724
+        },
+        "noname:x2_whole+x4": {
+          "주의": 0.3677,
+          "검토 권장": 0.491,
+          "위험": 0.5724
+        }
+      },
+      "standalone": {
+        "x1": 0.98,
+        "x2_text": 0.75,
+        "x2_img": null,
+        "x3": 0.7707,
+        "x4": null
+      },
+      "figure": 0.9
+    },
+    "pool": {
+      "image": 0,
+      "phonetic": 20,
+      "spelling": 20,
+      "semantic": 5,
+      "goods": 20,
+      "total": 55
+    },
+    "elapsed_ms": 290
+  },
+  "dataset_info": {
+    "총_상표수": 1469,
+    "출원일자_범위": "1962 ~ 2026",
+    "데이터_기준": "KIPRIS 등록 상태 도형·복합상표, 출원인 검색 기반 연구용 표본",
+    "생성일자": "2026-11-25"
+  },
+  "index_size": 1469,
+  "top_k_requested": 3,
+  "top_k_returned": 3
+}

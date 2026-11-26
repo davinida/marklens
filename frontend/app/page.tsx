@@ -23,6 +23,8 @@ export default function Home() {
   const requestRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
   const previousPhaseRef = useRef(phase.name);
+  // "다른 이름으로 다시 확인하기"로 돌아갈 때는 제목 대신 이름 칸에 포커스한다.
+  const focusNameRef = useRef(false);
   const queryPreview = useObjectUrl(phase.name === "idle" ? null : draft?.file ?? null);
 
   const cancelCurrentRequest = useCallback(() => {
@@ -37,6 +39,15 @@ export default function Home() {
     if (previousPhaseRef.current === phase.name) return;
     previousPhaseRef.current = phase.name;
     const frame = requestAnimationFrame(() => {
+      const nameInput = focusNameRef.current
+        ? document.querySelector<HTMLInputElement>("#mark-text")
+        : null;
+      focusNameRef.current = false;
+      if (nameInput) {
+        nameInput.focus();
+        nameInput.select();
+        return;
+      }
       document.querySelector<HTMLElement>("[data-phase-heading]")?.focus();
     });
     return () => cancelAnimationFrame(frame);
@@ -88,6 +99,14 @@ export default function Home() {
 
   const edit = useCallback(() => {
     cancelCurrentRequest();
+    setPhase({ name: "idle" });
+  }, [cancelCurrentRequest]);
+
+  // 설명적 이름 안내의 "다른 이름으로 다시 확인하기" — 입력(이미지·이름·지정상품)을 그대로 둔 채 입력
+  // 화면으로 돌아가 이름 칸을 고르게 한다. 자동으로 다시 검색하지 않는다(유형 고치기와 같은 흐름).
+  const rename = useCallback(() => {
+    cancelCurrentRequest();
+    focusNameRef.current = true;
     setPhase({ name: "idle" });
   }, [cancelCurrentRequest]);
 
@@ -153,7 +172,9 @@ export default function Home() {
             result={phase.data}
             queryPreview={queryPreview}
             queryHasName={Boolean(draft?.markName)}
+            queryName={draft?.markName ?? null}
             onReset={reset}
+            onRename={rename}
             onRetypeTo={retypeTo}
             onUseSuggestedName={useSuggestedName}
           />

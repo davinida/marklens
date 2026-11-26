@@ -4,6 +4,8 @@ import { useId, useState } from "react";
 import { AlertCircle, AlertTriangle, Info, type LucideIcon } from "lucide-react";
 import { imageUrl } from "@/lib/api";
 import type { SearchV2Famous, SearchV2FamousMatch, SearchV2Grade } from "@/lib/contracts";
+import type { FamousBannerState } from "@/lib/descriptiveNotice";
+import { josaEunNeun, josaIGa, josaWaGwa } from "@/lib/josa";
 
 // 유명 상표 확인(v1.4.7) — 결과 맨 위 안내 배너. 문구는 정해진 글자 그대로(다듬지 말 것) — 브랜드·표기·
 // 글자 뒤의 조사만 받침에 맞춘다('스타벅스'와 / '삼성'과). 응답의 famous 가 없으면(확인이 꺼진 서버)
@@ -59,23 +61,6 @@ const LEVEL_VIEW: Record<
     text: "text-blue-dark",
   },
 };
-
-// 종성(받침) 유무로 조사를 고른다 — 결과 화면(ResultViewV2)의 조사 규칙과 같게 한글 음절이 아니면
-// (라틴 문자·숫자 등) 받침 없는 것으로 본다.
-function hasBatchim(text: string): boolean {
-  const code = text.trim().slice(-1).charCodeAt(0);
-  if (Number.isNaN(code) || code < 0xac00 || code > 0xd7a3) return false;
-  return (code - 0xac00) % 28 !== 0;
-}
-function josaWaGwa(text: string): "과" | "와" {
-  return hasBatchim(text) ? "과" : "와";
-}
-function josaEunNeun(text: string): "은" | "는" {
-  return hasBatchim(text) ? "은" : "는";
-}
-function josaIGa(text: string): "이" | "가" {
-  return hasBatchim(text) ? "이" : "가";
-}
 
 /** 빈 글은 없는 것으로 본다. */
 function present(value: string | null | undefined): string | null {
@@ -146,6 +131,31 @@ export function famousFloorReason(
 ): string {
   const match = famous?.matches.find((item) => item.floor !== null && item.floor === grade);
   return match?.level === LEVEL_WEAK ? FLOOR_REASON_WEAK : FLOOR_REASON_STRONG;
+}
+
+/** 배너가 그리는 일치의 종류("강함"·"약함"·"설명적 사용") — 배너를 그리지 않으면 null. 결과 화면이
+ *  맨 위 영역의 순서를 정할 때 쓴다(강함·약함 배너 → 설명적 이름 안내 → 설명적 사용 안내). */
+export function famousBannerLevel(famous: SearchV2Famous | undefined): string | null {
+  if (!famous || famous.status !== "checked") return null;
+  const first = famous.matches[0];
+  if (!first || !famousBannerText(first) || !LEVEL_VIEW[first.level]) return null;
+  return first.level;
+}
+
+export const FAMOUS_LEVEL_DESCRIPTIVE = LEVEL_DESCRIPTIVE;
+
+/** 이 배너가 설명적 이름 안내에 주는 영향(계약 v2 §4-7) — 강함·약함 배너가 없으면(없거나 "설명적
+ *  사용" 안내) "none", 배너가 이름 쪽의 강한 일치로 떴으면 "name-strong"(설명적 이름 안내를 그리지
+ *  않는다), 그 밖의 강함·약함 배너(약한 일치·로고로만 강한 일치)는 "banner"(큰 안내 대신 작은 안내).
+ *  이름 쪽 = 로고가 아닌 근거(이름·이미지 속 글자) — 배너가 "이름이 … 같거나 거의 같아요"·"이미지 속
+ *  글자 …"라고 말하는 경우와 같다. 배너가 그리는 일치(첫째와 둘째 줄) 가운데 하나라도 그러면 그렇다. */
+export function famousBannerState(famous: SearchV2Famous | undefined): FamousBannerState {
+  const level = famousBannerLevel(famous);
+  if (!famous || level === null || level === LEVEL_DESCRIPTIVE) return "none";
+  const nameStrong = famous.matches
+    .slice(0, 2)
+    .some((match) => match.level === LEVEL_STRONG && match.basis !== BASIS_LOGO);
+  return nameStrong ? "name-strong" : "banner";
 }
 
 /** 대표 로고 최대 2장 — 주소가 없거나 못 받은 그림은 빼고, 하나도 없으면 칸째 그리지 않는다. */

@@ -45,6 +45,19 @@
       }
     ]
   },
+  "name_words": {
+    "generic": "none",
+    "words": [
+      {
+        "word": "스타벅스",
+        "distinctive": true,
+        "category": null,
+        "reason": "유명 브랜드"
+      }
+    ],
+    "more": 0,
+    "more_generic": 0
+  },
   "candidates": [
     {
       "id": "4520160000776",
@@ -309,7 +322,7 @@
       "goods": 20,
       "total": 58
     },
-    "elapsed_ms": 61
+    "elapsed_ms": 92
   },
   "dataset_info": {
     "총_상표수": 1469,

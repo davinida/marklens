@@ -65,6 +65,26 @@ export const SearchV2FamousSchema = z
   })
   .passthrough();
 
+// 질의 이름의 낱말별 식별력(선택 필드 — 이름이 있는 질의만, 계약 v2 §2-7). 설명적 이름 안내가 쓴다.
+// generic·category 는 문자열로 받아 화면이 아는 값만 그린다. 형식이 다르면 그 필드만 버린다(.catch).
+export const SearchV2NameWordSchema = z
+  .object({
+    word: z.string(),
+    distinctive: z.boolean(),
+    category: z.string().nullable(), // 식별력이 없을 때만 — "상품 이름" 등 화면용 분류
+    reason: z.string().optional(), // 엔진의 사유 원문(화면은 쓰지 않는다)
+  })
+  .passthrough();
+
+export const SearchV2NameWordsSchema = z
+  .object({
+    generic: z.string(), // "all" | "some" | "none"
+    words: z.array(SearchV2NameWordSchema),
+    more: NonnegativeInt,
+    more_generic: NonnegativeInt,
+  })
+  .passthrough();
+
 export const SearchV2CandidateSchema = z
   .object({
     id: z.string().regex(/^[0-9]{13}$/),
@@ -195,6 +215,7 @@ export const SearchV2ResponseSchema = z
     top_k_requested: z.number().int().min(1).max(20),
     top_k_returned: NonnegativeInt.max(20),
     famous: SearchV2FamousSchema.optional().catch(undefined),
+    name_words: SearchV2NameWordsSchema.optional().catch(undefined),
   })
   .passthrough();
 
@@ -202,6 +223,8 @@ export type SearchV2Response = z.infer<typeof SearchV2ResponseSchema>;
 export type SearchV2Candidate = z.infer<typeof SearchV2CandidateSchema>;
 export type SearchV2Famous = z.infer<typeof SearchV2FamousSchema>;
 export type SearchV2FamousMatch = z.infer<typeof SearchV2FamousMatchSchema>;
+export type SearchV2NameWords = z.infer<typeof SearchV2NameWordsSchema>;
+export type SearchV2NameWord = z.infer<typeof SearchV2NameWordSchema>;
 export type SearchV2Grade = z.infer<typeof SearchV2GradeSchema>;
 export type SearchV2QueryType = z.infer<typeof SearchV2QueryTypeSchema>;
 

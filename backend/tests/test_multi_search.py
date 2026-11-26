@@ -236,7 +236,7 @@ def test_ocr_fallback_caveat(client, monkeypatch):
 
 
 def test_key_sets_match_contract_examples(client, ocr_on):
-    text_example, image_example, famous_example = _contract_examples()
+    text_example, image_example, famous_example, descriptive_example = _contract_examples()
     name_result = engine.multi_search(name=NAME_Q, top_k=4).to_dict()
     image_result = engine.multi_search(image=_image(), top_k=3).to_dict()
     assert _key_paths(name_result) == _key_paths(text_example)
@@ -254,6 +254,16 @@ def test_key_sets_match_contract_examples(client, ocr_on):
             "goods_overlap", "floor", "logos")}
     assert famous_example["overall"]["famous_floor"] is True
     assert famous_example["famous"]["matches"][0]["floor"] == famous_example["overall"]["grade"]
+    # 넷째 예시(설명적 이름) — 낱말별 식별력 name_words 는 이름이 있는 질의에 늘 실려, 키는 문자상표
+    # 예시와 같다(이름이 없는 이미지 예시에는 없다). 값만 다르다 — 모든 낱말이 식별력 없는 말.
+    # 후보 하나(맛있는 건강 본죽)가 유명 상표 등록부의 표장이라 그 표시만 더 있다
+    assert _key_paths(descriptive_example) - _key_paths(text_example) == {
+        "candidates.famous_brand"}
+    assert _key_paths(text_example) <= _key_paths(descriptive_example)
+    assert not any(path.startswith("name_words") for path in _key_paths(image_example))
+    assert descriptive_example["name_words"]["generic"] == "all"
+    assert text_example["name_words"]["generic"] == "some"
+    assert famous_example["name_words"]["generic"] == "none"
     for payload in (name_result, image_result, famous_result):
         json.dumps(payload, ensure_ascii=False)  # 직렬화 가능(numpy 타입 없음)
 
