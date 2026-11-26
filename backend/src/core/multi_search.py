@@ -1085,17 +1085,17 @@ def score_record(record: Record, ctx: QueryContext,
 
 def _validate_inputs(image, name, goods_codes, type_override, top_k):
     if not engine.state.ready:
-        raise RuntimeError("Engine 이 아직 초기화되지 않았습니다.")
+        raise RuntimeError("Engine 이 아직 초기화되지 않았어요.")
     if top_k is not None and (isinstance(top_k, bool) or not isinstance(top_k, int)
                               or not TOP_K_MIN <= top_k <= TOP_K_MAX):
-        raise ValueError(f"top_k 는 {TOP_K_MIN}~{TOP_K_MAX} 정수여야 합니다 (받은 값: {top_k!r}).")
+        raise ValueError(f"top_k 는 {TOP_K_MIN}~{TOP_K_MAX} 정수여야 해요 (받은 값: {top_k!r}).")
     query_name = clean_name(name) or None
     goods = valid_goods(goods_codes)[0] or None  # 형식이 안 맞는 코드는 무시(API 는 422)
     override = str(type_override).strip() if type_override is not None else ""
     if override and override not in mt.OVERRIDE_TYPES:
-        raise ValueError(f"type_override 는 {'·'.join(mt.OVERRIDE_TYPES)} 중 하나여야 합니다.")
+        raise ValueError(f"type_override 는 {'·'.join(mt.OVERRIDE_TYPES)} 중 하나여야 해요.")
     if image is None and query_name is None and goods is None:
-        raise EmptyQueryError("image, name, goods_codes 중 하나는 있어야 합니다.")
+        raise EmptyQueryError("image, name, goods_codes 중 하나는 있어야 해요.")
     return query_name, goods, override
 
 

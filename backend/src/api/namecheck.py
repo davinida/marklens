@@ -239,7 +239,7 @@ def _run_name_check(name: str) -> NameCheckResponse:
     query = multi_search.clean_input_name(name)
     if not query:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="상표명이 비어 있습니다."
+            status_code=status.HTTP_400_BAD_REQUEST, detail="상표명이 비어 있어요."
         )
     # KIPRIS가 대소문자·전각·호환문자를 동일한 검색으로 처리한다는 공급자 계약이
     # 없다. 서로 다른 원문 질의의 결과를 섞지 않도록 위 정리 외에는 정규화하지 않는다
@@ -269,7 +269,7 @@ def _run_name_check(name: str) -> NameCheckResponse:
             # 일일/월간 어느 예산이든 초과면 같은 429 — 상세 사유는 서버 로그로만.
             raise HTTPException(
                 status_code=429,
-                detail="상표명 확인 호출 한도에 도달했습니다. 한도 초기화 후 다시 시도하세요.",
+                detail="상표명 확인 호출 한도에 도달했어요. 한도 초기화 후 다시 시도하세요.",
             ) from None
         except kipris_client.KiprisConfigError as e:
             logger.warning(
@@ -277,7 +277,7 @@ def _run_name_check(name: str) -> NameCheckResponse:
             )
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="KIPRIS 상표명 확인 서비스가 준비되지 않았습니다.",
+                detail="KIPRIS 상표명 확인 서비스가 준비되지 않았어요.",
             ) from None
         except kipris_client.KiprisError as e:
             logger.warning(
@@ -287,7 +287,7 @@ def _run_name_check(name: str) -> NameCheckResponse:
             )
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="KIPRIS 상표명 확인 서비스 응답을 확인하지 못했습니다.",
+                detail="KIPRIS 상표명 확인 서비스 응답을 확인하지 못했어요.",
             ) from None
 
         summary = kipris_client.summarize_name_search(

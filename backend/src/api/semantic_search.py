@@ -78,7 +78,7 @@ def _require_enabled() -> None:
     ):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"관념 유사도 검색을 쓸 수 없습니다. {semantic_search.state.error}".strip(),
+            detail=f"관념 유사도 검색을 쓸 수 없어요. {semantic_search.state.error}".strip(),
         )
 
 
@@ -92,7 +92,7 @@ async def semantic_search_endpoint(
     if not engine.state.ready:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="엔진이 아직 초기화되지 않았습니다. 잠시 후 다시 시도하세요.",
+            detail="엔진이 아직 초기화되지 않았어요. 잠시 후 다시 시도하세요.",
         )
     _require_enabled()
     top_k = payload.top_k if payload.top_k is not None else semantic_search.TOP_K_DEFAULT
@@ -109,13 +109,13 @@ async def semantic_search_endpoint(
         logger.warning("semantic-search 캐시 준비 안 됨: %s", e)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"관념 유사도 검색을 쓸 수 없습니다. {e}".strip(),
+            detail=f"관념 유사도 검색을 쓸 수 없어요. {e}".strip(),
         ) from None
     except Exception:
         logger.exception("semantic-search 처리 중 서버 오류")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="관념 유사도 계산 중 서버 오류가 발생했습니다.",
+            detail="관념 유사도 계산 중 서버 오류가 발생했어요.",
         ) from None
 
     # 질의 원문은 로그에 남기지 않는다(/phonetic-search 와 같은 정책) — 건수·시간만.
@@ -134,5 +134,5 @@ async def semantic_search_endpoint(
         logger.exception("semantic-search 응답 조립 중 계약 오류")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="관념 유사도 응답을 만들 수 없습니다.",
+            detail="관념 유사도 응답을 만들 수 없어요.",
         ) from None

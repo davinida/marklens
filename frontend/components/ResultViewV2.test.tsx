@@ -244,9 +244,10 @@ describe("ResultViewV2 — 후보 0건(§5-4)", () => {
 });
 
 describe("ResultViewV2 — 이미지에서 글자 제안(NAME_SUGGESTED)", () => {
-  it("'상표명으로 넣기' 버튼이 onUseSuggestedName 을 호출한다", async () => {
+  it("로고만 넣은 검색이면 '상표명으로 넣기' 대신 상표명 입력 안내의 버튼이 읽은 글자를 넘긴다(§4-9)", async () => {
     const user = userEvent.setup();
     const onUseSuggestedName = vi.fn();
+    const onAddName = vi.fn();
     const fixtureWithSuggestion = {
       ...SEARCH_V2_FIGURE_FIXTURE,
       overall: {
@@ -265,11 +266,14 @@ describe("ResultViewV2 — 이미지에서 글자 제안(NAME_SUGGESTED)", () =>
         queryHasName={false}
         onReset={vi.fn()}
         onUseSuggestedName={onUseSuggestedName}
+        onAddName={onAddName}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /상표명으로 넣기/ }));
-    expect(onUseSuggestedName).toHaveBeenCalledWith("블루커피");
+    expect(screen.queryByRole("button", { name: /상표명으로 넣기/ })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "이 이름을 넣고 다시 확인하기" }));
+    expect(onAddName).toHaveBeenCalledWith("블루커피");
+    expect(onUseSuggestedName).not.toHaveBeenCalled();
   });
 });
 

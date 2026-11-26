@@ -22,7 +22,7 @@ class PhoneticSearchRequest(BaseModel):
     @classmethod
     def _reject_blank(cls, value: str) -> str:
         if not value.strip():
-            raise ValueError("상표명이 비어 있습니다.")
+            raise ValueError("상표명이 비어 있어요.")
         return value
 
 

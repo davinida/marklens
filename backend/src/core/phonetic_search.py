@@ -164,7 +164,7 @@ def search(name: str, top_k: int, min_similarity: float) -> PhoneticSearchResult
     서식 문자 제거·NFC 는 통합 검색·상표명 확인과 같은 clean_input_name — 견고성 점검 R-P1-6)."""
     query = clean_input_name(name)
     if not query:
-        raise ValueError("상표명이 비어 있습니다.")
+        raise ValueError("상표명이 비어 있어요.")
     _ensure_fresh()
     started = time.perf_counter()
     query_candidates = tuple(pronunciation_candidates(query))

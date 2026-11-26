@@ -445,6 +445,6 @@ def test_configuration_error_maps_to_503(monkeypatch):
         namecheck._run_name_check("마크렌즈")
     except HTTPException as exc:
         assert exc.status_code == 503
-        assert exc.detail == "KIPRIS 상표명 확인 서비스가 준비되지 않았습니다."
+        assert exc.detail == "KIPRIS 상표명 확인 서비스가 준비되지 않았어요."
     else:
         raise AssertionError("KiprisConfigError가 HTTP 503으로 변환되지 않았습니다.")

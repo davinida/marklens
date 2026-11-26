@@ -135,7 +135,7 @@ def presets_for(query: str) -> list[BusinessPreset]:
 
 def _require() -> GoodsMap:
     if not state.ready or state.goods_map is None:
-        raise RuntimeError(state.error or "상품↔유사군 변환표가 준비되지 않았습니다.")
+        raise RuntimeError(state.error or "상품↔유사군 변환표가 준비되지 않았어요.")
     return state.goods_map
 
 
