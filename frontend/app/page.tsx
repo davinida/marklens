@@ -5,6 +5,7 @@ import ErrorView from "@/components/ErrorView";
 import LoadingView from "@/components/LoadingView";
 import ResultViewV2 from "@/components/ResultViewV2";
 import SearchForm, {
+  type MarkTypeOverride,
   type SearchDraft,
   type SearchFormValue,
 } from "@/components/SearchForm";
@@ -138,6 +139,34 @@ export default function Home() {
     [cancelCurrentRequest],
   );
 
+  // 로고만 넣은 결과의 "이름 넣고 다시 확인하기"(§4-9) — 입력 화면으로 돌아가 이름 칸에 포커스를 둔다.
+  // 로고에서 읽은 글자가 오면 이름 칸에 채운다(틀릴 수 있어 바로 검색하지 않는다). 로고·업종은 draft 에
+  // 그대로 있고, 사용자가 고친 유형(응답의 query_type.source 가 user)은 다음 제출에도 쓰게 다시 채운다.
+  const addName = useCallback(
+    (name: string | null) => {
+      cancelCurrentRequest();
+      focusNameRef.current = true;
+      const queryType = phase.name === "result" ? phase.data.overall.query_type : null;
+      const keptType: MarkTypeOverride | null =
+        queryType?.source === "user"
+          ? queryType.type.startsWith("결합")
+            ? "결합"
+            : (queryType.type as MarkTypeOverride)
+          : null;
+      setDraft((current) =>
+        current
+          ? {
+              ...current,
+              ...(name !== null ? { markName: name, nameFromSuggestion: true } : {}),
+              typeOverride: keptType,
+            }
+          : current,
+      );
+      setPhase({ name: "idle" });
+    },
+    [cancelCurrentRequest, phase],
+  );
+
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-10 border-b border-line/80 bg-bg/90 backdrop-blur">
@@ -177,6 +206,16 @@ export default function Home() {
             onRename={rename}
             onRetypeTo={retypeTo}
             onUseSuggestedName={useSuggestedName}
+            onAddName={addName}
+            query={
+              draft
+                ? {
+                    name: draft.markName,
+                    logo: queryPreview,
+                    goods: (draft.goods ?? []).map((good) => good.name),
+                  }
+                : null
+            }
           />
         )}
         {phase.name === "error" && (

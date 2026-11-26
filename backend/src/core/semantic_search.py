@@ -41,7 +41,7 @@ NOTE_NO_MEANING = "관념 없음(조어)"
 TOP_K_MAX = 5  # 반환 상한(작업 명세)
 TOP_K_DEFAULT = TOP_K_MAX
 DISABLED_REASON = (
-    "MARKLENS_X3_ENABLED=0 — 관념 유사도 검색이 꺼져 있습니다(기동 시 임베딩 캐시 생략)."
+    "MARKLENS_X3_ENABLED=0 — 관념 유사도 검색이 꺼져 있어요(기동 시 임베딩 캐시 생략)."
 )
 
 
@@ -199,7 +199,7 @@ def _ensure_fresh() -> None:
             return
         load_all()
         if not state.ready:
-            raise RuntimeError(state.error or "관념 유사도 캐시가 준비되지 않았습니다.")
+            raise RuntimeError(state.error or "관념 유사도 캐시가 준비되지 않았어요.")
 
 
 def _scores(query_vector: np.ndarray) -> np.ndarray:
@@ -218,7 +218,7 @@ def search(name: str, top_k: int, min_score: float) -> SemanticSearchResult:
     R-P1-6)."""
     query = clean_input_name(name)
     if not query:
-        raise ValueError("상표명이 비어 있습니다.")
+        raise ValueError("상표명이 비어 있어요.")
     if not state.enabled:
         raise RuntimeError(state.error or DISABLED_REASON)
     _ensure_fresh()

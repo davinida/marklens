@@ -122,7 +122,7 @@ def test_rate_limit_blocks_over_quota_with_korean_message():
 
     resp = client.get("/ping")
     assert resp.status_code == 429
-    assert "요청이 너무 많습니다" in resp.json()["detail"]
+    assert "요청이 너무 많아요" in resp.json()["detail"]
 
 
 def test_images_rate_limit_config_exists_and_is_validated():

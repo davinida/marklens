@@ -26,7 +26,14 @@ import {
   showsCrossGoodsOverallLine,
 } from "@/lib/crossGoods";
 import { NOTICE_TEXT, showsWholeNameLine } from "@/lib/descriptiveNotice";
-import { josaEuroRo as typeParticle } from "@/lib/josa";
+import { josaEulReul, josaEunNeun, josaEuroRo } from "@/lib/josa";
+import {
+  REFERENCE_NOTE,
+  logoOnlyNoticeKind,
+  splitCaveats,
+  type QuerySummaryInput,
+} from "@/lib/resultExtras";
+import { LogoOnlyNotice, PhotoNotice, QuerySummary } from "@/components/ResultExtras";
 // v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
 import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/visualStatusView";
 
@@ -151,7 +158,7 @@ export function ruleTriggerLines(
 
 /** 유형 고치기 버튼의 글자 — "문자로 고치기"·"도형으로 고치기"·"결합으로 고치기". */
 export function retypeLabel(type: string): string {
-  return `${type}${typeParticle(type)} 고치기`;
+  return `${type}${josaEuroRo(type)} 고치기`;
 }
 
 // API 계약 v2 §2-5 FIGURE_LOW_DATA·§4-5 — 후보 카드의 도형 참고 문구(응답 caveat 과 같은 문장)
@@ -260,22 +267,7 @@ function reasonPhrase(reason: string): string {
   return "식별력이 약한 말";
 }
 
-// 종성(받침) 유무로 조사를 고른다. 한글 음절이 아니면(라틴 문자 등) 받침 없는 것으로 본다.
-function hasBatchim(text: string): boolean {
-  const last = text.trim().slice(-1);
-  const code = last.charCodeAt(0);
-  if (code < 0xac00 || code > 0xd7a3) return false;
-  return (code - 0xac00) % 28 !== 0;
-}
-function josaEunNeun(text: string): "은" | "는" {
-  return hasBatchim(text) ? "은" : "는";
-}
-function josaEuroRo(text: string): "으로" | "로" {
-  if (!hasBatchim(text)) return "로";
-  const code = text.trim().slice(-1).charCodeAt(0);
-  const finalConsonant = (code - 0xac00) % 28;
-  return finalConsonant === 8 ? "로" : "으로"; // 8 = ㄹ 받침
-}
+// 조사는 lib/josa.ts(은/는·으로/로·을/를 — 한글 음절로 끝나지 않으면 받침 없는 것으로 본다)
 
 /** 0–1 점수를 % 정수로 — 내림. 기준(시각 상태 0.75·도형 규칙 0.9·단독 임계값 0.98 등)을 넘지 않은 값이
  *  넘은 것처럼 보이지 않게 한다(0.7499 → 74%). 1e-9 는 0.57 * 100 = 56.99… 같은 이진 표현 오차 보정으로,
@@ -698,6 +690,8 @@ export default function ResultViewV2({
   onRename,
   onRetypeTo,
   onUseSuggestedName,
+  query,
+  onAddName,
 }: {
   result: SearchV2Response;
   queryPreview: string | null;
@@ -712,6 +706,11 @@ export default function ResultViewV2({
   onRetypeTo?: (type: "문자" | "도형" | "결합") => void;
   /** "상표명으로 넣기" — OCR 이 읽은 글자를 이름 칸에 채워 입력 화면으로 돌아간다. */
   onUseSuggestedName?: (name: string) => void;
+  /** 화면이 갖고 있는 입력 상태(이름·로고·업종) — 검색 내용 한 줄에 쓴다. 없으면 그 줄을 그리지 않는다. */
+  query?: QuerySummaryInput | null;
+  /** 로고만 넣은 검색의 "이름 넣고 다시 확인하기" — 입력 화면으로 돌아가 이름 칸에 포커스(글자가 오면
+   *  이름 칸에 채운다). 로고·업종·고친 유형은 유지한다. */
+  onAddName?: (name: string | null) => void;
 }) {
   const { overall, candidates, meta } = result;
   const view = overall.grade ? GRADE_VIEW[overall.grade] : null;
@@ -728,6 +727,10 @@ export default function ResultViewV2({
   const famousState = famousBannerState(result.famous);
   // 로고만 넣은 검색 — 이름이 없고 이미지가 있는 질의(이미지가 없으면 visual_status 가 null, §2-1)
   const logoOnly = !queryHasName && overall.visual_status !== null;
+  // 로고만 넣은 검색의 상표명 입력 안내(§4-9) — 뜨면 같은 내용의 기존 줄("이미지에서 '…'를 읽었어요"·
+  // 주의 목록의 NAME_SUGGESTED)은 그리지 않는다. 사진 안내(PHOTO_QUERY)는 주의 목록에서 맨 위로 옮긴다.
+  const logoOnlyKind = logoOnlyNoticeKind(logoOnly, overall.query_type.suggested_name);
+  const { photo: photoNotice, rest: caveats } = splitCaveats(overall.caveats, logoOnlyKind !== null);
   // 처음 보이는 범위 밖의 "업종은 다르지만 표장이 닮은 상표"(§4-8) — 없으면 칸을 만들지 않는다
   const moreCrossGoods = crossGoodsMore(result);
   const famousBanner = <FamousBanner famous={result.famous} />;
@@ -745,6 +748,15 @@ export default function ResultViewV2({
         onRename={onRename}
       />
       {famousAfterNotice && famousBanner}
+      {photoNotice && <PhotoNotice text={photoNotice} />}
+      {logoOnlyKind && (
+        <LogoOnlyNotice
+          kind={logoOnlyKind}
+          suggestedName={overall.query_type.suggested_name}
+          onAddName={onAddName}
+        />
+      )}
+      {query && <QuerySummary query={query} />}
       <section className={`rounded-lg border p-5 ${view ? `${view.border} ${view.bg}` : "border-line bg-card"}`}>
         <div className="flex items-start gap-4">
           {queryPreview && (
@@ -850,10 +862,11 @@ export default function ResultViewV2({
               </p>
             )}
 
-            {overall.query_type.suggested_name && onUseSuggestedName && (
+            {logoOnlyKind === null && overall.query_type.suggested_name && onUseSuggestedName && (
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-card px-3 py-2">
                 <span className="text-[11.5px] text-sub">
-                  이미지에서 &apos;{overall.query_type.suggested_name}&apos;를 읽었어요
+                  이미지에서 &apos;{overall.query_type.suggested_name}&apos;
+                  {josaEulReul(overall.query_type.suggested_name)} 읽었어요
                 </span>
                 <button
                   type="button"
@@ -866,9 +879,9 @@ export default function ResultViewV2({
               </div>
             )}
 
-            {overall.caveats.length > 0 && (
+            {caveats.length > 0 && (
               <ul className="mt-3 flex flex-col gap-1">
-                {overall.caveats.map((caveat) => (
+                {caveats.map((caveat) => (
                   <li key={caveat} className="text-[11px] leading-relaxed text-sub">
                     <span aria-hidden>· </span>
                     <span>{caveat}</span>
@@ -876,6 +889,9 @@ export default function ResultViewV2({
                 ))}
               </ul>
             )}
+            <p data-testid="reference-note" className="mt-3 text-[10.5px] text-sub">
+              {REFERENCE_NOTE}
+            </p>
           </div>
         </div>
       </section>

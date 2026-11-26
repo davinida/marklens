@@ -159,6 +159,82 @@ describe("SearchForm search button", () => {
 describe("SearchForm name check", () => {
   beforeEach(() => vi.stubGlobal("fetch", vi.fn()));
 
+  it("'이름 확인' 버튼은 검색 버튼과 같은 정리로 켜고 끈다 — 공백만·보이지 않는 글자만이면 꺼짐", async () => {
+    const invisible = String.fromCodePoint(0x200b, 0xfeff, 0x2060, 0x00ad);
+    render(<SearchForm onSubmit={vi.fn()} initialValue={{ file: null, markName: "블", topK: 5 }} />);
+    const check = screen.getByRole("button", { name: "이름 확인" });
+    const input = screen.getByRole("textbox", { name: "상표 이름" });
+    await waitFor(() => expect(check).toBeEnabled()); // 자동 요청 확인 토큰이 왔고 이름은 '블'
+
+    fireEvent.change(input, { target: { value: "   " } });
+    expect(check).toBeDisabled();
+    fireEvent.change(input, { target: { value: invisible } });
+    expect(check).toBeDisabled();
+    fireEvent.change(input, { target: { value: ` ${invisible} ` } });
+    expect(check).toBeDisabled();
+    fireEvent.change(input, { target: { value: `블${invisible}루 커피` } });
+    expect(check).toBeEnabled();
+  });
+
+  it("보이지 않는 글자가 섞인 이름은 정리한 이름으로 확인을 요청한다", async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({ detail: "잠시 뒤 다시" }, 503));
+    const invisible = String.fromCodePoint(0x200b);
+    const user = userEvent.setup();
+    render(
+      <SearchForm
+        onSubmit={vi.fn()}
+        initialValue={{ file: null, markName: ` 블${invisible}루 `, topK: 5 }}
+      />,
+    );
+    const check = screen.getByRole("button", { name: "이름 확인" });
+    await waitFor(() => expect(check).toBeEnabled());
+    await user.click(check);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(vi.mocked(fetch).mock.calls[0][1]).toEqual(
+      expect.objectContaining({
+        body: JSON.stringify({ name: "블루", turnstileToken: "test-token" }),
+      }),
+    );
+  });
+
+  it("특허청 조회 서비스의 응답을 받지 못하면(502) 할 수 있는 일을 알려 주는 문구를 보인다", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse({ detail: "KIPRIS 상표명 확인 서비스 응답을 확인하지 못했어요." }, 502),
+    );
+    const user = userEvent.setup();
+    render(
+      <SearchForm onSubmit={vi.fn()} initialValue={{ file: null, markName: "블루커피", topK: 5 }} />,
+    );
+    const check = screen.getByRole("button", { name: "이름 확인" });
+    await waitFor(() => expect(check).toBeEnabled());
+    await user.click(check);
+    expect(
+      await screen.findByText(
+        "특허청 조회 서비스에서 응답을 받지 못했어요. 잠시 뒤 다시 눌러 주세요. 검색은 그대로 쓸 수 있어요.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByText(/KIPRIS 상표명 확인 서비스 응답/)).not.toBeInTheDocument();
+  });
+
+  it("요청 한도(429)는 서버가 준 문장 그대로 보인다", async () => {
+    vi.mocked(fetch).mockResolvedValue(
+      jsonResponse(
+        { detail: "상표명 확인 호출 한도에 도달했어요. 한도 초기화 후 다시 시도하세요." },
+        429,
+      ),
+    );
+    const user = userEvent.setup();
+    render(
+      <SearchForm onSubmit={vi.fn()} initialValue={{ file: null, markName: "블루커피", topK: 5 }} />,
+    );
+    const check = screen.getByRole("button", { name: "이름 확인" });
+    await waitFor(() => expect(check).toBeEnabled());
+    await user.click(check);
+    expect(
+      await screen.findByText("상표명 확인 호출 한도에 도달했어요. 한도 초기화 후 다시 시도하세요."),
+    ).toBeVisible();
+  });
+
   it("posts the name and presents partial coverage", async () => {
     vi.mocked(fetch).mockResolvedValue(
       new Response(

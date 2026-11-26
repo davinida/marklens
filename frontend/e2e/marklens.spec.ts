@@ -878,3 +878,107 @@ test("a look-alike mark in a different business is marked on its card, next to t
   expect(searchBody).toContain("블루핸즈");
   expect(searchBody).toContain("S120602");
 });
+
+test("a logo-only search invites the user to add the name read from the logo, keeping the logo and goods", async ({
+  page,
+}) => {
+  await page.route("**/api/goods/search?*", async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        url.searchParams.get("q") === "커피"
+          ? GOODS_SEARCH_RESULT
+          : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
+      ),
+    });
+  });
+  await page.route("**/api/goods/classes", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(GOODS_CLASSES_RESULT),
+    });
+  });
+  // 로고만 넣은 검색의 응답 — 로고에서 읽은 글자(suggested_name)와 사진 안내가 주의 문구로 함께 온다.
+  const nameSuggested =
+    "이미지에서 'BLUhands'를 읽었어요 — 상표명으로 넣으면 호칭·철자·관념도 비교해요";
+  const photo = "사진으로 보여요 — 로고 파일을 올리면 외관 비교가 더 정확해요";
+  const base = buildSearchV2Result({ x4: 0.5, nice_classes: [43] });
+  const result = {
+    ...base,
+    overall: {
+      ...base.overall,
+      pattern: "noname:x2_whole+x4",
+      caveats: ["상표명이 없어 호칭·철자·관념 축은 비교하지 않았어요", nameSuggested, photo],
+      query_type: {
+        type: "결합-도형요부",
+        source: "ocr",
+        detail: { text_ratio: 0.2, fig_ratio: 0.5 },
+        suggested_name: "BLUhands",
+      },
+      visual_status: "WEAK_MATCH",
+    },
+  };
+  let searches = 0;
+  await page.route("**/api/search/v2*", async (route) => {
+    searches += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(result),
+    });
+  });
+
+  const picker = page.getByRole("combobox", { name: "지정상품 검색" });
+  await picker.fill("커피");
+  await page.getByRole("option", { name: /^커피 제30류/ }).click();
+  await chooseLogo(page);
+  await page
+    .getByRole("dialog", { name: "분석할 로고 영역 선택" })
+    .getByRole("button", { name: "전체 이미지 사용" })
+    .click();
+  await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
+  await expect(page.getByTestId("overall-grade")).toHaveText("안전");
+
+  // 맨 위 안내: 사진 안내 → 상표명 입력 안내(A형), 그 아래 검색 내용 한 줄 → 전체 등급
+  const notice = page.getByTestId("logo-only-notice");
+  await expect(notice).toHaveAttribute("data-kind", "read");
+  await expect(notice.getByTestId("logo-only-line")).toHaveText(
+    "로고에서 'BLUhands'를 읽었어요. 지금은 로고 모양만 비교했어요. 이름까지 넣으면 이름이 닮은 상표도 찾을 수 있어요.",
+  );
+  await expect(page.getByTestId("photo-notice")).toHaveText(photo);
+  await expect(page.getByText(photo)).toHaveCount(1);
+  // 같은 내용의 기존 줄은 보이지 않는다
+  await expect(page.getByRole("button", { name: /상표명으로 넣기/ })).toHaveCount(0);
+  await expect(page.getByText(nameSuggested)).toHaveCount(0);
+  await expect(page.getByText("상표명이 없어 호칭·철자·관념 축은 비교하지 않았어요")).toBeVisible();
+  const order = await page.evaluate(() => {
+    const top = (id: string) =>
+      document.querySelector(`[data-testid="${id}"]`)!.getBoundingClientRect().top;
+    return ["photo-notice", "logo-only-notice", "query-summary", "overall-grade"].map(top);
+  });
+  expect([...order].sort((a, b) => a - b)).toEqual(order);
+  const summary = page.getByTestId("query-summary");
+  await expect(summary.getByTestId("query-summary-name")).toHaveText("이름 없음");
+  await expect(summary.getByRole("img", { name: "검색한 로고" })).toBeVisible();
+  await expect(summary.getByTestId("query-summary-goods")).toHaveText("커피");
+  await expect(page.getByTestId("reference-note")).toHaveText(
+    "참고용 결과예요. 법적 판단이 아니에요.",
+  );
+  await expectNoHorizontalOverflow(page);
+
+  // 버튼 — 입력 화면으로 돌아가 이름 칸에 읽은 글자를 채우고 포커스, 로고·업종은 그대로, 다시 검색하지 않음
+  await notice.getByRole("button", { name: "이 이름을 넣고 다시 확인하기" }).click();
+  const nameInput = page.getByRole("textbox", { name: "상표 이름" });
+  await expect(nameInput).toHaveValue("BLUhands");
+  await expect(nameInput).toBeFocused();
+  await expect(page.getByRole("img", { name: "선택한 로고 미리보기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "커피 제거" })).toBeVisible();
+  await expect(
+    page.getByText("이미지에서 읽은 글자예요 — 틀린 부분이 있으면 고쳐 주세요."),
+  ).toBeVisible();
+  expect(searches).toBe(1);
+  await expectNoHorizontalOverflow(page);
+});

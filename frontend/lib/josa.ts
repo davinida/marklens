@@ -22,6 +22,10 @@ export function josaEuroRo(text: string): "으로" | "로" {
   return (code - 0xac00) % 28 === 8 ? "로" : "으로"; // 8 = ㄹ 받침
 }
 
+export function josaEulReul(text: string): "을" | "를" {
+  return hasBatchim(text) ? "을" : "를";
+}
+
 export function josaIGa(text: string): "이" | "가" {
   return hasBatchim(text) ? "이" : "가";
 }

@@ -150,7 +150,7 @@ def test_inclusive_boundaries(api, top_k):
     (multi_search.EmptyQueryError("sensitive"), 400),
     (ValueError("sensitive"), 422),
     (multi_search.ModelNotReadyError("sensitive"), 503),
-    (RuntimeError("Engine 이 아직 초기화되지 않았습니다."), 503),
+    (RuntimeError("Engine 이 아직 초기화되지 않았어요."), 503),
     (RuntimeError("sensitive"), 500),
     (KeyError("sensitive"), 500),
 ])

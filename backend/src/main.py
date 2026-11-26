@@ -94,7 +94,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
     logger.exception("처리되지 않은 예외: %s %s", request.method, request.url.path)
     return JSONResponse(
         status_code=500,
-        content={"detail": "서버 내부 오류가 발생했습니다. 로그의 요청 ID로 문의하세요."},
+        content={"detail": "서버 내부 오류가 발생했어요. 로그의 요청 ID로 문의하세요."},
     )
 
 

@@ -81,7 +81,7 @@ async def phonetic_search_endpoint(
     if not engine.state.ready:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="엔진이 아직 초기화되지 않았습니다. 잠시 후 다시 시도하세요.",
+            detail="엔진이 아직 초기화되지 않았어요. 잠시 후 다시 시도하세요.",
         )
     top_k = payload.top_k if payload.top_k is not None else config.PHONETIC_TOP_K_DEFAULT
     min_similarity = config.PHONETIC_MIN_SIMILARITY
@@ -97,13 +97,13 @@ async def phonetic_search_endpoint(
         logger.exception("phonetic-search 발음 캐시 준비 실패")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="발음 유사도 캐시가 준비되지 않았습니다. 잠시 후 다시 시도하세요.",
+            detail="발음 유사도 캐시가 준비되지 않았어요. 잠시 후 다시 시도하세요.",
         ) from None
     except Exception:
         logger.exception("phonetic-search 처리 중 서버 오류")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="발음 유사도 계산 중 서버 오류가 발생했습니다.",
+            detail="발음 유사도 계산 중 서버 오류가 발생했어요.",
         ) from None
 
     # 질의 원문은 로그에 남기지 않는다(/name-check 와 같은 정책) — 건수·시간만.
@@ -121,5 +121,5 @@ async def phonetic_search_endpoint(
         logger.exception("phonetic-search 응답 조립 중 계약 오류")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="발음 유사도 응답을 만들 수 없습니다.",
+            detail="발음 유사도 응답을 만들 수 없어요.",
         ) from None

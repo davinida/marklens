@@ -63,7 +63,7 @@ async def rate_limit_exceeded_handler(
     response = JSONResponse(
         status_code=429,
         content={
-            "detail": "요청이 너무 많습니다. 잠시 후 다시 시도하세요."
+            "detail": "요청이 너무 많아요. 잠시 후 다시 시도하세요."
             + (f" ({limit})" if limit else "")
         },
     )

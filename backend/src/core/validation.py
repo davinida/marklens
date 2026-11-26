@@ -20,13 +20,13 @@ def validate_upload_size(raw_bytes: bytes) -> None:
     if len(raw_bytes) == 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="빈 파일입니다.",
+            detail="빈 파일이에요.",
         )
     if len(raw_bytes) > config.MAX_UPLOAD_BYTES:
         raise HTTPException(
             status_code=413,
             detail=(
-                f"파일 크기 상한({config.MAX_UPLOAD_BYTES} bytes)을 초과했습니다. "
+                f"파일 크기 상한({config.MAX_UPLOAD_BYTES} bytes)을 초과했어요. "
                 f"받은 크기: {len(raw_bytes)} bytes."
             ),
         )
@@ -58,12 +58,12 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
     except UnidentifiedImageError:
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="이미지로 디코딩할 수 없는 파일입니다.",
+            detail="이미지로 디코딩할 수 없는 파일이에요.",
         ) from None
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이미지 헤더를 읽을 수 없습니다.",
+            detail="이미지 헤더를 읽을 수 없어요.",
         ) from None
 
     fmt = (source.format or "").upper()
@@ -83,7 +83,7 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"이미지가 너무 작습니다: {w}x{h} "
+                f"이미지가 너무 작아요: {w}x{h} "
                 f"(최소 {config.MIN_IMAGE_DIM}x{config.MIN_IMAGE_DIM})"
             ),
         )
@@ -92,7 +92,7 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"이미지 치수 상한을 초과했습니다: {w}x{h} "
+                f"이미지 치수 상한을 초과했어요: {w}x{h} "
                 f"(최대 {config.MAX_IMAGE_DIM}x{config.MAX_IMAGE_DIM})"
             ),
         )
@@ -101,7 +101,7 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=(
-                f"이미지 픽셀 수 상한을 초과했습니다: {w * h} "
+                f"이미지 픽셀 수 상한을 초과했어요: {w * h} "
                 f"(최대 {config.MAX_IMAGE_PIXELS})"
             ),
         )
@@ -118,12 +118,12 @@ def validate_and_decode(raw_bytes: bytes) -> Image.Image:
     except (Image.DecompressionBombError, Image.DecompressionBombWarning):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="안전하게 처리할 수 없는 이미지 크기입니다.",
+            detail="안전하게 처리할 수 없는 이미지 크기예요.",
         ) from None
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="손상되었거나 완전히 디코딩할 수 없는 이미지입니다.",
+            detail="손상되었거나 완전히 디코딩할 수 없는 이미지예요.",
         ) from None
     finally:
         source.close()

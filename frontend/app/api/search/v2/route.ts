@@ -102,7 +102,7 @@ export async function POST(request: Request): Promise<Response> {
     return jsonError(422, "type_override는 문자·도형·결합 중 하나여야 해요.", requestId);
   }
   if (image === null && !name && goodsCodes.length === 0) {
-    return jsonError(400, "image, name, goods_codes 중 하나는 있어야 합니다.", requestId);
+    return jsonError(400, "image, name, goods_codes 중 하나는 있어야 해요.", requestId);
   }
 
   // Rebuild the body so verification tokens and unvalidated fields never cross the BFF.

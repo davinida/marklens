@@ -36,7 +36,7 @@ def _require_ready() -> None:
     if not goods.state.ready:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"상품 검색 데이터가 준비되지 않았습니다. {goods.state.error}".strip(),
+            detail=f"상품 검색 데이터가 준비되지 않았어요. {goods.state.error}".strip(),
         )
 
 
@@ -65,7 +65,7 @@ def goods_search(
     if not query and nice_class is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail="상품명 검색어(q, 1~50자) 또는 류 번호(nice_class, 1~45) 중 하나는 필요합니다.",
+            detail="상품명 검색어(q, 1~50자) 또는 류 번호(nice_class, 1~45) 중 하나는 필요해요.",
         )
     try:
         if query:
@@ -80,7 +80,7 @@ def goods_search(
         logger.exception("goods-search 처리 중 서버 오류")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="상품 검색 중 서버 오류가 발생했습니다.",
+            detail="상품 검색 중 서버 오류가 발생했어요.",
         ) from None
 
     logger.info(

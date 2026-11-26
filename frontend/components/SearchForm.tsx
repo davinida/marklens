@@ -26,6 +26,7 @@ import type {
 } from "@/lib/contracts";
 import { goodsCodeUnion, type SelectedGood } from "@/lib/goods";
 import { cleanInputName } from "@/lib/markName";
+import { nameCheckFailureMessage } from "@/lib/resultExtras";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
@@ -242,7 +243,8 @@ export default function SearchForm({
   });
 
   const runNameCheck = async () => {
-    const name = markName.trim();
+    // 검색 버튼과 같은 정리(서식 문자 제거 → NFC → 앞뒤 공백) — 보이지 않는 글자만이면 이름이 없는 것
+    const name = cleanInputName(markName);
     if (!name) {
       setNamePhase({ name: "error", message: "확인할 상표 이름을 입력해 주세요." });
       return;
@@ -274,13 +276,7 @@ export default function SearchForm({
       }
     } catch (error) {
       if (controller.signal.aborted || generation !== nameGenerationRef.current) return;
-      setNamePhase({
-        name: "error",
-        message:
-          error instanceof ApiError
-            ? error.message
-            : "이름을 확인하지 못했어요. 다시 시도해 주세요.",
-      });
+      setNamePhase({ name: "error", message: nameCheckFailureMessage(error) });
     } finally {
       turnstileRef.current?.reset();
     }
@@ -443,7 +439,7 @@ export default function SearchForm({
           <button
             type="button"
             onClick={runNameCheck}
-            disabled={!markName.trim() || !turnstileToken || namePhase.name === "loading"}
+            disabled={!trimmedName || !turnstileToken || namePhase.name === "loading"}
             className="press shrink-0 rounded-md bg-low-bg px-4 py-2 text-[13px] font-bold text-sub disabled:text-disabled-text"
           >
             {namePhase.name === "loading" ? "확인 중" : "이름 확인"}
