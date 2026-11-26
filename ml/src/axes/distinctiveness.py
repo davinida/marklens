@@ -508,7 +508,7 @@ class Distinctiveness:
         self.code_classes = code_classes or {}
         self.theta, self.theta_a, self.theta_n = theta, theta_a, theta_n
         self.descriptive = descriptive  # None 이면 모듈 상수 DESCRIPTIVE_TERMS 를 본다
-        self._judge_cache: dict[tuple[str, frozenset[str]], TokenJudgement] = {}
+        self._judge_cache: dict[tuple, TokenJudgement] = {}
 
     # ---- 1호 ----
     def is_generic_name(self, token: str, goods_codes: frozenset[str] | None) -> bool:
@@ -523,26 +523,32 @@ class Distinctiveness:
         return any(codes & goods_codes or nice_class in classes for nice_class, codes in items)
 
     # ---- 토큰 ----
-    def judge(self, token: str, goods_codes: Iterable[str] | None = None) -> TokenJudgement:
+    def judge(self, token: str, goods_codes: Iterable[str] | None = None, *,
+              famous_exception: bool = True) -> TokenJudgement:
         """토큰 하나의 식별력 판정. (토큰, 유사군) 키로 캐시한다 — 서비스(E-2)가 후보 수십 건마다
         같은
         질의 토큰을 반복 판정하므로. 판정은 적재된 통계·목록만 보는 순수 계산이라 캐시가
-        안전하다."""
+        안전하다.
+
+        famous_exception=False 면 유명 브랜드 예외(1.0 고정)를 건너뛰고 나머지 판정을 그대로 한다 —
+        유명 상표 확인 단계(src.famous_check)가 "유명하지 않았다면 이 낱말이 그 업종에서 식별력이
+        있는가"를 볼 때 쓴다. 기본 True 는 지금까지의 판정과 같다."""
         token = unicodedata.normalize("NFKC", str(token or "")).casefold().strip()
         goods = frozenset(c.strip().upper() for c in (goods_codes or ()) if c and c.strip())
-        key = (token, goods)
+        key = (token, goods) if famous_exception else (token, goods, False)
         cached = self._judge_cache.get(key)
         if cached is None:
             if len(self._judge_cache) >= JUDGE_CACHE_SIZE:
                 self._judge_cache.clear()
-            cached = self._judge_uncached(token, goods)
+            cached = self._judge_uncached(token, goods, famous_exception)
             self._judge_cache[key] = cached
         return cached
 
-    def _judge_uncached(self, token: str, goods: frozenset[str]) -> TokenJudgement:
+    def _judge_uncached(self, token: str, goods: frozenset[str],
+                        famous_exception: bool = True) -> TokenJudgement:
         if not token:
             return TokenJudgement(token, 0.0, ("빈 토큰",))
-        if token in self.famous:
+        if famous_exception and token in self.famous:
             return TokenJudgement(token, 1.0, ("유명 브랜드",))
         reasons: list[str] = []
         descriptive = DESCRIPTIVE_TERMS if self.descriptive is None else self.descriptive

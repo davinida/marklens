@@ -515,3 +515,97 @@ test("a business preset adds three goods that show up in the result summary", as
   await expect(page.getByText("상품 75%")).toBeVisible();
   await expectNoHorizontalOverflow(page);
 });
+
+// 유명 상표 확인(v1.4.7) — 기존 모의 응답에 선택 필드(famous·overall.famous_floor)를 더한다.
+const CLOTHING_GOODS_RESULT = {
+  query: "의류",
+  matches: [{ name: "의류", nice_class: 25, similarity_codes: ["G4503"], matched_alias: null }],
+  total: 1,
+  offset: 0,
+  source: "E2E fixture",
+};
+
+function buildFamousSearchV2Result() {
+  const result = buildSearchV2Result({ x4: 0, nice_classes: [43] });
+  return {
+    ...result,
+    overall: { ...result.overall, grade: "위험", famous_floor: true },
+    famous: {
+      status: "checked",
+      brand_count: 58,
+      matches: [
+        {
+          brand: "스타벅스",
+          level: "강함",
+          basis: "이름",
+          notation: "스타벅스",
+          matched_text: "스타벅스",
+          protection: "업종 불문",
+          goods_overlap: false,
+          floor: "위험",
+          logos: [{ id: "4020190000001", image_url: "/images/4020190000001.png" }],
+        },
+      ],
+    },
+  };
+}
+
+test("a famous mark name with clothing goods shows the famous banner and the floor reason", async ({
+  page,
+}) => {
+  await page.route("**/api/goods/search?*", async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        url.searchParams.get("q") === "의류"
+          ? CLOTHING_GOODS_RESULT
+          : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
+      ),
+    });
+  });
+  await page.route("**/api/goods/classes", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(GOODS_CLASSES_RESULT),
+    });
+  });
+  await page.route("**/api/images/**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "image/png", body: LOGO_PNG });
+  });
+  let searchBody = "";
+  await page.route("**/api/search/v2*", async (route) => {
+    searchBody = route.request().postData() ?? "";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(buildFamousSearchV2Result()),
+    });
+  });
+
+  await page.getByRole("textbox", { name: "상표 이름" }).fill("스타벅스");
+  await page.getByRole("combobox", { name: "지정상품 검색" }).fill("의류");
+  await page.getByRole("option", { name: /^의류 제25류/ }).click();
+  await expect(page.getByRole("button", { name: "의류 제거" })).toBeVisible();
+  await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
+
+  const title = "널리 알려진 상표 '스타벅스'와 이름이 같거나 거의 같아요";
+  const banner = page.getByRole("region", { name: title });
+  await expect(banner.getByRole("heading", { level: 2, name: title })).toBeVisible();
+  await expect(
+    banner.getByText(
+      "MarkLens가 정리한 유명 상표 58개 브랜드 기준이에요. 목록에 없는 유명 상표도 있어요.",
+    ),
+  ).toBeVisible();
+  await expect(banner.getByRole("img", { name: "'스타벅스' 대표 로고" })).toBeVisible();
+  await expect(page.getByTestId("overall-grade")).toHaveText("위험");
+  await expect(page.getByTestId("famous-floor-reason")).toHaveText(
+    "널리 알려진 상표와 같거나 거의 같아서 이 등급으로 봤어요.",
+  );
+  await expect(page.getByTestId("overall-prob")).toHaveCount(0);
+  expect(searchBody).toContain("스타벅스");
+  expect(searchBody).toContain("G4503");
+  await expectNoHorizontalOverflow(page);
+});

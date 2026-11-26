@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!-- 밖으로 아무것도 보내지 않는다: 스크립트·스타일은 이 파일 안의 것만, 그림은 옆 폴더의 파일만 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' file: data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>유명 상표 고르기</title>
+<style>
+:root{--bg:#fbfaf7;--panel:#f3f1ea;--ink:#1d1c19;--sub:#5f5b52;--line:#d9d5cb;--mark:#f6e7b4;
+--accent:#b4541a;--accent-ink:#fff;--ok:#2f6b3c;--card:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#191815;--panel:#211f1b;--ink:#ece9e1;--sub:#a8a397;
+--line:#3a372f;--mark:#4a3f16;--accent:#e8935a;--accent-ink:#191815;--ok:#7fc08c;--card:#24221d}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:var(--card);border:1px solid var(--line);border-radius:4px;padding:4px 10px}
+button:hover{border-color:var(--sub)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.plain{border-color:transparent;background:none;padding:2px 6px;color:var(--sub)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+input[type=text],textarea,select{background:var(--card);border:1px solid var(--line);border-radius:4px;padding:4px 7px;width:100%}
+textarea{resize:vertical;min-height:54px}
+.top{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 14px;
+background:var(--panel);border-bottom:1px solid var(--line)}
+.top h1{font-size:16px;margin:0 8px 0 0}
+.top .status{color:var(--sub);font-size:12.5px;margin-right:auto}
+.top .status.bad{color:var(--accent);font-weight:600}
+.wrap{display:grid;grid-template-columns:270px minmax(0,1fr);min-height:calc(100% - 46px)}
+nav{border-right:1px solid var(--line);background:var(--panel);overflow-y:auto;position:sticky;top:46px;
+height:calc(100vh - 46px);padding:10px 8px 30px}
+main{padding:14px 18px 80px;min-width:0}
+.summary{font-size:12.5px;border:1px solid var(--line);background:var(--bg);border-radius:4px;padding:8px 9px;margin-bottom:10px}
+.summary b{font-variant-numeric:tabular-nums}
+.summary .none{color:var(--sub);margin-top:4px;overflow-wrap:anywhere}
+.summary .none a{color:inherit}
+.filters{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 8px}
+.filters button{font-size:12px;padding:2px 7px}
+.filters button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.blist{list-style:none;margin:0;padding:0}
+.blist li button{display:flex;width:100%;text-align:left;gap:6px;align-items:baseline;border:0;border-radius:3px;
+background:none;padding:4px 6px}
+.blist li button[aria-current=true]{background:var(--ink);color:var(--bg)}
+.blist .nm{flex:1;min-width:0;overflow-wrap:anywhere}
+.blist .off .nm{text-decoration:line-through;opacity:.6}
+.tag{font-size:11px;white-space:nowrap;color:var(--sub)}
+[aria-current=true] .tag{color:inherit;opacity:.85}
+.tag.logo{color:var(--ok);font-weight:600}.tag.fetch{color:var(--accent);font-weight:600}
+[aria-current=true] .tag.logo,[aria-current=true] .tag.fetch{color:inherit}
+h2{font-size:19px;margin:0 0 2px}
+h3{font-size:14px;margin:22px 0 8px;padding-top:12px;border-top:1px solid var(--line)}
+h3 small{font-weight:400;color:var(--sub);margin-left:6px}
+.sub{color:var(--sub);font-size:12.5px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;max-width:900px}
+label.f{display:block;font-size:12.5px;color:var(--sub)}
+label.f>span{display:block;margin-bottom:2px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--line);border-radius:3px;padding:1px 3px 1px 7px;background:var(--card)}
+.kind{font-size:11.5px;padding:0 5px;border-radius:3px;background:var(--panel);color:var(--sub);white-space:nowrap}
+.kind.weak,.kind.initial{background:var(--mark);color:var(--ink)}
+table.nt{border-collapse:collapse;max-width:900px;width:100%}
+table.nt td{border-bottom:1px solid var(--line);padding:4px 6px;vertical-align:middle}
+table.nt tr.removed td:first-child{text-decoration:line-through;color:var(--sub)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(186px,1fr));gap:10px}
+.card{border:1px solid var(--line);border-radius:4px;background:var(--card);padding:7px;display:flex;flex-direction:column;gap:5px;min-width:0}
+.card.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card.dim{opacity:.62}
+.thumb{display:block;width:100%;height:132px;background:#fff;border:1px solid var(--line);border-radius:3px;padding:0;overflow:hidden}
+.thumb img{width:100%;height:100%;object-fit:contain;display:block}
+.thumb.none{display:flex;align-items:center;justify-content:center;color:#888;font-size:12px;cursor:default}
+.card .no{font-variant-numeric:tabular-nums;font-size:12.5px}
+.card .ti{font-weight:600;overflow-wrap:anywhere;line-height:1.35}
+.card .meta{font-size:12px;color:var(--sub);overflow-wrap:anywhere;line-height:1.4}
+.card .who{font-size:12.5px;font-weight:700;overflow-wrap:anywhere;line-height:1.35}
+.card .who.own{color:var(--ok)}.card .who.other{color:var(--accent)}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:auto}
+.roles button{font-size:11.5px;padding:3px 2px;line-height:1.25}
+.roles button[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.roles button.logo[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.pick{display:flex;gap:6px;align-items:center;margin-top:auto}
+.pick label{white-space:nowrap}
+.pick select{font-size:12px;padding:2px 4px;flex:1;min-width:0}
+.summary summary{cursor:pointer}
+.note{background:var(--mark);padding:6px 9px;border-radius:4px;font-size:12.5px;max-width:900px}
+.err{color:var(--accent);font-weight:600}
+.box{border:1px solid var(--line);border-radius:4px;padding:10px 12px;background:var(--panel);max-width:900px}
+details.help{max-width:900px;margin:8px 0 0}
+details.help summary{cursor:pointer;color:var(--sub)}
+.lightbox{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.82);display:flex;flex-direction:column;align-items:center;
+justify-content:center;gap:10px;padding:20px}
+.lightbox img{max-width:min(92vw,900px);max-height:78vh;background:#fff;object-fit:contain}
+.lightbox p{color:#fff;margin:0;text-align:center;overflow-wrap:anywhere;max-width:92vw}
+[hidden]{display:none!important}
+@media (max-width:860px){.wrap{grid-template-columns:1fr}nav{position:static;height:auto;max-height:42vh;border-right:0;border-bottom:1px solid var(--line)}
+.grid2{grid-template-columns:1fr}main{padding:12px 12px 80px}}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .12s}}
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>유명 상표 고르기</h1>
+  <span class="status" id="status" role="status"></span>
+  <button id="btn-export" class="primary">내보내기</button>
+  <button id="btn-import">가져오기</button>
+  <input type="file" id="file" accept="application/json,.json" hidden>
+  <button id="btn-new">새 브랜드 더하기</button>
+  <button id="btn-reset" class="plain">처음부터</button>
+</div>
+<div class="wrap">
+  <nav aria-label="브랜드">
+    <div class="summary" id="summary"></div>
+    <div class="filters" id="filters"></div>
+    <ul class="blist" id="blist"></ul>
+  </nav>
+  <main id="main"></main>
+</div>
+<div class="lightbox" id="lightbox" hidden role="dialog" aria-modal="true" aria-label="큰 그림">
+  <img alt="" id="lightbox-img"><p id="lightbox-cap"></p><button id="lightbox-close">닫기 (Esc)</button>
+</div>
+<script type="application/json" id="data">/*__DATA__*/</script>
+<script>
+"use strict";
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const [R_NOW, R_OLD, R_OTHER, R_NONE] = DATA.roles;
+const ROLE_SHORT = {[R_NOW]: "대표 로고(현재)", [R_OLD]: "과거 로고", [R_OTHER]: "그 밖의 표장", [R_NONE]: "관련 없음"};
+// 저장 키는 DB 세대와 적용된 overrides 별 — 둘 중 하나가 바뀌어 다시 만든 도구는 적용된 overrides 에서 시작한다
+const STORE_KEY = "marklens-famous-curate-v1" + (DATA.db_generation ? ":" + DATA.db_generation : "") + (DATA.overrides_key ? ":" + DATA.overrides_key : "");
+const $ = (id) => document.getElementById(id);
+
+// ---- 작은 도구 ----
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (k === "value" || k === "checked" || k === "disabled" || k === "selected") el[k] = v;
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+const lines = (text) => String(text || "").split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
+const uniq = (list) => [...new Set(list)];
+const sameList = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+const digits = (text) => String(text || "").replace(/\D/g, "");
+const fmtDate = (d) => { const s = digits(d); return s.length === 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6)}` : (d || ""); };
+
+// ---- 상태 ----
+const META = new Map();   // key → 브랜드 자료(자동 값 base, DB 표장, 후보)
+let ORDER = [];           // 보이는 순서
+let state = null;         // {brands: {key: …}, custom: [사람이 더한 브랜드의 자료], current: key, filter}
+
+function customMeta(key) {
+  return {key, proposed: false, custom: true,
+          base: {name: key, is_new: true, applicants: [], preset: null, urls: [], evidence_text: "",
+                 protection_default: DATA.protections[1], notations: []},
+          kinds: {}, marks: [], candidates: [], search: null};
+}
+function loadMeta(custom) {
+  META.clear(); ORDER = [];
+  for (const b of DATA.brands) { META.set(b.key, b); ORDER.push(b.key); }
+  for (const key of custom || []) if (!META.has(key)) { META.set(key, customMeta(key)); ORDER.push(key); }
+}
+function defaultBrand(b) {
+  return {include: true, name: b.base.name, applicants: [...b.base.applicants], preset: b.base.preset,
+          urls: [...b.base.urls], protection: b.base.protection_default,
+          notations: b.base.notations.map((text) => ({text, base: true, removed: false, common: false})),
+          exceptions: [], marks: {}, cand: {}, direct: [], memo: "", core: []};
+}
+function parseClasses(text) {
+  return uniq((text.match(/\d+/g) || []).map(Number).filter((n) => n >= 1 && n <= 45)).sort((a, b) => a - b);
+}
+function applyOverride(st, ov, b) {
+  if (ov.name) st.name = ov.name;
+  if ("applicants" in ov) st.applicants = [...ov.applicants];
+  if ("preset" in ov) st.preset = ov.preset || null;
+  if ("core_classes" in ov) st.core = [...ov.core_classes];
+  if ("evidence_urls" in ov) st.urls = [...ov.evidence_urls];
+  if (ov.protection) st.protection = ov.protection;
+  const edit = ov.notations || {};
+  for (const n of st.notations) if ((edit.remove || []).includes(n.text)) n.removed = true;
+  for (const text of edit.add || []) if (!st.notations.some((n) => n.text === text)) st.notations.push({text, base: false, removed: false, common: false});
+  for (const n of st.notations) if ((edit.common || []).includes(n.text)) n.common = true;
+  st.exceptions = [...(ov.exceptions || [])];
+  st.marks = Object.assign({}, ov.marks || {});
+  const candidates = new Set(b.candidates.map((c) => c.appno));
+  const inBrand = new Set(b.marks.map((m) => m.appno));
+  for (const f of ov.fetch || []) {
+    if (inBrand.has(f.appno)) st.marks[f.appno] = f.role;  // 받아서 DB 에 들어온 표장 — 역할만
+    else if (candidates.has(f.appno)) st.cand[f.appno] = {fetch: true, role: f.role};
+    else st.direct.push({appno: f.appno, role: f.role});
+  }
+  st.memo = ov.memo || "";
+}
+function stateFromOverrides(overrides) {
+  const brands = overrides.brands || {};
+  const custom = Object.keys(brands).filter((key) => brands[key].new && !DATA.brands.some((b) => b.key === key));
+  loadMeta(custom);
+  const next = {brands: {}, custom, current: ORDER[0], filter: "all"};
+  for (const key of ORDER) {
+    const b = META.get(key), st = defaultBrand(b), ov = brands[key];
+    if (ov) applyOverride(st, ov, b);
+    // 가져온 파일에 없는 새 브랜드는 그 파일을 내보낼 때 뺀 것이다(처음 상태에서는 제안된 브랜드를 넣어 둔다)
+    else if (b.base.is_new && overrides !== DATA.initial_overrides) st.include = false;
+    next.brands[key] = st;
+  }
+  return next;
+}
+function restore() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+    if (saved && saved.brands) {
+      loadMeta(saved.custom || []);
+      for (const key of ORDER) if (!saved.brands[key]) saved.brands[key] = defaultBrand(META.get(key));
+      if (!META.has(saved.current)) saved.current = ORDER[0];
+      saved.filter = saved.filter || "all";
+      return [saved, true];
+    }
+  } catch (e) { /* 저장소를 못 써도 도구는 돈다 */ }
+  return [stateFromOverrides(DATA.initial_overrides), false];
+}
+let saveTimer = 0;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(state));
+      setStatus(`브라우저에 저장됨 ${new Date().toLocaleTimeString("ko-KR")}`);
+    } catch (e) {
+      setStatus("브라우저에 저장하지 못했습니다 — \"내보내기\"로 남겨 두세요", true);
+    }
+  }, 250);
+}
+function setStatus(text, bad) { const el = $("status"); el.textContent = text; el.className = "status" + (bad ? " bad" : ""); }
+function changed() { save(); renderNav(); }
+
+// ---- 내보내기(overrides JSON) ----
+function defaultRole(b, appno) { const m = b.marks.find((x) => x.appno === appno); return m ? m.default_role : null; }
+function fetchList(b, st) {
+  const out = [], seen = new Set();
+  for (const m of b.marks) {  // 출원번호로 골라 이어 둔 표장 — fetch 에 남아야 계속 이어진다
+    if (!m.via_fetch) continue;
+    seen.add(m.appno);
+    const row = {appno: m.appno, role: st.marks[m.appno] || m.default_role, source: m.via_fetch};
+    if (m.title) row.title = m.title;
+    if (m.applicant) row.applicant = m.applicant.split("|")[0].trim();
+    out.push(row);
+  }
+  for (const c of b.candidates) {
+    const pick = st.cand[c.appno];
+    if (!pick || !pick.fetch || c.in_brand || seen.has(c.appno)) continue;
+    seen.add(c.appno);
+    const row = {appno: c.appno, role: pick.role || R_NOW, source: "후보"};
+    if (c.title) row.title = c.title;
+    if (c.applicants.length) row.applicant = c.applicants[0];
+    out.push(row);
+  }
+  for (const d of st.direct) {
+    const appno = digits(d.appno);
+    if (!appno || seen.has(appno)) continue;
+    seen.add(appno);
+    out.push({appno, role: d.role || R_NOW, source: "직접"});
+  }
+  return out;
+}
+function brandOverride(b, st) {
+  const isNew = b.base.is_new, o = {};
+  if (isNew) { if (!st.include) return null; o.new = true; }
+  const name = st.name.trim();
+  if (name && name !== b.key) o.name = name;
+  const applicants = uniq(st.applicants.map((s) => s.trim()).filter(Boolean));
+  if (isNew || !sameList(applicants, b.base.applicants)) o.applicants = applicants;
+  if (isNew ? st.preset : st.preset !== b.base.preset) o.preset = st.preset || null;
+  if ((st.core || []).length) o.core_classes = [...st.core];
+  const urls = uniq(st.urls.map((s) => s.trim()).filter(Boolean));
+  if (isNew ? urls.length : !sameList(urls, b.base.urls)) o.evidence_urls = urls;
+  if (st.protection !== b.base.protection_default) o.protection = st.protection;
+  const kept = st.notations.filter((n) => !n.removed);
+  const edit = {};
+  const remove = st.notations.filter((n) => n.base && n.removed).map((n) => n.text);
+  const add = kept.filter((n) => isNew || !n.base).map((n) => n.text);
+  const common = kept.filter((n) => n.common).map((n) => n.text);
+  if (remove.length && !isNew) edit.remove = remove;
+  if (add.length) edit.add = add;
+  if (common.length) edit.common = common;
+  if (Object.keys(edit).length) o.notations = edit;
+  if (st.exceptions.length) o.exceptions = [...st.exceptions];
+  const marks = {};
+  const viaFetch = new Set(b.marks.filter((m) => m.via_fetch).map((m) => m.appno));
+  // 사람이 고른 역할은 기본값과 같아도 남긴다(표기를 고쳐 기본값이 바뀌어도 고른 것이 유지되게).
+  // 기본값을 다시 누르면 고른 것이 지워진다(markCard).
+  for (const [appno, role] of Object.entries(st.marks)) if (role && !viaFetch.has(appno) && defaultRole(b, appno) !== null) marks[appno] = role;
+  if (Object.keys(marks).length) o.marks = marks;
+  const fetch = fetchList(b, st);
+  if (fetch.length) o.fetch = fetch;
+  if (st.memo.trim()) o.memo = st.memo.trim();
+  return Object.keys(o).length ? o : null;
+}
+function problems() {
+  const out = [], names = new Map();
+  for (const key of ORDER) {
+    const b = META.get(key), st = state.brands[key];
+    if (b.base.is_new && !st.include) continue;
+    const shown = (st.name.trim() || key);
+    names.set(shown, (names.get(shown) || 0) + 1);
+    if (!st.notations.some((n) => !n.removed)) out.push(`${shown}: 표기가 하나도 없습니다`);
+    for (const d of st.direct) if (d.appno.trim() && digits(d.appno).length !== 13) out.push(`${shown}: 받을 출원번호 "${d.appno}" 는 숫자 13자리가 아닙니다`);
+  }
+  for (const [name, n] of names) if (n > 1) out.push(`브랜드 이름이 겹칩니다: ${name}`);
+  return out;
+}
+function toOverrides() {
+  const brands = {};
+  for (const key of ORDER) { const o = brandOverride(META.get(key), state.brands[key]); if (o) brands[key] = o; }
+  return {version: DATA.overrides_version, purpose: DATA.overrides_purpose, brands};
+}
+function doExport() {
+  const bad = problems();
+  if (bad.length) { alert("내보내기 전에 고칠 것:\n\n" + bad.join("\n")); return; }
+  const data = toOverrides();
+  const blob = new Blob([JSON.stringify(data, null, 1) + "\n"], {type: "application/json"});
+  const a = h("a", {href: URL.createObjectURL(blob), download: "famous_registry_overrides.json"});
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  setStatus("내보냈습니다 — 내려받은 파일을 famous_registry.py apply 에 넘깁니다");
+}
+function doImport(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.version !== DATA.overrides_version) throw new Error(`version 이 ${DATA.overrides_version} 가 아닙니다`);
+      state = stateFromOverrides(data);
+      save(); renderAll(); setStatus(`가져왔습니다: ${file.name}`);
+    } catch (e) { alert("가져오지 못했습니다: " + e.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ---- 요약·목록 ----
+function brandStats(key) {
+  const b = META.get(key), st = state.brands[key];
+  let now = 0, old = 0;
+  for (const m of b.marks) { const role = st.marks[m.appno] || m.default_role; if (role === R_NOW) now++; else if (role === R_OLD) old++; }
+  const attached = new Set(b.marks.map((m) => m.appno));
+  const fetch = fetchList(b, st).filter((f) => !attached.has(f.appno));  // 아직 DB 에 없는 것만
+  const fetchNow = fetch.filter((f) => f.role === R_NOW).length;
+  return {now, old, fetch: fetch.length, fetchNow, off: b.base.is_new && !st.include, isNew: b.base.is_new};
+}
+function renderNav() {
+  const stats = ORDER.map((key) => [key, brandStats(key)]);
+  const live = stats.filter(([, s]) => !s.off);
+  const withLogo = live.filter(([, s]) => s.now > 0).length;
+  const none = live.filter(([, s]) => s.now === 0);
+  const fetchTotal = live.reduce((n, [, s]) => n + s.fetch, 0);
+  const summary = $("summary"); summary.replaceChildren(
+    h("div", null, "브랜드 ", h("b", null, live.length), "개 (새 브랜드 ", h("b", null, live.filter(([, s]) => s.isNew).length), ")"),
+    h("div", null, "대표 로고(현재)를 고른 브랜드 ", h("b", null, withLogo), " · 없는 브랜드 ", h("b", null, none.length)),
+    h("div", null, "받을 표장 ", h("b", null, fetchTotal), "건"),
+    none.length ? h("details", {class: "none", open: none.length <= 8}, h("summary", null, `대표 로고(현재)가 없는 브랜드 ${none.length}개`),
+      none.map(([key, s], i) => [i ? " · " : "",
+        h("a", {href: "#", onclick: (e) => { e.preventDefault(); select(key); }}, (state.brands[key].name || key) + (s.fetchNow ? "(받을 것 있음)" : ""))])) : null);
+  const filters = [["all", "전체"], ["nologo", "대표 로고 없음"], ["new", "새 브랜드"], ["fetch", "받을 것 있음"]];
+  const setAllNew = (on) => { for (const key of ORDER) if (META.get(key).base.is_new) state.brands[key].include = on; changed(); renderBrand(); };
+  $("filters").replaceChildren(...filters.map(([id, label]) => h("button", {"aria-pressed": String(state.filter === id), onclick: () => { state.filter = id; save(); renderNav(); }}, label)),
+    state.filter === "new" ? [h("button", {onclick: () => setAllNew(true)}, "모두 넣기"), h("button", {onclick: () => setAllNew(false)}, "모두 빼기")] : null);
+  const show = stats.filter(([, s]) => state.filter === "all" || (state.filter === "nologo" && !s.off && s.now === 0)
+    || (state.filter === "new" && s.isNew) || (state.filter === "fetch" && s.fetch > 0));
+  $("blist").replaceChildren(...show.map(([key, s]) => h("li", {class: s.off ? "off" : ""},
+    h("button", {"aria-current": String(key === state.current), onclick: () => select(key)},
+      h("span", {class: "nm"}, state.brands[key].name || key),
+      s.isNew ? h("span", {class: "tag"}, s.off ? "뺌" : "새") : null,
+      s.now || s.old ? h("span", {class: "tag logo"}, `로고 ${s.now}${s.old ? "+" + s.old : ""}`) : null,
+      s.fetch ? h("span", {class: "tag fetch"}, `받기 ${s.fetch}`) : null))));
+}
+function select(key) { state.current = key; save(); renderNav(); renderBrand(); window.scrollTo(0, 0); }
+
+// ---- 브랜드 화면 ----
+function kindChip(b, n) {
+  if (n.common) return h("span", {class: "kind weak"}, "약한 표기처럼(흔한 말)");
+  const info = b.kinds[n.text];
+  if (!info) return h("span", {class: "kind"}, "종류는 다시 만들 때 정해짐");
+  const cls = info.kind === DATA.kinds[0] ? " weak" : info.kind === DATA.kinds[1] ? " initial" : "";
+  return h("span", {class: "kind" + cls, title: info.reason || ""}, info.kind);
+}
+function thumb(src, caption) {
+  if (!src) return h("div", {class: "thumb none"}, "그림 없음");
+  return h("button", {class: "thumb", title: "크게 보기", onclick: () => openLightbox(src, caption)}, h("img", {src, alt: "", loading: "lazy"}));
+}
+const viaText = (v) => v.startsWith("가:") ? `상표명칭 검색 "${v.slice(2)}"` : v.startsWith("나:") ? `출원인 검색 "${v.slice(2)}"` : v;
+function goodsLine(item) { return item.goods ? h("div", {class: "meta", title: item.codes || ""}, item.goods) : null; }
+function dateLine(item) {
+  const parts = [];
+  if (item.app_date) parts.push("출원 " + fmtDate(item.app_date));
+  if (item.reg_date) parts.push("등록 " + fmtDate(item.reg_date));
+  return parts.length ? h("div", {class: "meta"}, parts.join(" · ")) : null;
+}
+function markCard(b, st, m) {
+  const role = () => st.marks[m.appno] || m.default_role;
+  const card = h("div", {class: "card"});
+  const paint = () => {
+    card.className = "card" + (role() === R_NOW || role() === R_OLD ? " on" : role() === R_NONE ? " dim" : "");
+    for (const btn of card.querySelectorAll(".roles button")) btn.setAttribute("aria-pressed", String(btn.dataset.role === role()));
+  };
+  card.append(
+    thumb(m.thumb, `${m.appno} ${m.title || "(상표명 없음)"}`),
+    h("div", {class: "no"}, m.appno), h("div", {class: "ti"}, m.title || "(상표명 없음)"),
+    h("div", {class: "meta"}, [m.kind, m.source].filter(Boolean).join(" · ")), dateLine(m), goodsLine(m),
+    h("div", {class: "roles", role: "group", "aria-label": "역할"}, DATA.roles.map((r) => h("button", {"data-role": r, class: r === R_NOW || r === R_OLD ? "logo" : "", title: r,
+      onclick: () => { if (r === m.default_role) delete st.marks[m.appno]; else st.marks[m.appno] = r; paint(); changed(); }}, ROLE_SHORT[r]))));
+  paint();
+  return card;
+}
+function candCard(b, st, c) {
+  const pick = () => st.cand[c.appno] || {fetch: false, role: R_NOW};
+  const card = h("div", {class: "card"});
+  const check = h("input", {type: "checkbox", id: "f-" + c.appno, disabled: c.in_brand,
+    onchange: () => { st.cand[c.appno] = {fetch: check.checked, role: sel.value}; paint(); changed(); }});
+  const sel = h("select", {"aria-label": "역할", disabled: c.in_brand, onchange: () => { st.cand[c.appno] = {fetch: check.checked, role: sel.value}; changed(); }},
+    DATA.roles.map((r) => h("option", {value: r}, ROLE_SHORT[r])));
+  const paint = () => { check.checked = pick().fetch; sel.value = pick().role || R_NOW; card.className = "card" + (pick().fetch ? " on" : ""); };
+  const who = c.applicants.join(" | ") || "(출원인 없음)";
+  card.append(
+    thumb(c.thumb, `${c.appno} ${c.title || "(상표명 없음)"} — ${who}`),
+    h("div", {class: "no"}, c.appno, c.intl ? h("span", {class: "tag", title: "국제등록 — 출원번호 칸은 참조번호"}, ` 국제등록 ${c.intl}`) : null),
+    h("div", {class: "ti"}, c.title || "(상표명 없음)"),
+    h("div", {class: "who " + (c.own ? "own" : "other"), title: c.own ? "검색에 쓴 출원인" : "다른 출원인"}, who),
+    c.rightholders.length && !c.applicants.some((a) => c.rightholders.some((r) => r.includes(a))) ? h("div", {class: "meta"}, "권리자 " + c.rightholders.join(" | ")) : null,
+    h("div", {class: "meta"}, [c.kind, c.via.map(viaText).join(", ")].filter(Boolean).join(" · ")), dateLine(c), goodsLine(c),
+    h("div", {class: "pick"}, check, h("label", {for: "f-" + c.appno}, c.in_brand ? "DB에 있음(위 목록)" : c.in_db ? "DB에 있음 — 잇기" : "받기"), sel));
+  paint();
+  return card;
+}
+function listEditor(title, hint, items, onChange, placeholder) {
+  const box = h("div", {class: "row"});
+  const input = h("input", {type: "text", placeholder, style: "max-width:260px", onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }});
+  const draw = () => box.replaceChildren(...items().map((text, i) => h("span", {class: "chip"}, text,
+    h("button", {class: "plain", title: "지우기", "aria-label": `${text} 지우기`, onclick: () => { onChange(items().filter((_, j) => j !== i)); draw(); }}, "×"))),
+    input, h("button", {onclick: () => add()}, "더하기"));
+  const add = () => { const value = input.value.trim(); if (!value) return; if (!items().includes(value)) onChange([...items(), value]); input.value = ""; draw(); input.focus(); };
+  draw();
+  return h("div", null, h("h3", null, title, h("small", null, hint)), box);
+}
+function renderBrand() {
+  const key = state.current, b = META.get(key), st = state.brands[key], main = $("main");
+  const isNew = b.base.is_new;
+  const head = h("div", null,
+    h("h2", null, st.name || key, isNew ? h("small", {class: "sub"}, b.custom ? "  새 브랜드(직접 더함)" : "  새 브랜드(제안)") : null),
+    isNew ? h("div", {class: "row", style: "margin:4px 0 8px"},
+      h("label", null, h("input", {type: "checkbox", checked: st.include, onchange: (e) => { st.include = e.target.checked; changed(); }}), " 등록부에 넣기"),
+      b.custom ? h("button", {onclick: () => removeCustom(key)}, "이 브랜드 지우기") : null,
+      !urlsOf(st).length ? h("span", {class: "kind weak"}, "근거 없음") : null) : null);
+  const presetSel = h("select", {onchange: (e) => { st.preset = e.target.value || null; changed(); }},
+    h("option", {value: ""}, "(없음)"), DATA.presets.map((p) => h("option", {value: p.id, selected: p.id === st.preset}, `${p.label} (${p.id})`)));
+  const basics = h("div", {class: "grid2"},
+    h("label", {class: "f"}, h("span", null, "이름"), h("input", {type: "text", value: st.name, oninput: (e) => { st.name = e.target.value; changed(); }})),
+    h("label", {class: "f"}, h("span", null, "업종 세트"), presetSel),
+    h("label", {class: "f"}, h("span", null, "핵심 류(숫자를 쉼표로 — 예: 9, 11)"), h("input", {type: "text", value: (st.core || []).join(", "), onchange: (e) => { st.core = parseClasses(e.target.value); changed(); }})),
+    h("label", {class: "f"}, h("span", null, "출원인(한 줄에 하나)"), h("textarea", {oninput: (e) => { st.applicants = lines(e.target.value); changed(); }}, st.applicants.join("\n"))),
+    h("label", {class: "f"}, h("span", null, "근거 URL(한 줄에 하나)"), h("textarea", {oninput: (e) => { st.urls = lines(e.target.value); changed(); }}, st.urls.join("\n"))));
+  const evidence = b.base.evidence_text ? h("p", {class: "sub", style: "max-width:900px"}, "표의 근거: " + b.base.evidence_text) : null;
+  const protection = h("div", {class: "row", role: "radiogroup", "aria-label": "보호 범위"}, h("span", {class: "sub"}, "보호 범위"),
+    DATA.protections.map((p) => h("label", null, h("input", {type: "radio", name: "prot", checked: st.protection === p, onchange: () => { st.protection = p; changed(); }}), " " + p,
+      p === b.base.protection_default ? h("span", {class: "sub"}, " (기본값)") : null)));
+  // 표기
+  const table = h("table", {class: "nt"});
+  const drawNotations = () => table.replaceChildren(...st.notations.map((n, i) => h("tr", {class: n.removed ? "removed" : ""},
+    h("td", null, n.text, n.base ? null : h("span", {class: "sub"}, " (더함)")),
+    h("td", null, n.removed ? h("span", {class: "kind"}, "지움") : kindChip(b, n)),
+    h("td", null, h("label", null, h("input", {type: "checkbox", checked: n.common, disabled: n.removed, onchange: (e) => { n.common = e.target.checked; drawNotations(); changed(); }}), " 흔한 말")),
+    h("td", {style: "text-align:right"}, n.base
+      ? h("button", {onclick: () => { n.removed = !n.removed; if (n.removed) n.common = false; drawNotations(); changed(); }}, n.removed ? "되살리기" : "지우기")
+      : h("button", {onclick: () => { st.notations.splice(i, 1); drawNotations(); changed(); }}, "지우기")))));
+  drawNotations();
+  const addInput = h("input", {type: "text", placeholder: "표기 더하기 — 읽는 법도 표기로(예: 지에스이십오)", style: "max-width:360px",
+    onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); addNotation(); } }});
+  const addNotation = () => { const text = addInput.value.trim(); if (!text) return;
+    if (!st.notations.some((n) => n.text === text)) st.notations.push({text, base: false, removed: false, common: false});
+    addInput.value = ""; drawNotations(); changed(); addInput.focus(); };
+  const notations = h("div", null, h("h3", null, "표기", h("small", null, "\"흔한 말\"로 표시한 표기는 이름이 그 표기뿐일 때만 일치로 봅니다")), table,
+    h("div", {class: "row", style: "margin-top:8px"}, addInput, h("button", {onclick: addNotation}, "더하기")));
+  const exceptions = listEditor("예외 낱말", "이 브랜드와 닮았다고 보면 안 되는 일반 낱말(약한 일치에만 적용)", () => st.exceptions,
+    (next) => { st.exceptions = next; changed(); }, "예: 채널");
+  // DB 표장
+  const marks = [...b.marks].sort((x, y) => digits(y.reg_date).localeCompare(digits(x.reg_date)));
+  const markSection = h("div", null, h("h3", null, `DB에 있는 표장 ${marks.length}건`, h("small", null, "등록일 최신순 · 그림을 누르면 크게 봅니다 · 고르지 않으면 대표 로고는 0건입니다")),
+    marks.length ? h("div", {class: "cards"}, marks.map((m) => markCard(b, st, m))) : h("p", {class: "sub"}, "이 브랜드의 출원인으로 된 표장이 DB 에 없습니다."));
+  // 후보
+  let candSection = null;
+  if (b.search) {
+    const s = b.search;
+    const used = s.applicants.map((a) => `${a.name}(${a.source}${a.terms && a.terms.length > 1 ? " · 보낸 말: " + a.terms.join(" → ") : ""})`).join(" / ") || "없음";
+    let view = "all";
+    const grid = h("div", {class: "cards"});
+    const drawCands = () => grid.replaceChildren(...b.candidates.filter((c) => view === "all" || (view === "fig" && c.kind === "도형")
+      || (view === "name" && c.kind !== "도형") || (view === "pick" && (st.cand[c.appno] || {}).fetch)).map((c) => candCard(b, st, c)));
+    const bar = h("div", {class: "filters"});
+    const drawBar = () => bar.replaceChildren(...[["all", `전체 ${b.candidates.length}`], ["fig", `도형 ${b.candidates.filter((c) => c.kind === "도형").length}`],
+      ["name", "이름 있는 것"], ["pick", "받기로 한 것"]].map(([id, label]) => h("button", {"aria-pressed": String(view === id), onclick: () => { view = id; drawBar(); drawCands(); }}, label)));
+    drawBar(); drawCands();
+    candSection = h("div", null, h("h3", null, `KIPRIS 후보 ${b.candidates.length}건`, h("small", null, "등록된 표장만 · DB 에는 아직 없습니다 — \"받기\"를 표시하면 다음 단계에서 받습니다")),
+      h("p", {class: "sub", style: "max-width:900px"}, `검색에 쓴 출원인: ${used}. `, s.top ? `(가) 결과에서 가장 많이 나온 출원인: ${s.top.name} ${s.top.count}건. ` : "",
+        `호출 ${s.calls}회`, s.errors.length ? h("span", {class: "err"}, ` · 오류 ${s.errors.length}: ${s.errors.join("; ")}`) : null,
+        s.note ? ` · ${s.note}` : ""),
+      bar, b.candidates.length ? grid : h("p", {class: "sub"}, "후보가 없습니다."));
+  }
+  // 받을 출원번호 직접 입력
+  const directBox = h("div");
+  const drawDirect = () => directBox.replaceChildren(...st.direct.map((d, i) => h("div", {class: "row", style: "margin-bottom:6px"},
+    h("input", {type: "text", value: d.appno, placeholder: "출원번호 13자리(40-2020-0011726 꼴도 됨)", style: "max-width:270px", "aria-label": "받을 출원번호",
+      oninput: (e) => { d.appno = e.target.value; changed(); }}),
+    h("select", {style: "max-width:170px", "aria-label": "역할", onchange: (e) => { d.role = e.target.value; changed(); }}, DATA.roles.map((r) => h("option", {value: r, selected: r === d.role}, ROLE_SHORT[r]))),
+    DATA.db_appnos.includes(digits(d.appno)) ? h("span", {class: "sub"}, "DB에 있음 — 이 브랜드에 잇습니다") : null,
+    h("button", {onclick: () => { st.direct.splice(i, 1); drawDirect(); changed(); }}, "지우기"))),
+    h("button", {onclick: () => { st.direct.push({appno: "", role: R_NOW}); drawDirect(); }}, "출원번호 더하기"));
+  drawDirect();
+  const direct = h("div", null, h("h3", null, "받을 출원번호 직접 입력", h("small", null, "후보에 없는 표장")), directBox,
+    h("label", {class: "f", style: "max-width:900px;margin-top:10px"}, h("span", null, "메모"), h("textarea", {oninput: (e) => { st.memo = e.target.value; changed(); }}, st.memo)));
+  main.replaceChildren(head, basics, evidence, protection, notations, exceptions, markSection, candSection, direct, helpBox());
+}
+const urlsOf = (st) => st.urls.map((s) => s.trim()).filter(Boolean);
+function helpBox() {
+  return h("details", {class: "help"}, h("summary", null, "쓰는 법"),
+    h("div", {class: "box"},
+      h("p", null, "1. 왼쪽에서 브랜드를 고르고, 표기·예외 낱말·보호 범위를 고칩니다."),
+      h("p", null, "2. \"DB에 있는 표장\"에서 지금 쓰는 대표 로고에 \"대표 로고(현재)\", 옛 로고에 \"과거 로고\"를 누릅니다. 로고 확인과 안내에는 이 둘만 씁니다."),
+      h("p", null, "3. DB 에 대표 로고가 없으면 \"KIPRIS 후보\"에서 \"받기\"를 표시하거나 출원번호를 직접 적습니다. 받는 일은 다음 단계에서 합니다."),
+      h("p", null, "4. \"내보내기\"로 내려받은 파일을 넘깁니다: ml/venv/bin/python ml/scripts/famous_registry.py apply 내려받은_파일.json"),
+      h("p", {class: "sub"}, "바뀔 때마다 이 브라우저에 저장합니다. 다른 컴퓨터나 브라우저에서 이으려면 \"내보내기\" 한 파일을 \"가져오기\"로 엽니다. 이 도구는 밖으로 아무것도 보내지 않습니다.")));
+}
+
+// ---- 새 브랜드 ----
+function addBrand() {
+  const main = $("main");
+  const name = h("input", {type: "text"}), notations = h("textarea", {placeholder: "한 줄에 하나(예: 삼성 / SAMSUNG)"}),
+    urls = h("textarea", {placeholder: "없으면 비워 둡니다 — \"근거 없음\"으로 표시됩니다"}), appnos = h("textarea", {placeholder: "한 줄에 하나"});
+  const msg = h("p", {class: "err"});
+  const ok = () => {
+    const key = name.value.trim();
+    if (!key) { msg.textContent = "이름을 적어 주세요"; return; }
+    if (META.has(key) || ORDER.some((k) => (state.brands[k].name || k) === key)) { msg.textContent = "같은 이름의 브랜드가 이미 있습니다"; return; }
+    const texts = uniq(lines(notations.value)); if (!texts.length) texts.push(key);
+    META.set(key, customMeta(key)); ORDER.push(key); state.custom.push(key);
+    const st = defaultBrand(META.get(key));
+    st.notations = texts.map((text) => ({text, base: false, removed: false, common: false}));
+    st.urls = lines(urls.value); st.direct = lines(appnos.value).map((appno) => ({appno, role: R_NOW}));
+    state.brands[key] = st; state.filter = "all"; select(key);
+  };
+  main.replaceChildren(h("h2", null, "새 브랜드 더하기"), h("div", {class: "grid2"},
+    h("label", {class: "f"}, h("span", null, "이름"), name), h("label", {class: "f"}, h("span", null, "표기(비우면 이름과 같게)"), notations),
+    h("label", {class: "f"}, h("span", null, "근거 URL"), urls), h("label", {class: "f"}, h("span", null, "받을 출원번호"), appnos)),
+    msg, h("div", {class: "row", style: "margin-top:10px"}, h("button", {class: "primary", onclick: ok}, "더하기"), h("button", {onclick: renderBrand}, "그만두기")));
+  name.focus();
+}
+function removeCustom(key) {
+  if (!confirm(`"${key}" 를 지울까요?`)) return;
+  META.delete(key); ORDER = ORDER.filter((k) => k !== key); state.custom = state.custom.filter((k) => k !== key);
+  delete state.brands[key]; state.current = ORDER[0]; changed(); renderBrand();
+}
+
+// ---- 큰 그림 ----
+let lastFocus = null;
+function openLightbox(src, caption) {
+  lastFocus = document.activeElement;
+  $("lightbox-img").src = src; $("lightbox-cap").textContent = caption; $("lightbox").hidden = false; $("lightbox-close").focus();
+}
+function closeLightbox() { $("lightbox").hidden = true; $("lightbox-img").removeAttribute("src"); if (lastFocus) lastFocus.focus(); }
+$("lightbox").addEventListener("click", (e) => { if (e.target.id !== "lightbox-img") closeLightbox(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("lightbox").hidden) closeLightbox(); });
+
+// ---- 시작 ----
+function renderAll() { renderNav(); renderBrand(); }
+$("btn-export").addEventListener("click", doExport);
+$("btn-import").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => { if (e.target.files[0]) doImport(e.target.files[0]); e.target.value = ""; });
+$("btn-new").addEventListener("click", addBrand);
+$("btn-reset").addEventListener("click", () => {
+  if (!confirm("이 브라우저에 저장한 작업을 버리고 처음 상태(저장소의 overrides)로 돌아갈까요?")) return;
+  try { localStorage.removeItem(STORE_KEY); } catch (e) { /* 무시 */ }
+  state = stateFromOverrides(DATA.initial_overrides); renderAll(); setStatus("처음 상태입니다");
+});
+const [restored, fromStore] = restore();
+state = restored;
+renderAll();
+setStatus(fromStore ? "이 브라우저에 저장된 작업을 이어 엽니다"
+  : `만든 때 ${DATA.generated} · DB ${DATA.db_count}건 · 적용된 overrides 에서 시작합니다`);
+window.__curate = {toOverrides, problems, state: () => state};  // 점검용
+</script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as searchV2 } from "@/app/api/search/v2/route";
+import textFixture from "@/test/fixtures/search-v2-text.json";
 
 function image(type = "image/png", size = 5): File {
   return new File([new Uint8Array(size)], "logo.png", { type });
@@ -296,6 +297,30 @@ describe("POST /api/search/v2", () => {
       "content-type": "application/json", "retry-after": "30", "x-ratelimit-limit": "10",
       "x-ratelimit-remaining": "0", "x-ratelimit-reset": "100", "x-request-id": "v2-request-1", "cache-control": "no-store",
     });
+  });
+
+  it("forwards the optional famous check fields (v1.4.7) unchanged", async () => {
+    const body = structuredClone(textFixture);
+    Object.assign(body.overall, { famous_floor: true });
+    Object.assign(body.candidates[0], { famous_brand: "스타벅스" });
+    Object.assign(body, {
+      famous: {
+        status: "checked",
+        brand_count: 58,
+        matches: [{
+          brand: "스타벅스", level: "강함", basis: "이름", notation: "스타벅스", matched_text: "스타벅스",
+          protection: "업종 불문", goods_overlap: false, floor: "위험",
+          logos: [{ id: "4020190000001", image_url: "/images/4020190000001.png" }],
+        }],
+      },
+    });
+    const raw = JSON.stringify(body);
+    vi.mocked(fetch).mockResolvedValue(new Response(raw, {
+      status: 200, headers: { "content-type": "application/json" },
+    }));
+    const response = await searchV2(request(nameForm("스타벅스")));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(raw);
   });
 
   it.each([

@@ -21,8 +21,8 @@
 | `meta` | n·CV AUC(심결 0.6184·현실 0.9113)·Brier·채택 규칙·입력 정의·`sigma_selection`·`risk_min_support`·`grade_precision`·`pattern_choice`·`coupling_floors`·`monotonicity`(학습 행 검사)·`indicator_reference`(지시변수 구조 참고 모델 — miss_x2img 0.56) |
 
 재학습(프로젝트 루트, KIPRIS 호출 0, 기본 2방법 약 13초): `ml/venv/bin/python ml/scripts/pairs_features.py --fill-easy-images`(쉬운 음성 이미지 축, 5초) →
-`ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-24 부터 서비스 기본 모델은 아래
-`risk_model_v1.4.6.json`(런타임 `MODEL_VERSION` risk_model_v1.4.6, `DEFAULT_MODEL_PATH`; 같은 날 PR #112 는 `risk_model_v1.4.5.json`, 2026-11-23 은 `risk_model_v1.4.3.json`·`risk_model_v1.4.2.json`·`risk_model_v1.4.1.json`, 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
+`ml/venv/bin/python ml/scripts/train_risk_model.py`(이 파일 `risk_model_v1.json` 에 쓴다 — 런타임 `V13_MODEL_PATH`). 2026-11-26 부터 서비스 기본 모델은 아래
+`risk_model_v1.4.7.json`(런타임 `MODEL_VERSION` risk_model_v1.4.7, `DEFAULT_MODEL_PATH`; 2026-11-24 는 `risk_model_v1.4.6.json`, 같은 날 PR #112 는 `risk_model_v1.4.5.json`, 2026-11-23 은 `risk_model_v1.4.3.json`·`risk_model_v1.4.2.json`·`risk_model_v1.4.1.json`, 2026-11-20–22 는 `risk_model_v1.4.json`)이고 이 파일은 이름 있는 계수의 원본으로 남는다. v1–v1.2.1 JSON 도 적재한다
 (패턴 없는 JSON 은 최상위 계수 집합 하나로, 없는 키는 규칙 미적용).
 
 런타임은 이름 없는 이미지+업종 집합(`nameless_patterns["x2_whole+x4"]`)의 **곱하기 항**도 읽는다(2026-11-24, 설계 §7-12 — 서비스 기본
@@ -42,10 +42,31 @@ v1.4.6 이 켠다): 이름 곱 `x1_d×x4`·`x2_text_d×x4`·`x3_d×x4`·
 상한이다 — 업종이 다르면(겹침 < `coupling.floors.x4`) 이름 없는 이미지+업종·이름 있는 업종 두 벌 모두 짝 판단의 등급 이하(rule_triggers
 `goods_cap`; 짝 판단의 등급은 단독 축·도형 규칙까지 반영한 등급, 상한은 내리기만 함). 이 키들이 없는 JSON(v1.4.5 까지)은 예전과 같다.
 
-## `risk_model_v1.4.6.json` — v1.4.6 (업종 상한), 서비스 기본 모델 (2026-11-24)
+런타임은 최상위 `famous_check` 표시도 읽는다(2026-11-26, 설계 §7-14-13 — v1.4.7 이 켠다): `{"enabled": true, "version": 확정 파일의
+형식 버전, "confirmed_sha256": 확정 파일 shared/famous_check_confirmed.json 의 sha256}`. 켜져 있으면 엔진이 기동 때 확정 파일(그 sha256 과
+대조)·등록부(확정 파일에 적힌 sha256 과 대조)·대표 로고 구분 파일을 읽고, 질의마다 검색과 별개로 유명 상표를 확인해 전체 등급의 바닥과
+응답의 선택 필드를 더한다(계약 v2 §2-6). 위험도 계산(`risk_score`)에는 쓰지 않는 표시다 — 키가 없는 JSON(v1.4.6 까지)은 예전과 똑같이
+동작한다. 적재 검증: `enabled` 는 true/false, 켜려면 `version` 과 64자리 16진수 `confirmed_sha256` 이 있어야 한다.
 
-**2026-11-24 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V146_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
-파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.5.json` 에 최상위 `goods_cap: {"enabled": true}` 만 켠 것이다 — 계수·기준·단독 임계값·도형 규칙·
+## `risk_model_v1.4.7.json` — v1.4.7 (유명 상표 확인 표시), 서비스 기본 모델 (2026-11-26)
+
+**2026-11-26 부터 서비스가 읽는 기본 모델이다**(`ml/src/model/risk_model.py` `DEFAULT_MODEL_PATH` = `V147_MODEL_PATH`, `MARKLENS_RISK_MODEL` 로 바꿀 수 있음 —
+파일을 바꾸면 서버를 다시 띄운다). 아래 `risk_model_v1.4.6.json` 에 최상위 `famous_check`(위 문단)와 출처 `meta.famous_check` 만 더한 것이다 —
+계수·등급 기준·단독 임계값·도형 규칙·`logo_floor`·`weak_run`·`goods_cap`·`grade_precision` 은 v1.4.6 그대로라 후보마다의 위험도·등급·정렬은
+달라지지 않는다. 달라지는 것은 엔진이 질의마다 따로 하는 유명 상표 확인뿐이다: 판정 규칙은 확정된 `ml/src/famous_check.py` 와 등록부
+`shared/famous_registry.json`(확정 파일이 둘의 해시를 담는다 — 설계 §7-14-12), 연결은 `ml/src/famous_runtime.py` 와
+`backend/src/core/multi_search.py`(설계 §7-14-13). 판정이 준 바닥(위험·검토 권장)이 전체 등급보다 높으면 전체 등급만 올리고
+(`overall.famous_floor`), 응답에 `famous`(확인 상태·등록부 브랜드 수·일치 최대 2개 브랜드)와 후보의 `famous_brand` 를 더한다.
+확인 (가)–(다)(같은 프로세스에서 v1.4.6 대 v1.4.7 — 후보 배열 불변, 일치가 없는 질의의 전체 등급 불변·내려간 질의 0, 엔진의 판정 = 규칙
+세션의 판정)를 넘었다(`ml/scripts/famous_connect.py verify`). `ml/scripts/famous_connect.py apply` 가 v1.4.6 JSON 과 확정 파일에서 만든다 —
+v1.4.6 과 다른 키는 `version`·`famous_check`·`meta.famous_check` 뿐이고 `ml/tests/test_risk_model.py` 가 이를 고정한다(표시의 sha256 =
+저장소의 확정 파일의 sha256 도). 확정 파일을 다시 만들면(판정 모듈·등록부를 고쳐 다시 확정) 이 파일도 다시 만들어야 한다. 유명 상표 확인
+없이 띄우려면 `MARKLENS_RISK_MODEL=shared/model/risk_model_v1.4.6.json`.
+
+## `risk_model_v1.4.6.json` — v1.4.6 (업종 상한), v1.4.7 의 원본 (2026-11-24)
+
+**2026-11-24–25 의 서비스 기본 모델이었고**(`V146_MODEL_PATH`) 2026-11-26 v1.4.7(유명 상표 확인 표시)의 원본이 됐다(`MARKLENS_RISK_MODEL` 로 지정하면
+지금도 이 모델로 뜬다 — 유명 상표 확인 없이 예전과 똑같이 동작). 아래 `risk_model_v1.4.5.json` 에 최상위 `goods_cap: {"enabled": true}` 만 켠 것이다 — 계수·기준·단독 임계값·도형 규칙·
 `logo_floor`·`weak_run`·이름 없는 이미지+업종 집합의 `goods_rule`·`grade_precision` 은 v1.4.5 그대로. 엔진은 업종이 다를 때(겹침 < `coupling.floors.x4`
 0.0252) 업종 집합의 등급을 업종 없는 짝 판단의 등급 이하로 내린다 — 이름 없는 이미지+업종 ↔ 이미지만, 이름+업종(`x4`) ↔ 이름만(`base`),
 이름+이미지+업종(`x2_whole+x4`) ↔ 이름+이미지(`x2_whole`); 짝 판단 등급은 단독 축·도형 규칙까지 반영한 등급이고 상한은 내리기만 한다(rule_triggers

@@ -20,7 +20,13 @@
       },
       "suggested_name": null
     },
-    "visual_status": "STRONG_MATCH"
+    "visual_status": "STRONG_MATCH",
+    "famous_floor": false
+  },
+  "famous": {
+    "status": "checked",
+    "brand_count": 58,
+    "matches": []
   },
   "candidates": [
     {
@@ -191,7 +197,7 @@
     }
   ],
   "meta": {
-    "model_version": "risk_model_v1.4.6",
+    "model_version": "risk_model_v1.4.7",
     "grade_precision": 0.7039,
     "thresholds": {
       "grade": {
@@ -228,15 +234,15 @@
       "goods": 0,
       "total": 20
     },
-    "elapsed_ms": 268
+    "elapsed_ms": 265
   },
   "dataset_info": {
-    "총_상표수": 1383,
+    "총_상표수": 1469,
     "출원일자_범위": "1962 ~ 2026",
     "데이터_기준": "KIPRIS 등록 상태 도형·복합상표, 출원인 검색 기반 연구용 표본",
-    "생성일자": "2026-11-19"
+    "생성일자": "2026-11-25"
   },
-  "index_size": 1383,
+  "index_size": 1469,
   "top_k_requested": 3,
   "top_k_returned": 3
 }

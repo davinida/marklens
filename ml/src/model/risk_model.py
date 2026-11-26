@@ -48,8 +48,13 @@ v1.4(§7-4) — 이름 없는 입력의 계수 집합: v1.3 은 이름(호칭·�
 시도 — 이름을 쉬운 음성 평균 이상으로 더 관측하면 비감소; 채택되지 않은 형식이고 그 학습 스크립트의
 재현용으로만 남긴다). `nameless_patterns` 가 없는 JSON(≤ v1.3)의 계산은 달라지지 않는다.
 
-서비스 기본 모델(2026-11-24, §7-13): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.6.json`
-(MODEL_VERSION risk_model_v1.4.6) — v1.4.5 에 업종 상한(`goods_cap.enabled`)만 켠 것: 업종이
+서비스 기본 모델(2026-11-26, §7-14-13): DEFAULT_MODEL_PATH = `shared/model/risk_model_v1.4.7.json`
+(MODEL_VERSION risk_model_v1.4.7) — v1.4.6 에 유명 상표 확인 표시(`famous_check` — enabled·확정
+파일의 version 과 sha256)만 더한 것: 계수·기준·다른 규칙은 그대로이고, 엔진이 질의마다 유명 상표
+확인(src.famous_runtime — 판정 규칙은 확정된 src.famous_check)을 따로 해 전체 등급의 바닥과 응답의
+선택 필드를 더한다. 표시가 없는 JSON(≤ v1.4.6)은 예전 동작 그대로다.
+v1.4.6(`risk_model_v1.4.6.json`, V146_MODEL_PATH — 2026-11-24 서비스 기본, §7-13)은
+v1.4.5 에 업종 상한(`goods_cap.enabled`)만 켠 것: 업종이
 다르면(겹침 < 결합 하한) 엔진이 업종 집합의 등급을 업종 없는 짝 판단의 등급 이하로 내린다(계수·
 기준·다른 규칙 그대로; `ml/scripts/goods_cap.py apply`, 4-b 곱하기 항은 채택하지 않음).
 v1.4.5(`risk_model_v1.4.5.json`, V145_MODEL_PATH — 2026-11-24 PR #112 의 기본, §7-12)는
@@ -96,7 +101,8 @@ __all__ = [
     "coupling_violations", "coupling_vertices", "select_pattern", "pattern_key", "pattern_keys",
     "block_logit", "GRADES", "TYPE_LEVELS", "AXIS_INPUTS", "FIGURE_FAMILY", "PATTERN_BASE_KEY",
     "DEFAULT_MODEL_PATH", "V13_MODEL_PATH", "V14_MODEL_PATH", "V141_MODEL_PATH",
-    "V142_MODEL_PATH", "V143_MODEL_PATH", "V145_MODEL_PATH", "V146_MODEL_PATH", "ENV_MODEL_PATH",
+    "V142_MODEL_PATH", "V143_MODEL_PATH", "V145_MODEL_PATH", "V146_MODEL_PATH", "V147_MODEL_PATH",
+    "ENV_MODEL_PATH", "FAMOUS_CHECK_KEY", "famous_check_enabled", "famous_check_config",
     "NAMELESS_KEY",
     "NAMELESS_PREFIX", "NAME_AXES", "is_nameless_pattern", "nameless_grade_thresholds",
     "SEARCH_THRESHOLDS_METHOD", "OverwriteRefused", "search_calibrated", "check_nameless_overwrite",
@@ -118,14 +124,16 @@ V141_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.1.json"  # v
 V142_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.2.json"  # v1.4.3 의 원본
 V143_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.3.json"  # v1.4.5 의 원본
 V145_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.5.json"  # v1.4.6 의 원본
-V146_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.6.json"  # 업종 상한(§7-13)
-DEFAULT_MODEL_PATH = V146_MODEL_PATH  # 서비스 기본 모델(2026-11-24 부터 v1.4.6)
+V146_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.6.json"  # v1.4.7 의 원본
+# 유명 상표 확인 표시(§7-14-13)
+V147_MODEL_PATH = REPO_ROOT / "shared" / "model" / "risk_model_v1.4.7.json"
+DEFAULT_MODEL_PATH = V147_MODEL_PATH  # 서비스 기본 모델(2026-11-26 부터 v1.4.7)
 ENV_MODEL_PATH = "MARKLENS_RISK_MODEL"
-MODEL_VERSION = "risk_model_v1.4.6"  # 서비스 기본 모델의 버전
+MODEL_VERSION = "risk_model_v1.4.7"  # 서비스 기본 모델의 버전
 SUPPORTED_VERSIONS = ("risk_model_v1", "risk_model_v1.1", "risk_model_v1.2", "risk_model_v1.2.1",
                       "risk_model_v1.3", "risk_model_v1.4", "risk_model_v1.4.1",
                       "risk_model_v1.4.2", "risk_model_v1.4.3", "risk_model_v1.4.5",
-                      "risk_model_v1.4.6", "risk_model_v1.5")
+                      "risk_model_v1.4.6", "risk_model_v1.4.7", "risk_model_v1.5")
 AXIS_VERSIONS_KEY = "axis_versions"  # 계수가 학습된 축 정의의 버전(없으면 모두 1)
 LOGO_FLOOR_KEY = "logo_floor"  # 이름 있는 이미지 질의에 이미지만 판단 비교를 켜는 표시(v1.4.2)
 # 서비스가 이름 축을 계산할 때 쓰는 식별력 결합 규칙의 약한 토큰열 버전(없으면 1 — v1.4.3 부터 2).
@@ -189,6 +197,12 @@ PAIR_TERM = re.compile(r"^pair\((?P<key>[a-z0-9_]+(?:\+[a-z0-9_]+)*)\)×x4$")
 # 집합의 최종 등급을 업종 없는 짝 판단의 등급 이하로 둔다 — 이름 없는·이름 있는 판단 모두. 키가
 # 없으면 꺼짐.
 GOODS_CAP_KEY = "goods_cap"
+# 유명 상표 확인(2026-11-26, 설계 §7-14-13): 켜면 엔진이 질의마다 유명 상표 확인을 따로 해 전체
+# 등급의 바닥과 응답의 선택 필드를 더한다(후보 목록·후보 등급·위험도는 그대로). enabled 가 true 면
+# version(확정 파일의 형식 버전)과 confirmed_sha256(확정 파일 shared/famous_check_confirmed.json 의
+# sha256 — 기동 때 대조)이 있어야 한다. 키가 없으면 꺼짐.
+FAMOUS_CHECK_KEY = "famous_check"
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 # 기여도를 "근거 축"으로 묶을 때의 항 → 축
 TERM_AXIS = {
@@ -821,6 +835,17 @@ def validate_model(data: dict) -> dict:
                                       and isinstance(goods_cap.get("enabled"), bool)):
         raise ValueError(f"risk_model: {GOODS_CAP_KEY} 는 enabled(true/false)를 가진 객체여야 "
                          "합니다")
+    famous = data.get(FAMOUS_CHECK_KEY)
+    if famous is not None:
+        if not (isinstance(famous, dict) and isinstance(famous.get("enabled"), bool)):
+            raise ValueError(f"risk_model: {FAMOUS_CHECK_KEY} 는 enabled(true/false)를 가진 "
+                             "객체여야 합니다")
+        if famous["enabled"] and not (
+                isinstance(famous.get("version"), str) and famous["version"]
+                and isinstance(famous.get("confirmed_sha256"), str)
+                and _SHA256.match(famous["confirmed_sha256"])):
+            raise ValueError(f"risk_model: {FAMOUS_CHECK_KEY} 를 켜려면 version 과 "
+                             "confirmed_sha256(64자리 16진수)이 있어야 합니다")
     weak_run = data.get(WEAK_RUN_KEY)
     if weak_run is not None and not (
             isinstance(weak_run, dict) and isinstance(weak_run.get("version"), int)
@@ -838,6 +863,17 @@ def weak_run_version(model: dict) -> int:
     없으면 1(v0.2–v0.3 부분열). 2 는 두 이름 모두에서 붙어 있는 구간만(식별력 v0.4, 견고성 점검
     R-P0-2)."""
     return int((model.get(WEAK_RUN_KEY) or {}).get("version", 1))
+
+
+def famous_check_enabled(model: dict) -> bool:
+    """계수 JSON 이 유명 상표 확인(엔진이 질의마다 따로 하는 확인 — 설계 §7-14-13)을 켰는가. 키가
+    없는 JSON(≤ v1.4.6)은 꺼짐 — 예전 동작 그대로."""
+    return bool((model.get(FAMOUS_CHECK_KEY) or {}).get("enabled"))
+
+
+def famous_check_config(model: dict) -> dict | None:
+    """유명 상표 확인 표시(version·confirmed_sha256) — 꺼져 있으면 None."""
+    return dict(model[FAMOUS_CHECK_KEY]) if famous_check_enabled(model) else None
 
 
 def goods_cap_enabled(model: dict) -> bool:
@@ -896,7 +932,7 @@ def _load_cached(path_text: str) -> dict:
 
 def load_model(path: str | os.PathLike[str] | None = None) -> dict:
     """계수 JSON 적재(경로: 인자 > MARKLENS_RISK_MODEL > DEFAULT_MODEL_PATH = shared/model/
-    risk_model_v1.4.5.json). 프로세스 캐시 — 파일을 바꾸면 서버를 다시 띄운다."""
+    risk_model_v1.4.7.json). 프로세스 캐시 — 파일을 바꾸면 서버를 다시 띄운다."""
     return _load_cached(str(resolve_model_path(path)))
 
 

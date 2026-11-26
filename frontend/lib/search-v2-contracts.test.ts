@@ -5,17 +5,18 @@ import { describe, expect, it } from "vitest";
 import { SearchV2ResponseSchema } from "@/lib/contracts";
 import textFixture from "@/test/fixtures/search-v2-text.json";
 import imageFixture from "@/test/fixtures/search-v2-image.json";
+import famousFixture from "@/test/fixtures/search-v2-famous.json";
 
 describe("SearchV2ResponseSchema", () => {
-  it.each([textFixture, imageFixture])("accepts and preserves the complete contract fixture", (fixture) => {
+  it.each([textFixture, imageFixture, famousFixture])("accepts and preserves the complete contract fixture", (fixture) => {
     expect(SearchV2ResponseSchema.parse(fixture)).toEqual(fixture);
   });
 
-  it("uses the two verbatim JSON blocks from contract §3", () => {
+  it("uses the three verbatim JSON blocks from contract §3", () => {
     const contract = readFileSync(new URL("../../docs/MarkLens_API계약_v2.md", import.meta.url), "utf8");
     const blocks = [...contract.matchAll(/```json\r?\n([\s\S]*?)\r?\n```/g)];
-    expect(blocks).toHaveLength(2);
-    for (const [index, file] of ["text", "image"].entries()) {
+    expect(blocks).toHaveLength(3);
+    for (const [index, file] of ["text", "image", "famous"].entries()) {
       const fixture = readFileSync(new URL(`../test/fixtures/search-v2-${file}.json`, import.meta.url), "utf8");
       expect(fixture.trimEnd()).toBe(blocks[index][1]);
     }
@@ -131,3 +132,130 @@ describe("SearchV2ResponseSchema", () => {
     expect(SearchV2ResponseSchema.safeParse(fixture).success).toBe(true);
   });
 });
+
+// 유명 상표 확인(v1.4.7) — famous·overall.famous_floor·candidates[].famous_brand 는 모두 선택 필드
+describe("SearchV2ResponseSchema — famous check fields (v1.4.7)", () => {
+  function famousMatch(overrides: Record<string, unknown> = {}) {
+    return {
+      brand: "스타벅스",
+      level: "강함",
+      basis: "이름",
+      notation: "스타벅스",
+      matched_text: "스타벅스",
+      protection: "업종 불문",
+      goods_overlap: false,
+      floor: "위험",
+      logos: [{ id: "4020190000001", image_url: "/images/4020190000001.png" }],
+      ...overrides,
+    };
+  }
+
+  function withFamousFields() {
+    const fixture = structuredClone(textFixture);
+    Object.assign(fixture.overall, { famous_floor: true });
+    Object.assign(fixture.candidates[0], { famous_brand: "스타벅스" });
+    Object.assign(fixture, {
+      famous: {
+        status: "checked",
+        brand_count: 58,
+        matches: [
+          famousMatch(),
+          famousMatch({
+            brand: "스타벅스 리저브", level: "약함", basis: "로고", notation: null,
+            matched_text: null, protection: "같은·가까운 업종 중심", goods_overlap: null, floor: null,
+            logos: [{ id: "4020190000002", image_url: null }],
+          }),
+        ],
+      },
+    });
+    return fixture;
+  }
+
+  it("accepts the new fields and keeps them after parsing", () => {
+    const fixture = withFamousFields();
+    const parsed = SearchV2ResponseSchema.parse(fixture);
+    expect(parsed).toEqual(fixture);
+    expect(parsed.overall.famous_floor).toBe(true);
+    expect(parsed.candidates[0].famous_brand).toBe("스타벅스");
+    expect(parsed.famous?.brand_count).toBe(58);
+    expect(parsed.famous?.matches[1].logos[0].image_url).toBeNull();
+  });
+
+  it("accepts a response without the new fields and does not invent them", () => {
+    for (const fixture of [textFixture, imageFixture]) {
+      // 유명 상표 확인이 꺼진 서버(v1.4.6 이하)의 응답 — 픽스처에서 새 선택 필드를 뺀 것
+      const older = structuredClone(fixture) as Record<string, unknown> & {
+        overall: Record<string, unknown>;
+      };
+      delete older.famous;
+      delete older.overall.famous_floor;
+      const parsed = SearchV2ResponseSchema.parse(older);
+      expect("famous" in parsed).toBe(false);
+      expect("famous_floor" in parsed.overall).toBe(false);
+      expect(parsed.candidates.some((candidate) => "famous_brand" in candidate)).toBe(false);
+    }
+  });
+
+  it("accepts an unavailable check and a checked one without matches", () => {
+    for (const famous of [
+      { status: "unavailable", brand_count: 58, matches: [] },
+      { status: "checked", brand_count: 58, matches: [] },
+    ]) {
+      const fixture = Object.assign(structuredClone(textFixture), { famous });
+      expect(SearchV2ResponseSchema.parse(fixture)).toEqual(fixture);
+    }
+  });
+
+  it("keeps unknown status/level/basis strings and additive keys (the screen draws only known values)", () => {
+    const fixture = withFamousFields();
+    const { famous } = fixture as unknown as {
+      famous: { status: string; matches: { logos: object[] }[] };
+    };
+    famous.status = "partial";
+    Object.assign(famous, { future_field: "retained" });
+    Object.assign(famous.matches[0], { level: "보통", basis: "소리", future_field: 1 });
+    Object.assign(famous.matches[0].logos[0], { future_field: true });
+    expect(SearchV2ResponseSchema.parse(fixture)).toEqual(fixture);
+  });
+
+  it("drops a malformed famous field instead of rejecting the whole response", () => {
+    const fixture = structuredClone(textFixture);
+    Object.assign(fixture.overall, { famous_floor: "yes" });
+    Object.assign(fixture.candidates[0], { famous_brand: 3 });
+    Object.assign(fixture, { famous: { status: "checked", brand_count: -1, matches: "none" } });
+    const parsed = SearchV2ResponseSchema.safeParse(fixture);
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.famous).toBeUndefined();
+    expect(parsed.data?.overall.famous_floor).toBeUndefined();
+    expect(parsed.data?.candidates[0].famous_brand).toBeUndefined();
+    // 나머지는 그대로
+    expect(parsed.data?.overall.grade).toBe(textFixture.overall.grade);
+    expect(parsed.data?.candidates).toHaveLength(textFixture.candidates.length);
+  });
+});
+
+describe("contract §3-3 fixture — a famous mark match (v1.4.7)", () => {
+  it("keeps the famous block, the floor flag and the brand tags through the schema", () => {
+    const parsed = SearchV2ResponseSchema.parse(famousFixture);
+    expect(parsed.famous?.status).toBe("checked");
+    expect(parsed.famous?.matches).toHaveLength(1);
+    expect(parsed.famous?.matches[0]).toMatchObject({
+      brand: "스타벅스",
+      level: "강함",
+      basis: "이름",
+      floor: "위험",
+      goods_overlap: false,
+    });
+    expect(parsed.famous?.matches[0].logos.length).toBeGreaterThan(0);
+    expect(parsed.overall.grade).toBe("위험");
+    expect(parsed.overall.famous_floor).toBe(true);
+    expect(parsed.candidates.every((candidate) => candidate.famous_brand === "스타벅스")).toBe(true);
+    // 유명 상표 확인을 켠 서버의 일치 없는 응답 — 확인함·일치 없음·바닥 아님
+    for (const fixture of [textFixture, imageFixture]) {
+      const plain = SearchV2ResponseSchema.parse(fixture);
+      expect(plain.famous).toEqual({ status: "checked", brand_count: famousFixture.famous.brand_count, matches: [] });
+      expect(plain.overall.famous_floor).toBe(false);
+    }
+  });
+});
+

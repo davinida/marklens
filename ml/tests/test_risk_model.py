@@ -270,8 +270,8 @@ def test_versions_accepted():
     assert _model(version="risk_model_v1.1")["version"] == "risk_model_v1.1"
     assert _model(version="risk_model_v1.2")["version"] == "risk_model_v1.2"
     assert _model(version="risk_model_v1.2.1")["version"] == "risk_model_v1.2.1"
-    assert rm.MODEL_VERSION == "risk_model_v1.4.6"  # 서비스 기본 모델(2026-11-24 부터)
-    assert rm.DEFAULT_MODEL_PATH == rm.V146_MODEL_PATH
+    assert rm.MODEL_VERSION == "risk_model_v1.4.7"  # 서비스 기본 모델(2026-11-26 부터)
+    assert rm.DEFAULT_MODEL_PATH == rm.V147_MODEL_PATH
     assert rm.V13_MODEL_PATH.name == "risk_model_v1.json"
     with pytest.raises(ValueError):
         _model(version="risk_model_v2")
@@ -589,13 +589,14 @@ def test_v14_validate_nameless_patterns():
     # name_floors 가 없는 v1.4 JSON 은 이름 결합을 검사하지 않는다(이름 없는 패턴 사이만)
     without_floors = rm.coupling_violations({**loose, "coupling": {"floors": V13_FLOORS}})
     assert without_floors and all("(이름" not in v for v in without_floors)
-    assert rm.MODEL_VERSION == "risk_model_v1.4.6"  # 서비스 기본 모델(2026-11-24 부터 v1.4.6)
+    assert rm.MODEL_VERSION == "risk_model_v1.4.7"  # 서비스 기본 모델(2026-11-26 부터 v1.4.7)
     assert "risk_model_v1.4" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.1" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.2" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.3" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.5" in rm.SUPPORTED_VERSIONS
     assert "risk_model_v1.4.6" in rm.SUPPORTED_VERSIONS
+    assert "risk_model_v1.4.7" in rm.SUPPORTED_VERSIONS
 
 
 def test_shipped_v13_scores_nameless_input_with_named_pattern():
@@ -1066,7 +1067,7 @@ def test_shipped_v145_only_changes_the_image_goods_set():
 
 
 def test_shipped_v146_only_turns_the_goods_cap_on():
-    """서비스 기본 v1.4.6(설계 §7-13, 2026-11-24 — 사람 결정): v1.4.5 JSON 에 업종 상한
+    """v1.4.6(설계 §7-13, 2026-11-24 — 사람 결정; v1.4.7 의 원본): v1.4.5 JSON 에 업종 상한
     `goods_cap.enabled` 만 켜고 출처 meta 를 더했다 — 계수·기준·다른 규칙은 v1.4.5 그대로(엔진이
     업종이 다르면 업종 없는 짝 판단의 등급 이하로 내린다). v1.4.5 를 다시 쓰면 이 시험이 v1.4.6 도
     다시 만들라고 알린다(goods_cap.py apply)."""
@@ -1074,8 +1075,7 @@ def test_shipped_v146_only_turns_the_goods_cap_on():
         pytest.skip("v1.4.6 계수 파일 없음")
     base = json.loads(rm.V145_MODEL_PATH.read_text(encoding="utf-8"))
     new = json.loads(rm.V146_MODEL_PATH.read_text(encoding="utf-8"))
-    assert rm.DEFAULT_MODEL_PATH == rm.V146_MODEL_PATH
-    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.6"
+    assert new["version"] == "risk_model_v1.4.6"
     assert {k for k in set(base) | set(new) if base.get(k) != new.get(k)} == {
         "version", rm.GOODS_CAP_KEY, "meta"}
     assert {k for k in set(base["meta"]) | set(new["meta"])
@@ -1091,3 +1091,53 @@ def test_shipped_v146_only_turns_the_goods_cap_on():
     for features in ({"x1_d": 0.16, "x2_text_d": 0.7, "x4": 0.01, "mark_type": "문자"},
                      {"x2_whole": 0.9, "x4": 0.0, "mark_type": "도형"}):
         assert rm.risk_score(features, model) == rm.risk_score(features, base)  # 위험도는 그대로
+
+
+def test_shipped_v147_only_marks_the_famous_check():
+    """서비스 기본 v1.4.7(설계 §7-14-13, 2026-11-26): v1.4.6 JSON 에 유명 상표 확인 표시
+    `famous_check`(enabled·확정 파일의 version·sha256)와 출처 meta 만 더했다 — 계수·기준·다른
+    규칙은 v1.4.6 그대로다(엔진이 질의마다 유명 상표 확인을 따로 해 전체 등급의 바닥만 더한다).
+    표시의 sha256 은 저장소의 확정 파일의 것이어야 한다 — 확정 파일을 다시 만들면 이 시험이 v1.4.7
+    도 다시 만들라고 알린다(famous_connect.py apply)."""
+    from src import famous_runtime as fr
+
+    if not rm.V147_MODEL_PATH.exists() or not rm.V146_MODEL_PATH.exists():
+        pytest.skip("v1.4.7 계수 파일 없음")
+    base = json.loads(rm.V146_MODEL_PATH.read_text(encoding="utf-8"))
+    new = json.loads(rm.V147_MODEL_PATH.read_text(encoding="utf-8"))
+    assert rm.DEFAULT_MODEL_PATH == rm.V147_MODEL_PATH
+    assert new["version"] == rm.MODEL_VERSION == "risk_model_v1.4.7"
+    assert {k for k in set(base) | set(new) if base.get(k) != new.get(k)} == {
+        "version", rm.FAMOUS_CHECK_KEY, "meta"}
+    assert {k for k in set(base["meta"]) | set(new["meta"])
+            if base["meta"].get(k) != new["meta"].get(k)} == {rm.FAMOUS_CHECK_KEY}
+    mark = new[rm.FAMOUS_CHECK_KEY]
+    assert mark["enabled"] is True and mark["version"] == fr.CONFIRMED_VERSION
+    assert mark["confirmed_sha256"] == fr.file_sha256(fr.CONFIRMED_PATH)
+    assert new["meta"][rm.FAMOUS_CHECK_KEY]["derived_from"] == base["version"]
+    model = rm.load_model(rm.V147_MODEL_PATH)
+    assert rm.famous_check_enabled(model) and rm.famous_check_config(model) == mark
+    assert not rm.famous_check_enabled(rm.load_model(rm.V146_MODEL_PATH))
+    assert rm.famous_check_config(rm.load_model(rm.V146_MODEL_PATH)) is None
+    assert rm.goods_cap_enabled(model) and rm.logo_floor_enabled(model)
+    assert rm.weak_run_version(model) == 2 and rm.coupling_violations(model) == []
+    for features in ({"x1_d": 0.16, "x2_text_d": 0.7, "x4": 0.01, "mark_type": "문자"},
+                     {"x2_whole": 0.9, "x4": 0.0, "mark_type": "도형"}, {}):
+        assert rm.risk_score(features, model) == rm.risk_score(features, base)  # 위험도는 그대로
+
+
+def test_famous_check_mark_format():
+    """famous_check 는 enabled(true/false)를 가진 객체 — 켜려면 version 과 confirmed_sha256(64자리
+    16진수)이 있어야 한다. 키가 없으면 꺼짐."""
+    assert not rm.famous_check_enabled(_model())
+    off = _model(**{rm.FAMOUS_CHECK_KEY: {"enabled": False}})
+    assert not rm.famous_check_enabled(off) and rm.famous_check_config(off) is None
+    good = {"enabled": True, "version": "famous_check_confirmed_v1", "confirmed_sha256": "a" * 64}
+    assert rm.famous_check_config(_model(**{rm.FAMOUS_CHECK_KEY: good})) == good
+    for bad in (True, {"enabled": "yes"}, {"enabled": True},
+                {"enabled": True, "version": "v", "confirmed_sha256": "abc"},
+                {"enabled": True, "version": "", "confirmed_sha256": "a" * 64},
+                {"enabled": True, "version": "v", "confirmed_sha256": "A" * 64}):
+        with pytest.raises(ValueError):
+            _model(**{rm.FAMOUS_CHECK_KEY: bad})
+
