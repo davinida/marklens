@@ -78,7 +78,7 @@ def test_particle_for_fallback_caveat():
     assert multi_search._particle_ro("문자") == "로"
     assert multi_search._particle_ro("결합") == "으로"
     assert multi_search.CAVEAT_OCR_FALLBACK.format(type="도형", ro="으로").startswith(
-        "이미지에서 글자를 읽지 못해 유형을 도형으로 두었습니다"
+        "이미지에서 글자를 읽지 못해 유형을 도형으로 두었어요"
     )
 
 

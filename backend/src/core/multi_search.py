@@ -133,20 +133,20 @@ CONTRIBUTION_KEYS = ("X1", "X2", "X3", "X4", "요부")
 CAVEAT_FIGURE_LOW_DATA = ("로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 "
                           "참고용이에요")
 CAVEAT_PHOTO_QUERY = "사진으로 보여요 — 로고 파일을 올리면 외관 비교가 더 정확해요"
-CAVEAT_NO_IMAGE = "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"
-CAVEAT_NO_NAME = "상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다"
-CAVEAT_NO_PRONUNCIATION = "입력 상표명에 호칭이 없어(기호·한자만) 호칭 축은 비교하지 않았습니다"
-CAVEAT_NO_MEANING = "입력 상표명에 사전적 의미가 없어(조어) 관념 축은 비교하지 않았습니다"
-CAVEAT_NO_GOODS = "지정상품이 없어 상품 견련성은 비교하지 않았습니다"
-CAVEAT_GOODS_COVERAGE = "비교 대상 중 지정상품 정보가 있는 상표는 {with_goods}/{total}건입니다"
+CAVEAT_NO_IMAGE = "이미지가 없어 외관(이미지) 축은 비교하지 않았어요"
+CAVEAT_NO_NAME = "상표명이 없어 호칭·철자·관념 축은 비교하지 않았어요"
+CAVEAT_NO_PRONUNCIATION = "입력 상표명에 호칭이 없어(기호·한자만) 호칭 축은 비교하지 않았어요"
+CAVEAT_NO_MEANING = "입력 상표명에 사전적 의미가 없어(조어) 관념 축은 비교하지 않았어요"
+CAVEAT_NO_GOODS = "지정상품이 없어 상품 견련성은 비교하지 않았어요"
+CAVEAT_GOODS_COVERAGE = "비교 대상 중 지정상품 정보가 있는 상표는 {with_goods}/{total}건이에요"
 CAVEAT_GOODS_ONLY = ("지정상품만으로는 유사군이 겹치는 상표를 나열할 뿐 "
-                     "표장 유사는 비교하지 않았습니다")
-CAVEAT_OCR_FALLBACK = ("이미지에서 글자를 읽지 못해 유형을 {type}{ro} 두었습니다. "
+                     "표장 유사는 비교하지 않았어요")
+CAVEAT_OCR_FALLBACK = ("이미지에서 글자를 읽지 못해 유형을 {type}{ro} 두었어요. "
                        "아니면 유형을 고쳐 주세요")
-CAVEAT_NO_CANDIDATES = "비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다"
-CAVEAT_X3_DISABLED = "관념 축이 꺼져 있어(MARKLENS_X3_ENABLED=0) 관념 유사도는 비교하지 않았습니다"
-CAVEAT_NAME_SUGGESTED = ("이미지에서 '{text}'를 읽었습니다 — 상표명으로 넣으면 호칭·철자·관념도 "
-                         "비교합니다")
+CAVEAT_NO_CANDIDATES = "비교할 후보가 없어요 — 안전하다는 뜻이 아니에요"
+CAVEAT_X3_DISABLED = "관념 축이 꺼져 있어(MARKLENS_X3_ENABLED=0) 관념 유사도는 비교하지 않았어요"
+CAVEAT_NAME_SUGGESTED = ("이미지에서 '{text}'를 읽었어요 — 상표명으로 넣으면 호칭·철자·관념도 "
+                         "비교해요")
 GOODS_CODE_PATTERN = re.compile(r"^[GS]\d{4,6}$")  # 유사군 코드 형식(G/S + 숫자 4~6자리)
 NAMELESS_FLOOR = "nameless_floor"  # 이름 있는 이미지 질의에서 로고만 판단의 등급이 쓰였다
 GOODS_FLOOR = "goods_floor"  # 업종이 겹치는 이름 없는 판단에서 이미지만 판단의 등급이 쓰였다

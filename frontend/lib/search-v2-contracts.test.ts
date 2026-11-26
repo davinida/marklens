@@ -47,7 +47,7 @@ describe("SearchV2ResponseSchema", () => {
     const empty = {
       ...fixture,
       candidates: [],
-      overall: { ...fixture.overall, grade: null, prob: null, caveats: ["비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다"] },
+      overall: { ...fixture.overall, grade: null, prob: null, caveats: ["비교할 후보가 없어요 — 안전하다는 뜻이 아니에요"] },
       top_k_returned: 0,
       meta: { ...fixture.meta, pool: { image: 0, phonetic: 0, spelling: 0, semantic: 0, goods: 0, total: 0 } },
     };
