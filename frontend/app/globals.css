@@ -23,6 +23,9 @@
   --review: #ff8a00;
   --review-deep: #a96000;
   --review-bg: #fff4e5;
+  /* 등급 칸의 설명 글씨용 — 배지·테두리가 쓰는 review-deep·low 는 그대로 두고 글씨만 4.5:1 이상으로
+     (review-bg 위 4.66, low-bg 위 4.65) */
+  --review-text: #a45d00;
   --warn: #e8b200;
   --warn-deep: #8a6900;
   --warn-bg: #fdf6df;
@@ -31,6 +34,7 @@
   --safe-bg: #e6f6ee;
   --low: #6b7684;
   --low-bg: #eef1f4;
+  --low-text: #626d7a;
 }
 
 @theme inline {
@@ -53,6 +57,7 @@
   --color-review: var(--review);
   --color-review-deep: var(--review-deep);
   --color-review-bg: var(--review-bg);
+  --color-review-text: var(--review-text);
   --color-warn: var(--warn);
   --color-warn-deep: var(--warn-deep);
   --color-warn-bg: var(--warn-bg);
@@ -61,6 +66,7 @@
   --color-safe-bg: var(--safe-bg);
   --color-low: var(--low);
   --color-low-bg: var(--low-bg);
+  --color-low-text: var(--low-text);
   --font-sans: var(--font-pretendard), "Pretendard", "Apple SD Gothic Neo",
     "Segoe UI", "Malgun Gothic", sans-serif;
 }

@@ -82,7 +82,7 @@ describe("ResultViewV2 — 문자상표(§3-1)", () => {
     expect(screen.getByTestId("overall-grade")).toHaveTextContent("위험");
     expect(screen.getByTestId("overall-prob")).toHaveTextContent("위험도 60%"); // 0.604
     expect(
-      screen.getByText(/'위험'으로 분류된 상표 쌍은 검증 데이터 기준 10건 중 7건/),
+      screen.getByText(/'위험'으로 나온 상표 쌍은 검증 데이터 기준 10건 중 7건이 심결에서 유사로 판단됐어요/),
     ).toBeVisible();
     // 후보 카드: "위험" 등급(후보 1)에만 정밀도 문구, 검토 권장 후보(2~4)에는 없음
     expect(screen.getAllByText("검증 데이터 기준 10건 중 7건")).toHaveLength(1);
@@ -168,7 +168,7 @@ describe("ResultViewV2 — 문자상표(§3-1)", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "도형로 고치기" }));
+    await user.click(screen.getByRole("button", { name: "도형으로 고치기" }));
     expect(onRetypeTo).toHaveBeenCalledWith("도형");
   });
 });
@@ -206,7 +206,7 @@ describe("ResultViewV2 — 도형상표(§3-2)", () => {
       screen.getAllByRole("button", { name: /이름 미등록 상표/ })[0],
     );
     expect(
-      screen.getByText("도형이 매우 비슷해 검토 권장으로 올렸습니다(검증 데이터 부족, 참고용)"),
+      screen.getByText("도형이 매우 비슷해서 검토 권장 이상으로 봤어요. 도형 비교는 검증 데이터가 적어 참고용이에요"),
     ).toBeVisible();
     expect(screen.getByTestId("nameless-judgment")).toHaveTextContent(
       "이름 없이 로고만으로 본 판단이라 위험도 %는 보이지 않아요",
@@ -238,7 +238,7 @@ describe("ResultViewV2 — 후보 0건(§5-4)", () => {
         onReset={vi.fn()}
       />,
     );
-    expect(screen.getAllByText("비교할 후보가 없습니다").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/^비교할 후보가 없어요\.?$/).length).toBeGreaterThan(0);
     expect(screen.queryByTestId("overall-prob")).toBeNull(); // prob null → 숫자 없음
   });
 });
@@ -329,7 +329,7 @@ describe("ResultViewV2 — 이름 있는·없는 판단이 섞인 응답(v1.4, �
       />,
     );
     await user.click(screen.getByRole("button", { name: /이름 미등록 상표/ }));
-    expect(screen.getByText("업종이 겹쳐 로고만으로 본 등급을 유지했어요")).toBeVisible();
+    expect(screen.getByText("업종이 겹쳐서 로고만 봤을 때의 등급 이상으로 봤어요")).toBeVisible();
   });
 
   it("goods_cap 규칙 문구를 보여준다(업종 상한, v1.4.6)", async () => {
@@ -352,7 +352,7 @@ describe("ResultViewV2 — 이름 있는·없는 판단이 섞인 응답(v1.4, �
       />,
     );
     await user.click(screen.getByRole("button", { name: /이름 미등록 상표/ }));
-    expect(screen.getByText("업종이 달라 업종 없이 본 등급까지만 썼어요")).toBeVisible();
+    expect(screen.getByText("업종이 달라서 등급을 더 높이지 않았어요")).toBeVisible();
     expect(screen.queryByText("goods_cap")).not.toBeInTheDocument();
   });
 
@@ -377,7 +377,7 @@ describe("ResultViewV2 — 이름 있는·없는 판단이 섞인 응답(v1.4, �
     );
     await user.click(screen.getByRole("button", { name: /블루커피/ }));
     expect(
-      screen.getByText("로고만으로 본 판단의 등급이 더 높아 그 등급을 썼어요"),
+      screen.getByText("로고만 봤을 때의 등급이 더 높아서 그 등급 이상으로 봤어요"),
     ).toBeVisible();
   });
 });

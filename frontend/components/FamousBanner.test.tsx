@@ -32,7 +32,7 @@ const BODY_DESCRIPTIVE =
 const TITLE_STARBUCKS_STRONG = "널리 알려진 상표 '스타벅스'와 이름이 같거나 거의 같아요";
 const REASON_STRONG = "널리 알려진 상표와 같거나 거의 같아서 이 등급으로 봤어요.";
 const REASON_WEAK = "널리 알려진 상표와 이름이 닮아서 이 등급으로 봤어요.";
-const OVERALL_PRECISION = /'위험'으로 분류된 상표 쌍은 검증 데이터 기준 10건 중/;
+const OVERALL_PRECISION = /'위험'으로 나온 상표 쌍은 검증 데이터 기준 10건 중/;
 
 function famousMatch(overrides: Partial<SearchV2FamousMatch> = {}): SearchV2FamousMatch {
   return {
@@ -256,7 +256,7 @@ describe("유명 상표 확인 — 확인하지 못함·일치 없음·없음", 
     // 지금 화면 그대로: 위험도 %·눈금·등급 설명·정밀도 문구
     expect(screen.getByTestId("overall-prob")).toHaveTextContent("위험도 61%");
     expect(screen.getByTestId("grade-scale")).toBeInTheDocument();
-    expect(screen.getByText("여러 축이 비슷한 선행 상표가 있습니다")).toBeVisible();
+    expect(screen.getByText("많이 닮은 선행 상표가 있어요")).toBeVisible();
     expect(screen.getByText(OVERALL_PRECISION)).toBeVisible();
     unmount();
 
@@ -366,7 +366,7 @@ describe("전체 등급 — 유명 상표 바닥(overall.famous_floor)", () => {
     expect(screen.queryByTestId("overall-prob")).toBeNull();
     expect(screen.queryByText(/위험도 \d+%/)).toBeNull();
     expect(screen.queryByTestId("grade-scale")).toBeNull();
-    expect(screen.queryByText("여러 축이 비슷한 선행 상표가 있습니다")).toBeNull();
+    expect(screen.queryByText("많이 닮은 선행 상표가 있어요")).toBeNull();
     expect(screen.queryByText(OVERALL_PRECISION)).toBeNull();
   });
 
@@ -379,7 +379,7 @@ describe("전체 등급 — 유명 상표 바닥(overall.famous_floor)", () => {
     renderResult(result);
     expect(screen.getByTestId("overall-grade")).toHaveTextContent("검토 권장");
     expect(screen.getByTestId("famous-floor-reason")).toHaveTextContent(REASON_WEAK);
-    expect(screen.queryByText("비슷한 선행 상표가 있을 수 있습니다. 전문가 검토를 권장합니다")).toBeNull();
+    expect(screen.queryByText("닮은 선행 상표가 있을 수 있어요. 전문가 검토를 권해요")).toBeNull();
     expect(screen.queryByTestId("overall-prob")).toBeNull();
   });
 
@@ -396,7 +396,7 @@ describe("전체 등급 — 유명 상표 바닥(overall.famous_floor)", () => {
     expect(screen.getByTestId("overall-prob")).toHaveTextContent("위험도 61%");
     expect(screen.getByTestId("grade-scale")).toBeInTheDocument();
     expect(screen.getByTestId("grade-scale-marker")).toBeInTheDocument();
-    expect(screen.getByText("여러 축이 비슷한 선행 상표가 있습니다")).toBeVisible();
+    expect(screen.getByText("많이 닮은 선행 상표가 있어요")).toBeVisible();
     expect(screen.getByText(OVERALL_PRECISION)).toBeVisible();
     // 배너는 famous_floor 와 상관없이 그린다
     expect(screen.getByRole("heading", { name: TITLE_STARBUCKS_STRONG })).toBeVisible();
