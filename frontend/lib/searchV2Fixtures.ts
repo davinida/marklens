@@ -15,7 +15,7 @@ export const SEARCH_V2_TEXT_FIXTURE: SearchV2Response = {
     prob: 0.604,
     pattern: "x4",
     caveats: [
-      "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
+      "이미지가 없어 외관(이미지) 축은 비교하지 않았어요",
     ],
     query_type: { type: "문자", source: "fallback", detail: null, suggested_name: null },
     visual_status: null,
@@ -166,8 +166,8 @@ export const SEARCH_V2_FIGURE_FIXTURE: SearchV2Response = {
     pattern: "noname:x2_whole",
     caveats: [
       "로고 파일끼리 비교한 결과예요. 도형 유사는 검증 데이터가 적어 참고용이에요",
-      "상표명이 없어 호칭·철자·관념 축은 비교하지 않았습니다",
-      "지정상품이 없어 상품 견련성은 비교하지 않았습니다",
+      "상표명이 없어 호칭·철자·관념 축은 비교하지 않았어요",
+      "지정상품이 없어 상품 견련성은 비교하지 않았어요",
     ],
     query_type: {
       type: "도형",
@@ -275,9 +275,9 @@ export const SEARCH_V2_EMPTY_FIXTURE: SearchV2Response = {
     prob: null,
     pattern: null,
     caveats: [
-      "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
-      "지정상품이 없어 상품 견련성은 비교하지 않았습니다",
-      "비교할 후보가 없습니다 — 안전하다는 뜻이 아닙니다",
+      "이미지가 없어 외관(이미지) 축은 비교하지 않았어요",
+      "지정상품이 없어 상품 견련성은 비교하지 않았어요",
+      "비교할 후보가 없어요 — 안전하다는 뜻이 아니에요",
     ],
     query_type: { type: "문자", source: "fallback", detail: null, suggested_name: null },
     visual_status: null,

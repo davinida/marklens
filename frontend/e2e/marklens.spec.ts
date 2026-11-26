@@ -19,7 +19,7 @@ function buildSearchV2Result(options: { x4?: number | null; nice_classes?: numbe
       grade: "안전",
       prob: 0.04,
       pattern,
-      caveats: ["이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"],
+      caveats: ["이미지가 없어 외관(이미지) 축은 비교하지 않았어요"],
       query_type: { type: "문자", source: "fallback", detail: null, suggested_name: null },
       visual_status: null,
     },
@@ -314,7 +314,7 @@ test("cropped upload renders a mocked same-origin search result", async ({ page 
   await expect(
     page.getByRole("img", { name: "상표 이미지 없음" }).first(),
   ).toBeVisible();
-  await expect(page.getByText("이미지가 없어 외관(이미지) 축은 비교하지 않았습니다")).toBeVisible();
+  await expect(page.getByText("이미지가 없어 외관(이미지) 축은 비교하지 않았어요")).toBeVisible();
   expect(searchRequest).toEqual({
     contentType: expect.stringContaining("multipart/form-data; boundary="),
     token: "dev-bypass",

@@ -87,7 +87,7 @@ describe("ResultViewV2 — 문자상표(§3-1)", () => {
     // 후보 카드: "위험" 등급(후보 1)에만 정밀도 문구, 검토 권장 후보(2~4)에는 없음
     expect(screen.getAllByText("검증 데이터 기준 10건 중 7건")).toHaveLength(1);
     expect(
-      screen.getByText("이미지가 없어 외관(이미지) 축은 비교하지 않았습니다"),
+      screen.getByText("이미지가 없어 외관(이미지) 축은 비교하지 않았어요"),
     ).toBeVisible();
     expect(screen.getAllByText("BLUE CAFE 블루카페").length).toBeGreaterThan(0);
     // 이름 있는 판단: 등급 눈금에 위험도 위치 표식, 이름 없는 질의 안내는 없음
