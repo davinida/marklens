@@ -237,18 +237,33 @@ def test_ocr_fallback_caveat(client, monkeypatch):
 
 def test_key_sets_match_contract_examples(client, ocr_on):
     text_example, image_example, famous_example, descriptive_example = _contract_examples()
-    name_result = engine.multi_search(name=NAME_Q, top_k=4).to_dict()
+    # 업종을 넣은 예시(§3-1·§3-3·§3-4)에는 후보의 cross_goods 와 최상위 cross_goods_more 가 실린다
+    # (계약 §2-8) — 업종을 넣은 질의와 견주고, 업종이 없으면 그 키만 없다
+    name_result = engine.multi_search(name=NAME_Q, goods_codes=GOODS, top_k=4).to_dict()
     image_result = engine.multi_search(image=_image(), top_k=3).to_dict()
     assert _key_paths(name_result) == _key_paths(text_example)
     assert _key_paths(image_result) == _key_paths(image_example)
+    cross = {"cross_goods_more", "cross_goods_more.count", "cross_goods_more.candidates",
+             "candidates.cross_goods", "candidates.cross_goods.differs",
+             "candidates.cross_goods.grade_without_goods", "candidates.cross_goods.flagged"}
+    assert cross <= _key_paths(text_example) and not cross & _key_paths(image_example)
+    without_goods = engine.multi_search(name=NAME_Q, top_k=4).to_dict()
+    assert _key_paths(without_goods) == _key_paths(text_example) - cross
     # 셋째 예시(유명 상표 일치, v1.4.7) — 일치가 없는 응답의 키에 일치 한 줄의 키와 후보의 브랜드
     # 표시가 더해진다. 픽스처 DB 에는 그 브랜드의 표장이 없어 대표 로고·후보 표시의 키는 예시에만
-    famous_result = engine.multi_search(name="스타벅스", top_k=3).to_dict()
+    famous_result = engine.multi_search(name="스타벅스", goods_codes=GOODS, top_k=3).to_dict()
     only_with_marks = {"famous.matches.logos.id", "famous.matches.logos.image_url",
                        "candidates.famous_brand"}
-    assert _key_paths(famous_example) - _key_paths(famous_result) == only_with_marks
+    # 이 예시에는 처음 보이는 범위 밖의 후보(cross_goods_more.candidates)도 실려 있다 — 후보와
+    # 같은 꼴
+    outside = {path.replace("candidates", "cross_goods_more.candidates", 1)
+               for path in _key_paths(famous_example) if path.startswith("candidates.")}
+    assert outside <= _key_paths(famous_example)
+    assert famous_example["cross_goods_more"]["count"] >= len(
+        famous_example["cross_goods_more"]["candidates"]) > 0
+    assert _key_paths(famous_example) - _key_paths(famous_result) == only_with_marks | outside
     assert _key_paths(famous_result) - _key_paths(famous_example) <= {"overall.query_type.detail"}
-    assert _key_paths(famous_example) - _key_paths(text_example) == only_with_marks | {
+    assert _key_paths(famous_example) - _key_paths(text_example) == only_with_marks | outside | {
         f"famous.matches.{key}" for key in (
             "brand", "level", "basis", "notation", "matched_text", "protection",
             "goods_overlap", "floor", "logos")}
@@ -264,7 +279,7 @@ def test_key_sets_match_contract_examples(client, ocr_on):
     assert descriptive_example["name_words"]["generic"] == "all"
     assert text_example["name_words"]["generic"] == "some"
     assert famous_example["name_words"]["generic"] == "none"
-    for payload in (name_result, image_result, famous_result):
+    for payload in (name_result, image_result, famous_result, without_goods):
         json.dumps(payload, ensure_ascii=False)  # 직렬화 가능(numpy 타입 없음)
 
 

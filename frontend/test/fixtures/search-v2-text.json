@@ -104,6 +104,11 @@
           "G370701"
         ],
         "jaccard": 0.0
+      },
+      "cross_goods": {
+        "differs": true,
+        "grade_without_goods": "검토 권장",
+        "flagged": true
       }
     },
     {
@@ -165,6 +170,11 @@
           "S2037"
         ],
         "jaccard": 0.0
+      },
+      "cross_goods": {
+        "differs": true,
+        "grade_without_goods": "검토 권장",
+        "flagged": true
       }
     },
     {
@@ -227,6 +237,11 @@
           "S120603"
         ],
         "jaccard": 0.6
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     },
     {
@@ -280,9 +295,18 @@
           "S120602"
         ],
         "jaccard": 0.75
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     }
   ],
+  "cross_goods_more": {
+    "count": 0,
+    "candidates": []
+  },
   "meta": {
     "model_version": "risk_model_v1.4.7",
     "grade_precision": 0.7039,
@@ -321,7 +345,7 @@
       "goods": 20,
       "total": 64
     },
-    "elapsed_ms": 93
+    "elapsed_ms": 276
   },
   "dataset_info": {
     "총_상표수": 1469,

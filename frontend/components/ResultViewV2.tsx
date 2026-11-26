@@ -17,6 +17,14 @@ import FamousBanner, {
   famousBannerState,
   famousFloorReason,
 } from "@/components/FamousBanner";
+import {
+  CROSS_GOODS_TEXT,
+  crossGoodsLine,
+  crossGoodsMore,
+  crossGoodsMoreNote,
+  crossGoodsMoreTitle,
+  showsCrossGoodsOverallLine,
+} from "@/lib/crossGoods";
 import { NOTICE_TEXT, showsWholeNameLine } from "@/lib/descriptiveNotice";
 // v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
 import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/visualStatusView";
@@ -395,6 +403,8 @@ function CandidateCard({
   const reasonTitle = candidate.salient.removed
     .map((item) => `${item.token}: ${item.reason}`)
     .join("\n");
+  // §4-8: 업종은 다르지만 표장이 닮은 후보 — "업종 다름" 표시와 설명 한 줄(엔진이 정한 값 그대로)
+  const crossGoodsText = crossGoodsLine(candidate);
 
   return (
     <li className="border-b border-line last:border-b-0">
@@ -429,6 +439,14 @@ function CandidateCard({
                   {`유명 상표 · ${candidate.famous_brand}`}
                 </span>
               )}
+              {crossGoodsText && (
+                <span
+                  data-testid="candidate-cross-goods"
+                  className="rounded-full border border-line bg-card px-2 py-0.5 text-[10px] font-bold text-ink"
+                >
+                  {CROSS_GOODS_TEXT.badge}
+                </span>
+              )}
             </span>
             <span className="mt-0.5 block break-words text-[11.5px] text-sub">
               {[
@@ -441,6 +459,14 @@ function CandidateCard({
             <span className="mt-2 block">
               <AxisValues axes={candidate.axes} />
             </span>
+            {crossGoodsText && (
+              <span
+                data-testid="candidate-cross-goods-line"
+                className="mt-2 block break-words text-[11.5px] leading-relaxed text-ink"
+              >
+                {crossGoodsText}
+              </span>
+            )}
           </span>
           <span className="flex shrink-0 flex-col items-end gap-1">
             <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${view.pill}`}>
@@ -544,6 +570,68 @@ function CandidateCard({
   );
 }
 
+/** 처음 보이는 범위 밖의 "업종은 다르지만 표장이 닮은 상표" — 목록 아래 접힌 칸(계약 v2 §4-8). */
+function CrossGoodsMoreSection({
+  count,
+  candidates,
+  hasQueryName,
+  meta,
+}: {
+  count: number;
+  candidates: SearchV2Candidate[];
+  hasQueryName: boolean;
+  meta: SearchV2Response["meta"];
+}) {
+  const [open, setOpen] = useState(false);
+  const headingId = useId();
+  const panelId = useId();
+  const note = crossGoodsMoreNote(count, candidates.length);
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      data-testid="cross-goods-more"
+      className="rounded-lg bg-card p-2"
+    >
+      <h2 id={headingId}>
+        <button
+          type="button"
+          data-testid="cross-goods-more-toggle"
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={() => setOpen((current) => !current)}
+          className="press flex w-full items-center justify-between gap-2 rounded-md px-2 py-2.5 text-left text-[13px] font-bold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-dark"
+        >
+          <span className="min-w-0 break-words">{crossGoodsMoreTitle(count)}</span>
+          <ChevronDown
+            aria-hidden
+            size={18}
+            className={`shrink-0 text-sub transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      </h2>
+      <div id={panelId} hidden={!open} data-testid="cross-goods-more-panel">
+        {note && (
+          <p data-testid="cross-goods-more-note" className="px-2 pb-1 text-[11.5px] text-sub">
+            {note}
+          </p>
+        )}
+        <ul>
+          {candidates.map((candidate) => (
+            <CandidateCard
+              key={candidate.id}
+              candidate={candidate}
+              hasQueryName={hasQueryName}
+              gradePrecision={meta.grade_precision}
+              cuts={thresholdsFor(meta, candidate.risk.pattern)}
+            />
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 export default function ResultViewV2({
   result,
   queryPreview,
@@ -581,6 +669,8 @@ export default function ResultViewV2({
   const famousLevel = famousBannerLevel(result.famous);
   const famousAfterNotice = famousLevel === FAMOUS_LEVEL_DESCRIPTIVE;
   const famousState = famousBannerState(result.famous);
+  // 처음 보이는 범위 밖의 "업종은 다르지만 표장이 닮은 상표"(§4-8) — 없으면 칸을 만들지 않는다
+  const moreCrossGoods = crossGoodsMore(result);
   const famousBanner = <FamousBanner famous={result.famous} />;
   // "결합-문자요부"·"결합-도형요부" 는 사용자에게는 "결합"으로 보여 주고, 고치기 버튼도 그 기준으로 제외한다.
   const displayType = overall.query_type.type.startsWith("결합") ? "결합" : overall.query_type.type;
@@ -645,6 +735,11 @@ export default function ResultViewV2({
                 {showsWholeNameLine(result.name_words, candidates, famousState) && (
                   <p data-testid="descriptive-whole-name" className="mt-1 text-[11.5px] text-sub">
                     {NOTICE_TEXT.wholeName}
+                  </p>
+                )}
+                {showsCrossGoodsOverallLine(result) && (
+                  <p data-testid="cross-goods-overall" className="mt-1 text-[11.5px] text-sub">
+                    {CROSS_GOODS_TEXT.overall}
                   </p>
                 )}
                 {!queryHasName && (
@@ -744,6 +839,15 @@ export default function ResultViewV2({
           <p className="p-4 text-[12.5px] text-sub">비교할 후보가 없습니다.</p>
         )}
       </section>
+
+      {moreCrossGoods && (
+        <CrossGoodsMoreSection
+          count={moreCrossGoods.count}
+          candidates={moreCrossGoods.candidates}
+          hasQueryName={queryHasName}
+          meta={meta}
+        />
+      )}
 
       <p className="px-1 text-[10.5px] leading-relaxed text-sub">
         비교 대상: 등록상표 {result.dataset_info.총_상표수.toLocaleString()}건 ·{" "}

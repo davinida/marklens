@@ -331,3 +331,119 @@ describe("SearchV2ResponseSchema — name_words (설명적 이름 안내, 선택
     }
   });
 });
+
+describe("SearchV2ResponseSchema — cross_goods·cross_goods_more (업종은 다르지만 표장이 닮은 후보, 선택 필드)", () => {
+  it("keeps the fields of the goods fixtures and none for the image-only one", () => {
+    // §3-1 블루커피 + 카페 — 가장 위 후보가 업종이 다른 닮은 상표, 범위 밖에는 없다
+    const text = SearchV2ResponseSchema.parse(textFixture);
+    expect(text.candidates[0].cross_goods).toEqual({
+      differs: true,
+      grade_without_goods: "검토 권장",
+      flagged: true,
+    });
+    expect(text.candidates.every((candidate) => candidate.cross_goods !== undefined)).toBe(true);
+    expect(text.cross_goods_more).toEqual({ count: 0, candidates: [] });
+    // §3-3 스타벅스 + 의류 — 범위 밖 후보가 최대 5개 실리고, 후보와 같은 꼴이다
+    const famous = SearchV2ResponseSchema.parse(famousFixture);
+    const more = famous.cross_goods_more!;
+    expect(more.count).toBeGreaterThanOrEqual(more.candidates.length);
+    expect(more.candidates.length).toBeGreaterThan(0);
+    expect(more.candidates.length).toBeLessThanOrEqual(5);
+    const shown = new Set(famous.candidates.map((candidate) => candidate.id));
+    for (const candidate of more.candidates) {
+      expect(candidate.cross_goods).toMatchObject({ differs: true, flagged: true });
+      expect(shown.has(candidate.id)).toBe(false);
+      expect(Object.keys(candidate).sort()).toEqual(
+        Object.keys(famous.candidates.find((item) => item.cross_goods?.flagged)!).sort(),
+      );
+    }
+    // 겹치는 후보는 업종 없이 본 등급을 싣지 않는다
+    for (const candidate of [...text.candidates, ...famous.candidates]) {
+      const field = candidate.cross_goods!;
+      const overlap = candidate.axes.x4;
+      expect(field.differs).toBe(overlap === null ? null : overlap < 0.0252);
+      expect(field.grade_without_goods === null).toBe(field.differs !== true);
+      expect(field.flagged).toBe(
+        field.differs === true && ["검토 권장", "위험"].includes(field.grade_without_goods!),
+      );
+    }
+    // 업종을 넣지 않은 질의에는 싣지 않는다
+    const image = SearchV2ResponseSchema.parse(imageFixture);
+    expect("cross_goods_more" in image).toBe(false);
+    expect(image.candidates.some((candidate) => "cross_goods" in candidate)).toBe(false);
+  });
+
+  it("accepts a response without the fields and does not invent them (older server)", () => {
+    const older = structuredClone(famousFixture) as unknown as {
+      cross_goods_more?: unknown;
+      candidates: Record<string, unknown>[];
+    };
+    delete older.cross_goods_more;
+    for (const candidate of older.candidates) delete candidate.cross_goods;
+    const parsed = SearchV2ResponseSchema.parse(older);
+    expect("cross_goods_more" in parsed).toBe(false);
+    expect(parsed.candidates.some((candidate) => "cross_goods" in candidate)).toBe(false);
+    expect(parsed.candidates).toHaveLength(famousFixture.candidates.length);
+  });
+
+  it("accepts an unknown overlap (differs null) and keeps additive keys", () => {
+    const fixture = structuredClone(textFixture) as unknown as {
+      cross_goods_more: Record<string, unknown>;
+      candidates: { cross_goods: Record<string, unknown> }[];
+    };
+    fixture.candidates[0].cross_goods = {
+      differs: null,
+      grade_without_goods: null,
+      flagged: false,
+      future: 1,
+    };
+    fixture.cross_goods_more.future = true;
+    const parsed = SearchV2ResponseSchema.parse(fixture);
+    expect(parsed.candidates[0].cross_goods).toEqual({
+      differs: null,
+      grade_without_goods: null,
+      flagged: false,
+      future: 1,
+    });
+    expect(parsed.cross_goods_more).toMatchObject({ count: 0, future: true });
+  });
+
+  it("drops a malformed candidate field without touching the candidate or the response", () => {
+    for (const broken of [
+      { differs: "yes", grade_without_goods: null, flagged: false },
+      { differs: true, grade_without_goods: "아주 위험", flagged: true },
+      { differs: true, grade_without_goods: "위험" },
+      "flagged",
+      null,
+    ]) {
+      const fixture = structuredClone(textFixture) as unknown as {
+        candidates: Record<string, unknown>[];
+      };
+      fixture.candidates[0].cross_goods = broken;
+      const parsed = SearchV2ResponseSchema.safeParse(fixture);
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.candidates[0].cross_goods).toBeUndefined();
+      expect(parsed.data?.candidates[0].id).toBe(textFixture.candidates[0].id);
+      expect(parsed.data?.candidates[1].cross_goods).toEqual(textFixture.candidates[1].cross_goods);
+      expect(parsed.data?.overall.grade).toBe(textFixture.overall.grade);
+    }
+  });
+
+  it("drops a malformed cross_goods_more field instead of rejecting the whole response", () => {
+    for (const broken of [
+      { count: -1, candidates: [] },
+      { count: 2, candidates: "많음" },
+      { count: 1, candidates: [{ id: "x" }] },
+      { candidates: [] },
+      3,
+      null,
+    ]) {
+      const fixture = Object.assign(structuredClone(famousFixture), { cross_goods_more: broken });
+      const parsed = SearchV2ResponseSchema.safeParse(fixture);
+      expect(parsed.success).toBe(true);
+      expect(parsed.data?.cross_goods_more).toBeUndefined();
+      expect(parsed.data?.overall.grade).toBe(famousFixture.overall.grade);
+      expect(parsed.data?.candidates).toHaveLength(famousFixture.candidates.length);
+    }
+  });
+});

@@ -111,6 +111,11 @@
           "S120602"
         ],
         "jaccard": 0.75
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     },
     {
@@ -164,7 +169,12 @@
         ],
         "jaccard": 0.25
       },
-      "famous_brand": "본죽&비빔밥"
+      "famous_brand": "본죽&비빔밥",
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
+      }
     },
     {
       "id": "4020230007146",
@@ -227,9 +237,18 @@
           "S120602"
         ],
         "jaccard": 0.75
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     }
   ],
+  "cross_goods_more": {
+    "count": 0,
+    "candidates": []
+  },
   "meta": {
     "model_version": "risk_model_v1.4.7",
     "grade_precision": 0.7039,
@@ -268,7 +287,7 @@
       "goods": 20,
       "total": 55
     },
-    "elapsed_ms": 290
+    "elapsed_ms": 409
   },
   "dataset_info": {
     "총_상표수": 1469,

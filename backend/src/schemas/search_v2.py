@@ -85,6 +85,16 @@ class Goods(ContractModel):
     jaccard: Score | None
 
 
+class CrossGoods(ContractModel):
+    """이 후보와 업종이 다른지(계약 v2 §2-8) — 업종을 넣은 질의의 후보만 싣는다. 등급 계산에는 쓰지
+    않는다(엔진이 후보를 채점하는 같은 함수를 업종 축만 빼고 한 번 더 부른 값)."""
+
+    # 업종 겹침(axes.x4)이 결합 하한(0.0252) 미만인가 — 후보의 유사군 정보가 없어 겹침을 모르면 null
+    differs: bool | None
+    grade_without_goods: Grade | None  # 업종이 다를 때만 — 업종 없이 본 등급
+    flagged: bool  # 업종은 다르지만 표장이 닮은 후보(다름 그리고 그 등급이 검토 권장 이상)
+
+
 class Candidate(ContractModel):
     id: str = Field(pattern=r"^[0-9]{13}$")
     title: str | None
@@ -98,6 +108,17 @@ class Candidate(ContractModel):
     goods: Goods
     # 유명 상표 등록부의 표장("관련 없음" 제외)이면 그 브랜드 — 해당할 때만 싣는다(v1.4.7)
     famous_brand: str | None = None
+    cross_goods: CrossGoods | None = None  # 업종을 넣은 질의만
+
+
+class CrossGoodsMore(ContractModel):
+    """처음 보이는 범위(top_k) 밖의 "업종은 다르지만 표장이 닮은 후보"(계약 v2 §2-8) — 업종을 넣은
+    질의만 싣는다. 후보 풀 안에서 센 것이다."""
+
+    count: int = Field(ge=0)  # 범위 밖에서 정의에 맞는 후보 수
+    # 업종 없이 본 등급이 높은 것부터(같은 등급이면 유명 상표 등록부의 표장 먼저, 그다음 풀의 순서)
+    # 최대 5개 — candidates[] 와 같은 꼴
+    candidates: list[Candidate] = Field(max_length=5)
 
 
 class FamousLogo(ContractModel):
@@ -190,6 +211,7 @@ class SearchV2Response(ContractModel):
     famous: Famous | None = None
     name_words: NameWords | None = None
     candidates: list[Candidate]
+    cross_goods_more: CrossGoodsMore | None = None
     meta: Meta
     dataset_info: DatasetInfo
     index_size: int = Field(ge=0)

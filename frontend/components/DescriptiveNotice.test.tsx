@@ -33,9 +33,11 @@ const BASE: SearchV2Response = (() => {
   const parsed = SearchV2ResponseSchema.parse(textFixture);
   delete parsed.famous;
   delete parsed.name_words;
+  delete parsed.cross_goods_more;
   delete parsed.overall.famous_floor;
   for (const candidate of parsed.candidates) {
     delete candidate.famous_brand;
+    delete candidate.cross_goods;
     candidate.salient = { ...candidate.salient, query_tokens: [], removed: [] };
   }
   return parsed;

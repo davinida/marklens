@@ -59,6 +59,15 @@ famous(확인 상태·등록부 브랜드 수·일치 최대 2개 브랜드)와 
 어느 후보와 견줄 때 요부 후보로 썼으면(업종 없는 질의의 "전역" 보통명칭) 식별력 있음으로 싣는다
 (_name_words). 후보 목록·등급·위험도·정렬은 건드리지 않는다.
 
+업종은 다르지만 표장이 닮은 후보(2026-11-26 — 계약 v2 §2-8, 설계 §7-15): 업종을 넣은 질의는 후보마다
+선택 필드 cross_goods(업종이 다른지 — 업종 겹침 x4 가 결합 하한 미만인지, 유사군 정보가 없으면
+모름 — 와, 다르면 업종 없이 본 등급, 그 등급이 검토 권장 이상인지)를 싣는다. 업종 없이 본 등급은
+후보를 채점하는 같은 함수(_candidate_judgment)를 업종 축만 빼고 한 번 더 부른 것이다 — 업종 상한
+(goods_cap)이 견주는 짝 판단에, 이미지만 판단과의 비교(nameless_floor·logo_floor)까지 같은 순서로.
+등급 계산에는 쓰지 않는다. 처음 보이는 범위(top_k) 밖의 풀 후보 가운데 그런 후보는 최상위 선택 필드
+cross_goods_more(수와 최대 5개 — 업종 없이 본 등급이 높은 것부터, 같은 등급이면 유명 상표 등록부의
+표장 먼저)로 따로 싣는다. 후보 목록·등급·위험도·정렬은 건드리지 않는다.
+
 규약: 동기 함수(CPU 작업은 API 가 기존 스레드 풀로 돌린다, asyncio 없음), 로그에 검색어·이미지
 미기록(풀
 크기·소요·유형 출처만), KIPRIS 호출 0. MARKLENS_FAKE_ML 에서는 가짜 임베더(CLIP·X3)·가짜 OCR 로 돌고
@@ -145,6 +154,10 @@ GOODS_FLOOR = "goods_floor"  # 업종이 겹치는 이름 없는 판단에서 �
 GOODS_FLOOR_NAMED = "goods_floor_named"
 # 업종이 다른(겹침 < 결합 하한) 업종 판단에서 업종 없는 짝 판단의 등급까지만 썼다(업종 상한, §7-13)
 GOODS_CAP = "goods_cap"
+# 업종은 다르지만 표장이 닮은 후보(§7-15) — 업종 없이 본 등급이 이 등급 이상이면 표시, 처음 보이는
+# 범위 밖의 것은 이만큼까지 따로 싣는다
+CROSS_GOODS_GRADE = "검토 권장"
+CROSS_GOODS_MORE = 5
 # search_pool 단계별 시간(PoolResult.timings 키) — 축 = compute_pair_axes(관념 축 MiniLM 포함),
 # 모델 = 그 밖의 채점(risk_score·nameless_floor 비교·기여도)
 STAGES = ("유형(OCR)", "이미지 임베딩", "이미지 풀", "발음 풀", "철자 풀", "관념 풀", "상품 풀",
@@ -251,11 +264,16 @@ class CandidateResult:
     pattern: str = ""  # risk_score 가 쓴 계수 집합(RiskResult.pattern; "noname:…" = 이름 없는 판단)
     rank: tuple[int, float] = (0, 0.0)  # 정렬 위치(rank_position — 응답에 넣지 않음)
     famous_brand: str | None = None  # 유명 상표 등록부의 표장이면 그 브랜드(선택 필드, v1.4.7)
+    # 업종을 넣은 질의에서 이 후보와 업종이 다른지·다르면 업종 없이 본 등급·그 등급이 검토 권장
+    # 이상인지(선택 필드 — {"differs", "grade_without_goods", "flagged"}, 계약 v2 §2-8)
+    cross_goods: dict | None = None
 
     def to_dict(self) -> dict:
         out = self._base_dict()
         if self.famous_brand is not None:
             out["famous_brand"] = self.famous_brand
+        if self.cross_goods is not None:
+            out["cross_goods"] = dict(self.cross_goods)
         return out
 
     def _base_dict(self) -> dict:
@@ -316,6 +334,9 @@ class SearchV2Result:
     famous_ms: float = 0.0  # 유명 상표 확인에 든 시간
     # 질의 이름의 낱말별 식별력(선택 필드 — 이름이 있는 질의만, 계약 v2 §2-7) — 응답 그대로
     name_words: dict | None = None
+    # 처음 보이는 범위(top_k) 밖의 "업종은 다르지만 표장이 닮은 후보"(선택 필드 — 업종을 넣은
+    # 질의만, 계약 v2 §2-8) — {"count": 수, "candidates": 최대 5개 CandidateResult}
+    cross_goods_more: dict | None = None
 
     def to_dict(self) -> dict:
         overall = {
@@ -333,9 +354,16 @@ class SearchV2Result:
             head["famous"] = self.famous
         if self.name_words is not None:  # 이름이 없는 질의는 키를 싣지 않는다
             head["name_words"] = self.name_words
+        body = {"candidates": [candidate.to_dict() for candidate in self.candidates]}
+        if self.cross_goods_more is not None:  # 업종을 넣지 않은 질의는 키를 싣지 않는다
+            body["cross_goods_more"] = {
+                "count": int(self.cross_goods_more["count"]),
+                "candidates": [candidate.to_dict()
+                               for candidate in self.cross_goods_more["candidates"]],
+            }
         return {
             **head,
-            "candidates": [candidate.to_dict() for candidate in self.candidates],
+            **body,
             "meta": {
                 "model_version": self.model_version,
                 "grade_precision": self.grade_precision,
@@ -917,6 +945,66 @@ def _named_judgment(features: dict, model: dict,
     return judged, rank
 
 
+def _candidate_judgment(features: dict, named: bool, ctx: QueryContext,
+                        x2_img: float | None) -> tuple[Judgment, tuple[int, float]]:
+    """후보 하나의 판단과 정렬 위치 — 이름 있는·없는 판단에 업종 규칙을 적용하고, 이름을 뺀 판단
+    (nameless_floor)·이미지만 판단(logo_floor)과 견준다. score_record 가 부르고, 업종 축을 뺀 같은
+    판단(_cross_goods)도 이 함수를 그대로 부른다."""
+    model = ctx.model
+    if not named:  # 이름 없는 판단 — 업종 하한(goods_floor)·상한(goods_cap)까지 적용
+        judged, rank = _nameless_judgment(features, model, ctx.query_type.type)
+    else:  # 이름 있는 판단 — 업종 집합이면 이름 있는 업종 하한·상한까지(§7-13)
+        judged, rank = _named_judgment(features, model, ctx.query_type.type)
+        if ctx.nameless_floor:
+            # 이름을 뺀 판단(업종 하한 적용 뒤)과 견준다. 정렬 위치는 모든 판단 중 높은 쪽 — 등급이
+            # 같아 이름 있는 판단을 보여 줄 때도 로고만의 판단이 더 높은 위치면 그 자리에 둔다
+            other, other_rank = _nameless_judgment(
+                _nameless_features({**features, "x2_whole": x2_img}), model, ctx.query_type.type)
+            rank = max(rank, other_rank)
+            if rm.GRADES.index(other.result.grade) > rm.GRADES.index(judged.result.grade):
+                judged = Judgment(other.result, other.values, other.triggers + (NAMELESS_FLOOR,),
+                                  other.rank)  # 같으면 이름 있는 쪽
+    if ctx.logo_floor and x2_img is not None:
+        # 이름도 업종도 뺀 "이미지만" 판단(유형은 이름 없이 넣었을 때의 유형)과 견준다 — 상표명
+        # 없는 후보도. 업종이 들어간 이름 없는 판단은 쓰지 않는다(업종 겹침에 기대 무관한 로고도
+        # 올리므로, 설계 §7-7·§7-9). 정렬 위치는 둘 중 높은 쪽, 등급이 같으면 원래 판단
+        level = ctx.nameless_level
+        other = _judge(_image_only_features(x2_img, level), model, level)
+        rank = max(rank, other.rank)
+        if rm.GRADES.index(other.result.grade) > rm.GRADES.index(judged.result.grade):
+            judged = Judgment(other.result, other.values, other.triggers + (NAMELESS_FLOOR,),
+                              other.rank)
+    return judged, rank
+
+
+def _cross_goods(features: dict, named: bool, ctx: QueryContext, x2_img: float | None,
+                 x4: float | None) -> dict | None:
+    """후보의 선택 필드 cross_goods(계약 v2 §2-8, 설계 §7-15) — 업종을 넣은 질의에서 이 후보와
+    업종이 다른지(업종 겹침 x4 < 결합 하한), 다르면 업종 없이 본 등급, 그 등급이 검토 권장 이상인지
+    ("업종은 다르지만 표장이 닮은 후보"). 후보의 유사군 정보가 없어 겹침을 모르면 다름이 아니라 모름
+    (differs None)이고 표시하지 않는다. 업종 없이 본 등급 = 같은 판단(_candidate_judgment)에서 업종
+    축만 뺀 것 — 업종 상한(goods_cap)이 견주는 짝 판단에, 이미지만 판단과의 비교까지. 엔진이 그 짝
+    판단을 건너뛴 후보(축이 없어 업종만으로 본 판단 등)도 같은 함수로 계산한다. **등급 계산에는 쓰지
+    않는다.** 업종을 넣지 않은 질의·결합 하한이 없는 JSON 은 None(싣지 않는다), 계산에서 예외가 나도
+    None — 검색은 그대로 낸다."""
+    floor = goods_floor_value(ctx.model)
+    if not ctx.goods or floor is None:
+        return None
+    if x4 is None:
+        return {"differs": None, "grade_without_goods": None, "flagged": False}
+    if float(x4) >= floor:
+        return {"differs": False, "grade_without_goods": None, "flagged": False}
+    try:
+        judged, _ = _candidate_judgment({**features, "x4": None}, named, ctx, x2_img)
+    except Exception as exc:  # 검색어가 섞일 수 있는 예외 본문은 남기지 않는다
+        logger.error("업종 없이 본 등급 계산 실패(%s) — 검색 결과는 그대로 낸다",
+                     type(exc).__name__)
+        return None
+    grade = judged.result.grade
+    return {"differs": True, "grade_without_goods": grade,
+            "flagged": rm.GRADES.index(grade) >= rm.GRADES.index(CROSS_GOODS_GRADE)}
+
+
 def score_record(record: Record, ctx: QueryContext,
                  image_similarity: dict[int, float] | None = None,
                  timings: dict | None = None) -> CandidateResult:
@@ -961,29 +1049,7 @@ def score_record(record: Record, ctx: QueryContext,
             token for token, _ in distinct.salient_tokens(record.title, ctx.goods)
         ) if record.title else ()
         removed = ()
-    if axes is None:  # 이름 없는 판단 — 업종 하한(goods_floor)·상한(goods_cap)까지 적용
-        judged, rank = _nameless_judgment(features, model, ctx.query_type.type)
-    else:  # 이름 있는 판단 — 업종 집합이면 이름 있는 업종 하한·상한까지(§7-13)
-        judged, rank = _named_judgment(features, model, ctx.query_type.type)
-        if ctx.nameless_floor:
-            # 이름을 뺀 판단(업종 하한 적용 뒤)과 견준다. 정렬 위치는 모든 판단 중 높은 쪽 — 등급이
-            # 같아 이름 있는 판단을 보여 줄 때도 로고만의 판단이 더 높은 위치면 그 자리에 둔다
-            other, other_rank = _nameless_judgment(
-                _nameless_features({**features, "x2_whole": x2_img}), model, ctx.query_type.type)
-            rank = max(rank, other_rank)
-            if rm.GRADES.index(other.result.grade) > rm.GRADES.index(judged.result.grade):
-                judged = Judgment(other.result, other.values, other.triggers + (NAMELESS_FLOOR,),
-                                  other.rank)  # 같으면 이름 있는 쪽
-    if ctx.logo_floor and x2_img is not None:
-        # 이름도 업종도 뺀 "이미지만" 판단(유형은 이름 없이 넣었을 때의 유형)과 견준다 — 상표명
-        # 없는 후보도. 업종이 들어간 이름 없는 판단은 쓰지 않는다(업종 겹침에 기대 무관한 로고도
-        # 올리므로, 설계 §7-7·§7-9). 정렬 위치는 둘 중 높은 쪽, 등급이 같으면 원래 판단
-        level = ctx.nameless_level
-        other = _judge(_image_only_features(x2_img, level), model, level)
-        rank = max(rank, other.rank)
-        if rm.GRADES.index(other.result.grade) > rm.GRADES.index(judged.result.grade):
-            judged = Judgment(other.result, other.values, other.triggers + (NAMELESS_FLOOR,),
-                              other.rank)
+    judged, rank = _candidate_judgment(features, axes is not None, ctx, x2_img)
     result, values, triggers = judged.result, judged.values, judged.triggers
     contributions, missing = _group_contributions(result.contributions)
     return CandidateResult(
@@ -1013,6 +1079,7 @@ def score_record(record: Record, ctx: QueryContext,
         jaccard=x4,
         pattern=result.pattern,
         rank=rank,
+        cross_goods=_cross_goods(features, axes is not None, ctx, x2_img, x4),
     )
 
 
@@ -1306,6 +1373,23 @@ def multi_search(
                     if candidate.id in runtime.brand_of_mark else candidate for candidate in top)
         famous_ms = (time.perf_counter() - clock) * 1000
 
+    # ---- 업종은 다르지만 표장이 닮은 후보(§7-15) — 처음 보이는 범위(top_k) 밖의 것을 따로 싣는다.
+    # 업종 없이 본 등급이 높은 것부터, 같은 등급이면 유명 상표 등록부의 표장 먼저(업종이 달라도
+    # 문제가 될 수 있는 쪽), 그다음 풀의 순서(정렬은 안정적). 후보 목록은 그대로
+    cross_goods_more: dict | None = None
+    if goods is not None and goods_floor_value(model) is not None:
+        marks = runtime.brand_of_mark if runtime is not None else {}
+        outside = sorted(
+            (candidate for candidate in pooled.candidates[top_k:]
+             if candidate.cross_goods is not None and candidate.cross_goods["flagged"]),
+            key=lambda candidate: (
+                -rm.GRADES.index(candidate.cross_goods["grade_without_goods"]),
+                candidate.id not in marks))
+        listed = tuple(  # 앞의 후보와 같게 유명 상표 표시를 붙인다
+            replace(candidate, famous_brand=marks[candidate.id]) if candidate.id in marks
+            else candidate for candidate in outside[:CROSS_GOODS_MORE])
+        cross_goods_more = {"count": len(outside), "candidates": listed}
+
     elapsed_ms = int(round((time.perf_counter() - started) * 1000))
     logger.info(
         "multi_search: pool=%s type=%s/%s photo=%s candidates=%d returned=%d famous=%s "
@@ -1336,4 +1420,5 @@ def multi_search(
         famous_outcome=outcome,
         famous_ms=famous_ms,
         name_words=None if pooled.name_words is None else pooled.name_words.to_dict(),
+        cross_goods_more=cross_goods_more,
     )
