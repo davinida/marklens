@@ -26,6 +26,7 @@ import {
   showsCrossGoodsOverallLine,
 } from "@/lib/crossGoods";
 import { NOTICE_TEXT, showsWholeNameLine } from "@/lib/descriptiveNotice";
+import { josaEuroRo as typeParticle } from "@/lib/josa";
 // v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
 import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/visualStatusView";
 
@@ -39,15 +40,18 @@ const GRADE_VIEW: Record<
     pill: string;
     bar: string;
     description: string;
+    /** 로고만 넣은 검색(이름이 없고 이미지가 있는 질의)의 설명 */
+    logoDescription: string;
   }
 > = {
   안전: {
-    text: "text-low",
+    text: "text-low-text",
     border: "border-low",
     bg: "bg-low-bg",
     pill: "bg-low text-white",
     bar: "bg-low",
-    description: "비교 표본에서 가까운 후보를 찾지 못했습니다 — 안전 판정이 아닙니다",
+    description: "비교한 상표 가운데 가까운 것을 찾지 못했어요. 안전하다는 뜻은 아니에요",
+    logoDescription: "로고가 가까운 상표를 찾지 못했어요. 안전하다는 뜻은 아니에요",
   },
   주의: {
     text: "text-warn-deep",
@@ -55,15 +59,17 @@ const GRADE_VIEW: Record<
     bg: "bg-warn-bg",
     pill: "bg-warn-deep text-white",
     bar: "bg-warn",
-    description: "일부 축이 비슷한 후보가 있습니다",
+    description: "조금 닮은 상표가 있어요",
+    logoDescription: "로고가 조금 닮은 상표가 있어요",
   },
   "검토 권장": {
-    text: "text-review-deep",
+    text: "text-review-text",
     border: "border-review",
     bg: "bg-review-bg",
     pill: "bg-review-deep text-white",
     bar: "bg-review",
-    description: "비슷한 선행 상표가 있을 수 있습니다. 전문가 검토를 권장합니다",
+    description: "닮은 선행 상표가 있을 수 있어요. 전문가 검토를 권해요",
+    logoDescription: "로고가 닮은 선행 상표가 있을 수 있어요. 전문가 검토를 권해요",
   },
   위험: {
     text: "text-caution-deep",
@@ -71,9 +77,16 @@ const GRADE_VIEW: Record<
     bg: "bg-caution-bg",
     pill: "bg-caution-deep text-white",
     bar: "bg-caution",
-    description: "여러 축이 비슷한 선행 상표가 있습니다",
+    description: "많이 닮은 선행 상표가 있어요",
+    logoDescription: "로고가 많이 닮은 선행 상표가 있어요",
   },
 };
+
+/** 등급 한 줄 설명(§4-4) — 축 수를 말하지 않는다. 로고만 넣은 검색(이름이 없고 이미지가 있는
+ *  질의)은 로고를 견준 것임을 말한다. */
+export function gradeDescription(grade: SearchV2Grade, logoOnly: boolean): string {
+  return logoOnly ? GRADE_VIEW[grade].logoDescription : GRADE_VIEW[grade].description;
+}
 
 const AXIS_VALUE_LABEL: Record<"x1" | "x2_text" | "x2_img" | "x3" | "x4", string> = {
   x1: "호칭",
@@ -93,15 +106,53 @@ const CONTRIBUTION_LABEL: Record<"X1" | "X2" | "X3" | "X4" | "요부", string> =
 };
 const CONTRIBUTION_ORDER = ["X1", "X2", "X3", "X4", "요부"] as const;
 
+// 규칙 사유(§4-1) — 카드의 최종 등급이 무엇이든 참인 문장만 쓴다. 응답에는 규칙을 적용하기 전 등급이
+// 없어 규칙이 실제로 등급을 바꿨는지 화면은 알 수 없다. 하한 규칙은 "… 이상으로 봤어요", 상한 규칙은
+// "… 더 높이지 않았어요" — 특정 등급으로 올렸다·내렸다고 단정하지 않는다.
 const RULE_TRIGGER_TEXT: Record<string, string> = {
-  standalone_x1: "호칭이 거의 같아 검토 권장으로 올렸습니다",
-  standalone_x2_text: "철자가 매우 비슷해 검토 권장으로 올렸습니다",
-  standalone_x3: "뜻이 매우 비슷해 검토 권장으로 올렸습니다",
-  figure_x2_img: "도형이 매우 비슷해 검토 권장으로 올렸습니다(검증 데이터 부족, 참고용)",
-  nameless_floor: "로고만으로 본 판단의 등급이 더 높아 그 등급을 썼어요",
-  goods_floor: "업종이 겹쳐 로고만으로 본 등급을 유지했어요",
-  goods_cap: "업종이 달라 업종 없이 본 등급까지만 썼어요",
+  standalone_x1: "발음이 거의 같아서 검토 권장 이상으로 봤어요",
+  standalone_x2_text: "철자가 매우 비슷해서 검토 권장 이상으로 봤어요",
+  standalone_x3: "뜻이 매우 비슷해서 검토 권장 이상으로 봤어요",
+  figure_x2_img:
+    "도형이 매우 비슷해서 검토 권장 이상으로 봤어요. 도형 비교는 검증 데이터가 적어 참고용이에요",
+  nameless_floor: "로고만 봤을 때의 등급이 더 높아서 그 등급 이상으로 봤어요",
+  goods_floor: "업종이 겹쳐서 로고만 봤을 때의 등급 이상으로 봤어요",
+  goods_floor_named: "업종이 겹쳐서 업종 없이 봤을 때의 등급 이상으로 봤어요",
+  goods_cap: "업종이 달라서 등급을 더 높이지 않았어요",
 };
+/** 문구가 없는 규칙 코드 — 코드를 그대로 보이지 않는다. */
+const RULE_TRIGGER_FALLBACK = "따로 정한 규칙이 적용됐어요";
+/** 사유 문장이 등급을 말하는 하한 규칙 — 카드의 등급이 그보다 낮으면 그 문장을 보이지 않는다. */
+const RULE_TRIGGER_FLOOR: Record<string, SearchV2Grade> = {
+  standalone_x1: "검토 권장",
+  standalone_x2_text: "검토 권장",
+  standalone_x3: "검토 권장",
+  figure_x2_img: "검토 권장",
+};
+/** 업종 상한 — 같은 카드에 "업종 다름" 표시가 있으면 숨긴다(업종 얘기를 두 번 하지 않는다). */
+const RULE_TRIGGER_GOODS_CAP = "goods_cap";
+
+/** 카드에 보일 규칙 사유 문장 — 규칙 코드 순서대로, 같은 문장은 한 번만. */
+export function ruleTriggerLines(
+  triggers: string[],
+  grade: SearchV2Grade,
+  hasCrossGoodsBadge: boolean,
+): string[] {
+  const lines: string[] = [];
+  for (const trigger of triggers) {
+    if (trigger === RULE_TRIGGER_GOODS_CAP && hasCrossGoodsBadge) continue;
+    const floor = RULE_TRIGGER_FLOOR[trigger];
+    if (floor && SCALE_GRADES.indexOf(grade) < SCALE_GRADES.indexOf(floor)) continue;
+    const line = RULE_TRIGGER_TEXT[trigger] ?? RULE_TRIGGER_FALLBACK;
+    if (!lines.includes(line)) lines.push(line);
+  }
+  return lines;
+}
+
+/** 유형 고치기 버튼의 글자 — "문자로 고치기"·"도형으로 고치기"·"결합으로 고치기". */
+export function retypeLabel(type: string): string {
+  return `${type}${typeParticle(type)} 고치기`;
+}
 
 // API 계약 v2 §2-5 FIGURE_LOW_DATA·§4-5 — 후보 카드의 도형 참고 문구(응답 caveat 과 같은 문장)
 const FIGURE_CAVEAT_TEXT =
@@ -254,7 +305,7 @@ function buildSalientSentences(
     const phrase = reasonPhrase(items[0].reason);
     const j1 = josaEunNeun(removedText);
     if (!subjectTokens.length) {
-      sentences.push(`'${removedText}'${j1} ${phrase}이라 제외했습니다`);
+      sentences.push(`'${removedText}'${j1} ${phrase}이라 제외했어요`);
       continue;
     }
     const subjectText = subjectTokens.join("·");
@@ -263,7 +314,7 @@ function buildSalientSentences(
   }
 
   if (!sentences.length && !salient.query_tokens.length && hasQueryName) {
-    sentences.push("식별력 있는 부분이 없어 전체로 비교했습니다");
+    sentences.push("식별력 있는 부분이 없어 전체로 비교했어요");
   }
   return sentences;
 }
@@ -339,7 +390,7 @@ function ContributionBars({ risk }: { risk: SearchV2Candidate["risk"] }) {
   const positiveSum = positive.reduce((sum, entry) => sum + entry.value, 0);
 
   if (!positive.length && !negative.length) {
-    return <p className="text-[11px] text-sub">근거 축 정보가 없습니다</p>;
+    return <p className="text-[11px] text-sub">근거 축 정보가 없어요</p>;
   }
 
   return (
@@ -405,6 +456,12 @@ function CandidateCard({
     .join("\n");
   // §4-8: 업종은 다르지만 표장이 닮은 후보 — "업종 다름" 표시와 설명 한 줄(엔진이 정한 값 그대로)
   const crossGoodsText = crossGoodsLine(candidate);
+  // §4-1: 규칙 사유 — 최종 등급과 어긋나지 않는 문장만("업종 다름" 표시가 있으면 업종 상한 줄은 숨김)
+  const ruleLines = ruleTriggerLines(
+    candidate.risk.rule_triggers,
+    candidate.risk.grade,
+    crossGoodsText !== null,
+  );
 
   return (
     <li className="border-b border-line last:border-b-0">
@@ -510,15 +567,15 @@ function CandidateCard({
               <div className="mt-2">
                 <ContributionBars risk={candidate.risk} />
               </div>
-              {candidate.risk.rule_triggers.length > 0 && (
+              {ruleLines.length > 0 && (
                 <ul className="mt-3 flex flex-col gap-1">
-                  {candidate.risk.rule_triggers.map((trigger) => (
+                  {ruleLines.map((line) => (
                     <li
-                      key={trigger}
+                      key={line}
                       className="flex items-start gap-1.5 text-[11px] font-semibold text-review-deep"
                     >
                       <AlertTriangle aria-hidden size={13} className="mt-0.5 shrink-0" />
-                      {RULE_TRIGGER_TEXT[trigger] ?? trigger}
+                      {line}
                     </li>
                   ))}
                 </ul>
@@ -669,6 +726,8 @@ export default function ResultViewV2({
   const famousLevel = famousBannerLevel(result.famous);
   const famousAfterNotice = famousLevel === FAMOUS_LEVEL_DESCRIPTIVE;
   const famousState = famousBannerState(result.famous);
+  // 로고만 넣은 검색 — 이름이 없고 이미지가 있는 질의(이미지가 없으면 visual_status 가 null, §2-1)
+  const logoOnly = !queryHasName && overall.visual_status !== null;
   // 처음 보이는 범위 밖의 "업종은 다르지만 표장이 닮은 상표"(§4-8) — 없으면 칸을 만들지 않는다
   const moreCrossGoods = crossGoodsMore(result);
   const famousBanner = <FamousBanner famous={result.famous} />;
@@ -730,7 +789,9 @@ export default function ResultViewV2({
                     {famousFloorReason(result.famous, overall.grade)}
                   </p>
                 ) : (
-                  <p className={`mt-2 text-[13px] font-semibold ${view!.text}`}>{view!.description}</p>
+                  <p className={`mt-2 text-[13px] font-semibold ${view!.text}`}>
+                    {gradeDescription(overall.grade, logoOnly)}
+                  </p>
                 )}
                 {showsWholeNameLine(result.name_words, candidates, famousState) && (
                   <p data-testid="descriptive-whole-name" className="mt-1 text-[11.5px] text-sub">
@@ -749,14 +810,14 @@ export default function ResultViewV2({
                 )}
                 {showPrecision && (
                   <p className="mt-1 text-[11.5px] text-sub">
-                    &apos;위험&apos;으로 분류된 상표 쌍은 검증 데이터 기준 10건 중{" "}
-                    {Math.round(meta.grade_precision * 10)}건이 심결에서 유사로 판단됐습니다
+                    &apos;위험&apos;으로 나온 상표 쌍은 검증 데이터 기준 10건 중{" "}
+                    {Math.round(meta.grade_precision * 10)}건이 심결에서 유사로 판단됐어요
                   </p>
                 )}
               </>
             ) : (
               <span className="inline-block rounded-full bg-low-bg px-3 py-1 text-[13px] font-extrabold text-sub">
-                비교할 후보가 없습니다
+                비교할 후보가 없어요
               </span>
             )}
 
@@ -776,7 +837,7 @@ export default function ResultViewV2({
                         onClick={() => onRetypeTo(type)}
                         className="press rounded-full border border-line bg-card px-2.5 py-1 text-[11px] font-semibold text-sub hover:border-blue-dark hover:text-blue-dark"
                       >
-                        {type}로 고치기
+                        {retypeLabel(type)}
                       </button>
                     ))}
                 </div>
@@ -792,7 +853,7 @@ export default function ResultViewV2({
             {overall.query_type.suggested_name && onUseSuggestedName && (
               <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-card px-3 py-2">
                 <span className="text-[11.5px] text-sub">
-                  이미지에서 &apos;{overall.query_type.suggested_name}&apos;를 읽었습니다
+                  이미지에서 &apos;{overall.query_type.suggested_name}&apos;를 읽었어요
                 </span>
                 <button
                   type="button"
@@ -836,7 +897,7 @@ export default function ResultViewV2({
             ))}
           </ul>
         ) : (
-          <p className="p-4 text-[12.5px] text-sub">비교할 후보가 없습니다.</p>
+          <p className="p-4 text-[12.5px] text-sub">비교할 후보가 없어요.</p>
         )}
       </section>
 
@@ -852,7 +913,7 @@ export default function ResultViewV2({
       <p className="px-1 text-[10.5px] leading-relaxed text-sub">
         비교 대상: 등록상표 {result.dataset_info.총_상표수.toLocaleString()}건 ·{" "}
         {result.dataset_info.데이터_기준} · 모델 {meta.model_version} · 결과는 참고 정보이며 법적
-        판단이 아닙니다.
+        판단이 아니에요.
       </p>
 
       <button
