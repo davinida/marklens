@@ -85,6 +85,17 @@ export const SearchV2NameWordsSchema = z
   })
   .passthrough();
 
+// 업종을 넣은 질의에서 이 후보와 업종이 다른지(선택 필드 — 계약 v2 §2-8). differs 는 업종 겹침이 결합
+// 하한 미만인가(후보의 유사군 정보가 없으면 null), grade_without_goods 는 다를 때만 — 업종 없이 본
+// 등급, flagged 는 "업종은 다르지만 표장이 닮은 후보"인가. 형식이 다르면 그 필드만 버린다(.catch).
+export const SearchV2CrossGoodsSchema = z
+  .object({
+    differs: z.boolean().nullable(),
+    grade_without_goods: SearchV2GradeSchema.nullable(),
+    flagged: z.boolean(),
+  })
+  .passthrough();
+
 export const SearchV2CandidateSchema = z
   .object({
     id: z.string().regex(/^[0-9]{13}$/),
@@ -143,6 +154,17 @@ export const SearchV2CandidateSchema = z
       .passthrough(),
     // 유명 상표 등록부의 표장일 때만(v1.4.7)
     famous_brand: z.string().optional().catch(undefined),
+    // 업종을 넣은 질의의 후보만(계약 v2 §2-8)
+    cross_goods: SearchV2CrossGoodsSchema.optional().catch(undefined),
+  })
+  .passthrough();
+
+// 처음 보이는 범위(top_k) 밖의 "업종은 다르지만 표장이 닮은 후보"(선택 필드 — 업종을 넣은 질의만,
+// 계약 v2 §2-8). candidates 는 candidates[] 와 같은 꼴 최대 5개, count 는 풀 안에서 센 전체 수.
+export const SearchV2CrossGoodsMoreSchema = z
+  .object({
+    count: NonnegativeInt,
+    candidates: z.array(SearchV2CandidateSchema),
   })
   .passthrough();
 
@@ -216,6 +238,7 @@ export const SearchV2ResponseSchema = z
     top_k_returned: NonnegativeInt.max(20),
     famous: SearchV2FamousSchema.optional().catch(undefined),
     name_words: SearchV2NameWordsSchema.optional().catch(undefined),
+    cross_goods_more: SearchV2CrossGoodsMoreSchema.optional().catch(undefined),
   })
   .passthrough();
 
@@ -225,6 +248,8 @@ export type SearchV2Famous = z.infer<typeof SearchV2FamousSchema>;
 export type SearchV2FamousMatch = z.infer<typeof SearchV2FamousMatchSchema>;
 export type SearchV2NameWords = z.infer<typeof SearchV2NameWordsSchema>;
 export type SearchV2NameWord = z.infer<typeof SearchV2NameWordSchema>;
+export type SearchV2CrossGoods = z.infer<typeof SearchV2CrossGoodsSchema>;
+export type SearchV2CrossGoodsMore = z.infer<typeof SearchV2CrossGoodsMoreSchema>;
 export type SearchV2Grade = z.infer<typeof SearchV2GradeSchema>;
 export type SearchV2QueryType = z.infer<typeof SearchV2QueryTypeSchema>;
 

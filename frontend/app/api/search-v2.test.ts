@@ -345,6 +345,27 @@ describe("POST /api/search/v2", () => {
     expect(await response.text()).toBe(raw);
   });
 
+  it("forwards the optional cross_goods fields (업종은 다르지만 표장이 닮은 후보) unchanged", async () => {
+    const body = structuredClone(textFixture) as unknown as {
+      cross_goods_more: unknown;
+      candidates: Record<string, unknown>[];
+    };
+    const outside = {
+      ...structuredClone(body.candidates[0]),
+      id: "4020260099999",
+      cross_goods: { differs: true, grade_without_goods: "위험", flagged: true },
+    };
+    body.candidates[0].cross_goods = { differs: null, grade_without_goods: null, flagged: false };
+    body.cross_goods_more = { count: 7, candidates: [outside] };
+    const raw = JSON.stringify(body);
+    vi.mocked(fetch).mockResolvedValue(new Response(raw, {
+      status: 200, headers: { "content-type": "application/json" },
+    }));
+    const response = await searchV2(request(nameForm("블루커피")));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(raw);
+  });
+
   it.each([
     [new TypeError("connection failed"), 502],
     [new DOMException("timed out", "TimeoutError"), 504],

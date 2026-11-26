@@ -769,3 +769,112 @@ test("a strong famous-name match shows only the famous banner, not the descripti
   expect(searchBody).toContain("파리바게트");
   await expectNoHorizontalOverflow(page);
 });
+
+// 업종은 다르지만 표장이 닮은 후보(계약 v2 §2-8·§4-8) — 기존 모의 응답에 선택 필드 cross_goods(후보)와
+// cross_goods_more(처음 보이는 범위 밖의 후보)를 더한다.
+function buildCrossGoodsSearchV2Result() {
+  const result = buildSearchV2Result({ x4: 0, nice_classes: [25] });
+  const [base] = result.candidates;
+  const lookalike = {
+    ...base,
+    title: "BLU hands",
+    risk: { ...base.risk, grade: "검토 권장", prob: 0.52, rule_triggers: ["standalone_x1"] },
+    cross_goods: { differs: true, grade_without_goods: "검토 권장", flagged: true },
+  };
+  const sameGoods = {
+    ...base,
+    id: "4020260012346",
+    title: "내림 커피",
+    nice_classes: [43],
+    axes: { ...base.axes, x4: 0.6 },
+    goods: { codes: ["G0502"], jaccard: 0.6 },
+    cross_goods: { differs: false, grade_without_goods: null, flagged: false },
+  };
+  const outsideFamous = {
+    ...lookalike,
+    id: "4020260012347",
+    title: "STARBUCKS COFFEE",
+    famous_brand: "스타벅스",
+    cross_goods: { differs: true, grade_without_goods: "위험", flagged: true },
+  };
+  const outsidePlain = { ...lookalike, id: "4020260012348", title: "BLUE HANDS" };
+  return {
+    ...result,
+    overall: { ...result.overall, grade: "검토 권장", prob: 0.52 },
+    candidates: [lookalike, sameGoods],
+    cross_goods_more: { count: 2, candidates: [outsideFamous, outsidePlain] },
+    top_k_returned: 2,
+  };
+}
+
+test("a look-alike mark in a different business is marked on its card, next to the overall grade and in a folded section", async ({
+  page,
+}) => {
+  await page.route("**/api/goods/search?*", async (route) => {
+    const url = new URL(route.request().url());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(
+        url.searchParams.get("q") === "카페"
+          ? CAFE_PRESET_RESULT
+          : { query: url.searchParams.get("q") ?? "", matches: [], total: 0, offset: 0 },
+      ),
+    });
+  });
+  let searchBody = "";
+  await page.route("**/api/search/v2*", async (route) => {
+    searchBody = route.request().postData() ?? "";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(buildCrossGoodsSearchV2Result()),
+    });
+  });
+
+  await page.getByRole("textbox", { name: "상표 이름" }).fill("블루핸즈");
+  await page.getByRole("combobox", { name: "지정상품 검색" }).fill("카페");
+  await page
+    .getByRole("region", { name: "카페 업종 세트" })
+    .getByRole("button", { name: "3개 모두 추가" })
+    .click();
+  await expect(page.getByText("선택 3개")).toBeVisible();
+  await page.getByRole("button", { name: "비슷한 상표 찾아보기" }).click();
+
+  // 전체 등급 옆 한 줄 — 가장 위 후보가 다른 업종의 닮은 상표
+  await expect(page.getByTestId("overall-grade")).toHaveText("검토 권장");
+  await expect(page.getByTestId("cross-goods-overall")).toHaveText(
+    "가장 닮은 상표가 다른 업종에 있어요. 업종이 다르면 함께 등록될 수도 있어요.",
+  );
+  // 후보 카드 — 정의에 맞는 후보에만 "업종 다름" 표시와 설명 한 줄
+  const list = page.getByRole("region", { name: "유사 상표 후보" });
+  const first = list.locator(":scope > ul > li").nth(0);
+  const second = list.locator(":scope > ul > li").nth(1);
+  await expect(first.getByTestId("candidate-cross-goods")).toHaveText("업종 다름");
+  await expect(first.getByTestId("candidate-cross-goods-line")).toHaveText(
+    "표장은 닮았지만 업종이 달라요. 보통은 함께 등록될 수 있어요. 다만 나중에 이 업종으로 넓히면 문제가 될 수 있어요.",
+  );
+  await expect(second.getByTestId("candidate-cross-goods")).toHaveCount(0);
+  await expect(list.getByText("업종 다름")).toHaveCount(1);
+
+  // 목록 아래 접힌 칸 — 처음 보이는 범위 밖의 후보
+  const title = "업종은 다르지만 표장이 닮은 상표 2건";
+  const more = page.getByRole("region", { name: title });
+  const toggle = more.getByRole("button", { name: title });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(more.getByText("STARBUCKS COFFEE")).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  const outside = more.getByTestId("cross-goods-more-panel").locator(":scope > ul > li");
+  await expect(outside).toHaveCount(2);
+  await expect(outside.nth(0).getByText("STARBUCKS COFFEE")).toBeVisible();
+  await expect(outside.nth(0).getByTestId("candidate-cross-goods-line")).toHaveText(
+    "업종은 다르지만 널리 알려진 상표라 문제가 될 수 있어요.",
+  );
+  await expect(outside.nth(1).getByTestId("candidate-cross-goods")).toHaveText("업종 다름");
+  await expectNoHorizontalOverflow(page);
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(searchBody).toContain("블루핸즈");
+  expect(searchBody).toContain("S120602");
+});

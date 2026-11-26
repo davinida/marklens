@@ -1,7 +1,7 @@
 # MarkLens API 계약 v2 — 3입력 통합 검색 `POST /search/v2`
 
 - 기준일: 2026-10-24(통합 모델 v1.4 반영 2026-11-20 — `risk.pattern`·`overall.pattern`·`meta.thresholds.nameless`·`nameless_floor`·
-  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1; 이름 축의 약한 토큰열 결합을 두 이름 모두에서 붙어 있는 구간만 `weak_run`(통합 모델 v1.4.3, 식별력 v0.4, 견고성 점검 R-P0-2) 2026-11-23 — §2-2 `salient.removed`·`model_version`·§3; 견고성 점검 P1 — `name` 의 보이지 않는 서식 문자 정리·빈 이미지 400·429·503 고정 문구·`/health` 의 검색 가능 여부 2026-11-23 — §1·§4-1·§5-1·§5-6·§5-7; 이름 없는 이미지+업종 판단에 로고 유사도 × 업종 겹침의 곱하기 항(통합 모델 v1.4.5 — 채택 조건 ③ 미달, 사람 결정) 2026-11-24 — §2-2 `risk.contributions`·`model_version`·`thresholds.nameless`·§2-4 1·2·8항·§3; 업종이 다르면 업종 없는 짝 판단의 등급 이하로 두는 업종 상한 `goods_cap`(통합 모델 v1.4.6) 2026-11-24 — §2-2 `rule_triggers`·`model_version`·§2-4 8·9항·§3; 유명 상표 확인 단계 — 응답의 선택 필드 `famous`·`overall.famous_floor`·`candidates[].famous_brand` 와 전체 등급의 바닥(통합 모델 v1.4.7) 2026-11-26 — §2·§2-1·§2-2·§2-3·§2-4 10항·§2-6·§3(세 예시 모두 DB 1,469건·v1.4.7 로 다시)·§4-6·§5-3·§5-6·§5-7; 질의 이름의 낱말별 식별력 — 응답의 선택 필드 `name_words`(설명적 이름 안내, 모델 버전 v1.4.7 그대로·후보 목록과 전체 등급 불변) 2026-11-26 — §2·§2-7·§3(네 예시)·§4-7) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
+  `goods_floor`·`PHOTO_QUERY`·정렬 위치·§3 실제 엔진 예시; v1 이미지 검색 `POST /search` 제거·% 표시 내림 2026-11-21 — §0·§1·§4·§5; 이름 있는 판단의 검토 권장 하한 0.1805 → 0.5059(통합 모델 v1.4.1) 2026-11-23 — §2-3·§2-4·§3; 이름 + 이미지 질의를 이미지만 판단과 견주기 `logo_floor`(통합 모델 v1.4.2, 견고성 점검 R-P0-1) 2026-11-23 — §2-2·§2-4·§3·§4-1; 이름 축의 약한 토큰열 결합을 두 이름 모두에서 붙어 있는 구간만 `weak_run`(통합 모델 v1.4.3, 식별력 v0.4, 견고성 점검 R-P0-2) 2026-11-23 — §2-2 `salient.removed`·`model_version`·§3; 견고성 점검 P1 — `name` 의 보이지 않는 서식 문자 정리·빈 이미지 400·429·503 고정 문구·`/health` 의 검색 가능 여부 2026-11-23 — §1·§4-1·§5-1·§5-6·§5-7; 이름 없는 이미지+업종 판단에 로고 유사도 × 업종 겹침의 곱하기 항(통합 모델 v1.4.5 — 채택 조건 ③ 미달, 사람 결정) 2026-11-24 — §2-2 `risk.contributions`·`model_version`·`thresholds.nameless`·§2-4 1·2·8항·§3; 업종이 다르면 업종 없는 짝 판단의 등급 이하로 두는 업종 상한 `goods_cap`(통합 모델 v1.4.6) 2026-11-24 — §2-2 `rule_triggers`·`model_version`·§2-4 8·9항·§3; 유명 상표 확인 단계 — 응답의 선택 필드 `famous`·`overall.famous_floor`·`candidates[].famous_brand` 와 전체 등급의 바닥(통합 모델 v1.4.7) 2026-11-26 — §2·§2-1·§2-2·§2-3·§2-4 10항·§2-6·§3(세 예시 모두 DB 1,469건·v1.4.7 로 다시)·§4-6·§5-3·§5-6·§5-7; 질의 이름의 낱말별 식별력 — 응답의 선택 필드 `name_words`(설명적 이름 안내, 모델 버전 v1.4.7 그대로·후보 목록과 전체 등급 불변) 2026-11-26 — §2·§2-7·§3(네 예시)·§4-7; 업종은 다르지만 표장이 닮은 후보 — 후보의 선택 필드 `cross_goods` 와 최상위 선택 필드 `cross_goods_more`(모델 버전 v1.4.7 그대로·후보 목록과 전체 등급 불변) 2026-11-26 — §2·§2-2·§2-8·§3(네 예시)·§4-8) · 상태: **서비스 연결의 기준 문서 — 엔진 몫(§6 E-1–E-6)은 구현됨(2026-10-24, `feat/engine-multiaxis`:
   `engine.multi_search()` → `SearchV2Result.to_dict()` 가 §2 키 그대로), API·BFF·zod·gateway(2026-10-26, PR #69)·결과 화면 v2(2026-10-27, PR #72)·E2E v2 15건까지 **연결 완료(2026-10-27)** — 실제 모델로 BFF 경유
   시나리오 8종을 §2·§2-4·§2-5 규칙으로 검산**. 백엔드와 프론트는 이 문서의 §3 예시 JSON 과 엔진 결과만으로 스텁과 목업을 만들어 병렬로 구현했다.
 - 관련: [API 계약 v1](MarkLens_API계약_v1.md)(경계·Turnstile·오류·한도 — v2 는 이를 그대로 상속), [통합 모델 설계](MarkLens_통합모델_설계.md)
@@ -19,7 +19,7 @@
 |---|---|
 | 입력 | `image`(파일) · `name`(상표명) · `goods_codes[]`(유사군 코드) 중 **하나 이상** + 선택 `type_override`(문자/도형/결합) |
 | 처리 | 입력별 후보 풀(CLIP·발음·철자·관념·유사군)을 합쳐 → 후보마다 4축 점수(식별력 필터 적용) → 통합 모델 v1.3 `risk_score`(입력의 결측 패턴에 맞는 계수 집합) → 위험도 내림차순 |
-| 출력 | `overall`(등급·위험도·주의 문구·유형) · `famous`(유명 상표 확인 — 선택 필드, §2-6) · `name_words`(질의 이름의 낱말별 식별력 — 선택 필드, §2-7) · `candidates[]`(축 점수·위험도·등급·근거 축 기여도·규칙·요부·지정상품) · `meta`(모델 버전·등급 정밀도·임계값·소요) |
+| 출력 | `overall`(등급·위험도·주의 문구·유형) · `famous`(유명 상표 확인 — 선택 필드, §2-6) · `name_words`(질의 이름의 낱말별 식별력 — 선택 필드, §2-7) · `candidates[]`(축 점수·위험도·등급·근거 축 기여도·규칙·요부·지정상품, 업종을 넣은 질의는 업종이 다른지 `cross_goods` — 선택 필드, §2-8) · `cross_goods_more`(처음 보이는 범위 밖의 업종은 다르지만 표장이 닮은 후보 — 선택 필드, §2-8) · `meta`(모델 버전·등급 정밀도·임계값·소요) |
 | 경계 | v1 과 같다 — 브라우저는 same-origin BFF `/api/search/v2` 만, FastAPI 는 내부(`X-API-Key`), Turnstile 1회용 토큰, `X-Request-ID` |
 | 한도 | `MARKLENS_SEARCH_RATELIMIT`(기본 10/minute, 한도 묶음 `search`), gateway 사용자별 5회/분 |
 | v1 | 이미지 검색 `POST /search`·BFF `/api/search` 는 2026-11-21 제거(v2 로 일원화). `/phonetic-search`·`/semantic-search` 는 상표명 확인 패널용 엔드포인트, 유지(§5-5) |
@@ -91,6 +91,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | `famous` | object | **선택 필드** — 유명 상표 확인이 켜진 서버(모델 v1.4.7 부터)만 싣는다. 없으면 확인을 하지 않은 것 | 유명 상표 확인(§2-6): 확인 상태·등록부 브랜드 수·일치(가장 강한 것부터 최대 2개 브랜드) |
 | `name_words` | object | **선택 필드** — `name` 이 있는 질의만 싣는다(2026-11-26 부터). 없으면 이름이 없는 질의이거나 이 필드가 생기기 전의 서버 | 질의 이름의 낱말별 식별력(§2-7): 낱말마다 식별력 여부와 화면용 사유 분류, 모든 낱말이 식별력 없는 말인지·일부만 그런지 |
 | `candidates` | array | 아니오(빈 배열 가능) | §2-2, 정렬 위치 내림차순(§1-3) |
+| `cross_goods_more` | object | **선택 필드** — `goods_codes` 가 있는 질의만 싣는다(2026-11-26 부터). 없으면 업종을 넣지 않은 질의이거나 이 필드가 생기기 전의 서버 | 처음 보이는 범위(`candidates[]`) 밖의 후보 풀에서 "업종은 다르지만 표장이 닮은 후보"의 수와 그 가운데 최대 5개(§2-8) |
 | `meta` | object | 아니오 | §2-3 |
 | `dataset_info` | object | 아니오 | v1 과 같음(`총_상표수`·`출원일자_범위`·`데이터_기준`·`생성일자`) |
 | `index_size` | int | 아니오 | 비교 대상 DB 레코드 수(현재 1,469 — 2026-11-26 대표 표장 86건 승격 뒤; §3 예시도 이 세대의 응답) |
@@ -139,6 +140,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 | `goods.codes` | string[] | 아니오(빈 배열 가능) | 후보의 유사군 코드(v1 `유사군`) — 형식(G/S + 숫자 4–6자리)에 맞는 코드만(수집 원본의 형식이 다른 코드는 무시, 2026-11-20 기준 7건 108개). DB 보유 1,469/1,469건(형식에 맞는 코드가 있는 상표 기준 — 2026-11-26 세대) — 없으면 빈 배열이고 `x4` 는 null |
 | `goods.jaccard` | 0–1 | `x4` 와 같은 조건으로 null | `axes.x4` 와 같은 값(지정상품 요약 영역용 중복 제공) |
 | `famous_brand` | string | **선택 필드** — 해당할 때만 키가 있다 | 그 후보가 유명 상표 등록부의 표장(역할이 "관련 없음"이 아닌 것)이면 그 브랜드 이름. 유명 상표 확인이 켜진 서버(v1.4.7)만 싣고, 후보의 다른 필드(순서·등급·위험도·규칙)는 이 필드와 무관하게 v1.4.6 과 같다 |
+| `cross_goods` | `{ "differs": bool \| null, "grade_without_goods": 4등급 \| null, "flagged": bool }` | **선택 필드** — `goods_codes` 가 있는 질의의 후보만 키가 있다 | 이 후보와 업종이 다른지(`differs` — 업종 겹침 `axes.x4` 가 결합 하한 0.0252 미만인가, 후보의 유사군 정보가 없어 겹침을 모르면 null), 다르면 업종 없이 본 등급(`grade_without_goods`), 그 등급이 검토 권장 이상인지(`flagged` — "업종은 다르지만 표장이 닮은 후보"). 등급 계산에는 쓰지 않는다 — 후보의 다른 필드(순서·등급·위험도·규칙)는 이 필드와 무관하다(§2-8) |
 
 ### 2-3. `meta`
 
@@ -346,9 +348,47 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
   든 업종에서는 3호 사전의 낱말이 업종과 상관없이 설명하는 말이 된다(의류 세트에서 `커피`). 영문 고시 명칭은 대조하지 않아 `coffee` 는
   상품 이름이 아니라 성질·품질(3호)로 나온다.
 
+### 2-8. `cross_goods`·`cross_goods_more` — 업종은 다르지만 표장이 닮은 후보(선택 필드, 2026-11-26)
+
+업종(`goods_codes`)을 넣은 질의에서 업종은 다르지만 표장이 닮은 후보를 화면이 알아볼 수 있게 한다(§4-8). **새 판정이 아니고 등급 계산에도
+쓰지 않는다** — 엔진이 후보를 채점하는 같은 함수를 업종 축만 빼고 한 번 더 부른 등급을 싣는다([통합 모델 설계](MarkLens_통합모델_설계.md)
+§7-15). 모델 버전은 그대로(v1.4.7)이고, 후보 배열·후보 등급·위험도·정렬·전체 등급은 이 필드들이 없을 때와 같다.
+
+**정의** — "업종은 다르지만 표장이 닮은 후보": 업종을 넣은 질의에서 ① 후보와의 업종 겹침(`axes.x4`)이 결합 하한 0.0252(통합 모델의
+`coupling.floors.x4` — 업종 하한·상한이 쓰는 것과 같은 기준, §2-4 8·9항) 미만이고 ② 업종 없이 본 등급이 검토 권장 이상인 후보.
+
+`candidates[].cross_goods`(업종을 넣은 질의의 모든 후보 — `cross_goods_more.candidates[]` 의 후보도):
+
+| 필드 | 형식 | null | 뜻 |
+|---|---|---|---|
+| `differs` | bool | 후보의 유사군 정보가 없어 업종 겹침을 모르면 null(`axes.x4` 가 null 일 때) | 업종이 다른가 = `axes.x4` < 0.0252. 모르는 것은 "다름"이 아니다 — 표시하지 않는다 |
+| `grade_without_goods` | 4등급 | `differs` 가 true 가 아니면 null | 업종 없이 본 등급 — 이 후보의 판단에서 업종 축만 뺀 등급(아래) |
+| `flagged` | bool | 아니오 | 위 정의에 맞는가 = `differs` 가 true 이고 `grade_without_goods` 가 검토 권장 이상 |
+
+- **업종 없이 본 등급**: 후보를 채점하는 같은 함수를, 업종 겹침만 관측 없음으로 두고 다시 부른 등급이다. 이름 있는 판단이면 업종 상한
+  (`goods_cap`, §2-4 9항)이 견주는 짝 판단(`x4` → `base`, `x2_whole+x4` → `x2_whole`), 이름 없는 판단이면 이미지만 판단이고, 엔진이 후보의
+  등급을 정할 때와 같은 순서로 이미지만 판단과의 비교(`nameless_floor` — §2-4 6항)까지 거친다. 단독 축 규칙·도형 규칙이 반영된 등급이다.
+  축 점수와 요부는 그대로 둔다(업종을 넣고 계산한 식별력 맥락 그대로라, 업종 없이 다시 검색한 결과와는 다를 수 있다).
+- 업종 상한 때문에 업종이 다른 후보의 `risk.grade` 는 `grade_without_goods` 보다 높지 않다 — 그래서 **업종이 다른데 검토 권장·위험으로
+  보이는 후보는 모두 `flagged` 다.** 반대로 `flagged` 인데 `risk.grade` 가 주의·안전일 수는 있다(업종이 달라 내려간 것).
+- 견줄 표장 축이 하나도 없는 판단(이름도 이미지도 견주지 못하고 업종만으로 본 판단 — `risk.pattern` `x4` 에 이름 축이 모두 null)은 업종
+  없이 보면 근거가 없어 `안전` 이고 표시되지 않는다.
+- **싣는 때**: `goods_codes` 가 있는 질의. 없는 질의에는 후보에도 최상위에도 키가 없다. 계산 중 예외가 나면 그 후보의 키만 빠지고 검색은
+  그대로 나간다(원인은 서버 로그에 예외 종류만).
+
+`cross_goods_more`(최상위 — 업종을 넣은 질의만):
+
+| 필드 | 형식 | null | 뜻 |
+|---|---|---|---|
+| `count` | int | 아니오 | 처음 보이는 범위(응답의 `candidates[]` — `top_k`) 밖의 후보 풀에서 정의에 맞는 후보 수 |
+| `candidates[]` | array | 아니오(빈 배열 가능) | 그 가운데 **최대 5개** — `candidates[]` 와 같은 꼴(`cross_goods`, 해당하면 `famous_brand` 포함). 업종 없이 본 등급이 높은 것부터, 같은 등급이면 유명 상표 등록부의 표장(`famous_brand` 가 붙는 후보) 먼저, 그다음 풀의 정렬 순서 |
+
+- 후보 풀(§1-3 — 축별 상위를 모은 것, `meta.pool.total`) 안에서 센 것이다. DB 전체를 다시 찾은 것이 아니다.
+- `top_k` 를 늘리면 그만큼 `candidates[]` 로 옮겨 가고 `count` 가 준다. `candidates[]` 와 겹치는 후보는 없다.
+
 ## 3. 예시 JSON
 
-네 예시 모두 2026-11-26 의 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,469건, 통합 모델 v1.4.7)이 낸 응답 그대로다 — 앞의 세 예시는 같은 날 유명 상표 확인을 연결했을 때의 예시와 새 선택 필드 `name_words`(이름이 있는 §3-1·§3-3 에만 — §3-2 는 이름이 없어 없다)·`elapsed_ms` 말고 같고(후보는 같다), 넷째 예시(§3-4)는 모든 낱말이 상품을 설명하는 말인 이름이다. 그 전의 경과 — 앞의 두 예시는 2026-11-24 의 v1.4.6 예시(DB 1,383건)와 `model_version`·`dataset_info`(`총_상표수`·`생성일자`)·`index_size`·`elapsed_ms`, 그리고 새 선택 필드 `famous`(확인함·일치 없음)·`overall.famous_floor`(false)만 다르고 후보는 같다. 셋째 예시(§3-3)는 유명 상표 일치가 든 응답이다
+네 예시 모두 2026-11-26 의 코드·데이터로 **실제 엔진**(실제 CLIP·OCR·관념 모델, DB 1,469건, 통합 모델 v1.4.7)이 낸 응답 그대로다 — 같은 날 설명적 이름 안내를 더했을 때의 예시와 새 선택 필드(업종을 넣은 §3-1·§3-3·§3-4 의 후보마다 `cross_goods`, 최상위 `cross_goods_more` — §3-2 는 업종이 없어 없다, §2-8)·`elapsed_ms` 말고 같다(후보는 같다). 그 전의 경과 — 앞의 세 예시는 같은 날 유명 상표 확인을 연결했을 때의 예시와 새 선택 필드 `name_words`(이름이 있는 §3-1·§3-3 에만 — §3-2 는 이름이 없어 없다)·`elapsed_ms` 말고 같고(후보는 같다), 넷째 예시(§3-4)는 모든 낱말이 상품을 설명하는 말인 이름이다. 그 전의 경과 — 앞의 두 예시는 2026-11-24 의 v1.4.6 예시(DB 1,383건)와 `model_version`·`dataset_info`(`총_상표수`·`생성일자`)·`index_size`·`elapsed_ms`, 그리고 새 선택 필드 `famous`(확인함·일치 없음)·`overall.famous_floor`(false)만 다르고 후보는 같다. 셋째 예시(§3-3)는 유명 상표 일치가 든 응답이다
 (`engine.multi_search`, 첫 호출 준비를 한 번 한 뒤의 호출 — `elapsed_ms` 는 그때 값; 그 전 예시들의 경과 — 2026-11-20 의 v1.4 예시와 다른 곳은 `model_version`·`thresholds.grade`
 검토 권장·문자상표 예시 3·4위 등급(검토 권장 → 주의)·`elapsed_ms` 뿐 — 두 예시는 이름 + 이미지 질의가 아니라 v1.4.2 의 `logo_floor` 가 걸리지 않아, 같은 날 v1.4.1 예시와는 `model_version`·`elapsed_ms` 만 다르다; v1.4.3 의 `weak_run` 도 두 예시에서 결과를 바꾸지 않아 v1.4.2 예시와 `model_version`·`elapsed_ms` 만 다르다; v1.4.5 의 곱하기 항은 두 예시에 이름 없는 이미지+업종 판단이 없어 후보를 바꾸지 않아, v1.4.3 예시와 `model_version`·`meta.thresholds.nameless` 의 이미지+업종 하한·`elapsed_ms` 만 다르다; v1.4.6 의 업종 상한도 두 예시의 결과를 바꾸지 않아 — 문자상표 예시의 BLU hands 는 업종 겹침 0 이지만 짝 판단(이름만)도 단독 규칙으로 검토 권장이라 그대로 — v1.4.5 예시와 `model_version`·`elapsed_ms` 만 다르다). `image_url` 만(대표 로고의 것도) 브라우저 측 값(`/api/images/…`)으로
 바꿨다. 프론트는 이 네 응답을 Vitest 픽스처(`frontend/test/fixtures/search-v2-{text,image,famous,descriptive}.json`, 블록과 바이트 단위로 같음)로,
@@ -364,7 +404,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 이름 있는 계수 집합 `x4`(절편 -3.4535 → `missing_adjustment` 0.018)를 쓴다. 1·2위 BLU hands(같은 출원인의 두 등록)는 후보 쪽 `hands`
 (일반어·다수 등록)가 빠져 `블루` ↔ `blu` 로 비교되고 호칭 1.0·관념 0.9186 이라 단독 규칙(`standalone_x1`·`standalone_x3`)이 걸린다 —
 위험도 0.524(검토 권장 하한 0.5059 이상, 정밀도 0.8 목표 미달 대체값인 위험 하한 0.5902 아래)라 "검토 권장". 3·4위는 지정상품이 겹치는
-(자카드 0.6·0.75) 커피 관련 상표로 위험도 0.378·0.339 — 검토 권장 하한 0.5059 아래라 "주의"(v1.4 의 하한 0.1805 에서는 검토 권장이었다). 유사군 보유가 전건(1,469/1,469)이라 `GOODS_COVERAGE` 는 나오지 않는다(§2-5).
+(자카드 0.6·0.75) 커피 관련 상표로 위험도 0.378·0.339 — 검토 권장 하한 0.5059 아래라 "주의"(v1.4 의 하한 0.1805 에서는 검토 권장이었다). 유사군 보유가 전건(1,469/1,469)이라 `GOODS_COVERAGE` 는 나오지 않는다(§2-5). **업종은 다르지만 표장이 닮은 후보**(§2-8): 1·2위 BLU hands 는 카페 세트와 업종 겹침이 0 이고(`cross_goods.differs` true) 업종 없이 봐도 검토 권장이라 `flagged` — 화면은 그 카드에 "업종 다름"을 붙이고, 가장 위 후보가 그런 후보라 전체 등급 옆에 "가장 닮은 상표가 다른 업종에 있어요. …" 한 줄을 보인다(§4-8). 3·4위는 업종이 겹쳐 `differs` false. 처음 보이는 범위 밖에는 그런 후보가 없다(`cross_goods_more.count` 0).
 
 ```json
 {
@@ -473,6 +513,11 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
           "G370701"
         ],
         "jaccard": 0.0
+      },
+      "cross_goods": {
+        "differs": true,
+        "grade_without_goods": "검토 권장",
+        "flagged": true
       }
     },
     {
@@ -534,6 +579,11 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
           "S2037"
         ],
         "jaccard": 0.0
+      },
+      "cross_goods": {
+        "differs": true,
+        "grade_without_goods": "검토 권장",
+        "flagged": true
       }
     },
     {
@@ -596,6 +646,11 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
           "S120603"
         ],
         "jaccard": 0.6
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     },
     {
@@ -649,9 +704,18 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
           "S120602"
         ],
         "jaccard": 0.75
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     }
   ],
+  "cross_goods_more": {
+    "count": 0,
+    "candidates": []
+  },
   "meta": {
     "model_version": "risk_model_v1.4.7",
     "grade_precision": 0.7039,
@@ -690,7 +754,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 20,
       "total": 64
     },
-    "elapsed_ms": 93
+    "elapsed_ms": 276
   },
   "dataset_info": {
     "총_상표수": 1469,
@@ -951,7 +1015,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 0,
       "total": 20
     },
-    "elapsed_ms": 159
+    "elapsed_ms": 312
   },
   "dataset_info": {
     "총_상표수": 1469,
@@ -976,7 +1040,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 바닥이 위험 → **전체 등급만** 위험으로 오른다(`overall.famous_floor` true). `overall.prob` 0.542 와 후보 배열은 같은 질의의 v1.4.6
 응답과 같고, 후보 셋은 등록부의 표장이라 `famous_brand` 가 붙는다. 화면은 맨 위에 배너("널리 알려진 상표 '스타벅스'와 이름이 같거나
 거의 같아요")와 대표 로고 2장을 보이고, 전체 등급에는 "널리 알려진 상표와 같거나 거의 같아서 이 등급으로 봤어요."를 보이며 위험도 %·
-등급 눈금·정밀도 문구는 그리지 않는다(§4-6).
+등급 눈금·정밀도 문구는 그리지 않는다(§4-6). **업종은 다르지만 표장이 닮은 후보**(§2-8): 1·2위는 의류 세트와 업종이 조금 겹쳐(겹침 0.077·0.056 ≥ 0.0252) `differs` false, 3위 STARBUCKS COFFEE 는 겹침 0 이고 업종 없이 본 등급이 검토 권장이라 `flagged` — 유명 상표 표시가 붙은 후보라 카드의 설명은 "업종은 다르지만 널리 알려진 상표라 문제가 될 수 있어요."다. 처음 보이는 범위(앞 3) 밖에도 그런 후보가 7건 있어 `cross_goods_more` 에 5건이 실리고, 화면은 목록 아래 접힌 칸 "업종은 다르지만 표장이 닮은 상표 7건"으로 보인다. 전체 등급은 유명 상표 바닥이 정했으므로 전체 등급 옆의 한 줄은 없다(§4-8).
 
 ```json
 {
@@ -1107,7 +1171,12 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
         ],
         "jaccard": 0.0769
       },
-      "famous_brand": "스타벅스"
+      "famous_brand": "스타벅스",
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
+      }
     },
     {
       "id": "5620070020012",
@@ -1186,7 +1255,12 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
         ],
         "jaccard": 0.0556
       },
-      "famous_brand": "스타벅스"
+      "famous_brand": "스타벅스",
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
+      }
     },
     {
       "id": "4020120059966",
@@ -1262,9 +1336,388 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
         ],
         "jaccard": 0.0
       },
-      "famous_brand": "스타벅스"
+      "famous_brand": "스타벅스",
+      "cross_goods": {
+        "differs": true,
+        "grade_without_goods": "검토 권장",
+        "flagged": true
+      }
     }
   ],
+  "cross_goods_more": {
+    "count": 7,
+    "candidates": [
+      {
+        "id": "4020200011726",
+        "title": "STARBUCKS COFFEE",
+        "image_url": "/api/images/4020200011726.png",
+        "type": "결합",
+        "applicant": "스타벅스 코포레이션",
+        "nice_classes": [
+          43
+        ],
+        "axes": {
+          "x1": 1.0,
+          "x2_text": 0.0,
+          "x2_img": null,
+          "x3": null,
+          "x4": 0.0
+        },
+        "risk": {
+          "prob": 0.524,
+          "grade": "검토 권장",
+          "contributions": {
+            "X1": 3.549,
+            "X2": 0.0,
+            "X3": 0.0,
+            "X4": 0.0,
+            "요부": 0.0
+          },
+          "missing_adjustment": 0.018,
+          "figure_caveat": false,
+          "rule_triggers": [
+            "standalone_x1"
+          ],
+          "pattern": "x4"
+        },
+        "salient": {
+          "query_tokens": [
+            "스타벅스"
+          ],
+          "candidate_tokens": [
+            "starbucks"
+          ],
+          "removed": [
+            {
+              "token": "coffee",
+              "reason": "3호 기술적 표장:원재료(류 30,35,43)",
+              "side": "candidate"
+            }
+          ]
+        },
+        "goods": {
+          "codes": [
+            "G0301",
+            "G0502",
+            "S120602",
+            "S120603",
+            "S1207",
+            "S121004",
+            "S121201",
+            "S121202",
+            "S121203"
+          ],
+          "jaccard": 0.0
+        },
+        "famous_brand": "스타벅스",
+        "cross_goods": {
+          "differs": true,
+          "grade_without_goods": "검토 권장",
+          "flagged": true
+        }
+      },
+      {
+        "id": "4020230148641",
+        "title": "STARBUCKS COFFEE",
+        "image_url": "/api/images/4020230148641.png",
+        "type": "결합",
+        "applicant": "스타벅스 코포레이션",
+        "nice_classes": [
+          9,
+          21,
+          30,
+          43
+        ],
+        "axes": {
+          "x1": 1.0,
+          "x2_text": 0.0,
+          "x2_img": null,
+          "x3": null,
+          "x4": 0.0
+        },
+        "risk": {
+          "prob": 0.524,
+          "grade": "검토 권장",
+          "contributions": {
+            "X1": 3.549,
+            "X2": 0.0,
+            "X3": 0.0,
+            "X4": 0.0,
+            "요부": 0.0
+          },
+          "missing_adjustment": 0.018,
+          "figure_caveat": false,
+          "rule_triggers": [
+            "standalone_x1"
+          ],
+          "pattern": "x4"
+        },
+        "salient": {
+          "query_tokens": [
+            "스타벅스"
+          ],
+          "candidate_tokens": [
+            "starbucks"
+          ],
+          "removed": [
+            {
+              "token": "coffee",
+              "reason": "3호 기술적 표장:원재료(류 30,35,43)",
+              "side": "candidate"
+            }
+          ]
+        },
+        "goods": {
+          "codes": [
+            "G0206",
+            "G0301",
+            "G0302",
+            "G0403",
+            "G0404",
+            "G0501",
+            "G0502",
+            "G0503",
+            "G1801",
+            "G1802",
+            "G1803",
+            "G1804",
+            "G2507",
+            "G2603",
+            "G2902",
+            "G3601",
+            "G390102",
+            "G3903",
+            "G390702",
+            "G390802",
+            "G390803",
+            "G520101",
+            "G5203",
+            "S120602",
+            "S120603"
+          ],
+          "jaccard": 0.0
+        },
+        "famous_brand": "스타벅스",
+        "cross_goods": {
+          "differs": true,
+          "grade_without_goods": "검토 권장",
+          "flagged": true
+        }
+      },
+      {
+        "id": "4520100001281",
+        "title": "STARBUCKS COFFEE AND TEA",
+        "image_url": "/api/images/4520100001281.png",
+        "type": "결합",
+        "applicant": "스타벅스 코포레이션",
+        "nice_classes": [
+          30,
+          43
+        ],
+        "axes": {
+          "x1": 1.0,
+          "x2_text": 0.0,
+          "x2_img": null,
+          "x3": null,
+          "x4": 0.0
+        },
+        "risk": {
+          "prob": 0.524,
+          "grade": "검토 권장",
+          "contributions": {
+            "X1": 3.549,
+            "X2": 0.0,
+            "X3": 0.0,
+            "X4": 0.0,
+            "요부": 0.0
+          },
+          "missing_adjustment": 0.018,
+          "figure_caveat": false,
+          "rule_triggers": [
+            "standalone_x1"
+          ],
+          "pattern": "x4"
+        },
+        "salient": {
+          "query_tokens": [
+            "스타벅스"
+          ],
+          "candidate_tokens": [
+            "starbucks"
+          ],
+          "removed": [
+            {
+              "token": "coffee",
+              "reason": "3호 기술적 표장:원재료(류 30,35,43)",
+              "side": "candidate"
+            },
+            {
+              "token": "tea",
+              "reason": "3호 기술적 표장:원재료(류 30,35,43)",
+              "side": "candidate"
+            }
+          ]
+        },
+        "goods": {
+          "codes": [
+            "G0206",
+            "G0290",
+            "G0301",
+            "G0404",
+            "G0501",
+            "G0502",
+            "G0503",
+            "S120602"
+          ],
+          "jaccard": 0.0
+        },
+        "famous_brand": "스타벅스",
+        "cross_goods": {
+          "differs": true,
+          "grade_without_goods": "검토 권장",
+          "flagged": true
+        }
+      },
+      {
+        "id": "4520120004853",
+        "title": "STARBUCKS",
+        "image_url": "/api/images/4520120004853.png",
+        "type": "결합",
+        "applicant": "스타벅스 코포레이션",
+        "nice_classes": [
+          30,
+          32,
+          43
+        ],
+        "axes": {
+          "x1": 1.0,
+          "x2_text": 0.0,
+          "x2_img": null,
+          "x3": null,
+          "x4": 0.0
+        },
+        "risk": {
+          "prob": 0.524,
+          "grade": "검토 권장",
+          "contributions": {
+            "X1": 3.549,
+            "X2": 0.0,
+            "X3": 0.0,
+            "X4": 0.0,
+            "요부": 0.0
+          },
+          "missing_adjustment": 0.018,
+          "figure_caveat": false,
+          "rule_triggers": [
+            "standalone_x1"
+          ],
+          "pattern": "x4"
+        },
+        "salient": {
+          "query_tokens": [
+            "스타벅스"
+          ],
+          "candidate_tokens": [
+            "starbucks"
+          ],
+          "removed": []
+        },
+        "goods": {
+          "codes": [
+            "G020102",
+            "G0206",
+            "G0301",
+            "G0302",
+            "G0403",
+            "G0404",
+            "G0501",
+            "G0502",
+            "G0503",
+            "S120602"
+          ],
+          "jaccard": 0.0
+        },
+        "famous_brand": "스타벅스",
+        "cross_goods": {
+          "differs": true,
+          "grade_without_goods": "검토 권장",
+          "flagged": true
+        }
+      },
+      {
+        "id": "5120070002832",
+        "title": "STARBUCKS COFFEE",
+        "image_url": "/api/images/5120070002832.png",
+        "type": "결합",
+        "applicant": "스타벅스 코포레이션",
+        "nice_classes": [
+          35,
+          41,
+          42,
+          43
+        ],
+        "axes": {
+          "x1": 1.0,
+          "x2_text": 0.0,
+          "x2_img": null,
+          "x3": null,
+          "x4": 0.0
+        },
+        "risk": {
+          "prob": 0.524,
+          "grade": "검토 권장",
+          "contributions": {
+            "X1": 3.549,
+            "X2": 0.0,
+            "X3": 0.0,
+            "X4": 0.0,
+            "요부": 0.0
+          },
+          "missing_adjustment": 0.018,
+          "figure_caveat": false,
+          "rule_triggers": [
+            "standalone_x1"
+          ],
+          "pattern": "x4"
+        },
+        "salient": {
+          "query_tokens": [
+            "스타벅스"
+          ],
+          "candidate_tokens": [
+            "starbucks"
+          ],
+          "removed": [
+            {
+              "token": "coffee",
+              "reason": "3호 기술적 표장:원재료(류 30,35,43)",
+              "side": "candidate"
+            }
+          ]
+        },
+        "goods": {
+          "codes": [
+            "G0301",
+            "G0502",
+            "S120602",
+            "S120999",
+            "S121302",
+            "S2002",
+            "S2007",
+            "S2008",
+            "S2022"
+          ],
+          "jaccard": 0.0
+        },
+        "famous_brand": "스타벅스",
+        "cross_goods": {
+          "differs": true,
+          "grade_without_goods": "검토 권장",
+          "flagged": true
+        }
+      }
+    ]
+  },
   "meta": {
     "model_version": "risk_model_v1.4.7",
     "grade_precision": 0.7039,
@@ -1303,7 +1756,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 20,
       "total": 58
     },
-    "elapsed_ms": 92
+    "elapsed_ms": 144
   },
   "dataset_info": {
     "총_상표수": 1469,
@@ -1443,6 +1896,11 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
           "S120602"
         ],
         "jaccard": 0.75
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     },
     {
@@ -1496,7 +1954,12 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
         ],
         "jaccard": 0.25
       },
-      "famous_brand": "본죽&비빔밥"
+      "famous_brand": "본죽&비빔밥",
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
+      }
     },
     {
       "id": "4020230007146",
@@ -1559,9 +2022,18 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
           "S120602"
         ],
         "jaccard": 0.75
+      },
+      "cross_goods": {
+        "differs": false,
+        "grade_without_goods": null,
+        "flagged": false
       }
     }
   ],
+  "cross_goods_more": {
+    "count": 0,
+    "candidates": []
+  },
   "meta": {
     "model_version": "risk_model_v1.4.7",
     "grade_precision": 0.7039,
@@ -1600,7 +2072,7 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
       "goods": 20,
       "total": 55
     },
-    "elapsed_ms": 290
+    "elapsed_ms": 409
   },
   "dataset_info": {
     "총_상표수": 1469,
@@ -1783,6 +2255,29 @@ p 대신 이 위치로 견준다. 판단을 둘 이상 계산한 후보(`nameles
 - **접근성**: 큰 안내에는 보이는 제목(결과가 뜨면 맨 위 안내의 제목으로 포커스가 간다), 작은 안내에는 보이지 않는 제목("이름에 든
   누구나 쓰는 말")을 두고 영역에 이름을 붙인다. 펼치는 버튼은 펼침 상태(`aria-expanded`)를 알리고, 안내의 종류는 색만이 아니라 아이콘과
   글자("이름 안내 · 설명하는 말로만 된 이름")로도 구분한다.
+
+### 4-8. 업종은 다르지만 표장이 닮은 후보(`cross_goods`·`cross_goods_more`, 2026-11-26)
+
+문구는 `frontend/lib/crossGoods.ts` 한 곳에 모은다. 판단은 엔진의 것이고(`cross_goods.flagged`) 화면은 새로 판단하지 않는다. 필드가
+없으면(업종을 넣지 않은 질의·옛 서버) 아무것도 그리지 않는다.
+
+- **후보 카드** — `cross_goods.flagged` 가 true 인 후보의 카드에 표시 **업종 다름**과 설명 한 줄을 붙인다(카드를 펼치지 않아도 보인다).
+
+| 후보 | 설명 한 줄 |
+|---|---|
+| 보통 상표 | 표장은 닮았지만 업종이 달라요. 보통은 함께 등록될 수 있어요. 다만 나중에 이 업종으로 넓히면 문제가 될 수 있어요. |
+| 유명 상표 표시(`famous_brand`)가 붙은 후보 | 업종은 다르지만 널리 알려진 상표라 문제가 될 수 있어요. |
+
+- **전체 등급 옆 한 줄** — 가장 위 후보(`candidates[0]`)가 그런 후보이고, 유명 상표 바닥이 전체 등급을 정한 것이 아닐 때
+  (`overall.famous_floor` 가 true 가 아닐 때): "가장 닮은 상표가 다른 업종에 있어요. 업종이 다르면 함께 등록될 수도 있어요."
+- **맨 위 영역의 순서** — 유명 상표 배너 → 설명적 이름 안내 → 전체 등급 칸의 이 한 줄. 기존 두 안내의 조건과 문구는 그대로다
+  (§4-6·§4-7).
+- **목록 아래 접힌 칸** — 화면이 처음 보여 주는 것은 응답의 `candidates[]`(사용자가 고른 `top_k` 5·10·20, 기본 5)이고 더 보기는 없다.
+  `cross_goods_more.candidates` 에 보일 후보가 있으면 목록 아래에 접힌 칸 "업종은 다르지만 표장이 닮은 상표 {N}건"({N} = `count`)을
+  두고, 펼치면 그 후보(최대 5개)를 목록과 같은 카드로 보인다. {N} 이 보이는 수보다 많으면 "{N}건 가운데 표장이 가장 닮은 {보이는 수}건을
+  보여요." 한 줄을 더한다. 보일 후보가 없으면(범위 안에 다 보이면) 칸을 만들지 않는다.
+- **접근성** — 표시는 글자("업종 다름")로 보이고 색만으로 구분하지 않는다. 접힌 칸은 제목으로 이름 붙은 영역이고, 버튼이 펼침 상태
+  (`aria-expanded`)와 여는 영역(`aria-controls`)을 알린다.
 
 ## 5. 오류·경계
 
