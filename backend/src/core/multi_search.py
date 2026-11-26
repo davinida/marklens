@@ -40,6 +40,16 @@ multi_search 가 ModelNotReadyError 를 낸다. 발음·관념 캐시는 phoneti
 판단(유형은 이름 없이 넣었을 때의 유형)과 견줘 높은 등급·위치를 쓴다(같은 nameless_floor — 업종이
 들어간 이름 없는 판단은 쓰지 않는다). 질의 이미지가 사진이면 이 비교를 하지 않는다.
 
+유명 상표 확인(v1.4.7, 2026-11-26 — 설계 §7-14-13, 계약 v2 §2-6): 계수 JSON 이 famous_check 를 켜면
+기동 때 등록부·확정 파일을 읽어 해시를 대조하고(없거나 다르면 검색 준비 안 됨 — /health 503
+FAMOUS_CHECK_UNAVAILABLE), 질의마다 검색과 별개로 유명 상표를 확인한다(src.famous_runtime — 판정
+규칙은 확정된 src.famous_check): 이름, 이름 없는 이미지 질의의 OCR 제안 상표명, 사진이 아닌 질의
+이미지와 대표 로고. 판정이 준 바닥(위험·검토 권장)이 전체 등급보다 높으면 전체 등급만 올리고
+(overall.famous_floor), 후보 목록·후보 등급·위험도·정렬은 그대로 둔다. 응답에는 선택 필드
+famous(확인 상태·등록부 브랜드 수·일치 최대 2개 브랜드)와 후보의 famous_brand 를 더한다. 확인에서
+예외가 나면 검색은 그대로 내고 famous.status 만 "unavailable". 표시가 없는 JSON(≤ v1.4.6)은 예전과
+똑같이 동작한다. MARKLENS_FAKE_ML 에서는 로고 경로를 쓰지 않는다(가짜 임베딩은 유사도가 고정).
+
 규약: 동기 함수(CPU 작업은 API 가 기존 스레드 풀로 돌린다, asyncio 없음), 로그에 검색어·이미지
 미기록(풀
 크기·소요·유형 출처만), KIPRIS 호출 0. MARKLENS_FAKE_ML 에서는 가짜 임베더(CLIP·X3)·가짜 OCR 로 돌고
@@ -54,7 +64,7 @@ import re
 import sys
 import threading
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -63,8 +73,10 @@ from . import config, engine, ocr, paths, phonetic_search, semantic_search, stor
 if str(paths.ML_ROOT) not in sys.path:
     sys.path.insert(0, str(paths.ML_ROOT))
 
+from src import famous_runtime as fr  # noqa: E402
 from src import mark_type as mt  # noqa: E402
 from src import photo_mark  # noqa: E402
+from src.axes import goods_map as gm  # noqa: E402
 from src.axes import x3_semantic as x3  # noqa: E402
 from src.axes.distinctiveness import Distinctiveness, load_distinctiveness  # noqa: E402
 from src.axes.pair_axes import (  # noqa: E402
@@ -171,6 +183,8 @@ class MultiState:
     model: dict | None = None
     grade_precision: float | None = None
     distinct: Distinctiveness | None = None
+    # 유명 상표 확인 자료(계수 JSON 이 famous_check 를 켰을 때만 — 못 읽으면 None, 검색 준비 안 됨)
+    famous: fr.Runtime | None = None
     error: str = ""
     load_token: str = ""
     ready: bool = False
@@ -226,8 +240,15 @@ class CandidateResult:
     jaccard: float | None
     pattern: str = ""  # risk_score 가 쓴 계수 집합(RiskResult.pattern; "noname:…" = 이름 없는 판단)
     rank: tuple[int, float] = (0, 0.0)  # 정렬 위치(rank_position — 응답에 넣지 않음)
+    famous_brand: str | None = None  # 유명 상표 등록부의 표장이면 그 브랜드(선택 필드, v1.4.7)
 
     def to_dict(self) -> dict:
+        out = self._base_dict()
+        if self.famous_brand is not None:
+            out["famous_brand"] = self.famous_brand
+        return out
+
+    def _base_dict(self) -> dict:
         return {
             "id": self.id,
             "title": self.title,
@@ -277,20 +298,29 @@ class SearchV2Result:
     top_k_requested: int
     top_k_returned: int
     overall_pattern: str | None = None  # 전체 등급을 정한 후보의 계수 집합("noname:…" = 이름 없음)
+    # 유명 상표 확인(선택 필드 — 계수 JSON 이 켰을 때만, 계약 v2 §2-6). famous = 응답 그대로,
+    # famous_floor = 그 바닥이 전체 등급을 정했는가. 아래 둘은 응답에 넣지 않는다(분석·검증용)
+    famous: dict | None = None
+    famous_floor: bool | None = None
+    famous_outcome: object | None = None  # fr.Outcome
+    famous_ms: float = 0.0  # 유명 상표 확인에 든 시간
 
     def to_dict(self) -> dict:
+        overall = {
+            "grade": self.overall_grade,
+            "prob": None if self.overall_prob is None else round(self.overall_prob, 3),
+            "pattern": self.overall_pattern,
+            "caveats": list(self.caveats),
+            "query_type": self.query_type.to_dict(),
+            "visual_status": self.visual_status,
+        }
+        head = {"api_version": API_VERSION, "research_beta": True, "legal_conclusion": False,
+                "overall": overall}
+        if self.famous is not None:  # 꺼져 있으면 키를 싣지 않는다(v1.4.6 응답과 같게)
+            overall["famous_floor"] = bool(self.famous_floor)
+            head["famous"] = self.famous
         return {
-            "api_version": API_VERSION,
-            "research_beta": True,
-            "legal_conclusion": False,
-            "overall": {
-                "grade": self.overall_grade,
-                "prob": None if self.overall_prob is None else round(self.overall_prob, 3),
-                "pattern": self.overall_pattern,
-                "caveats": list(self.caveats),
-                "query_type": self.query_type.to_dict(),
-                "visual_status": self.visual_status,
-            },
+            **head,
             "candidates": [candidate.to_dict() for candidate in self.candidates],
             "meta": {
                 "model_version": self.model_version,
@@ -456,6 +486,14 @@ def load_all() -> MultiState:
         except Exception as exc:
             logger.warning("사진 판정 방향 벡터를 읽지 못해 사진 판정을 끈다: %s",
                            type(exc).__name__)
+    # 유명 상표 확인 — 계수 JSON 이 켰을 때만. 등록부·확정 파일이 없거나 깨졌거나 해시가 다르면
+    # 모델 파일 문제와 같게 검색을 준비 안 됨으로 둔다(원인은 여기 로그에만)
+    if fresh.model is not None and rm.famous_check_enabled(fresh.model):
+        try:
+            fresh.famous = _load_famous(fresh)
+        except Exception as exc:
+            errors.append(f"유명 상표 확인: {type(exc).__name__}")
+            logger.exception("유명 상표 확인 자료 적재 실패 — multi_search 는 ModelNotReadyError")
     fresh.error = " / ".join(errors)
     fresh.load_token = engine.state.load_token
     fresh.ready = True
@@ -478,6 +516,55 @@ def load_all() -> MultiState:
         fresh.load_ms,
     )
     return state
+
+
+def image_only_grade(x2: float, level: str, model: dict | None = None) -> str:
+    """이름도 업종도 뺀 "이미지만" 판단의 등급(유형 level) — logo_floor 의 비교와 유명 상표의 로고
+    확인이 같은 판단을 쓴다."""
+    model = state.model if model is None else model
+    return _judge(_image_only_features(x2, level), model, level).result.grade
+
+
+def _load_famous(fresh: MultiState) -> fr.Runtime:
+    """유명 상표 확인에 쓰는 것(설계 §7-14-13) — 확정 파일·등록부(해시 대조)·업종 표, 그리고 대표
+    로고 색인(지금 색인에 있는 표장만 — 없는 것은 건너뛰고 수만 로그에). 가짜 ML 모드나 색인 벡터를
+    재구성할 수 없을 때는 로고 색인을 만들지 않는다(로고 경로 끔 — 이름 확인은 그대로)."""
+    started = time.perf_counter()
+    model = fresh.model
+    goods_map = gm.load_goods_map()
+    runtime = fr.load_runtime(rm.famous_check_config(model), dist=fresh.distinct,
+                              goods_map=goods_map, presets=gm.load_business_presets(goods_map))
+    by_appno = fresh.by_appno
+    logos, stats = None, {}
+    if not ocr.is_fake() and fresh.embeddings is not None:
+        direction, threshold = fresh.photo_direction, fresh.photo_threshold
+        photo_of = None if direction is None else (
+            lambda row: photo_mark.is_photo(row, direction=direction, threshold=threshold))
+        logos, stats = fr.build_logo_index(
+            runtime.registry, by_appno, fresh.embeddings,
+            lambda x2, level: image_only_grade(x2, level, model), runtime.logo_kinds,
+            photo_of=photo_of)
+        for level in mt.MODEL_TYPES:  # 위험이 되는 유사도를 미리 구해 둔다(질의 때는 읽기만)
+            logos.risk_min(level)
+
+    def shown(appno: str) -> bool:
+        record = by_appno.get(appno)
+        return record is not None and bool(record.image_key)
+
+    runtime = fr.with_engine(runtime, logos=logos,
+                             brand_logos=fr.brand_logo_table(runtime.registry, shown))
+    # 한 번 돌려 둔다(업종 없이·업종 세트 하나로) — 등록부 표기의 읽기·업종 낱말·35류를 뺀 식별력
+    # 사본 같은 캐시가 채워져 첫 질의가 느리지 않고, 판정이 돌지 않는 상태(자료가 서로 안 맞음)는
+    # 기동 때 드러난다
+    fr.check(runtime, name="유명 상표 확인 준비")
+    fr.check(runtime, name="유명 상표 확인 준비", goods=next(iter(runtime.codes_of.values()), None))
+    logger.info(
+        "유명 상표 확인 준비: 브랜드 %d · 대표 로고 %s(색인에 없어 건너뜀 %s · 구분 없어 건너뜀 %s)"
+        " · 로고 경로 %s (%.0fms)",
+        runtime.brand_count, stats.get("쓰는_것", 0), stats.get("색인에_없음", "-"),
+        stats.get("구분_없음", "-"), "켜짐" if logos is not None else "꺼짐",
+        (time.perf_counter() - started) * 1000)
+    return runtime
 
 
 def _ensure_fresh() -> None:
@@ -503,6 +590,8 @@ def unavailable_reason() -> str | None:
         return "RISK_MODEL_UNAVAILABLE"
     if state.distinct is None:
         return "DISTINCTIVENESS_UNAVAILABLE"
+    if rm.famous_check_enabled(state.model) and state.famous is None:
+        return "FAMOUS_CHECK_UNAVAILABLE"  # 등록부·확정 파일이 없거나 깨졌거나 해시가 다름
     if not state.records:
         return "CANDIDATES_UNAVAILABLE"
     return None
@@ -937,7 +1026,8 @@ def search_pool(
     multi_search 가 이것을 잘라 응답을 만든다)."""
     query_name, goods, override = _validate_inputs(image, name, goods_codes, type_override, None)
     _ensure_fresh()
-    if state.model is None or state.distinct is None:
+    if state.model is None or state.distinct is None or (
+            rm.famous_check_enabled(state.model) and state.famous is None):
         raise ModelNotReadyError(state.error or "통합 모델이 준비되지 않았습니다.")
     model, distinct = state.model, state.distinct
     spelling = rm.spelling_version(model)  # 철자 축 정의 버전(계수 JSON axis_versions, 없으면 1)
@@ -1058,6 +1148,34 @@ def _overall(top: tuple[CandidateResult, ...]) -> tuple[str | None, float | None
     return grade, prob, source.pattern
 
 
+def _famous_query_kind(query_type: QueryType) -> str | None:
+    """질의 이미지의 글자 위주·결합·도형 위주 — 검색이 이미 구한 유형 판정에서(OCR 을 새로 돌리지
+    않는다). 자동 유형은 OCR 면적 비율, 사용자가 고른 유형은 그 유형, OCR 이 실패했으면 None."""
+    if query_type.source == "user":
+        return fr.kind_from_type(query_type.type)
+    detail = query_type.detail or {}
+    return fr.kind_from_ratios(detail.get("text_ratio"), detail.get("fig_ratio"))
+
+
+def _famous_block(runtime: fr.Runtime, outcome: fr.Outcome) -> dict:
+    """응답의 famous(계약 v2 §2-6) — 가장 강한 것부터 최대 두 브랜드."""
+    def logo(appno: str) -> dict:
+        record = state.by_appno.get(appno)
+        return {"id": appno,
+                "image_url": storage.public_url(record.image_key) if record else None}
+
+    return {
+        "status": fr.STATUS_CHECKED,
+        "brand_count": runtime.brand_count,
+        "matches": [
+            {"brand": match.brand, "level": match.level, "basis": match.basis,
+             "notation": match.notation, "matched_text": match.matched_text,
+             "protection": match.protection, "goods_overlap": match.overlap,
+             "floor": match.floor, "logos": [logo(appno) for appno in match.logos]}
+            for match in outcome.matches],
+    }
+
+
 def multi_search(
     image=None,
     name: str | None = None,
@@ -1108,11 +1226,43 @@ def multi_search(
         caveats.append(CAVEAT_NO_CANDIDATES)
     overall_grade, overall_prob, overall_pattern = _overall(top)
 
+    # ---- 유명 상표 확인(§7-14-13) — 검색과 별개. 후보 목록·후보 등급·위험도·정렬은 그대로 두고,
+    # 판정이 준 바닥이 전체 등급보다 높을 때 전체 등급만 올린다. 예외가 나도 검색은 그대로 낸다
+    famous: dict | None = None
+    famous_floor: bool | None = None
+    outcome: fr.Outcome | None = None
+    famous_ms = 0.0
+    runtime = state.famous if rm.famous_check_enabled(model) else None
+    if runtime is not None:
+        clock = time.perf_counter()
+        try:
+            outcome = fr.check(
+                runtime, name=name if query_name is not None else None, goods=goods,
+                ocr_text=query_type.suggested_name, embedding=pooled.embedding,
+                query_kind=_famous_query_kind(query_type), query_photo=pooled.query_photo,
+                level=nameless_level(query_type))
+            famous = _famous_block(runtime, outcome)
+        except Exception as exc:  # 검색어가 섞일 수 있는 예외 본문은 남기지 않는다
+            outcome = None
+            famous = {"status": fr.STATUS_UNAVAILABLE, "brand_count": runtime.brand_count,
+                      "matches": []}
+            logger.error("유명 상표 확인 실패(%s) — 검색 결과는 그대로 낸다", type(exc).__name__)
+        famous_floor = False
+        if outcome is not None and outcome.floor is not None and (
+                overall_grade is None
+                or rm.GRADES.index(outcome.floor) > rm.GRADES.index(overall_grade)):
+            overall_grade, famous_floor = outcome.floor, True
+        top = tuple(replace(candidate, famous_brand=runtime.brand_of_mark[candidate.id])
+                    if candidate.id in runtime.brand_of_mark else candidate for candidate in top)
+        famous_ms = (time.perf_counter() - clock) * 1000
+
     elapsed_ms = int(round((time.perf_counter() - started) * 1000))
     logger.info(
-        "multi_search: pool=%s type=%s/%s photo=%s candidates=%d returned=%d elapsed=%dms",
+        "multi_search: pool=%s type=%s/%s photo=%s candidates=%d returned=%d famous=%s "
+        "elapsed=%dms",
         pooled.counts, query_type.type, query_type.source, pooled.query_photo,
-        len(pooled.candidates), len(top), elapsed_ms,
+        len(pooled.candidates), len(top),
+        "꺼짐" if famous is None else famous["status"], elapsed_ms,
     )
     return SearchV2Result(
         overall_grade=overall_grade,
@@ -1131,4 +1281,8 @@ def multi_search(
         top_k_requested=int(top_k),
         top_k_returned=len(top),
         overall_pattern=overall_pattern,
+        famous=famous,
+        famous_floor=famous_floor,
+        famous_outcome=outcome,
+        famous_ms=famous_ms,
     )

@@ -22,8 +22,10 @@ from PIL import Image, ImageDraw, ImageFont
 def check_shared_assets() -> None:
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root / "ml"))
+    from src import famous_runtime
+    from src.axes import goods_map
     from src.axes.distinctiveness import load_distinctiveness
-    from src.model.risk_model import load_model, risk_score
+    from src.model.risk_model import famous_check_config, load_model, risk_score
     from src.photo_mark import load_direction
 
     for relative in (
@@ -33,7 +35,8 @@ def check_shared_assets() -> None:
         "model/risk_model_v1.4.2.json",  # v1.4.3 의 원본(2026-11-23 서비스 기본 — logo_floor)
         "model/risk_model_v1.4.3.json",  # v1.4.5 의 원본(2026-11-23 서비스 기본 — weak_run 2)
         "model/risk_model_v1.4.5.json",  # v1.4.6 의 원본(2026-11-24 — 이미지+업종 곱하기 항)
-        "model/risk_model_v1.4.6.json",  # 서비스 기본 모델(2026-11-24 — 업종 상한 goods_cap)
+        "model/risk_model_v1.4.6.json",  # v1.4.7 의 원본(2026-11-24 — 업종 상한 goods_cap)
+        "model/risk_model_v1.4.7.json",  # 서비스 기본 모델(2026-11-26 — 유명 상표 확인 표시)
         "model/photo_direction_v1.json",  # 사진 질의 판정
         "distinctiveness/token_stats.json",
         "distinctiveness/descriptive_terms.json",
@@ -43,9 +46,19 @@ def check_shared_assets() -> None:
     ):
         path = root / "shared" / relative
         assert path.is_file() and path.stat().st_size > 0, f"Missing shared asset: {relative}"
+    # 유명 상표 확인이 런타임에 읽는 파일(ml/src/famous_runtime.RUNTIME_FILES) — 이미지에
+    # 있어야 한다
+    for relative in famous_runtime.RUNTIME_FILES:
+        path = root / relative
+        assert path.is_file() and path.stat().st_size > 0, (
+            f"Missing famous-check file: {relative}")
     model = load_model()
     # 명시 값 — 기본 모델을 바꿀 때 이 검사도 의식적으로 같이 고치게 하는 가드
-    assert model["version"] == "risk_model_v1.4.6", model["version"]
+    assert model["version"] == "risk_model_v1.4.7", model["version"]
+    # 유명 상표 확인 — 계수 JSON 의 표시가 켜져 있고 확정 파일의 해시를 가리킨다
+    assert model["famous_check"]["enabled"] is True
+    assert model["famous_check"]["confirmed_sha256"] == famous_runtime.file_sha256(
+        famous_runtime.CONFIRMED_PATH)
     # 업종 상한 — 업종이 다르면 업종 없는 짝 판단의 등급 이하(엔진 규칙, 계수는 v1.4.5 그대로)
     assert model["goods_cap"]["enabled"] is True
     assert model["logo_floor"]["enabled"] is True  # 이름 있는 이미지 질의의 이미지만 판단 비교
@@ -67,6 +80,20 @@ def check_shared_assets() -> None:
     distinct = load_distinctiveness()
     assert distinct.stats and distinct.goods_names and distinct.famous
     assert distinct.token_score("커피", {"G0301"}) == 0.0
+    # 유명 상표 확인 — 서버 기동과 같은 적재(확정 파일·등록부·대표 로고 구분의 해시 대조, 업종 표)가
+    # 이미지 안의 파일만으로 되고, 이름 판정이 돈다(로고는 DB 가 있어야 하므로 여기서는 보지 않는다)
+    table = goods_map.load_goods_map()
+    runtime = famous_runtime.load_runtime(
+        famous_check_config(model), dist=distinct, goods_map=table,
+        presets=goods_map.load_business_presets(table))
+    assert runtime.brand_count > 0 and runtime.thresholds.weak_mode == "W2"
+    strong = famous_runtime.check(runtime, name="스타벅스")
+    assert strong.matches[0].brand == "스타벅스" and strong.floor == "위험", strong.matches
+    assert famous_runtime.check(runtime, name="블루커피").matches == ()
+    cafe = sorted({code for good in goods_map.load_business_presets(table).get("cafe").goods
+                   for code in good.similarity_codes})
+    assert famous_runtime.check(runtime, name="스타벅수", goods=cafe).classes_basis == (
+        "업종 세트(cafe)")
     print("Canonical risk/distinctiveness/goods/famous assets loaded", flush=True)
 
 

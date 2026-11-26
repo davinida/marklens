@@ -38,6 +38,7 @@ for _root in (ML_ROOT, REPO_ROOT):
         sys.path.insert(0, str(_root))
 
 from src import famous_check as fc  # noqa: E402
+from src import famous_runtime as fr  # noqa: E402
 from src.axes import distinctiveness as dx  # noqa: E402
 from src.axes import goods_map as gm  # noqa: E402
 
@@ -210,9 +211,7 @@ def summary(registry: fc.Registry) -> dict:
 
 def preset_classes() -> dict[str, list[int]]:
     """업종 세트 → 그 세트의 지정상품이 속한 류(브랜드의 핵심 업종을 류로 본 것)."""
-    presets = gm.load_business_presets(gm.load_goods_map()).presets
-    return {preset.id: sorted({good.nice_class for good in preset.goods if good.nice_class})
-            for preset in presets}
+    return fr.preset_tables(gm.load_business_presets(gm.load_goods_map()))[1]
 
 
 def raw_goods(appno: str, raw_dir: Path = DEFAULT_RAW_BIBLIO) -> list[tuple[int, str]]:

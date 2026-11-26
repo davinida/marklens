@@ -36,6 +36,35 @@ export const SearchV2QueryTypeSchema = z
   })
   .passthrough();
 
+// 유명 상표 확인(v1.4.7, 선택 필드 — 없으면 유명 상표 확인이 꺼진 서버). level·basis·status·floor 는
+// 문자열로 받아 화면이 아는 값만 그린다. 형식이 다르면 그 필드만 버린다(.catch) — 응답 전체를 거절해
+// 기존 결과 화면이 깨지지 않게.
+export const SearchV2FamousLogoSchema = z
+  .object({ id: z.string(), image_url: z.string().nullable() })
+  .passthrough();
+
+export const SearchV2FamousMatchSchema = z
+  .object({
+    brand: z.string(),
+    level: z.string(), // "강함" | "약함" | "설명적 사용"
+    basis: z.string(), // "이름" | "로고" | "이미지 속 글자"
+    notation: z.string().nullable(),
+    matched_text: z.string().nullable(),
+    protection: z.string(),
+    goods_overlap: z.boolean().nullable(),
+    floor: z.string().nullable(), // "위험" | "검토 권장" | null
+    logos: z.array(SearchV2FamousLogoSchema),
+  })
+  .passthrough();
+
+export const SearchV2FamousSchema = z
+  .object({
+    status: z.string(), // "checked" | "unavailable"
+    brand_count: NonnegativeInt,
+    matches: z.array(SearchV2FamousMatchSchema),
+  })
+  .passthrough();
+
 export const SearchV2CandidateSchema = z
   .object({
     id: z.string().regex(/^[0-9]{13}$/),
@@ -92,6 +121,8 @@ export const SearchV2CandidateSchema = z
     goods: z
       .object({ codes: z.array(z.string()), jaccard: NullableUnitScore })
       .passthrough(),
+    // 유명 상표 등록부의 표장일 때만(v1.4.7)
+    famous_brand: z.string().optional().catch(undefined),
   })
   .passthrough();
 
@@ -109,6 +140,8 @@ export const SearchV2ResponseSchema = z
         caveats: z.array(z.string()),
         query_type: SearchV2QueryTypeSchema,
         visual_status: StatusCodeSchema.nullable(),
+        // 유명 상표 바닥이 전체 등급을 정했으면 true(v1.4.7)
+        famous_floor: z.boolean().optional().catch(undefined),
       })
       .passthrough(),
     candidates: z.array(SearchV2CandidateSchema),
@@ -161,11 +194,14 @@ export const SearchV2ResponseSchema = z
     index_size: NonnegativeInt,
     top_k_requested: z.number().int().min(1).max(20),
     top_k_returned: NonnegativeInt.max(20),
+    famous: SearchV2FamousSchema.optional().catch(undefined),
   })
   .passthrough();
 
 export type SearchV2Response = z.infer<typeof SearchV2ResponseSchema>;
 export type SearchV2Candidate = z.infer<typeof SearchV2CandidateSchema>;
+export type SearchV2Famous = z.infer<typeof SearchV2FamousSchema>;
+export type SearchV2FamousMatch = z.infer<typeof SearchV2FamousMatchSchema>;
 export type SearchV2Grade = z.infer<typeof SearchV2GradeSchema>;
 export type SearchV2QueryType = z.infer<typeof SearchV2QueryTypeSchema>;
 

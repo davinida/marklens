@@ -36,6 +36,9 @@ class Overall(ContractModel):
     visual_status: Literal[
         "STRONG_MATCH", "POSSIBLE_MATCH", "WEAK_MATCH", "NO_CLOSE_MATCH"
     ] | None
+    # 유명 상표 확인의 바닥이 전체 등급(grade)을 정했는가 — 유명 상표 확인이 켜진 서버
+    # (v1.4.7)만 싣는다
+    famous_floor: bool | None = None
 
 
 class Axes(ContractModel):
@@ -93,6 +96,33 @@ class Candidate(ContractModel):
     risk: Risk
     salient: Salient
     goods: Goods
+    # 유명 상표 등록부의 표장("관련 없음" 제외)이면 그 브랜드 — 해당할 때만 싣는다(v1.4.7)
+    famous_brand: str | None = None
+
+
+class FamousLogo(ContractModel):
+    id: str = Field(pattern=r"^[0-9]{13}$")  # 대표 로고의 출원번호
+    image_url: str | None  # 후보의 image_url 과 같은 꼴
+
+
+class FamousMatch(ContractModel):
+    brand: str
+    level: Literal["강함", "약함", "설명적 사용"]
+    basis: Literal["이름", "로고", "이미지 속 글자"]
+    notation: str | None  # 일치한 표기(로고 일치는 null)
+    matched_text: str | None  # 질의에서 맞은 글자(로고 일치는 null)
+    protection: Literal["업종 불문", "같은·가까운 업종 중심"]
+    goods_overlap: bool | None  # 업종 겹침(업종이 없거나 로고 일치면 null)
+    floor: Literal["위험", "검토 권장"] | None  # 이 일치가 주는 전체 등급 바닥
+    logos: list[FamousLogo]  # 그 브랜드의 대표 로고(현재 먼저, 최대 2)
+
+
+class Famous(ContractModel):
+    """유명 상표 확인(계약 v2 §2-6) — 유명 상표 확인이 켜진 서버(v1.4.7)만 싣는다."""
+
+    status: Literal["checked", "unavailable"]  # 확인함 | 확인하지 못함
+    brand_count: int = Field(ge=0)  # 등록부 브랜드 수
+    matches: list[FamousMatch]  # 가장 강한 것부터 최대 2개 브랜드
 
 
 class GradeThresholds(ContractModel):
@@ -138,6 +168,7 @@ class SearchV2Response(ContractModel):
     research_beta: Literal[True]
     legal_conclusion: Literal[False]
     overall: Overall
+    famous: Famous | None = None
     candidates: list[Candidate]
     meta: Meta
     dataset_info: DatasetInfo

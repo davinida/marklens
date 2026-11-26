@@ -50,6 +50,7 @@ for _root in (ML_ROOT, REPO_ROOT):
         sys.path.insert(0, str(_root))
 
 from src import famous_check as fc  # noqa: E402
+from src import famous_runtime as fr  # noqa: E402
 from src.axes import distinctiveness as dx  # noqa: E402
 from src.axes import goods_map as gm  # noqa: E402
 from src.axes.x1_phonetic import (  # noqa: E402
@@ -85,7 +86,7 @@ N1_RATE_MAX, N3_RATE_MAX = 0.005, 0.02
 LOGO_N1_IMAGES = 300
 OCR_TIMEOUT_S = 20.0  # 측정에서는 OCR 을 끝까지 기다린다(서비스 상한 2초를 넘긴 수는 따로 센다)
 OCR_SERVICE_LIMIT_MS = 2000.0
-KIND_NAMES = {"문자": "글자 위주", "결합": "결합", "도형": "도형 위주"}  # 자동 유형 → 보고 이름
+KIND_NAMES = fr.KIND_NAMES  # 자동 유형 → 보고 이름(서비스와 같은 표 — src.famous_runtime)
 P3_PER_NOTATION = 4
 FRUIT_GOODS = (("신선한 과실", 31), ("신선한 과실 판매업(도소매·중개·대행)", 35))
 SMOKE = {"P1_브랜드": 2, "P2": 3, "P3_표기": 3, "N1": 30, "N2": 30, "N3": 10, "N4": 5,
@@ -1009,7 +1010,9 @@ def targets(results: dict) -> dict:
 def load_context():
     from scripts import nameless_shared_threshold as ns
 
-    context = ns._context(rm.DEFAULT_MODEL_PATH)  # noqa: SLF001
+    # 유명 상표 확인을 켜기 전의 서비스 모델(v1.4.6) — 이 측정은 "바닥을 얹기 전"의 등급과 이미지만
+    # 판단을 잰다. 서비스 기본 모델(v1.4.7 부터)은 계수·기준이 같고 전체 등급에 바닥만 더한다
+    context = ns._context(rm.V146_MODEL_PATH)  # noqa: SLF001
     context["ns"] = ns
     return context
 
@@ -1019,10 +1022,12 @@ def image_types() -> dict[str, str]:
         return {row["경로"]: row["자동유형"] for row in csv.DictReader(handle)}
 
 
-class Logo:
+class Logo(fr.LogoIndex):
     """로고 — 질의 이미지와 브랜드의 대표 이미지(역할 "대표 로고(현재)"·"과거 로고") 사이의 엔진
     '이미지만' 판단 등급이 위험이면 강함. 약함(검토 권장)은 쓰지 않는다. 사람이 대표 로고를 고르기
-    전에는 견줄 표장이 없다(2-1 측정은 그때의 역할 — 이름·도형 — 로 쟀다)."""
+    전에는 견줄 표장이 없다(2-1 측정은 그때의 역할 — 이름·도형 — 로 쟀다). 판정(is_risk·strong)은
+    서비스와 같은 코드(src.famous_runtime.LogoIndex)이고, 여기는 측정용 준비(대표 로고의 구분을 OCR
+    로 구하기·임베딩·사진 판정)만 더한다."""
 
     def __init__(self, context: dict, registry: fc.Registry):
         import numpy as np
@@ -1031,21 +1036,12 @@ class Logo:
         self.ms, self.engine = context["ms"], context["engine"]
         self.model = self.ms.state.model
         self.direct = context["direct"]
-        self.marks: list[tuple[str, fc.Mark, int]] = []
-        for brand in registry.brands:
-            for mark in brand.marks:
-                if mark.role not in fc.LOGO_ROLES:
-                    continue
-                record = self.ms.state.by_appno.get(mark.appno)
-                if record is None or record.pos is None or not mark.image_exists:
-                    continue
-                self.marks.append((brand.name, mark, record.pos))
-        self.matrix = self.ms.state.embeddings[[pos for _, _, pos in self.marks]]
-        # 확정 단계의 로고 규칙(fc.logo_match)에 쓰는 것 — prepare() 가 채운다
-        self.kinds: list[str] | None = None
-        self.photos: list[bool] = []
+        marks, _ = fr.LogoIndex.entries(registry, self.ms.state.by_appno)
+        # 구분(kinds)·사진 판정(photos)은 확정 단계의 로고 규칙(fc.logo_match)에 쓰는 것 — prepare()
+        # 가 채운다(그 전에는 규칙 없이 이미지만 판단의 위험만 본다)
+        super().__init__(marks, self.ms.state.embeddings[[pos for _, _, pos in marks]],
+                         self._grade_level)
         self.texts: list[str | None] = []
-        self._risk_min: float | None = None
 
     def prepare(self) -> None:
         """대표 로고마다 글자 위주·결합·도형 위주(엔진의 OCR 자동 유형)와 사진 판정을 구해 둔다 —
@@ -1059,55 +1055,18 @@ class Logo:
             photos.append(bool(self.photo(self.matrix[index])))
         self.kinds, self.photos, self.texts = kinds, photos, texts
 
-    def is_risk(self, value: float) -> bool:
-        """이미지만 판단이 위험인 유사도인가 — 넷째 자리까지의 값에서 등급이 바뀌는 곳을 한 번
-        찾아 둔다."""
-        if self._risk_min is None:
-            low, high = 0, 10000  # high 는 위험이라고 본다(1.0)
-            if self._grade(1.0) != fc.GRADE_RISK:
-                self._risk_min = 2.0
-            else:
-                while low < high:
-                    middle = (low + high) // 2
-                    if self._grade(middle / 10000) == fc.GRADE_RISK:
-                        high = middle
-                    else:
-                        low = middle + 1
-                self._risk_min = low / 10000
-        return value >= self._risk_min - 1e-9
+    def _grade_level(self, x2: float, level: str) -> str:
+        """엔진의 이미지만 판단 등급(유형 level — 측정은 자동 유형의 이름 없는 질의처럼 도형)."""
+        ms = self.ms
+        features = ms._image_only_features(x2, level)  # noqa: SLF001
+        return ms._judge(features, self.model, level).result.grade  # noqa: SLF001
 
     def _grade(self, x2: float) -> str:
-        ms = self.ms
-        features = ms._image_only_features(x2, "도형")  # noqa: SLF001
-        return ms._judge(features, self.model, "도형").result.grade  # noqa: SLF001
+        return self._grade_level(x2, fr.LOGO_LEVEL)
 
     def embed(self, image):
         return self.np.asarray(self.engine.encode_image(image),
                                dtype=self.np.float32).reshape(-1)
-
-    def strong(self, embedding, *, exclude: str | None = None, query_kind: str | None = None,
-               rule: bool = True) -> dict[str, dict]:
-        """강함인 브랜드 — 브랜드마다 일치하는 표장 가운데 가장 닮은 것. 일치 = 유사도가 이미지만
-        판단 위험. prepare() 를 한 뒤(rule=True)에는 로고 규칙(fc.logo_match)까지: 대표 로고와
-        질의가 둘 다 글자 위주면 0.98 이상, 사진으로 판정된 대표 로고는 보지 않는다."""
-        scores = self.matrix @ embedding
-        use_rule = rule and self.kinds is not None
-        best: dict[str, tuple[float, fc.Mark]] = {}
-        for index, ((brand, mark, _), score) in enumerate(zip(self.marks, scores)):
-            if mark.appno == exclude:
-                continue
-            value = round(min(1.0, max(0.0, float(score))), 4)
-            if not self.is_risk(value):
-                continue
-            if use_rule and not fc.logo_match(
-                    value, fc.GRADE_RISK, logo_kind=self.kinds[index], query_kind=query_kind,
-                    logo_photo=self.photos[index]):
-                continue
-            if brand not in best or value > best[brand][0]:
-                best[brand] = (value, mark)
-        return {brand: {"유사도": value, "표장": mark.appno, "표장_이름": mark.title,
-                        "역할": mark.role, "표장_이미지": mark.image}
-                for brand, (value, mark) in best.items()}
 
     def photo(self, embedding) -> bool:
         return bool(self.ms.is_photo_query(embedding))
@@ -1121,7 +1080,7 @@ def read_text(image) -> dict:
     if detection is None:
         return {"글자": None, "ms": None, "유형": "유형 모름"}
     return {"글자": detection.text or None, "ms": round(float(detection.elapsed_ms), 1),
-            "유형": KIND_NAMES.get(detection.kind, "유형 모름")}
+            "유형": fr.kind_name(detection.kind)}
 
 
 def logo_n1_marks(samples: dict) -> list[dict]:

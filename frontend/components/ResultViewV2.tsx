@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { imageUrl } from "@/lib/api";
 import type { SearchV2Candidate, SearchV2Grade, SearchV2Response } from "@/lib/contracts";
+import FamousBanner, { famousFloorReason } from "@/components/FamousBanner";
 // v1 결과 화면의 시각 4상태 문구(API 계약 v2 §4-5: v1 과 같은 문구로 보여 준다)
 import { GRADE_VIEW as VISUAL_STATUS_VIEW } from "@/components/visualStatusView";
 
@@ -413,6 +414,14 @@ function CandidateCard({
                   {candidate.type}
                 </span>
               )}
+              {candidate.famous_brand && (
+                <span
+                  data-testid="candidate-famous-brand"
+                  className="rounded-full bg-blue-bg px-2 py-0.5 text-[10px] font-bold text-blue-dark"
+                >
+                  {`유명 상표 · ${candidate.famous_brand}`}
+                </span>
+              )}
             </span>
             <span className="mt-0.5 block break-words text-[11.5px] text-sub">
               {[
@@ -550,12 +559,16 @@ export default function ResultViewV2({
   const view = overall.grade ? GRADE_VIEW[overall.grade] : null;
   // 전체 등급이 이름 없는 판단에서 나왔으면 전체 위험도 %·정밀도 문구를 숨긴다(§4-3·§4-4)
   const overallNameless = isNamelessPattern(overall.pattern);
-  const showPrecision = overall.grade === "위험" && !overallNameless;
+  // 유명 상표 바닥이 전체 등급을 정했으면(v1.4.7) 위험도 %·눈금·정밀도·등급 설명은 그 등급의 근거가 아니라
+  // 그리지 않고 까닭 한 줄만 보인다.
+  const famousFloor = overall.famous_floor === true;
+  const showPrecision = overall.grade === "위험" && !overallNameless && !famousFloor;
   // "결합-문자요부"·"결합-도형요부" 는 사용자에게는 "결합"으로 보여 주고, 고치기 버튼도 그 기준으로 제외한다.
   const displayType = overall.query_type.type.startsWith("결합") ? "결합" : overall.query_type.type;
 
   return (
     <div className="flex flex-col gap-4">
+      <FamousBanner famous={result.famous} />
       <section className={`rounded-lg border p-5 ${view ? `${view.border} ${view.bg}` : "border-line bg-card"}`}>
         <div className="flex items-start gap-4">
           {queryPreview && (
@@ -576,7 +589,7 @@ export default function ResultViewV2({
                   >
                     {overall.grade}
                   </span>
-                  {overall.prob !== null && !overallNameless && (
+                  {overall.prob !== null && !overallNameless && !famousFloor && (
                     <span
                       data-testid="overall-prob"
                       className={`tnum text-[13px] font-extrabold ${view!.text}`}
@@ -585,12 +598,23 @@ export default function ResultViewV2({
                     </span>
                   )}
                 </span>
-                <GradeScale
-                  cuts={thresholdsFor(meta, overall.pattern)}
-                  grade={overall.grade}
-                  prob={overallNameless ? null : overall.prob}
-                />
-                <p className={`mt-2 text-[13px] font-semibold ${view!.text}`}>{view!.description}</p>
+                {!famousFloor && (
+                  <GradeScale
+                    cuts={thresholdsFor(meta, overall.pattern)}
+                    grade={overall.grade}
+                    prob={overallNameless ? null : overall.prob}
+                  />
+                )}
+                {famousFloor ? (
+                  <p
+                    data-testid="famous-floor-reason"
+                    className={`mt-2 text-[13px] font-semibold ${view!.text}`}
+                  >
+                    {famousFloorReason(result.famous, overall.grade)}
+                  </p>
+                ) : (
+                  <p className={`mt-2 text-[13px] font-semibold ${view!.text}`}>{view!.description}</p>
+                )}
                 {!queryHasName && (
                   <p data-testid="nameless-guidance" className="mt-1 text-[11.5px] text-sub">
                     {NAMELESS_GUIDANCE}

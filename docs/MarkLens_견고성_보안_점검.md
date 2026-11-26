@@ -10,6 +10,13 @@ KIPRIS 호출 0(상표명 확인 경로는 모의 응답으로 요청 URL 만 �
 
 후속 수정(2026-11-23): R-P0-1 은 통합 모델 v1.4.2(PR #109), P1 6건과 R-P0-1 의 화면 문구는 브랜치 `fix/robustness-p1` — 각 항목의 **해결**·3장 P1 표 아래 "P1 해결". 고친 뒤 다시 돌린 점검(전·후 비교)은 `~/marklens-archive/robustness-p1-20261123/`(`before/`·`after/`·`after/compare_before_after.json`·`after/ui/`).
 
+후속(2026-11-26, 유명 상표 확인의 서비스 연결 v1.4.7 — 통합 모델 설계 §7-14-13): 같은 코드·같은 DB(1,469건)에서 v1.4.6 JSON 백엔드(전)와
+v1.4.7 백엔드(후)로 `probe_api`·`probe_results`·`probe_ui` 를 다시 돌려 견줬다 — `probe_api` 97입력 × API·중계 달라진 입력 0,
+`probe_results` 기대 15개 모두 기대대로·달라진 항목 0, `probe_ui` 21화면 중 달라진 것은 유명 상표 배너(U18)와 후보 카드의 "유명 상표 ·
+{브랜드}" 표시(U6·U14·U19·U20·U21)뿐. 시작 단계에는 유명 상표 확인의 경우를 더했다(`probe_startup.py --only famous` — 등록부·확정 파일·
+대표 로고 구분 파일이 없거나 해시가 다르면 `/health` 503 `FAMOUS_CHECK_UNAVAILABLE`·검색 503 고정 문구). 원자료
+`~/marklens-archive/famous-connect-20261126/`(`before/`·`after/`·`after/compare_before_after.json`·`captures/`).
+
 ## 0. 한눈에
 
 | 우선순위 | 건수 | 항목 |
@@ -306,6 +313,7 @@ UI 평가 문서의 변수 이름. `.env` 계열 파일이 커밋된 적 없음,
 
 ```bash
 bash scripts/robustness/servers.sh start --default-limits   # 백엔드 8000(한도 상향)·8001(기본 한도) + next build → 3000
+#   전·후 비교: ROBUSTNESS_RISK_MODEL=$PWD/shared/model/risk_model_v1.4.6.json 을 앞에 붙이면 백엔드를 그 모델로 띄운다(유명 상표 확인 없이)
 bash scripts/robustness/servers.sh start-extra              # 3001 → 8001(429 화면), 3002 → 빈 포트(백엔드 꺼짐)
 ml/venv/bin/python scripts/robustness/make_images.py         # 시험 이미지 43장(DB 로고 사본은 보관 폴더에만)
 ml/venv/bin/python scripts/robustness/probe_api.py           # 입력 경계 97가지 × API·중계
@@ -314,6 +322,7 @@ ml/venv/bin/python scripts/robustness/probe_results.py       # 결과가 이상�
 ml/venv/bin/python scripts/robustness/probe_security.py      # 한도·경로·출처·노출·헤더·보관(한도 창을 기다림)
 ml/venv/bin/python scripts/robustness/probe_load.py          # 동시 다발 + 긴 이름 2,000건(30분; --skip-churn·--repeat-big N)
 ml/venv/bin/python scripts/robustness/probe_startup.py       # 모델 JSON·색인 누락·손상(포트 8002, 2분)
+ml/venv/bin/python scripts/robustness/probe_startup.py --only famous --old-data <승격 전 DB 사본>   # 유명 상표 확인(v1.4.7)의 시작 단계만: 등록부·확정 파일·대표 로고 구분 파일 없음·해시 다름, v1.4.6 JSON, 대표 로고가 색인에 없는 DB(2.5분)
 ml/venv/bin/python scripts/robustness/scan_secrets.py        # 키·.env 흔적(값은 안 찍음)
 bash scripts/robustness/servers.sh stop
 cd frontend && npm audit --omit=dev && cd .. && ml/venv/bin/pip-audit --timeout 60   # 레지스트리 조회(외부)

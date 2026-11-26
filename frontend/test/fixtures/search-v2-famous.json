@@ -1,0 +1,323 @@
+{
+  "api_version": "2026-10-24",
+  "research_beta": true,
+  "legal_conclusion": false,
+  "overall": {
+    "grade": "위험",
+    "prob": 0.542,
+    "pattern": "x4",
+    "caveats": [
+      "이미지가 없어 외관(이미지) 축은 비교하지 않았습니다",
+      "입력 상표명에 사전적 의미가 없어(조어) 관념 축은 비교하지 않았습니다"
+    ],
+    "query_type": {
+      "type": "문자",
+      "source": "fallback",
+      "detail": null,
+      "suggested_name": null
+    },
+    "visual_status": null,
+    "famous_floor": true
+  },
+  "famous": {
+    "status": "checked",
+    "brand_count": 58,
+    "matches": [
+      {
+        "brand": "스타벅스",
+        "level": "강함",
+        "basis": "이름",
+        "notation": "스타벅스",
+        "matched_text": "스타벅스",
+        "protection": "업종 불문",
+        "goods_overlap": false,
+        "floor": "위험",
+        "logos": [
+          {
+            "id": "4020230148641",
+            "image_url": "/api/images/4020230148641.png"
+          },
+          {
+            "id": "4020200011726",
+            "image_url": "/api/images/4020200011726.png"
+          }
+        ]
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "id": "4520160000776",
+      "title": "STARBUCKS REWARDS",
+      "image_url": "/api/images/4520160000776.png",
+      "type": "결합",
+      "applicant": "스타벅스 코포레이션",
+      "nice_classes": [
+        9,
+        35,
+        36
+      ],
+      "axes": {
+        "x1": 1.0,
+        "x2_text": 0.0,
+        "x2_img": null,
+        "x3": null,
+        "x4": 0.0769
+      },
+      "risk": {
+        "prob": 0.542,
+        "grade": "검토 권장",
+        "contributions": {
+          "X1": 3.549,
+          "X2": 0.0,
+          "X3": 0.0,
+          "X4": 0.074,
+          "요부": 0.0
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [
+          "standalone_x1"
+        ],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [
+          "스타벅스"
+        ],
+        "candidate_tokens": [
+          "starbucks",
+          "rewards"
+        ],
+        "removed": []
+      },
+      "goods": {
+        "codes": [
+          "G390802",
+          "G520101",
+          "S0101",
+          "S0201",
+          "S123101",
+          "S2002",
+          "S2003",
+          "S2005",
+          "S2007",
+          "S2018",
+          "S2025",
+          "S2039",
+          "S2043",
+          "S2044",
+          "S2045",
+          "S2051",
+          "S2052"
+        ],
+        "jaccard": 0.0769
+      },
+      "famous_brand": "스타벅스"
+    },
+    {
+      "id": "5620070020012",
+      "title": "STARBUCKS",
+      "image_url": "/api/images/5620070020012.png",
+      "type": "결합",
+      "applicant": "스타벅스 코포레이션",
+      "nice_classes": [
+        35,
+        41,
+        42,
+        43
+      ],
+      "axes": {
+        "x1": 1.0,
+        "x2_text": 0.0,
+        "x2_img": null,
+        "x3": null,
+        "x4": 0.0556
+      },
+      "risk": {
+        "prob": 0.537,
+        "grade": "검토 권장",
+        "contributions": {
+          "X1": 3.549,
+          "X2": 0.0,
+          "X3": 0.0,
+          "X4": 0.053,
+          "요부": 0.0
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [
+          "standalone_x1"
+        ],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [
+          "스타벅스"
+        ],
+        "candidate_tokens": [
+          "starbucks"
+        ],
+        "removed": []
+      },
+      "goods": {
+        "codes": [
+          "G0301",
+          "G0502",
+          "S120602",
+          "S120999",
+          "S121301",
+          "S2002",
+          "S2003",
+          "S2005",
+          "S2007",
+          "S2008",
+          "S2018",
+          "S2022",
+          "S2025",
+          "S2026",
+          "S2027",
+          "S2029",
+          "S2030",
+          "S2034",
+          "S2035",
+          "S2038",
+          "S2039",
+          "S2040",
+          "S2043",
+          "S2044",
+          "S2045",
+          "S2051",
+          "S2052"
+        ],
+        "jaccard": 0.0556
+      },
+      "famous_brand": "스타벅스"
+    },
+    {
+      "id": "4020120059966",
+      "title": "STARBUCKS COFFEE",
+      "image_url": "/api/images/4020120059966.png",
+      "type": "결합",
+      "applicant": "스타벅스 코포레이션",
+      "nice_classes": [
+        5,
+        29,
+        30,
+        32
+      ],
+      "axes": {
+        "x1": 1.0,
+        "x2_text": 0.0,
+        "x2_img": null,
+        "x3": null,
+        "x4": 0.0
+      },
+      "risk": {
+        "prob": 0.524,
+        "grade": "검토 권장",
+        "contributions": {
+          "X1": 3.549,
+          "X2": 0.0,
+          "X3": 0.0,
+          "X4": 0.0,
+          "요부": 0.0
+        },
+        "missing_adjustment": 0.018,
+        "figure_caveat": false,
+        "rule_triggers": [
+          "standalone_x1"
+        ],
+        "pattern": "x4"
+      },
+      "salient": {
+        "query_tokens": [
+          "스타벅스"
+        ],
+        "candidate_tokens": [
+          "starbucks"
+        ],
+        "removed": [
+          {
+            "token": "coffee",
+            "reason": "3호 기술적 표장:원재료(류 30,35,43)",
+            "side": "candidate"
+          }
+        ]
+      },
+      "goods": {
+        "codes": [
+          "G020102",
+          "G0202",
+          "G0204",
+          "G0205",
+          "G0206",
+          "G0211",
+          "G0301",
+          "G0302",
+          "G0403",
+          "G0404",
+          "G0501",
+          "G0502",
+          "G0503",
+          "G0703",
+          "G0704",
+          "G0803",
+          "G100401",
+          "G1009"
+        ],
+        "jaccard": 0.0
+      },
+      "famous_brand": "스타벅스"
+    }
+  ],
+  "meta": {
+    "model_version": "risk_model_v1.4.7",
+    "grade_precision": 0.7039,
+    "thresholds": {
+      "grade": {
+        "주의": 0.0902,
+        "검토 권장": 0.5059,
+        "위험": 0.5902
+      },
+      "nameless": {
+        "noname:x2_whole": {
+          "주의": 0.3677,
+          "검토 권장": 0.491,
+          "위험": 0.5724
+        },
+        "noname:x2_whole+x4": {
+          "주의": 0.3677,
+          "검토 권장": 0.491,
+          "위험": 0.5724
+        }
+      },
+      "standalone": {
+        "x1": 0.98,
+        "x2_text": 0.75,
+        "x2_img": null,
+        "x3": 0.7707,
+        "x4": null
+      },
+      "figure": 0.9
+    },
+    "pool": {
+      "image": 0,
+      "phonetic": 20,
+      "spelling": 20,
+      "semantic": 0,
+      "goods": 20,
+      "total": 58
+    },
+    "elapsed_ms": 61
+  },
+  "dataset_info": {
+    "총_상표수": 1469,
+    "출원일자_범위": "1962 ~ 2026",
+    "데이터_기준": "KIPRIS 등록 상태 도형·복합상표, 출원인 검색 기반 연구용 표본",
+    "생성일자": "2026-11-25"
+  },
+  "index_size": 1469,
+  "top_k_requested": 3,
+  "top_k_returned": 3
+}

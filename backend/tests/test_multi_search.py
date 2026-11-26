@@ -76,7 +76,7 @@ def test_startup_prepared_caches(client):
     assert len(ms.state.records) == 9 and len(ms.state.spelling_entries) == 9
     assert ms.state.goods_index == {"S0101": tuple(r.appno for r in ms.state.records)}
     assert ms.state.embeddings is not None and ms.state.embeddings.shape[0] == 10
-    assert ms.state.model["version"] == "risk_model_v1.4.6"  # 서비스 기본 모델(2026-11-24)
+    assert ms.state.model["version"] == "risk_model_v1.4.7"  # 서비스 기본 모델(2026-11-26)
     assert ms.state.grade_precision == ms.state.model["meta"]["grade_precision"]
     # 가짜 ML 은 사진 판정을 끈다(임베딩이 의미 없음)
     assert ms.state.goods_ignored == 0 and ms.state.photo_direction is None
@@ -236,12 +236,25 @@ def test_ocr_fallback_caveat(client, monkeypatch):
 
 
 def test_key_sets_match_contract_examples(client, ocr_on):
-    text_example, image_example = _contract_examples()
+    text_example, image_example, famous_example = _contract_examples()
     name_result = engine.multi_search(name=NAME_Q, top_k=4).to_dict()
     image_result = engine.multi_search(image=_image(), top_k=3).to_dict()
     assert _key_paths(name_result) == _key_paths(text_example)
     assert _key_paths(image_result) == _key_paths(image_example)
-    for payload in (name_result, image_result):
+    # 셋째 예시(유명 상표 일치, v1.4.7) — 일치가 없는 응답의 키에 일치 한 줄의 키와 후보의 브랜드
+    # 표시가 더해진다. 픽스처 DB 에는 그 브랜드의 표장이 없어 대표 로고·후보 표시의 키는 예시에만
+    famous_result = engine.multi_search(name="스타벅스", top_k=3).to_dict()
+    only_with_marks = {"famous.matches.logos.id", "famous.matches.logos.image_url",
+                       "candidates.famous_brand"}
+    assert _key_paths(famous_example) - _key_paths(famous_result) == only_with_marks
+    assert _key_paths(famous_result) - _key_paths(famous_example) <= {"overall.query_type.detail"}
+    assert _key_paths(famous_example) - _key_paths(text_example) == only_with_marks | {
+        f"famous.matches.{key}" for key in (
+            "brand", "level", "basis", "notation", "matched_text", "protection",
+            "goods_overlap", "floor", "logos")}
+    assert famous_example["overall"]["famous_floor"] is True
+    assert famous_example["famous"]["matches"][0]["floor"] == famous_example["overall"]["grade"]
+    for payload in (name_result, image_result, famous_result):
         json.dumps(payload, ensure_ascii=False)  # 직렬화 가능(numpy 타입 없음)
 
 
@@ -422,7 +435,7 @@ def test_engine_spelling_follows_model_version(client, monkeypatch):
     from src.axes.x2_ortho import orthographic_similarity
 
     query = "더미상표1 블루베리"  # 요부 토큰 둘 — v1 은 공통 토큰 하나로 1.0, v2 는 덮개 점수
-    assert ms.state.model["version"] == "risk_model_v1.4.6"
+    assert ms.state.model["version"] == "risk_model_v1.4.7"
     results = {}
     for version in (1, 2):
         monkeypatch.setattr(ms.state, "model", _spelling_model(version))
@@ -617,8 +630,8 @@ def test_goods_floor_in_engine_and_with_nameless_floor(client, ocr_on, monkeypat
     top = both["candidates"][0]
     assert {"goods_floor", "nameless_floor"} <= set(top["risk"]["rule_triggers"])
     assert top["risk"]["pattern"] == "noname:x2_whole" and top["risk"]["grade"] == "위험"
-    monkeypatch.setattr(ms.state, "model", shipped)  # 배포 모델(v1.4.6) — 곱하기 항·업종 상한
-    assert shipped["version"] == "risk_model_v1.4.6"
+    monkeypatch.setattr(ms.state, "model", shipped)  # 배포 모델(v1.4.7) — 곱하기 항·업종 상한
+    assert shipped["version"] == "risk_model_v1.4.7"
     product = engine.multi_search(image=_image(), goods_codes=_goods_for_jaccard(39),
                                   top_k=3).to_dict()
     top = product["candidates"][0]

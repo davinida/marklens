@@ -11,6 +11,8 @@
 #   bash scripts/robustness/servers.sh stop
 #   bash scripts/robustness/servers.sh status
 # 출력(로그·PID·임시 API 키)은 ROBUSTNESS_OUT(기본 ~/marklens-archive/robustness-YYYYMMDD) 아래.
+# ROBUSTNESS_RISK_MODEL=<계수 JSON 경로> 를 주면 백엔드를 그 모델로 띄운다(전·후 비교용 — 예:
+# shared/model/risk_model_v1.4.6.json 으로 띄우면 유명 상표 확인 없이 예전처럼 동작). 없으면 기본 모델.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
@@ -38,6 +40,7 @@ start_backend() {  # 포트, 로그 이름, 한도 상향 여부
   local port="$1" log="$2" raised="$3"
   local envs=("${COMMON[@]}")
   if [ "$raised" = "1" ]; then envs+=("${RAISED[@]}"); fi
+  if [ -n "${ROBUSTNESS_RISK_MODEL:-}" ]; then envs+=(MARKLENS_RISK_MODEL="$ROBUSTNESS_RISK_MODEL"); fi
   (cd "$ROOT" && env -u MARKLENS_RISK_MODEL "${envs[@]}" nohup "$ROOT/ml/venv/bin/python" -m uvicorn \
     backend.src.main:app --host 127.0.0.1 --port "$port" > "$OUT/logs/$log.log" 2>&1 & echo $! > "$OUT/$log.pid")
   wait_http "http://127.0.0.1:$port/health" 300

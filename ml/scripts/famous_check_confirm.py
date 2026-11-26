@@ -44,6 +44,7 @@ for _root in (ML_ROOT, REPO_ROOT):
         sys.path.insert(0, str(_root))
 
 from src import famous_check as fc  # noqa: E402
+from src import famous_runtime as fr  # noqa: E402
 from src.axes import distinctiveness as dx  # noqa: E402
 from src.axes import goods_map as gm  # noqa: E402
 from src.model import risk_model as rm  # noqa: E402
@@ -276,12 +277,12 @@ def load_static() -> dict:
     presets = gm.load_business_presets(goods_map)
     preset_list = json.loads(gm.DEFAULT_PRESETS_PATH.read_text(encoding="utf-8"))
     metadata = json.loads(fm.METADATA.read_text(encoding="utf-8"))
+    codes_of, classes_of = fr.preset_tables(presets)  # 서비스와 같은 표(src.famous_runtime)
     return {
         "registry": fc.load_registry(), "dist": dx.load_distinctiveness(), "presets": presets,
         "preset_list": preset_list,
-        "codes_of": {preset["id"]: fm._preset_codes(presets, preset["id"])  # noqa: SLF001
-                     for preset in preset_list},
-        "classes_of": builder.preset_classes(),
+        "codes_of": {preset["id"]: codes_of[preset["id"]] for preset in preset_list},
+        "classes_of": classes_of,
         "control": json.loads(fm.CONTROL.read_text(encoding="utf-8")),
         "records": {str(record["출원번호"]): record for record in metadata["trademarks"]},
         "applicant_keys": builder.applicant_key_function(),
@@ -1262,27 +1263,11 @@ def command_images(args) -> int:
 
 # ---- 명령: classes(서비스 연결 준비 — 보고만) ---------------------------------------------------
 
-def representative_classes(goods_map) -> dict[str, int]:
-    """유사군 코드 → 대표 류(변환표에서 그 코드가 붙은 상품이 가장 많은 류, 같으면 작은 번호)."""
-    counts: dict[str, Counter] = {}
-    for entry in goods_map.entries:
-        for code in entry.similarity_codes:
-            counts.setdefault(code, Counter())[int(entry.nice_class)] += 1
-    return {code: min(count, key=lambda nice: (-count[nice], nice))
-            for code, count in counts.items()}
-
-
-def classes_from_codes(codes, codes_of: dict, classes_of: dict,
-                       representative: dict[str, int]) -> tuple[list[int], str]:
-    """질의의 류를 유사군 코드만으로 정하는 안 — (류, 근거). ① 코드 집합이 어느 업종 세트의 코드와
-    같으면 그 세트의 류 ② 아니면 코드마다 대표 류의 합집합. 판정에는 쓰지 않는다(보고용)."""
-    wanted = sorted({str(code).strip().upper() for code in codes or () if str(code).strip()})
-    same = [preset for preset, preset_codes in codes_of.items() if list(preset_codes) == wanted]
-    if same:
-        return (sorted({nice for preset in same for nice in classes_of[preset]}),
-                f"업종 세트({'·'.join(same)})")
-    return (sorted({representative[code] for code in wanted if code in representative}),
-            "코드별 대표 류")
+# 질의의 류를 유사군 코드만으로 정하는 안(① 코드 집합이 어느 업종 세트의 코드와 같으면 그 세트의 류
+# ② 아니면 코드마다 대표 류의 합집합) — 서비스가 쓰게 되어 런타임 모듈(src.famous_runtime)로 옮겼다.
+# 이 스크립트는 그것을 불러 쓴다(한 곳에만 둔다). 규칙 세션에서는 판정에 쓰지 않고 보고만 했다.
+representative_classes = fr.representative_classes
+classes_from_codes = fr.classes_from_codes
 
 
 def command_classes(args) -> int:
