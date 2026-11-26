@@ -323,6 +323,28 @@ describe("POST /api/search/v2", () => {
     expect(await response.text()).toBe(raw);
   });
 
+  it("forwards the optional name_words field (설명적 이름 안내) unchanged", async () => {
+    const body = structuredClone(textFixture);
+    Object.assign(body, {
+      name_words: {
+        generic: "all",
+        words: [
+          { word: "맛있는", distinctive: false, category: "성질·품질", reason: "3호 기술적 표장:품질(류 29,30,43)" },
+          { word: "커피", distinctive: false, category: "상품 이름", reason: "1호 보통명칭" },
+        ],
+        more: 0,
+        more_generic: 0,
+      },
+    });
+    const raw = JSON.stringify(body);
+    vi.mocked(fetch).mockResolvedValue(new Response(raw, {
+      status: 200, headers: { "content-type": "application/json" },
+    }));
+    const response = await searchV2(request(nameForm("맛있는 커피")));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe(raw);
+  });
+
   it.each([
     [new TypeError("connection failed"), 502],
     [new DOMException("timed out", "TimeoutError"), 504],

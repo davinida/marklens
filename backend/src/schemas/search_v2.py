@@ -125,6 +125,25 @@ class Famous(ContractModel):
     matches: list[FamousMatch]  # 가장 강한 것부터 최대 2개 브랜드
 
 
+class NameWord(ContractModel):
+    word: str  # 엔진의 낱말 꼴(소문자·문자 종류 경계 분리 — salient 의 token 과 같은 꼴)
+    distinctive: bool  # 식별력이 있다고 본 낱말(유명 브랜드 예외 포함)
+    # 식별력이 없을 때만 — 화면용 사유 분류
+    category: Literal["상품 이름", "성질·품질", "흔히 쓰는 말", "지역 이름", "흔한 성·이름",
+                      "짧고 흔한 글자", "그 밖"] | None
+    reason: str  # 엔진의 사유 원문("·" 로 이음 — salient.removed[].reason 과 같은 꼴)
+
+
+class NameWords(ContractModel):
+    """질의 이름의 낱말별 식별력(계약 v2 §2-7) — 이름이 있는 질의만 싣는다. 질의의 이름과 질의의
+    업종만으로 본 판정이다(후보와 견줄 때의 쌍별 결과는 candidates[].salient)."""
+
+    generic: Literal["all", "some", "none"]  # 식별력 없는 낱말이 전부 | 일부 | 없음
+    words: list[NameWord] = Field(max_length=6)  # 이름 순서, 같은 낱말은 한 번, 최대 6
+    more: int = Field(ge=0)  # 싣지 않은 낱말 수
+    more_generic: int = Field(ge=0)  # 그 가운데 식별력 없는 낱말 수
+
+
 class GradeThresholds(ContractModel):
     주의: Score
     검토_권장: Score = Field(alias="검토 권장")
@@ -169,6 +188,7 @@ class SearchV2Response(ContractModel):
     legal_conclusion: Literal[False]
     overall: Overall
     famous: Famous | None = None
+    name_words: NameWords | None = None
     candidates: list[Candidate]
     meta: Meta
     dataset_info: DatasetInfo

@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, ImageFont
 def check_shared_assets() -> None:
     root = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(root / "ml"))
-    from src import famous_runtime
+    from src import famous_runtime, name_words
     from src.axes import goods_map
     from src.axes.distinctiveness import load_distinctiveness
     from src.model.risk_model import famous_check_config, load_model, risk_score
@@ -94,6 +94,11 @@ def check_shared_assets() -> None:
                    for code in good.similarity_codes})
     assert famous_runtime.check(runtime, name="스타벅수", goods=cafe).classes_basis == (
         "업종 세트(cafe)")
+    # 설명적 이름 안내(계약 v2 §2-7) — 낱말별 식별력을 응답 꼴로 옮기는 모듈이 이미지에 있고, 실제
+    # 식별력 자산으로 카페 업종의 "맛있는 커피 전문점" 이 모두 설명하는 말로 나온다
+    words = name_words.describe(distinct.judge_name("맛있는 커피 전문점", cafe))
+    assert words.generic == name_words.GENERIC_ALL, words
+    assert [word.category for word in words.words] == ["성질·품질", "상품 이름", "성질·품질"]
     print("Canonical risk/distinctiveness/goods/famous assets loaded", flush=True)
 
 
