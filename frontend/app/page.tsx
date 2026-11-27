@@ -9,6 +9,7 @@ import SearchForm, {
   type SearchDraft,
   type SearchFormValue,
 } from "@/components/SearchForm";
+import { ANNOUNCE_TEXT, moveFocus, resultAnnouncement, type FocusTarget } from "@/lib/announce";
 import { searchV2, type SearchV2Response } from "@/lib/api";
 import { useObjectUrl } from "@/lib/useObjectUrl";
 
@@ -24,8 +25,11 @@ export default function Home() {
   const requestRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
   const previousPhaseRef = useRef(phase.name);
-  // "다른 이름으로 다시 확인하기"로 돌아갈 때는 제목 대신 이름 칸에 포커스한다.
-  const focusNameRef = useRef(false);
+  // 화면이 바뀔 때 포커스를 둘 곳(§4-10) — 입력 화면으로 돌아가는 버튼이 가리키는 칸(이름 칸·로고 고르기).
+  // 따로 정하지 않으면 그 화면의 제목이다.
+  const focusTargetRef = useRef<FocusTarget>("heading");
+  // 화면 낭독기용 알림 한 줄 — 사용자가 검색을 실행했을 때만 채운다(처음 열었을 때는 비어 있다).
+  const [announcement, setAnnouncement] = useState("");
   const queryPreview = useObjectUrl(phase.name === "idle" ? null : draft?.file ?? null);
 
   const cancelCurrentRequest = useCallback(() => {
@@ -39,17 +43,11 @@ export default function Home() {
   useEffect(() => {
     if (previousPhaseRef.current === phase.name) return;
     previousPhaseRef.current = phase.name;
+    // 화면이 바뀐 것은 사용자가 검색이나 버튼을 실행했을 때뿐이다 — 처음 그릴 때는 여기까지 오지 않는다.
     const frame = requestAnimationFrame(() => {
-      const nameInput = focusNameRef.current
-        ? document.querySelector<HTMLInputElement>("#mark-text")
-        : null;
-      focusNameRef.current = false;
-      if (nameInput) {
-        nameInput.focus();
-        nameInput.select();
-        return;
-      }
-      document.querySelector<HTMLElement>("[data-phase-heading]")?.focus();
+      const target = focusTargetRef.current;
+      focusTargetRef.current = "heading";
+      moveFocus(target);
     });
     return () => cancelAnimationFrame(frame);
   }, [phase.name]);
@@ -72,6 +70,7 @@ export default function Home() {
       // 사용자가 직접 제출한 이름이니 "방금 OCR이 채운 값" 힌트는 끈다.
       nameFromSuggestion: false,
     });
+    setAnnouncement(ANNOUNCE_TEXT.searching);
     setPhase({ name: "loading" });
 
     try {
@@ -87,10 +86,13 @@ export default function Home() {
         controller.signal,
       );
       if (generation === generationRef.current) {
+        setAnnouncement(resultAnnouncement(data.overall.grade));
         setPhase({ name: "result", data });
       }
     } catch (error) {
       if (!controller.signal.aborted && generation === generationRef.current) {
+        // 오류 문장은 오류 화면의 role="alert" 가 바로 알린다 — 같은 말을 두 번 하지 않게 비운다.
+        setAnnouncement("");
         setPhase({ name: "error", error });
       }
     } finally {
@@ -100,6 +102,7 @@ export default function Home() {
 
   const edit = useCallback(() => {
     cancelCurrentRequest();
+    setAnnouncement("");
     setPhase({ name: "idle" });
   }, [cancelCurrentRequest]);
 
@@ -107,15 +110,23 @@ export default function Home() {
   // 화면으로 돌아가 이름 칸을 고르게 한다. 자동으로 다시 검색하지 않는다(유형 고치기와 같은 흐름).
   const rename = useCallback(() => {
     cancelCurrentRequest();
-    focusNameRef.current = true;
+    focusTargetRef.current = "name";
+    setAnnouncement("");
     setPhase({ name: "idle" });
   }, [cancelCurrentRequest]);
 
   const reset = useCallback(() => {
     cancelCurrentRequest();
     setDraft(null);
+    setAnnouncement("");
     setPhase({ name: "idle" });
   }, [cancelCurrentRequest]);
+
+  // 결과 화면의 "다른 로고 비교하기" — 처음 상태의 입력 화면으로 돌아가 로고 고르기 버튼에 포커스를 둔다.
+  const resetToLogo = useCallback(() => {
+    focusTargetRef.current = "logo";
+    reset();
+  }, [reset]);
 
   // "유형 고치기"·"상표명으로 넣기" — 입력 화면으로 돌아가 다음 제출에서만 쓸 값을 draft 에 채운다.
   // 자동으로 다시 검색하지 않는다(API 계약 v2 §4-5) — 사용자가 확인하고 직접 제출해야 새 Turnstile
@@ -124,6 +135,7 @@ export default function Home() {
     (type: "문자" | "도형" | "결합") => {
       cancelCurrentRequest();
       setDraft((current) => (current ? { ...current, typeOverride: type } : current));
+      setAnnouncement("");
       setPhase({ name: "idle" });
     },
     [cancelCurrentRequest],
@@ -134,6 +146,8 @@ export default function Home() {
       setDraft((current) =>
         current ? { ...current, markName: name, nameFromSuggestion: true } : current,
       );
+      focusTargetRef.current = "name";
+      setAnnouncement("");
       setPhase({ name: "idle" });
     },
     [cancelCurrentRequest],
@@ -145,7 +159,8 @@ export default function Home() {
   const addName = useCallback(
     (name: string | null) => {
       cancelCurrentRequest();
-      focusNameRef.current = true;
+      focusTargetRef.current = "name";
+      setAnnouncement("");
       const queryType = phase.name === "result" ? phase.data.overall.query_type : null;
       const keptType: MarkTypeOverride | null =
         queryType?.source === "user"
@@ -190,6 +205,16 @@ export default function Home() {
           phase.name === "result" ? "max-w-[1080px]" : "max-w-[560px]"
         }`}
       >
+        {/* 화면 낭독기용 알림(§4-10) — 화면에는 보이지 않는다. 화면이 바뀌어도 이 줄은 그대로 남아 있어야 읽힌다. */}
+        <p
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="page-announcement"
+          className="sr-only"
+        >
+          {announcement}
+        </p>
         {phase.name === "idle" && (
           <SearchForm onSubmit={runSearch} initialValue={draft} />
         )}
@@ -202,7 +227,7 @@ export default function Home() {
             queryPreview={queryPreview}
             queryHasName={Boolean(draft?.markName)}
             queryName={draft?.markName ?? null}
-            onReset={reset}
+            onReset={resetToLogo}
             onRename={rename}
             onRetypeTo={retypeTo}
             onUseSuggestedName={useSuggestedName}

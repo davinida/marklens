@@ -99,18 +99,18 @@ def _to_message(summary: dict) -> str:
     if n > 0:
         if not summary["complete"]:
             return (
-                f"확인된 범위에서 동일 명칭의 선행 등록상표가 최소 {n}건 있습니다. "
-                "전체 건수는 확정할 수 없습니다."
+                f"확인된 범위에서 동일 명칭의 선행 등록상표가 최소 {n}건 있어요. "
+                "전체 건수는 확정할 수 없어요."
             )
-        return f"동일 명칭의 선행 등록상표 {n}건이 존재합니다."
+        return f"동일 명칭의 선행 등록상표 {n}건이 존재해요."
     if not summary["complete"]:
-        return "일부 결과만 확인되어 동일 명칭 등록상표 존재 여부를 확정할 수 없습니다."
+        return "일부 결과만 확인되어 동일 명칭 등록상표 존재 여부를 확정할 수 없어요."
     if summary["registered_count"] > 0:
         return (
             f"정확히 같은 등록 명칭은 없지만, 이 문구를 포함한 등록상표가 "
-            f"{summary['registered_count']}건 있습니다."
+            f"{summary['registered_count']}건 있어요."
         )
-    return "동일 명칭의 등록상표가 발견되지 않았습니다."
+    return "동일 명칭의 등록상표가 발견되지 않았어요."
 
 
 def _optional_text(value: object) -> str | None:

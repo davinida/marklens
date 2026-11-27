@@ -116,7 +116,7 @@ describe("Home request lifecycle", () => {
   });
 
   it("preserves the latest name check in the image result dashboard", async () => {
-    searchMock.mockResolvedValueOnce({ result: true });
+    searchMock.mockResolvedValueOnce({ overall: { grade: "안전" } });
     const user = userEvent.setup();
     render(<Home />);
 

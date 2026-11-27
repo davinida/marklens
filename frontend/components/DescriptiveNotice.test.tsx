@@ -412,10 +412,10 @@ describe("유명 상표 배너가 이름 쪽의 강한 일치로 뜨면 설명�
     renderResult(resultWith(PARIS, [PARIS_MATCH]), "파리바게트");
     expectBannerOnly();
     expect(screen.getByRole("heading", { level: 2, name: /파리바게뜨/ })).toBeInTheDocument();
-    // 결과가 뜰 때 포커스를 받는 제목은 배너의 것 하나뿐이다
+    // 결과가 뜰 때 포커스를 받는 제목은 결과 화면의 제목(h1) 하나뿐이다 — 배너의 제목은 그 아래 h2
     const headings = document.querySelectorAll("[data-phase-heading]");
     expect(headings).toHaveLength(1);
-    expect(headings[0]).toHaveTextContent("파리바게뜨");
+    expect(headings[0]).toBe(screen.getByRole("heading", { level: 1, name: "검색 결과" }));
   });
 
   it("이름 강함 + 한 낱말(김가네)도 같다", () => {
@@ -502,9 +502,11 @@ describe("맨 위 안내의 순서 — ① 유명 상표 배너(강함·약함) 
     expect(banner).toHaveAttribute("data-level", "설명적 사용");
     expect(follows(box, banner)).toBe(true);
     expect(follows(banner, screen.getByTestId("overall-grade"))).toBe(true);
-    // 결과가 뜰 때 포커스를 받는 제목은 맨 위 안내의 것 하나가 먼저다
+    // 결과가 뜰 때 포커스를 받는 제목은 결과 화면의 제목(h1) 하나뿐이고, 안내의 제목들은 그 아래 h2
     const headings = document.querySelectorAll("[data-phase-heading]");
-    expect(headings[0]).toHaveTextContent(TITLE);
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent("검색 결과");
+    expect(screen.getByRole("heading", { level: 2, name: TITLE })).toBeInTheDocument();
   });
 
   it("유명 상표 확인을 하지 못했을 때의 한 줄은 맨 위에 그대로, 큰 안내는 그 아래", () => {
@@ -705,9 +707,10 @@ describe("설명적 이름 안내 — 접근성", () => {
     for (const icon of region.querySelectorAll("svg")) {
       expect(icon).toHaveAttribute("aria-hidden", "true");
     }
+    // 포커스는 결과 화면의 제목(h1)이 받는다 — 안내의 제목(h2)은 포커스를 가져가지 않는다
     const heading = within(region).getByRole("heading", { level: 2 });
-    expect(heading).toHaveAttribute("data-phase-heading");
-    expect(heading).toHaveAttribute("tabindex", "-1");
+    expect(heading).not.toHaveAttribute("data-phase-heading");
+    expect(heading).not.toHaveAttribute("tabindex");
   });
 
   it("작은 안내: 보이지 않는 제목으로 이름 붙은 영역, 펼침 상태를 알리는 버튼", () => {

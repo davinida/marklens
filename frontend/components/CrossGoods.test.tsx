@@ -294,7 +294,9 @@ describe("목록 아래 접힌 칸 — 처음 보이는 범위 밖의 후보", (
     expect(panel).toBeVisible();
     const items = moreCards();
     expect(items).toHaveLength(2);
-    expect(within(items[0]).getByText("범위 밖 상표 1")).toBeInTheDocument();
+    // 카드의 이름은 제목(h3 — 화면에는 보이지 않는다)과 카드 안의 글자로 두 번 읽힌다
+    expect(within(items[0]).getByRole("heading", { level: 3, name: "범위 밖 상표 1" })).toBeInTheDocument();
+    expect(within(items[0]).getAllByText("범위 밖 상표 1")).toHaveLength(2);
     for (const item of items) {
       expect(within(item).getByTestId("candidate-cross-goods")).toHaveTextContent(BADGE);
       expect(within(item).getByTestId("candidate-cross-goods-line")).toHaveTextContent(PLAIN);

@@ -1,9 +1,11 @@
 "use client";
 
+import { useId } from "react";
 import { Camera, PencilLine, Type } from "lucide-react";
 import { josaEulReul } from "@/lib/josa";
 import {
   LOGO_ONLY_TEXT,
+  PHOTO_NOTICE_LABEL,
   QUERY_SUMMARY_TEXT,
   goodsSummary,
   oneLine,
@@ -31,14 +33,18 @@ export function LogoOnlyNotice({
 }) {
   const read = kind === "read" ? oneLine(suggestedName ?? "") : "";
   const shown = shorten(read);
+  const headingId = useId();
 
   return (
     <section
-      aria-label={LOGO_ONLY_TEXT.label}
+      aria-labelledby={headingId}
       data-testid="logo-only-notice"
       data-kind={kind}
       className="rounded-lg border border-blue-dark/30 bg-blue-bg p-5"
     >
+      <h2 id={headingId} className="sr-only">
+        {LOGO_ONLY_TEXT.label}
+      </h2>
       <div className="flex items-start gap-3">
         <Type aria-hidden size={20} className="mt-0.5 shrink-0 text-blue-dark" />
         <div className="min-w-0 flex-1">
@@ -78,14 +84,20 @@ export function LogoOnlyNotice({
 
 /** 사진으로 판정된 이미지의 안내 — 문장은 서버가 준 그대로(주의 목록에서 옮겨 온 것). */
 export function PhotoNotice({ text }: { text: string }) {
+  const headingId = useId();
   return (
-    <p
-      data-testid="photo-notice"
-      className="flex items-start gap-2 rounded-lg border border-line bg-card px-4 py-3 text-[12.5px] leading-relaxed text-ink"
-    >
-      <Camera aria-hidden size={15} className="mt-0.5 shrink-0 text-blue-dark" />
-      <span className="min-w-0 break-words">{text}</span>
-    </p>
+    <section aria-labelledby={headingId}>
+      <h2 id={headingId} className="sr-only">
+        {PHOTO_NOTICE_LABEL}
+      </h2>
+      <p
+        data-testid="photo-notice"
+        className="flex items-start gap-2 rounded-lg border border-line bg-card px-4 py-3 text-[12.5px] leading-relaxed text-ink"
+      >
+        <Camera aria-hidden size={15} className="mt-0.5 shrink-0 text-blue-dark" />
+        <span className="min-w-0 break-words">{text}</span>
+      </p>
+    </section>
   );
 }
 

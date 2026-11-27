@@ -386,8 +386,8 @@ def test_incomplete_result_uses_neutral_message(monkeypatch):
 
     assert response.complete is False
     assert response.scanned_count == 0
-    assert "확정할 수 없습니다" in response.message
-    assert "발견되지 않았습니다" not in response.message
+    assert "확정할 수 없어요" in response.message
+    assert "발견되지 않았어요" not in response.message
 
 
 def test_incomplete_result_reports_confirmed_match_as_minimum(monkeypatch):
@@ -406,7 +406,7 @@ def test_incomplete_result_reports_confirmed_match_as_minimum(monkeypatch):
 
     assert response.exact_registered_count == 1
     assert "최소 1건" in response.message
-    assert "전체 건수는 확정할 수 없습니다" in response.message
+    assert "전체 건수는 확정할 수 없어요" in response.message
 
 
 def test_message_distinguishes_exact_nonregistered_from_registered_contains(monkeypatch):
