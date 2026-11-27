@@ -229,11 +229,9 @@ export default function FamousBanner({ famous }: { famous: SearchV2Famous | unde
       <div className="flex items-start gap-3">
         <Icon aria-hidden size={20} className={`mt-0.5 shrink-0 ${view.text}`} />
         <div className="min-w-0 flex-1">
-          {/* 결과가 뜰 때 page.tsx 가 [data-phase-heading] 으로 포커스를 옮긴다 — 결과 화면에서는 이 제목이 읽힌다 */}
+          {/* 결과가 뜨면 포커스는 결과 화면의 제목(h1 "검색 결과")으로 간다(§4-10) — 이 제목은 그 아래 h2 */}
           <h2
             id={headingId}
-            data-phase-heading
-            tabIndex={-1}
             className="break-words text-[15px] font-extrabold leading-snug text-ink outline-none"
           >
             {text.title}

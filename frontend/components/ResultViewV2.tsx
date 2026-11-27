@@ -26,6 +26,7 @@ import {
   showsCrossGoodsOverallLine,
 } from "@/lib/crossGoods";
 import { NOTICE_TEXT, showsWholeNameLine } from "@/lib/descriptiveNotice";
+import { ANNOUNCE_TEXT } from "@/lib/announce";
 import { josaEulReul, josaEunNeun, josaEuroRo } from "@/lib/josa";
 import {
   REFERENCE_NOTE,
@@ -395,7 +396,12 @@ function ContributionBars({ risk }: { risk: SearchV2Candidate["risk"] }) {
               <span className="text-[11px] font-semibold text-ink">
                 {CONTRIBUTION_LABEL[entry.key]}
               </span>
-              <span className="relative h-2.5 overflow-hidden rounded-sm bg-low-bg">
+              {/* 막대 길이 = 근거 가운데 이 축이 차지하는 몫 — 같은 뜻을 글자로도 읽히게 한다 */}
+              <span
+                role="img"
+                aria-label={`근거 가운데 ${width}%`}
+                className="relative h-2.5 overflow-hidden rounded-sm bg-low-bg"
+              >
                 <span
                   className="block h-full bg-blue-dark"
                   style={{ width: `${Math.max(width, 3)}%` }}
@@ -457,6 +463,8 @@ function CandidateCard({
 
   return (
     <li className="border-b border-line last:border-b-0">
+      {/* 제목으로 찾아갈 수 있게 후보 이름을 h3 로(화면에는 보이지 않는다 — 카드 전체가 펼치는 버튼이라) */}
+      <h3 className="sr-only">{name}</h3>
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -731,6 +739,7 @@ export default function ResultViewV2({
   // 주의 목록의 NAME_SUGGESTED)은 그리지 않는다. 사진 안내(PHOTO_QUERY)는 주의 목록에서 맨 위로 옮긴다.
   const logoOnlyKind = logoOnlyNoticeKind(logoOnly, overall.query_type.suggested_name);
   const { photo: photoNotice, rest: caveats } = splitCaveats(overall.caveats, logoOnlyKind !== null);
+  const overallHeadingId = useId();
   // 처음 보이는 범위 밖의 "업종은 다르지만 표장이 닮은 상표"(§4-8) — 없으면 칸을 만들지 않는다
   const moreCrossGoods = crossGoodsMore(result);
   const famousBanner = <FamousBanner famous={result.famous} />;
@@ -739,6 +748,11 @@ export default function ResultViewV2({
 
   return (
     <div className="flex flex-col gap-4">
+      {/* 결과 화면의 제목(§4-10) — 눈에 보이는 제목이 없어 화면에는 보이지 않는 h1 을 둔다. 결과가 나오면
+          page.tsx 가 포커스를 여기([data-phase-heading])로 옮긴다. */}
+      <h1 data-phase-heading tabIndex={-1} className="sr-only outline-none">
+        {ANNOUNCE_TEXT.resultTitle}
+      </h1>
       {!famousAfterNotice && famousBanner}
       <DescriptiveNotice
         nameWords={result.name_words}
@@ -757,7 +771,13 @@ export default function ResultViewV2({
         />
       )}
       {query && <QuerySummary query={query} />}
-      <section className={`rounded-lg border p-5 ${view ? `${view.border} ${view.bg}` : "border-line bg-card"}`}>
+      <section
+        aria-labelledby={overallHeadingId}
+        className={`rounded-lg border p-5 ${view ? `${view.border} ${view.bg}` : "border-line bg-card"}`}
+      >
+        <h2 id={overallHeadingId} className="sr-only">
+          전체 등급
+        </h2>
         <div className="flex items-start gap-4">
           {queryPreview && (
             // eslint-disable-next-line @next/next/no-img-element -- local blob preview
@@ -879,6 +899,7 @@ export default function ResultViewV2({
               </div>
             )}
 
+            {caveats.length > 0 && <h2 className="sr-only">주의할 점</h2>}
             {caveats.length > 0 && (
               <ul className="mt-3 flex flex-col gap-1">
                 {caveats.map((caveat) => (

@@ -346,6 +346,7 @@ export default function SearchForm({
             </div>
             <button
               type="button"
+              data-logo-picker
               onClick={() => inputRef.current?.click()}
               className="press shrink-0 rounded-md bg-low-bg px-4 py-2 text-[13px] font-semibold text-sub"
             >
@@ -355,6 +356,7 @@ export default function SearchForm({
         ) : (
           <button
             type="button"
+            data-logo-picker
             onClick={() => inputRef.current?.click()}
             onDragOver={(event) => {
               event.preventDefault();
@@ -384,6 +386,7 @@ export default function SearchForm({
           ref={inputRef}
           type="file"
           accept={ACCEPTED.join(",")}
+          aria-label="로고 이미지 파일 선택"
           className="sr-only"
           tabIndex={-1}
           onChange={(event) => {

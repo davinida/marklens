@@ -177,7 +177,11 @@ describe("유명 상표 확인 배너 — 종류별 문구(글자 그대로)", (
     const { container } = renderResult(withFamous([famousMatch()]));
     const banners = screen.getAllByTestId("famous-banner");
     expect(banners).toHaveLength(1);
-    expect(container.firstElementChild?.firstElementChild).toBe(banners[0]);
+    // 맨 위는 화면에 보이지 않는 결과 제목(h1)이고, 눈에 보이는 것 가운데서는 배너가 맨 위다
+    const first = container.firstElementChild?.firstElementChild;
+    expect(first?.tagName).toBe("H1");
+    expect(first).toHaveClass("sr-only");
+    expect(first?.nextElementSibling).toBe(banners[0]);
   });
 });
 
@@ -321,7 +325,7 @@ describe("유명 상표 확인 배너 — 각주·접근성", () => {
     ).toBeVisible();
   });
 
-  it("제목 요소(h2 — 결과 화면에 h1 이 없어 후보 목록 제목과 같은 단계)·이름 붙은 영역·아이콘은 숨김", () => {
+  it("제목 요소(h2 — 결과 화면의 제목 h1 아래, 후보 목록 제목과 같은 단계)·이름 붙은 영역·아이콘은 숨김", () => {
     renderResult(
       withFamous([
         famousMatch({
@@ -329,13 +333,15 @@ describe("유명 상표 확인 배너 — 각주·접근성", () => {
         }),
       ]),
     );
-    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    const title = screen.getByRole("heading", { level: 1, name: "검색 결과" });
     const heading = screen.getByRole("heading", { level: 2, name: TITLE_STARBUCKS_STRONG });
     const banner = screen.getByRole("region", { name: TITLE_STARBUCKS_STRONG });
     expect(banner).toContainElement(heading);
-    // 결과가 뜰 때 page.tsx 가 포커스를 옮기는 제목([data-phase-heading])
-    expect(document.querySelector("[data-phase-heading]")).toBe(heading);
-    expect(heading).toHaveAttribute("tabindex", "-1");
+    // 결과가 뜰 때 page.tsx 가 포커스를 옮기는 제목([data-phase-heading])은 결과 화면의 제목 하나
+    expect(document.querySelectorAll("[data-phase-heading]")).toHaveLength(1);
+    expect(document.querySelector("[data-phase-heading]")).toBe(title);
+    expect(title).toHaveAttribute("tabindex", "-1");
+    expect(heading).not.toHaveAttribute("tabindex");
     expect(within(banner).getByRole("img", { name: "'스타벅스' 대표 로고" })).toBeVisible();
     for (const svg of banner.querySelectorAll("svg")) {
       expect(svg).toHaveAttribute("aria-hidden", "true");

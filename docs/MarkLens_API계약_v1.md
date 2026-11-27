@@ -149,7 +149,7 @@ BFF는 Turnstile의 action·hostname을 서버에서 확인한 뒤 토큰을 제
   "checked_at": "2026-08-14T12:34:56Z",
   "source": "KIPRIS Plus trademarkNameMatchSearchInfo",
   "cached": false,
-  "message": "동일 명칭의 선행 등록상표 1건이 존재합니다."
+  "message": "동일 명칭의 선행 등록상표 1건이 존재해요."
 }
 ```
 

@@ -71,9 +71,8 @@ export default function LoadingView({
       >
         취소하고 입력으로 돌아가기
       </button>
-      <span className="sr-only" role="status" aria-live="polite">
-        로고 분석이 진행 중입니다.
-      </span>
+      {/* 검색 중이라는 알림은 page.tsx 의 알림 한 줄("검색하고 있어요")이 한 번 낸다(§4-10) — 여기서 또 알리지 않는다 */}
+      <span className="sr-only">로고를 분석하고 있어요.</span>
     </section>
   );
 }

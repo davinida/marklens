@@ -208,7 +208,7 @@ const NAME_CHECK_RESULT = {
   checked_at: "2026-08-14T00:00:00Z",
   source: "KIPRIS browser fixture",
   cached: false,
-  message: "동일 명칭의 선행 등록상표 1건이 존재합니다.",
+  message: "동일 명칭의 선행 등록상표 1건이 존재해요.",
 };
 
 async function expectNoHorizontalOverflow(page: Page) {
@@ -668,7 +668,8 @@ test("a name made only of descriptive words shows the notice and lets the user t
   const notice = page.getByRole("region", { name: title });
   const heading = notice.getByRole("heading", { level: 2, name: title });
   await expect(heading).toBeVisible();
-  await expect(heading).toBeFocused(); // 결과가 뜨면 맨 위 안내의 제목이 읽힌다
+  // 결과가 뜨면 포커스는 결과 화면의 제목(h1)으로 간다 — 안내의 제목은 그 아래 h2
+  await expect(page.getByRole("heading", { level: 1, name: "검색 결과" })).toBeFocused();
   await expect(
     notice.getByText("'맛있는 커피 전문점'은 모두 상품을 설명하거나 누구나 쓰는 말이에요."),
   ).toBeVisible();
@@ -757,7 +758,8 @@ test("a strong famous-name match shows only the famous banner, not the descripti
   const banner = page.getByRole("region", { name: title });
   const heading = banner.getByRole("heading", { level: 2, name: title });
   await expect(heading).toBeVisible();
-  await expect(heading).toBeFocused(); // 결과가 뜨면 배너의 제목이 읽힌다
+  // 결과가 뜨면 포커스는 결과 화면의 제목(h1)으로 간다 — 배너의 제목은 그 아래 h2
+  await expect(page.getByRole("heading", { level: 1, name: "검색 결과" })).toBeFocused();
   await expect(page.getByTestId("overall-grade")).toHaveText("위험");
   await expect(page.getByTestId("famous-floor-reason")).toHaveText(
     "널리 알려진 상표와 같거나 거의 같아서 이 등급으로 봤어요.",
@@ -862,12 +864,16 @@ test("a look-alike mark in a different business is marked on its card, next to t
   const more = page.getByRole("region", { name: title });
   const toggle = more.getByRole("button", { name: title });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await expect(more.getByText("STARBUCKS COFFEE")).toBeHidden();
+  await expect(more.getByTestId("cross-goods-more-panel")).toBeHidden();
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   const outside = more.getByTestId("cross-goods-more-panel").locator(":scope > ul > li");
   await expect(outside).toHaveCount(2);
-  await expect(outside.nth(0).getByText("STARBUCKS COFFEE")).toBeVisible();
+  // 카드의 이름은 제목(h3 — 화면에는 보이지 않는다)과 카드 안의 글자로 읽힌다
+  await expect(
+    outside.nth(0).getByRole("heading", { level: 3, name: "STARBUCKS COFFEE" }),
+  ).toBeAttached();
+  await expect(outside.nth(0).getByRole("button").first()).toContainText("STARBUCKS COFFEE");
   await expect(outside.nth(0).getByTestId("candidate-cross-goods-line")).toHaveText(
     "업종은 다르지만 널리 알려진 상표라 문제가 될 수 있어요.",
   );

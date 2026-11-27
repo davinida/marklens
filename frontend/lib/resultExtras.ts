@@ -50,6 +50,8 @@ export function logoReadLine(text: string): string {
 }
 
 // ---- 서버가 보낸 주의 문구 가운데 자리를 옮기거나 숨기는 것(계약 v2 §2-5) ----------------------
+/** 사진 안내 영역의 이름(화면에는 보이지 않는 제목) */
+export const PHOTO_NOTICE_LABEL = "사진 안내";
 /** PHOTO_QUERY — 맨 위 안내 영역으로 옮긴다(문장은 서버가 준 그대로). */
 export const PHOTO_CAVEAT = "사진으로 보여요 — 로고 파일을 올리면 외관 비교가 더 정확해요";
 /** NAME_SUGGESTED 의 머리·꼬리 — 상표명 입력 안내가 같은 내용을 말할 때 주의 목록에서 뺀다. */

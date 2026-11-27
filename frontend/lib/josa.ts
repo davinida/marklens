@@ -26,6 +26,11 @@ export function josaEulReul(text: string): "을" | "를" {
   return hasBatchim(text) ? "을" : "를";
 }
 
+/** 서술격 조사 "이에요/예요" — 위험이에요·주의예요. */
+export function josaIeyoYeyo(text: string): "이에요" | "예요" {
+  return hasBatchim(text) ? "이에요" : "예요";
+}
+
 export function josaIGa(text: string): "이" | "가" {
   return hasBatchim(text) ? "이" : "가";
 }
