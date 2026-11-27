@@ -36,7 +36,7 @@
     "axe-core": "4.12.1",
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
-    "jsdom": "27.4.0",
+    "jsdom": "31.0.1",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "4.1.10"
